@@ -52,7 +52,7 @@ The order matters. The old Projects page cannot sign Russel in under the new rul
 
 ## Working rule for future sessions
 
-1. Start by downloading the live page (`curl https://legolord00.github.io/mb-projects/<page>`) and compare it to the copy here. If they differ, the live page wins and gets written here first.
+1. Start by downloading the live page (`curl https://apps.mangbrothers.com/<page>`) and compare it to the copy here. If they differ, the live page wins and gets written here first.
 2. Edit the source, build a preview, test it in headless Chromium, show Russel the preview.
 3. When he approves, write the new page (and rules if they changed) back to this folder with `project_write` before handing him the download.
 4. Update the master plan with what changed.
