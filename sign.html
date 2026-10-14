@@ -208,6 +208,7 @@ function showPay(A){
           <div class="field2"><label for="ccZip">Billing ZIP</label><input id="ccZip" name="postal" autocomplete="billing postal-code" inputmode="numeric" placeholder="48150" maxlength="10"></div></div>
         <button type="button" class="primary wide" id="cardGo">Save my card and finish</button>
         <p class="meta" style="margin:10px 0 0">${A.dueNow>0?`Today's ${esc(money(A.dueNow))} is charged later today. You should see a charge email and a confirmation from us come through at some point today.`:"Nothing is charged today."} Later charges follow your agreement, with a receipt each time. There is no card fee.</p>
+        <p class="meta" style="margin:6px 0 0">Payments are processed by QuickBooks Payments, provided by Intuit Payments Inc. Your card goes straight to them; we never receive or store your card number or security code.</p>
       </form>
       <button type="button" class="more" id="moreBtn" aria-expanded="false">More options ▾</button>
       <div id="more" hidden>
@@ -263,7 +264,7 @@ function showPayLink(A){
     <div class="card"><h2>Last step: your card on file</h2>
       ${quoteRows(A, false)}
       <div class="opt main"><h3>Card on file</h3>
-        <p>We email you a secure QuickBooks page, usually within the hour. QuickBooks is our payment processor, so your card goes straight to them. There is no card fee.</p>
+        <p>We email you a secure QuickBooks page, usually within the hour. QuickBooks Payments, provided by Intuit Payments Inc., is our payment processor, so your card goes straight to them. There is no card fee.</p>
         <button type="button" class="primary wide" data-choice="card">Add my card</button></div>
       <button type="button" class="more" id="moreBtn" aria-expanded="false">More options ▾</button>
       <div id="more" hidden>
