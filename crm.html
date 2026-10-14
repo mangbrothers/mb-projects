@@ -268,6 +268,15 @@
   .pgdrawer a:hover{background:var(--surface2)}
   .pgdrawer a.here{background:var(--accent-soft);color:var(--accent);font-weight:650}
   .pgdrawer .pdfoot{margin-top:auto;font-size:12px;color:var(--muted);padding:8px 4px 0}
+.leadctr{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0 4px}
+.leadctr button{min-height:36px}
+.leadctr .signedbtn{background:var(--greenbg,#e6f2e9);color:var(--green,#1f6b33);border-color:transparent;font-weight:600}
+.quickbtns{display:flex;gap:8px;align-items:flex-end}
+.quickbtns button{min-height:44px}
+details.ssamore{margin:12px 0 0;border:1px solid var(--line,#d9dee2);border-radius:10px;padding:8px 12px}
+details.ssamore summary{cursor:pointer;font-weight:600}
+.typedsig{font-family:"Brush Script MT","Segoe Script","Snell Roundhand",cursive;font-size:30px;line-height:1.2;padding:6px 0;border-bottom:1px solid #999;margin-bottom:4px}
+@media (max-width:600px){ .quickbtns{width:100%} .quickbtns button{flex:1} #signBody .actions{flex-wrap:wrap} #signBody .actions button{flex:1 1 100%} }
 </style>
 </head>
 <body>
@@ -322,6 +331,7 @@
       <div><label>Phone</label><input name="phone" type="tel" id="dlgPhone"></div>
       <div style="grid-column:1/-1" id="dlgDup"></div>
       <div><label>Email</label><input name="email" type="email"></div>
+      <div><label>Second email (optional)</label><input name="email2" type="email"></div>
       <div><label>Region</label><select name="region" id="regionSel"></select></div>
       <div style="grid-column:1/-1"><label>Address</label><input name="address" placeholder="Street, City"></div>
       <div><label>Status</label><select name="status" id="statusSel"></select></div>
@@ -698,6 +708,7 @@ function renderLeads(m){
       <div class="meta">${tel(c.phone)}${c.region?" · "+esc(c.region):""}</div>
       <div class="meta">${esc(c.source||"")}${c.interest?" · "+esc(c.interest):""}</div>
       <div class="meta">${tags(c)}${tags(c)?" · ":""}<span class="${stale?"stale":""}">last contact ${ago(lc)}</span></div>
+      ${leadCtrHtml(id,c)}
       <select data-stage="${id}">${opts([...LEAD_STAGES,"active","lost"], c.status, {...STATUSES, active:"Won → Active client"})}</select>
     </div>`; };
   // Keep what was typed in the quick-add form across live re-renders.
@@ -708,11 +719,12 @@ function renderLeads(m){
       <form class="quick" id="quickAdd" onsubmit="return false">
         <div><label>Name</label><input name="name" placeholder="Name" autocomplete="off"></div>
         <div><label>Phone</label><input name="phone" type="tel" placeholder="734..."></div>
-        <div><label>Address</label><input name="address" placeholder="Street, City"></div>
+        <div><label>Address</label><input name="address" placeholder="Street, City" autocomplete="off"></div>
+        <div><label>Email</label><input name="email" type="email" inputmode="email" placeholder="name@example.com" autocomplete="off" autocapitalize="off"></div>
         <div><label>Region</label><select name="region"><option value="">Region</option>${opts(REGIONS,"")}</select></div>
         <div><label>Source</label><select name="source"><option value="">Source</option>${opts(SOURCES,"")}</select></div>
         <div><label>Interested in</label><input name="interest" placeholder="Lawn, snow, mulch..."></div>
-        <button class="primary" type="button" id="quickGo">Add lead</button>
+        <div class="quickbtns"><button type="button" id="quickGo">Add lead</button><button class="primary" type="button" id="quickQuote">Add and quote</button></div>
       </form>
       <div id="quickDup"></div>
       <div class="meta" style="margin-top:6px">Type while on the call. A number already in the CRM is flagged as you type. First contact is stamped when you press Add. Open a card to log notes. Drag cards between columns, or use the dropdown on a phone.</div>
@@ -728,32 +740,38 @@ function renderLeads(m){
   if(prev){ for(const [k,v] of Object.entries(prev)) if(form.elements[k]) form.elements[k].value=v; if(focusName && form.elements[focusName]){ const el=form.elements[focusName]; el.focus(); try{ el.setSelectionRange(el.value.length,el.value.length); }catch(e){} } }
   const showDup = () => { const hit=findByPhone(form.phone.value); $("#quickDup").innerHTML = hit ? dupHtml(hit) : ""; wireDup($("#quickDup")); if(!hit) quickDupAck=null; return hit; };
   form.phone.oninput = showDup; showDup();
-  const quick = async () => {
+  const quick = async (andQuote) => {
     const d=Object.fromEntries(new FormData(form).entries());
     if(!d.name.trim()){ toast("Name is required"); form.name.focus(); return; }
     if(!d.source){ toast("Pick a lead source"); form.source.focus(); return; }
     const hit=findByPhone(d.phone);
-    if(hit && quickDupAck!==hit.id){ quickDupAck=hit.id; toast(`That number belongs to ${hit.c.name}. Open the record, or press Add lead again to add a second record.`); return; }
+    if(hit && quickDupAck!==hit.id){ quickDupAck=hit.id; toast(`That number belongs to ${hit.c.name}. Open the record, or press Add again to add a second record.`); return; }
+    if(d.email && !/^\S+@\S+\.\S+$/.test(d.email.trim())){ toast("That email does not look right."); form.email.focus(); return; }
+    if(andQuote && !d.address.trim()){ toast("Add the service address to quote."); form.address.focus(); return; }
     if(quickBusy) return; quickBusy=true; quickDupAck=null;
     // Clear the form before saving. Saving redraws the board, and the redraw keeps whatever is in the form,
     // so clearing afterward would hit the old, replaced form and leave the boxes full.
     form.reset(); $("#quickDup").innerHTML="";
     try{
-      await saveClient(null, { name:d.name.trim(), phone:d.phone.trim(), address:d.address.trim(), region:d.region, source:d.source, interest:d.interest.trim(), status:"new", lastContactAt: Date.now() }, "Added lead "+d.name.trim());
-      const f2=$("#quickAdd"); if(f2){ f2.reset(); f2.name.focus(); } const qd=$("#quickDup"); if(qd) qd.innerHTML="";
+      const newId = await saveClient(null, { name:d.name.trim(), phone:d.phone.trim(), address:d.address.trim(), email:(d.email||"").trim(), region:d.region, source:d.source, interest:d.interest.trim(), status:"new", lastContactAt: Date.now() }, "Added lead "+d.name.trim());
+      const f2=$("#quickAdd"); if(f2){ f2.reset(); if(!andQuote) f2.name.focus(); } const qd=$("#quickDup"); if(qd) qd.innerHTML="";
+      if(andQuote) openSeasonal(newId);
     }catch(e){
       const f2=$("#quickAdd"); if(f2) for(const [k,v] of Object.entries(d)) if(f2.elements[k]) f2.elements[k].value=v;
       toast("Not saved: "+(e.code||e.message)+". Your typing is still in the form.");
     }finally{ quickBusy=false; }
   };
-  $("#quickGo").onclick = quick;
-  form.onkeydown = e => { if(e.key==="Enter" && e.target.tagName==="INPUT"){ e.preventDefault(); quick(); } };
+  $("#quickGo").onclick = () => quick(false); $("#quickQuote").onclick = () => quick(true);
+  form.onkeydown = e => { if(e.key==="Enter" && e.target.tagName==="INPUT"){ e.preventDefault(); quick(false); } };
   m.querySelectorAll(".lead").forEach(el=>{
-    el.onclick = e => { if(e.target.tagName!=="SELECT" && e.target.tagName!=="A") openClient(el.dataset.id); };
+    el.onclick = e => { if(!e.target.closest("select,a,button")) openClient(el.dataset.id); };
     el.ondragstart = e => { e.dataTransfer.setData("text/plain", el.dataset.id); el.classList.add("dragging"); };
     el.ondragend = () => el.classList.remove("dragging");
   });
   m.querySelectorAll("select[data-stage]").forEach(s=> s.onchange = () => setStatus(s.dataset.stage, s.value));
+  m.querySelectorAll("[data-lead-send]").forEach(b=> b.onclick = () => openSeasonal(b.dataset.leadSend));
+  m.querySelectorAll("[data-lead-status]").forEach(b=> b.onclick = () => showSentFor(b.dataset.leadStatus));
+  m.querySelectorAll("[data-lead-view]").forEach(b=> b.onclick = () => { const [cid2,ct]=b.dataset.leadView.split("|"); viewContract(cid2, ct); });
   m.querySelectorAll("[data-fold]").forEach(h=> h.onclick = () => toggleCol(h.dataset.fold));
   m.querySelectorAll(".col").forEach(col=>{
     col.ondragover = e => { e.preventDefault(); col.classList.add("drop"); };
@@ -772,16 +790,17 @@ function renderClients(m){
   if(filters.region) rows = rows.filter(([,c])=>c.region===filters.region);
   if(filters.svc) rows = rows.filter(([,c])=>hasSvc(c,filters.svc));
   if(filters.status==="unsigned") rows = rows.filter(([,c])=>unsignedFor(c));
+  else if(filters.status==="nocard") rows = rows.filter(([,c])=>c.payOnFile && !payOnFileOk(c));
   else if(filters.status) rows = rows.filter(([,c])=>c.status===filters.status);
   sortRows(rows);
   const counts = {}; Object.keys(SERVICE_TYPES).forEach(t=>counts[t]=live().filter(([,c])=>c.status==="active"&&hasSvc(c,t)).length);
-  const nUnsigned = live().filter(([,c])=>unsignedFor(c)).length;
+  const nUnsigned = live().filter(([,c])=>unsignedFor(c)).length, nNoCard = live().filter(([,c])=>c.payOnFile && !payOnFileOk(c)).length;
   m.innerHTML = `
     <div class="filters">
       <input type="search" id="fq" placeholder="Search name, phone, address" value="${esc(filters.q)}">
       <select id="fregion"><option value="">All regions</option>${opts(REGIONS,filters.region)}</select>
       <select id="fsvc"><option value="">All services</option>${Object.entries(SERVICE_TYPES).map(([k,v])=>`<option value="${k}"${filters.svc===k?" selected":""}>${esc(v.label)}</option>`).join("")}</select>
-      <select id="fstatus"><option value="">Active, paused, former</option>${opts(["active","paused","former"],filters.status,STATUSES)}<option value="unsigned"${filters.status==="unsigned"?" selected":""}>Contract not signed (${nUnsigned})</option></select>
+      <select id="fstatus"><option value="">Active, paused, former</option>${opts(["active","paused","former"],filters.status,STATUSES)}<option value="unsigned"${filters.status==="unsigned"?" selected":""}>Contract not signed (${nUnsigned})</option><option value="nocard"${filters.status==="nocard"?" selected":""}>No payment method on file (${nNoCard})</option></select>
       <select id="fsort" title="Sort">${Object.entries(SORTS).map(([k,l])=>`<option value="${k}"${sort.key===k?" selected":""}>Sort: ${esc(l)}</option>`).join("")}</select>
       <button class="small" id="fdir" title="Flip direction">${sort.dir===1?"↑ A to Z / oldest first":"↓ Z to A / newest first"}</button>
       <button class="primary" id="newClient">+ New client</button>
@@ -791,7 +810,7 @@ function renderClients(m){
     <table><thead><tr>${th("name","Name")}<th>Phone</th>${th("address","Address")}${th("region","Region")}${th("services","Services")}${th("status","Status")}${th("pay","Billing")}${th("last","Last contact")}</tr></thead>
     <tbody>${rows.map(([id,c])=>`<tr class="click" data-id="${id}">
       <td><b>${esc(c.name)}</b>${unsignedPill(c)}</td><td style="white-space:nowrap">${tel(c.phone)}</td><td>${esc(c.address||"")}</td><td>${esc(c.region||"")}</td>
-      <td>${tags(c)}</td><td>${statusPill(c.status)}</td><td>${payPill(c)} <span class="meta">${esc(c.payMethod||"")}</span></td><td class="meta">${ago(lastContact(c))}</td></tr>`).join("") || `<tr><td colspan="8" class="empty">No clients match.</td></tr>`}
+      <td>${tags(c)}</td><td>${statusPill(c.status)}</td><td>${payFilePill(c)} ${payPill(c)}</td><td class="meta">${ago(lastContact(c))}</td></tr>`).join("") || `<tr><td colspan="8" class="empty">No clients match.</td></tr>`}
     </tbody></table></div>`;
   $("#fq").oninput = e => { filters.q=e.target.value; renderClients(m); const i=$("#fq"); i.focus(); i.setSelectionRange(i.value.length,i.value.length); };
   $("#fregion").onchange = e => { filters.region=e.target.value; renderClients(m); };
@@ -865,7 +884,7 @@ fillSelects();
 function openClient(id, defaultStatus){
   openId = id; const c = id ? clients[id] : { status: defaultStatus||"new" };
   const f=$("#clientForm");
-  f.name.value=c.name||""; f.phone.value=c.phone||""; f.email.value=c.email||""; f.address.value=c.address||""; f.region.value=c.region||""; f.status.value=c.status||"new"; f.source.value=c.source||""; f.interest.value=c.interest||"";
+  f.name.value=c.name||""; f.phone.value=c.phone||""; f.email.value=c.email||""; f.email2.value=c.email2||""; f.address.value=c.address||""; f.region.value=c.region||""; f.status.value=c.status||"new"; f.source.value=c.source||""; f.interest.value=c.interest||"";
   $("#clientTitle").textContent = id ? c.name : "New client";
   draftServices = JSON.parse(JSON.stringify(c.services||{})); removedServices = new Set();
   renderStamps(); renderSvcs(); renderLog(); renderContracts(); showDlgDup();
@@ -877,7 +896,7 @@ function showDlgDup(){ const hit=findByPhone($("#dlgPhone").value, openId); $("#
 $("#dlgPhone").oninput = showDlgDup;
 function renderStamps(){
   const c = openId ? clients[openId] : null;
-  $("#billSummary").innerHTML = !c ? "" : `<b>Billing:</b> ${c.payStatus?esc(PAY_STATUSES[c.payStatus]||c.payStatus):"no payment recorded"}${c.payMethod?" · "+esc(c.payMethod):""}${c.qbId?" · QuickBooks customer "+esc(c.qbId):""}. Payments are recorded from Ways to pay on each signed contract.`;
+  $("#billSummary").innerHTML = !c ? "" : `<b>Payment on file:</b> ${payOnFileLabel(c)||"none recorded"}. <b>Billing:</b> ${c.payStatus?esc(PAY_STATUSES[c.payStatus]||c.payStatus):"no payment recorded"}${c.qbId?" · QuickBooks customer "+esc(c.qbId):""}. Payments are recorded from Payment on file on each signed contract.`;
   if(!c){ $("#clientStamps").innerHTML=""; return; }
   $("#clientStamps").innerHTML = `<b>First contact</b><span>${fmtStamp(c.firstContactAt||c.createdAt)}</span><b>Last contact</b><span>${fmtStamp(lastContact(c))} <i class="meta">(${ago(lastContact(c))})</i></span>${c.wonAt?`<b>Won</b><span>${fmtStamp(c.wonAt)}</span>`:""}`;
 }
@@ -968,7 +987,7 @@ $("#clientForm").onkeydown = e => { if(e.key==="Enter" && e.target.tagName==="IN
 $("#clientSave").onclick = async () => {
   const f=$("#clientForm"); readSvcForm();
   const services = {}; for(const [sid,s] of Object.entries(draftServices)) services[sid]=s;
-  const data = { name:f.name.value.trim(), phone:f.phone.value.trim(), email:f.email.value.trim(), address:f.address.value.trim(), region:f.region.value, status:f.status.value, source:f.source.value, interest:f.interest.value.trim() };
+  const data = { name:f.name.value.trim(), phone:f.phone.value.trim(), email:f.email.value.trim(), email2:f.email2.value.trim(), address:f.address.value.trim(), region:f.region.value, status:f.status.value, source:f.source.value, interest:f.interest.value.trim() };
   if(!data.name){ toast("Name is required"); f.name.focus(); return; }
   if(!data.source){ toast("Pick a lead source"); f.source.focus(); return; }
   const prev = openId ? clients[openId] : null;
@@ -1136,97 +1155,150 @@ async function lockContract(){
   openPaySheet(S.clientId, cid, rec);
 }
 
-// ---------- Ways to pay: the sheet the client sees right after signing ----------
-// Shows the service and price, then the ways to pay: no-fee methods first (Zelle, check), then Venmo,
-// PayPal and card with the fee added. The bottom row is for the admin to record how they paid, which
-// also queues the QuickBooks work. Close with the X or by sliding the sheet down.
-// From the company Ways to Pay sheet (Oct 2026). Change these in More > Contracts > Ways to pay.
-// Everything here is paid in person at signing.
-const PAY_DEFAULTS = { zelle:"mangiapanebrothers or 734-450-2400", checkPayable:"Mangiapane Brothers", checkMail:"",
-  cashNote:"Hand it to us today.",
-  venmo:"@Mangiapane_Brothers", paypal:"@MangiapaneBrothers", venmoFee:3, paypalFee:4, cardFee:3,
-  cardNote:"Tap your card or phone on our phone today. Receipt by text or email." };
-// Card surcharges are capped at 3% by the card networks; Venmo and PayPal are a price difference, not a card surcharge.
-const feeFor = (method, P) => method==="Venmo" ? +P.venmoFee||0 : method==="PayPal" ? +P.paypalFee||0 : method===GOPAY ? Math.min(3,+P.cardFee||0) : 0;
-const payInfo = () => ({ ...PAY_DEFAULTS, ...(templates._payInfo||{}) });
-const r2 = n => Math.round(n*100)/100;
-const withFee = (amt, pct) => r2(amt*(1+pct/100));
-// The amount on the signed contract: the service price stored with it, or the first dollar figure in its text.
+// ---------- Payment on file: the step right after every signing ----------
+// Card on file is required for every client (Oct 13, 2026). The sheet shows what is charged today, then always
+// asks for the payment method on file, even when nothing is due today. Card and bank numbers never come into
+// this tool: they are entered in QuickBooks. Only the card brand and the last four digits are kept here.
+// The exceptions: a bank account (ACH) with approval, or prepaying everything by check.
+const CARD_BRANDS = ["Visa","Mastercard","American Express","Discover"];
+const POF_LABEL = { card:"Card on file", ach:"Bank account (ACH) on file", check:"Prepaid by check" };
+const payOnFileOk = c => { const p=c?.payOnFile; return !!p && (p.status==="on-file" || p.status==="check-received"); };
+function payOnFileLabel(c){
+  const p=c?.payOnFile; if(!p) return "";
+  if(p.status==="missing") return "No payment method on file";
+  if(p.status==="received") return `${p.method==="ach"?"Bank account":esc(p.brand||"Card")} ending ${esc(p.last4||"")} from the customer: enter it in QuickBooks`;
+  if(p.status==="pending") return `${p.method==="ach"?"Bank account":"Card"}: link sent, waiting for it in QuickBooks`;
+  if(p.status==="check-awaiting") return "Check prepay: waiting for the check";
+  if(p.status==="check-received") return "Prepaid by check";
+  return p.method==="ach" ? `Bank account (ACH) ending ${esc(p.last4||"")}` : `${esc(p.brand||"Card")} ending ${esc(p.last4||"")}`;
+}
+const payFilePill = c => !c?.payOnFile ? "" : payOnFileOk(c) ? `<span class="pill paid" title="${payOnFileLabel(c)}">${c.payOnFile.method==="check"?"Check prepay":c.payOnFile.method==="ach"?"ACH":"Card"} ${esc(c.payOnFile.last4||"")}</span>` : c.payOnFile.status==="received" ? `<span class="pill open" title="${payOnFileLabel(c)}">Enter in QB ${esc(c.payOnFile.last4||"")}</span>` : `<span class="pill pastdue">${c.payOnFile.status==="missing"?"No card":"Pending"}</span>`;
+const chargesFor = (clientId, cid) => Object.entries(qbRows).filter(([,r])=>r.type==="charge" && r.clientId===clientId && (!cid || r.contractId===cid));
+// The amount on the signed contract: the price stored with it, or the first dollar figure in its text.
 function contractAmount(rec){
   if(rec.amount!=null && rec.amount!=="" && !isNaN(+rec.amount)) return +rec.amount;
   const m=/\$\s?([\d,]+(?:\.\d{1,2})?)/.exec(rec.text||""); return m ? +m[1].replace(/,/g,"") : null;
 }
 function openPaySheet(clientId, cid, rec){
-  const P=payInfo(), c=clients[clientId]||{}, amt=contractAmount(rec);
-  const paid=(c.contracts?.[cid]||{}).payment;
-  const price = v => amt==null ? "the amount on your invoice" : money(v);
-  const opt = (k, title, body, total, feeNote) => `<div class="payopt${feeNote?"":" nofee"}" data-opt="${k}"><div class="ph"><b>${title}</b><span class="amt"><small>Amount due</small>${total}</span></div><div class="pb">${body}</div>${feeNote?`<div class="pf">${feeNote}</div>`:`<div class="pf ok">No added fee</div>`}</div>`;
-  const feeOpt = (k, title, body, method, what) => { const f=feeFor(method,P); if(!f) return opt(k, title, body, price(amt));
-    return opt(k, title, body, amt==null?price(amt):money(withFee(amt,f)), amt==null ? `Plus the ${f}% ${what} fee` : `${money(amt)} + ${money(r2(withFee(amt,f)-amt))} ${what} fee (${f}%)`); };
-  const rows = [
-    P.zelle ? opt("zelle","Zelle",`Send it now to <b>${esc(P.zelle)}</b>.`, price(amt)) : "",
-    opt("check","Check",`Make it payable to <b>${esc(P.checkPayable||COMPANY)}</b> and hand it to us today.`, price(amt)),
-    P.cashNote ? opt("cash","Cash",esc(P.cashNote), price(amt)) : "",
-    P.venmo ? feeOpt("venmo","Venmo",`Send it now to <b>${esc(P.venmo)}</b>.`, "Venmo", "Venmo") : "",
-    P.paypal ? feeOpt("paypal","PayPal",`Send it now to <b>${esc(P.paypal)}</b>.`, "PayPal", "PayPal") : "",
-    feeOpt("card","Credit card",esc(P.cardNote||"Tap to pay with us today."), GOPAY, "card processing")
-  ].join("");
-  const marks = [["Zelle","Zelle"],["Check","Check"],["Cash","Cash"],["Venmo","Venmo"],["PayPal","PayPal"],[GOPAY,"Card"],["later","Paying later"]];
+  const c=clients[clientId]||{}, d=rec.details||{}, total=contractAmount(rec);
+  const dueNow = d.dueNow!=null ? +d.dueNow : total, dueInstall = +d.dueInstall||0, pp = d.snow?.perPushAfter;
+  const pof=c.payOnFile||{};
+  const opt=(v,title,body)=>`<label class="payopt" style="display:block;cursor:pointer"><div class="ph"><span><input type="radio" name="pofm" value="${v}" style="width:20px;height:20px;vertical-align:-4px;margin-right:8px">${title}</span></div><div class="pb">${body}</div></label>`;
   const host = document.createElement("div"); host.className="paysheet-bg"; host.id="paySheet";
-  host.innerHTML = `<div class="paysheet" role="dialog" aria-label="Ways to pay">
+  host.innerHTML = `<div class="paysheet" role="dialog" aria-label="Payment on file">
     <div class="grab" aria-hidden="true"></div>
     <button type="button" class="psx" id="psClose" aria-label="Close">&times;</button>
     <div class="psin">
       <div class="meta">Thank you, ${esc(rec.signerName||c.name||"")}</div>
       <h3>${esc(rec.tplName)}</h3>
       <div class="pssvc">${esc(rec.serviceSummary||"")}</div>
-      <div class="pstotal"><span>Contract total</span><b>${amt==null?"See contract":money(amt)}</b></div>
-      <h4>Ways to pay</h4>
-      ${rows}
-      <div class="psadmin"><div class="meta"><b>For ${esc(COMPANY.replace(" LLC",""))}:</b> how did they pay?${paid?` Recorded: ${esc(paid.method==="later"?"paying later":paid.method)}.`:""}</div>
-        <div class="row" style="margin-top:6px">${marks.map(([v,l])=>`<button type="button" class="small${paid&&paid.method===v?" primary":""}" data-paid="${esc(v)}">${l}</button>`).join("")}</div></div>
+      <div class="pstotal"><span>Charged today</span><b>${dueNow==null?"See contract":money(dueNow)||"$0"}</b></div>
+      ${dueInstall>0?`<div class="pstotal" style="border-top:0;margin-top:0"><span>Charged when the lights are installed</span><b style="font-size:18px">${money(dueInstall)}</b></div>`:""}
+      ${pp?`<div class="meta" style="margin-top:6px">Snow visits after the sixteenth: ${money(pp)} each, charged after the visit.</div>`:""}
+      <div class="meta" style="margin-top:6px">A receipt is emailed for every charge. There is no card fee.</div>
+      <h4>Payment method on file</h4>
+      ${pof.status==="received"?`<div class="payopt" style="border-color:var(--amber)"><div class="ph"><b>From the customer: ${pof.method==="ach"?"bank account":esc(pof.brand||"card")} ending ${esc(pof.last4||"")}${pof.exp?`, exp ${esc(pof.exp)}`:""}</b></div>
+        <div class="pb">1. ${pof.driveFileId?`<a href="https://drive.google.com/file/d/${esc(pof.driveFileId)}/view" target="_blank" rel="noopener">Open the details file</a> (signed in as admin@ only)`:"The details file was already deleted"}.<br>2. Save it on the customer in QuickBooks and run ${dueNow>0?`today's <b>${money(dueNow)}</b>`:"nothing today"}.<br>3. Press the button. The file is deleted from Drive and the CRM keeps the last 4 only.</div>
+        <div class="actions" style="justify-content:flex-start"><button type="button" class="primary" id="pofEntered">Saved in QuickBooks, delete the file</button></div></div>`:""}
+      ${payOnFileOk(c)?`<div class="payopt nofee"><div class="ph"><b>Already on file</b></div><div class="pb">${payOnFileLabel(c)}. Choose below only to replace it.</div></div>`:""}
+      ${opt("card_now","Scan the card now (GoPayment)",`In person. Open QuickBooks GoPayment, ${dueNow>0?`charge <b>${money(dueNow)}</b>, and save the card to the customer.`:"and save the card to the customer. <b>Nothing is charged today.</b>"}`)}
+      ${opt("card_link","Email the customer a QuickBooks card link","They enter the card on the QuickBooks page. It shows as pending until it appears in QuickBooks.")}
+      <button type="button" class="link" id="pofMoreBtn" aria-expanded="false" style="margin:4px 0 6px">More options \u25BE</button>
+      <div id="pofMore" hidden>
+      ${opt("ach","Bank account (ACH)","Only if the customer will not use a card. We email the QuickBooks link for the bank account.")}
+      ${opt("check","Prepay everything by check",`Check for <b>${money(total)}</b> payable to Mangiapane Brothers LLC. The spot is not confirmed until the check arrives.`)}
+      </div>
+      <div id="pofLink" hidden style="margin-top:10px"><label>QuickBooks payment link (optional)</label><input id="pofUrl" type="url" inputmode="url" placeholder="https://connect.intuit.com/..." autocomplete="off">
+        <p class="meta" style="margin:6px 0 0">Paste one made in QuickBooks for this customer and it is emailed now from admin@. Leave it empty and one is made for them from the QuickBooks queue.</p></div>
+      <div id="pofCard" hidden class="grid2" style="margin-top:10px">
+        <div><label>Card brand</label><select id="pofBrand"><option value="">Choose</option>${opts(CARD_BRANDS,"")}</select></div>
+        <div><label>Last 4 digits only</label><input id="pofLast4" inputmode="numeric" maxlength="4" autocomplete="off" placeholder="1234"></div>
+        ${dueNow>0?`<div style="grid-column:1/-1"><label class="row" style="color:var(--ink);font-size:15px;margin:6px 0"><input type="checkbox" id="pofCharged"> ${money(dueNow)} was charged in GoPayment just now</label></div>`:""}
+      </div>
+      <div id="pofCheck" hidden style="margin-top:10px"><label class="row" style="color:var(--ink);font-size:15px;margin:6px 0"><input type="checkbox" id="pofCheckIn"> I have the check now</label></div>
+      <div class="meta" id="pofErr" style="color:var(--red);font-weight:600;margin-top:8px"></div>
+      <div class="actions"><button type="button" class="primary big" id="pofSave">Save payment method</button></div>
+      <p class="meta" style="margin:6px 0 0">Never type a full card or bank number here. It goes into QuickBooks only.</p>
       ${rec.sample?`<p class="meta" style="margin-top:10px">Sample contract: nothing is sent to QuickBooks.</p>`:""}
     </div></div>`;
   $("#signDlg").appendChild(host);
   const sheet=host.querySelector(".paysheet");
-  const close=()=>{ sheet.style.transition="transform .2s"; sheet.style.transform="translateY(100%)"; host.style.opacity="0"; setTimeout(()=>host.remove(),200); };
+  const close=()=>{ sheet.style.transition="transform .2s"; sheet.style.transform="translateY(100%)"; host.style.opacity="0"; setTimeout(()=>host.remove(),200);
+    if(!payOnFileOk(clients[clientId]) && !(clients[clientId]?.payOnFile?.status||"").match(/pending|check-awaiting/)) toast("No payment method recorded. The client shows as missing until one is."); };
   host.querySelector("#psClose").onclick=close;
   host.onclick=e=>{ if(e.target===host) close(); };
-  // Slide down to close: drag from the handle or the top of the sheet.
   let y0=null, dy=0;
-  sheet.addEventListener("pointerdown", e=>{ if(e.target.closest("button,a,input")) return; if(sheet.scrollTop>0 && !e.target.closest(".grab")) return; y0=e.clientY; dy=0; sheet.style.transition="none"; try{ sheet.setPointerCapture(e.pointerId); }catch(x){} });
+  sheet.addEventListener("pointerdown", e=>{ if(e.target.closest("button,a,input,select,label")) return; if(sheet.scrollTop>0 && !e.target.closest(".grab")) return; y0=e.clientY; dy=0; sheet.style.transition="none"; try{ sheet.setPointerCapture(e.pointerId); }catch(x){} });
   sheet.addEventListener("pointermove", e=>{ if(y0==null) return; dy=Math.max(0,e.clientY-y0); sheet.style.transform=`translateY(${dy}px)`; });
   const up=()=>{ if(y0==null) return; y0=null; if(dy>110) close(); else { sheet.style.transition="transform .2s"; sheet.style.transform=""; } };
   sheet.addEventListener("pointerup", up); sheet.addEventListener("pointercancel", up);
-  host.querySelectorAll("[data-paid]").forEach(b=>b.onclick=async()=>{ await recordPayment(clientId, cid, rec, b.dataset.paid); close(); });
+  const choice=()=>host.querySelector('input[name="pofm"]:checked')?.value||"";
+  host.querySelectorAll('input[name="pofm"]').forEach(r=>r.onchange=()=>{ host.querySelector("#pofCard").hidden=choice()!=="card_now"; host.querySelector("#pofCheck").hidden=choice()!=="check"; host.querySelector("#pofLink").hidden=!["card_link","ach"].includes(choice()); });
+  const moreBtn=host.querySelector("#pofMoreBtn"); moreBtn.onclick=()=>{ const box=host.querySelector("#pofMore"); box.hidden=!box.hidden; moreBtn.setAttribute("aria-expanded",String(!box.hidden)); moreBtn.textContent = box.hidden ? "More options \u25BE" : "Fewer options \u25B4"; };
+  const ent=host.querySelector("#pofEntered"); if(ent) ent.onclick=async()=>{ ent.disabled=true; const ok=await enteredInQb(clientId, cid); if(ok){ sheet.style.transition="transform .2s"; sheet.style.transform="translateY(100%)"; host.style.opacity="0"; setTimeout(()=>host.remove(),200); } else ent.disabled=false; };
+  const l4=host.querySelector("#pofLast4"); l4.oninput=()=>{ l4.value=l4.value.replace(/\D/g,"").slice(0,4); };
+  host.querySelector("#pofSave").onclick=async()=>{
+    const m=choice(), err=host.querySelector("#pofErr"); err.textContent="";
+    if(!m) return err.textContent="Choose how the customer is paying.";
+    const f={ brand:host.querySelector("#pofBrand").value, last4:l4.value, charged:!!host.querySelector("#pofCharged")?.checked, checkIn:host.querySelector("#pofCheckIn").checked, url:host.querySelector("#pofUrl").value.trim() };
+    if(f.url && !/^https:\/\/\S+$/.test(f.url)) return err.textContent="The QuickBooks link must start with https://.";
+    if((m==="card_link"||m==="ach") && ![c.email,c.email2].some(Boolean)) return err.textContent="The client has no email. Add one to the client first.";
+    if(m==="card_now"){ if(!f.brand) return err.textContent="Choose the card brand."; if(!/^\d{4}$/.test(f.last4)) return err.textContent="Enter the last 4 digits of the card, and nothing more."; }
+    const ok=await recordPayOnFile(clientId, cid, rec, m, f); if(ok){ sheet.style.transition="transform .2s"; sheet.style.transform="translateY(100%)"; host.style.opacity="0"; setTimeout(()=>host.remove(),200); }
+  };
+}
+// The card or bank account the customer entered after signing is now saved in QuickBooks: mark it on file and delete the Drive file.
+async function enteredInQb(clientId, cid){
+  const c=clients[clientId]||{}, p=c.payOnFile||{}, now=Date.now();
+  const upd={ [`clients/${clientId}/payOnFile/status`]:"on-file", [`clients/${clientId}/payOnFile/enteredAt`]:now, [`clients/${clientId}/payOnFile/enteredBy`]:me.email,
+    [`clientLog/${clientId}/${db.ref("clientLog").push().key}`]:{ text:`${p.method==="ach"?"Bank account":(p.brand||"Card")} ending ${p.last4||""} saved in QuickBooks. Details file deleted from Drive.`, at:now, by:me.email, source:"payment" } };
+  let k=null; if(p.driveFileId && svcReady()){ k=db.ref("sync/mail").push().key; upd["sync/mail/"+k]={ kind:"purgepay", clientId, fileId:p.driveFileId, status:"queued", createdAt:now, createdBy:me.email }; }
+  try{ await db.ref().update(upd); if(k) svcCall("mail",{k}); toast("On file. The details file is being deleted."); return true; }
+  catch(e){ toast("Not saved: "+(e.code||e.message)); return false; }
 }
 function payLine(clientId, cid, rec){
-  const p=(clients[clientId]?.contracts?.[cid]||{}).payment;
-  return p ? (p.method==="later"?"Paying later: invoice queued.":`Paid ${p.total!=null?money(p.total)+" ":""}by ${esc(p.method)}.`) : (rec.payStatus==="paid"?`Payment recorded: ${esc(rec.payMethod||"")}.`:"Payment not recorded yet.");
+  const c=clients[clientId]||{}, ch=chargesFor(clientId, cid);
+  const open=ch.filter(([,r])=>r.status==="pending"||r.status==="declined").reduce((a,[,r])=>a+(+r.amount||0),0);
+  return `${payOnFileLabel(c)||"No payment method recorded."}${open?` · ${money(open)} not yet charged.`:""}`;
 }
-// Records how the client paid (or that they will pay later) and queues the matching QuickBooks work.
-async function recordPayment(clientId, cid, rec, method){
-  const P=payInfo(), fee=feeFor(method,P), now=Date.now(), later=method==="later";
-  const amt=contractAmount(rec), hasFee=fee>0;
-  const total = amt==null ? null : (hasFee ? withFee(amt,fee) : amt);
-  const upd = {
-    [`clients/${clientId}/contracts/${cid}/payment`]: { method, status: later?"open":"paid", amount:amt, fee: hasFee&&amt!=null ? r2(total-amt) : 0, total, at:now, by:me.email },
-    [`clients/${clientId}/payStatus`]: later ? "open" : "paid",
-    [`clients/${clientId}/payMethod`]: later ? (clients[clientId]?.payMethod||"") : method,
-    [`clientLog/${clientId}/${db.ref("clientLog").push().key}`]: { text: later ? `${rec.tplName}: paying later, invoice to follow.` : `${rec.tplName}: paid ${total==null?"":money(total)+" "}by ${method}${hasFee&&amt!=null?` (includes ${money(total-amt)} fee)`:""}.`, at:now, by:me.email, source:"payment" }
-  };
-  if(!rec.sample){
-    const base = { clientId, contractId:cid, amount:total, serviceAmount:amt, fee: hasFee&&amt!=null ? r2(total-amt) : 0, date:today(), description:`${rec.tplName}: ${rec.serviceSummary||""}`, status:"pending", createdAt:now, createdBy:me.email };
-    upd["sync/qb/"+db.ref("sync/qb").push().key] = later ? { ...base, type:"invoice" } : method===GOPAY ? { ...base, type:"match-payment" } : { ...base, type:"record-payment", method };
+// Records the payment method on file and moves the signing charge along. Never stores a card or bank number.
+async function recordPayOnFile(clientId, cid, rec, m, f){
+  const now=Date.now(), c=clients[clientId]||{}, d=rec.details||{}, total=contractAmount(rec);
+  const method = m==="check" ? "check" : m==="ach" ? "ach" : "card";
+  const status = m==="card_now" ? "on-file" : m==="check" ? (f.checkIn?"check-received":"check-awaiting") : "pending";
+  const pof = { method, status, contractId:cid, authAt:rec.signedAt||now, at:now, by:me.email, ...(m==="card_now"?{ brand:f.brand, last4:f.last4 }:{}) };
+  const upd = { [`clients/${clientId}/payOnFile`]: pof, [`clients/${clientId}/payMethod`]: POF_LABEL[method], ...fieldUpdates("clients/"+clientId, stamp()) };
+  const charges=chargesFor(clientId, cid), signing=charges.find(([,r])=>r.trigger==="signing" && r.status!=="done");
+  let note=`${rec.tplName}: ${POF_LABEL[method]}${m==="card_now"?` (${f.brand} ending ${f.last4})`:m==="card_link"||m==="ach"?" link to be sent; pending":""}.`;
+  if(m==="card_now" && f.charged && signing){
+    upd[`sync/qb/${signing[0]}/status`]="done"; upd[`sync/qb/${signing[0]}/doneAt`]=now; upd[`sync/qb/${signing[0]}/doneBy`]=me.email; upd[`sync/qb/${signing[0]}/via`]="GoPayment";
+    if(!rec.sample) upd["sync/qb/"+db.ref("sync/qb").push().key] = { type:"match-payment", clientId, contractId:cid, amount:signing[1].amount, date:today(), description:signing[1].description, status:"pending", createdAt:now, createdBy:me.email };
+    note+=` Charged ${money(signing[1].amount)} in GoPayment.`;
   }
-  try{ await db.ref().update(upd); if($("#cvPayLine")) $("#cvPayLine").innerHTML=payLine(clientId,cid,rec); toast(later ? "Recorded: paying later. The invoice is queued for QuickBooks." : `Recorded: paid by ${method==="later"?"":method}.`); }
-  catch(e){ toast("Not recorded: "+(e.code||e.message)); }
+  if(m==="check"){
+    charges.filter(([,r])=>r.status!=="done").forEach(([rid])=>{ upd[`sync/qb/${rid}/status`]= f.checkIn ? "done" : "awaiting-check"; if(f.checkIn){ upd[`sync/qb/${rid}/doneAt`]=now; upd[`sync/qb/${rid}/via`]="check"; } });
+    if(f.checkIn && !rec.sample) upd["sync/qb/"+db.ref("sync/qb").push().key] = { type:"record-payment", method:"Check", clientId, contractId:cid, amount:total, date:today(), description:`${rec.tplName}: season prepaid by check`, status:"pending", createdAt:now, createdBy:me.email };
+    note+= f.checkIn ? ` Check for ${money(total)} received.` : ` Waiting for a check for ${money(total)}.`;
+  }
+  if((m==="card_link"||m==="ach") && !rec.sample){
+    const to=[c.email,c.email2].filter(Boolean), amt = signing ? signing[1].amount : 0;
+    if(f.url && svcReady()){ upd["sync/mail/"+db.ref("sync/mail").push().key] = { kind:"paylink", clientId, contractId:cid, url:f.url, amount:amt, to, status:"queued", createdAt:now, createdBy:me.email }; note+=" QuickBooks link emailed from admin@."; }
+    else upd["sync/qb/"+db.ref("sync/qb").push().key] = { type:"paylink", clientId, contractId:cid, amount:amt, method:method==="ach"?"ach":"card", to, url:f.url||"", description:`${rec.tplName}${rec.agreementNo?" "+rec.agreementNo:""}: ${amt?"due at signing":"payment method on file"}`, status:"pending", createdAt:now, createdBy:me.email };
+  }
+  const stillOwed = m==="check" ? !f.checkIn : (signing && !(m==="card_now" && f.charged));
+  upd[`clients/${clientId}/payStatus`] = stillOwed ? "open" : "paid";
+  upd[`clientLog/${clientId}/${db.ref("clientLog").push().key}`] = { text:note, at:now, by:me.email, source:"payment" };
+  try{ await db.ref().update(upd); if($("#cvPayLine")) $("#cvPayLine").innerHTML=payLine(clientId,cid,rec); toast("Payment method recorded.");
+    for(const k of Object.keys(upd)) if(k.startsWith("sync/mail/")) svcCall("mail",{ k:k.split("/")[2] });
+    return true; }
+  catch(e){ toast("Not recorded: "+(e.code||e.message)); return false; }
 }
 // Status line on the contract screen: saves to Drive when asked, or shows where the copy is.
 async function driveStatus(clientId, cid, rec, start){
   const box=$("#cvDrive"); if(!box) return;
   const m=clients[clientId]?.contracts?.[cid]||{}; const done = rec.voided ? m.driveVoid : m.drive;
-  if(done && !start){ box.innerHTML=`Copy saved in Google Drive${done.link?` · <a href="${esc(done.link)}" target="_blank" rel="noopener">open</a>`:""}`; return; }
+  if(!done && !start && svcReady() && !rec.sample){ box.innerHTML = m.mailed ? `Emailed to ${esc((m.mailed.to||[]).join(", "))} ${esc(ago(m.mailed.at))}. The Drive copy is saved by admin@.` : `The signing service saves the PDF to admin@'s Google Drive and emails the customer within a few minutes.`; return; }
+  if(done && !start){ box.innerHTML=`${m.mailed?`Emailed to ${esc((m.mailed.to||[]).join(", "))}. `:""}Copy saved in Google Drive${done.link?` · <a href="${esc(done.link)}" target="_blank" rel="noopener">open</a>`:""}`; return; }
   if(!start){ box.innerHTML=`Not in Google Drive yet. <button type="button" class="small" id="cvDriveGo">Save to Drive</button>`; $("#cvDriveGo").onclick=()=>{ askDriveToken().catch(()=>{}); driveStatus(clientId,cid,rec,true); }; return; }
   box.textContent="Saving a copy to Google Drive…";
   try{ const f=await saveContractToDrive(clientId, cid, rec); if($("#cvDrive")===box) box.innerHTML=`Copy saved in Google Drive${f.webViewLink?` · <a href="${esc(f.webViewLink)}" target="_blank" rel="noopener">open</a>`:""}`; }
@@ -1238,11 +1310,11 @@ function contractDocHtml(rec){
   return `${rec.sample?`<div class="samplebar">SAMPLE CONTRACT. Signed as a test only. Not binding.</div>`:""}${rec.voided?`<div class="voidbar">VOIDED ${esc(fmtStamp(rec.voidedAt))}${rec.voidReason?": "+esc(rec.voidReason):""}</div>`:""}
     ${rec.kind==="seasonal"?SSA_HEAD:""}${renderDocHtml(rec.text,"view",rec.choices,rec.initials)}
     <div class="sigs">
-      <div><img src="${rec.signature}" alt="Client signature"><b>${esc(rec.signerName)}</b><br>Client · ${esc(fmtLong(rec.signedDate))}</div>
+      <div>${rec.signatureTyped?`<div class="typedsig">${esc(rec.signatureTyped)}</div><div class="meta">Signed electronically by typed name</div>`:`<img src="${rec.signature}" alt="Client signature">`}<b>${esc(rec.signerName)}</b><br>Client · ${esc(fmtLong(rec.signedDate))}</div>
       <div>${rec.companySig?`<img src="${rec.companySig}" alt="Company signature">`:""}<b>${esc(rec.companySigner||"")}</b><br>For ${esc(rec.kind==="seasonal"?"Mangiapane Brothers LLC":COMPANY)} · ${esc(fmtLong(rec.signedDate))}</div>
     </div>
     ${rec.notice?`<div class="ssanotice">${renderDocHtml(rec.notice,"view")}</div>`:""}
-    <div class="fp">Signed ${esc(fmtStamp(rec.signedAt))} Eastern · witness ${esc(rec.witness)} · template "${esc(rec.tplName)}" version ${esc(rec.tplVersion)}<br>Record fingerprint (SHA-256): ${esc(rec.hash)}</div>`;
+    <div class="fp">Signed ${esc(fmtStamp(rec.signedAt))} Eastern · ${rec.remote?"":"witness "}${esc(rec.witness)} · template "${esc(rec.tplName)}" version ${esc(rec.tplVersion)}<br>Record fingerprint (SHA-256): ${esc(rec.hash)}</div>`;
 }
 async function viewContract(clientId, cid, recIn){
   let rec = recIn;
@@ -1257,13 +1329,15 @@ async function viewContract(clientId, cid, recIn){
       <div class="row"><button type="button" class="primary" id="cvPrint">Print or save PDF</button>${mail?`<a href="${mail}" class="small" style="text-decoration:none"><button type="button">Email the client</button></a>`:`<span class="meta">No email on file for this client.</span>`}
       <span style="margin-left:auto"></span>${rec.voided?"":`<button type="button" class="danger" id="cvVoid">Void</button>`}</div>
       <p class="meta" id="cvDrive" style="margin:8px 0 0"></p>
-      <p class="meta" style="margin:8px 0 0">To give the client a copy: Print or save PDF, then Save to Files, then attach that PDF to the email. <span id="cvPayLine">${payLine(clientId,cid,rec)}</span> <button type="button" class="small" id="cvPay">Ways to pay</button></p>
+      <p class="meta" style="margin:8px 0 0">To give the client a copy: Print or save PDF, then Save to Files, then attach that PDF to the email. <span id="cvPayLine">${payLine(clientId,cid,rec)}</span> <button type="button" class="small" id="cvPay">Payment on file</button></p>
       <div id="cvVoidBox" hidden style="margin-top:10px"><label>Reason for voiding (kept with the record)</label><input id="cvVoidReason" placeholder="Wrong price, client changed package..."><div class="actions"><button type="button" id="cvVoidCancel">Keep it</button><button type="button" class="danger" id="cvVoidGo">Void this contract</button></div></div>
     </div>`;
   if(!$("#signDlg").open) $("#signDlg").showModal();
   $("#signBody").scrollTop=0;
   driveStatus(clientId, cid, rec, false);
   $("#cvPay").onclick = () => openPaySheet(clientId, cid, rec);
+  if(svcReady() && !rec.voided && c.email){ const ml=$("#signBody").querySelector('a[href^="mailto:"]'); if(ml) ml.outerHTML=`<button type="button" id="cvMail">Email the signed copy</button>`;
+    $("#cvMail").onclick=async()=>{ const k=db.ref("sync/mail").push().key; await db.ref("sync/mail/"+k).set({ kind:"contract", clientId, contractId:cid, to:[c.email,c.email2].filter(Boolean), status:"queued", createdAt:Date.now(), createdBy:me.email }); svcCall("mail",{k}); toast("Sending the signed PDF from admin@."); }; }
   $("#cvPrint").onclick = () => { $("#printArea").innerHTML = `<div class="doc">${contractDocHtml(rec)}</div>`; window.print(); };
   if($("#cvVoid")){
     $("#cvVoid").onclick = () => { $("#cvVoidBox").hidden=false; $("#cvVoidReason").focus(); };
@@ -1407,26 +1481,20 @@ function renderContractsView(m){
     </tbody></table></div>`:""}
     <div class="card"><h2>Google Drive copies</h2>${(()=>{ const n=driveMissing().length; return `<p class="meta">Every signed contract is also saved as a PDF and an exact record in your Google Drive folder "${esc(DRIVE_ROOT_NAME)}", one folder per client.</p>` +
       (n ? `<div class="warnline">${n} signed contract${n===1?" is":"s are"} not in Google Drive yet. <button class="small primary" id="driveAll">Save to Drive</button></div>` : `<p class="meta">All signed contracts are in Google Drive.</p>`); })()}</div>
-    <div class="card"><h2>Ways to pay</h2><p class="meta">Shown to the client right after signing. Everything is paid in person, at the door. Zelle, check and cash come first with no fee; Venmo, PayPal and card show the price with their fee added. Leave a line empty to hide that option (check and card always show).</p>
-      <div class="grid2">
-        <div><label>Zelle (email or phone)</label><input id="piZelle" value="${esc(payInfo().zelle)}" placeholder="payments@..."></div>
-        <div><label>Checks payable to</label><input id="piPayable" value="${esc(payInfo().checkPayable)}"></div>
-        <div><label>Venmo</label><input id="piVenmo" value="${esc(payInfo().venmo)}" placeholder="@Mangiapane-Brothers"></div>
-        <div><label>PayPal</label><input id="piPaypal" value="${esc(payInfo().paypal)}" placeholder="paypal.me/... or email"></div>
-        <div><label>Venmo fee (%)</label><input id="piVenmoFee" type="number" min="0" max="10" step="0.1" value="${esc(payInfo().venmoFee)}"></div>
-        <div><label>PayPal fee (%)</label><input id="piPaypalFee" type="number" min="0" max="10" step="0.1" value="${esc(payInfo().paypalFee)}"></div>
-        <div><label>Card fee (%, 3 at most)</label><input id="piCardFee" type="number" min="0" max="3" step="0.1" value="${esc(payInfo().cardFee)}"></div>
-        <div><label>Card line</label><input id="piCard" value="${esc(payInfo().cardNote)}"></div>
-        <div style="grid-column:1/-1"><label>Cash instructions (leave empty to hide cash)</label><input id="piCash" value="${esc(payInfo().cashNote)}"></div>
-      </div>
-      <div class="actions"><button class="primary" id="piSave">Save ways to pay</button></div></div>
+    <div class="card"><h2>Payment</h2><p class="meta">Every client keeps a card on file, taken right after signing, even when nothing is due that day. A bank account (ACH) is an approved exception, and prepaying everything by check is the only other choice. No card fee. Card and bank numbers are entered in QuickBooks only; this page keeps the brand and the last four digits. Charges waiting to be run are in More, QuickBooks and export.</p></div>
+    <div class="card"><h2>Signing service</h2><p class="meta">Runs in admin@mangbrothers.com. It emails the one-link contract, takes the typed signature, saves every signed PDF to admin@'s Google Drive and emails a copy, and sends the payment confirmed email.</p>
+      <label>Web app address (from Apps Script: Deploy, Manage deployments)</label><input id="svcUrl" value="${esc(svcInfo()?.url||"")}" placeholder="https://script.google.com/macros/s/.../exec" autocomplete="off">
+      <div class="row" style="margin-top:8px"><button class="small" id="svcTest">Test</button><button class="small primary" id="svcSave">Save</button><span class="meta" id="svcMsg">${svcReady()?"Set up.":"Not set up. Emailing contracts is off."}</span></div></div>
     <div class="card"><h2>Your countersignature</h2><p class="meta">Drawn once and applied to every contract you lock. Each admin keeps his own.</p><div id="mySigBox" class="meta">Loading…</div></div>
     ${list.length?"":`<p class="meta" style="margin:0 2px 16px"><button class="link" id="tplNew">Add a contract for another service (lawn, landscaping)</button></p>`}`;
   $("#tplNew").onclick = () => openTemplate(null);
-  $("#piSave").onclick = () => { const pct=(id,max)=>Math.min(max,Math.max(0,+$(id).value||0));
-    commit("Saved ways to pay", { "contractTemplates/_payInfo": { zelle:$("#piZelle").value.trim(), checkPayable:$("#piPayable").value.trim()||COMPANY, cashNote:$("#piCash").value.trim(), venmo:$("#piVenmo").value.trim(), paypal:$("#piPaypal").value.trim(), venmoFee:pct("#piVenmoFee",10), paypalFee:pct("#piPaypalFee",10), cardFee:pct("#piCardFee",3), cardNote:$("#piCard").value.trim(), updatedAt:Date.now(), updatedBy:me.email } }); };
   if($("#driveAll")) $("#driveAll").onclick = e => saveMissingToDrive(e.currentTarget);
   m.querySelectorAll("[data-tpl]").forEach(b=>b.onclick=()=>openTemplate(b.dataset.tpl));
+  const svcUrlOk=()=>{ const u=$("#svcUrl").value.trim(); if(!/^https:\/\/script\.google\.com\/macros\/s\/[\w-]+\/exec$/.test(u)){ $("#svcMsg").textContent="Paste the address that ends in /exec."; return ""; } return u; };
+  $("#svcTest").onclick=async()=>{ const u=svcUrlOk(); if(!u) return; $("#svcMsg").textContent="Testing…";
+    try{ const r=await (await fetch(u+"?action=ping",{redirect:"follow"})).json(); $("#svcMsg").textContent = r.ok ? `Working. Sends from ${r.from}${r.sendsAsAdmin?"":" (expected admin@mangbrothers.com)"}. Database: ${r.database}. Emails left today: ${r.quota}.` : "Answered with an error: "+(r.error||""); }
+    catch(e){ $("#svcMsg").textContent="No answer. Check the address and that the deployment is set to Anyone."; } };
+  $("#svcSave").onclick=async()=>{ const u=$("#svcUrl").value.trim(); if(u && !svcUrlOk()) return; await commit(u?"Set the signing service":"Turned off the signing service", { "contractTemplates/_signing": u ? { url:u, deploy:svcDeploy(u), updatedAt:Date.now(), updatedBy:me.email } : null }); toast(u?"Signing service saved.":"Signing service turned off."); };
   loadMySig().then(sig=>{
     const box=$("#mySigBox"); if(!box) return;
     box.innerHTML = (sig&&sig.data ? `<img class="sigimg" src="${sig.data}" alt="Your saved signature"><p class="meta">Saved ${fmtStamp(sig.savedAt)}. Draw below to replace it.</p>` : `<p class="meta">None saved yet. Draw it below, or at the first contract you lock.</p>`) +
@@ -1472,96 +1540,194 @@ cache.contractTemplates = () => templates;
 // The admin sets it up (services, options, property details), then hands the iPad over. The customer sees a
 // finished agreement that holds only the services chosen, and signs at the bottom. Nothing else to fill in.
 // Prices and clause text come from the company's Seasonal Services Agreement. Changing either: raise SSA_VERSION.
-const SSA_VERSION = 1;
+const SSA_VERSION = 2;
 const SSA_NAME = "Seasonal Services Agreement";
 const SSA_TYPES = ["fall","lights","snow"];
-const SSA_FALL = { south:435, north:595 };
-const SSA_FALL_DESC = "Two leaf visits timed to city pickup, free gutter cleaning on final visit, roof look while on the ladder, beds cleared of leaves, sticks gathered, everything blown to the curb.";
-const SSA_FALL_ADJ = [["two","Two-storey home",75],["corner","Corner lot",80],["oak","Heavy oak lot",60]];
+// Version 2 (Oct 13, 2026): prices from the Oct 13 price book, card on file, no card fee, no late fee,
+// no snow season maximum, three areas, neighbor credit. Policy source: claude/contracts-v2-2026-10-13.md.
+// Three pricing areas. Westland is priced at the South column for lights and snow and has no Fall Cleanup.
+const SSA_ZONES = { south:"South Livonia", north:"North Livonia", westland:"Westland" };
+const ssaCol = S => S.zone==="north" ? "north" : "south";
+const SSA_FALL = { south:450, north:615 };
+const SSA_FALL_DESC = "Two leaf visits timed to the city curbside pickup for the Property's section; gutters cleared on the final visit; a look at the roof from the ladder; flower beds cleared of leaves and debris; sticks and branches gathered; everything blown to the curb for city pickup. Not included: bed cleanouts, mulch, bagging or hauling, and written roof inspections. Fall Cleanup is available in Livonia only.";
+const SSA_FALL_ADJ = [["two","Two-storey home",80],["corner","Corner lot",85],["oak","Heavy oak lot",60],["gutters","Gutters not cleaned in three or more years",50]];
 const SSA_PKG = [
-  {k:"showcase",n:"Showcase",d:"Full Front + 2 more shrubs (6 total), 1 medium tree wrapped, and a full season Fall Cleanup. Westland: Fall Cleanup not available, price is $1,160.",sw:1595,n2:1895,wl:1160},
-  {k:"fullfront",n:"Full Front",d:"Roofline, plus up to 4 front shrubs wrapped.",sw:895,n2:1045},
-  {k:"roofline",n:"Roofline",d:"Front roofline in LED, up to 120 ft, and a wreath hung on the front door.",sw:625,n2:795} ];
-const SSA_LIGHTS_NOTE = "Every package includes commercial-grade lights, installation, timer and extension cords, service calls all season, lit by Thanksgiving (Nov 26), and takedown by end of January.";
-const SSA_ADDONS = [["shrub","Extra shrub",65],["medTree","Medium tree",225],["lgTree","Large tree",325],["wreath","Extra wreath, hung",55]];
-const SSA_L_ADJ = [["two","Two-story home",150],["twoShow","Two-story home (Showcase)",225],["steep","Steep roof over 7/12 pitch",125]];
-// sw / n2: season price South-Westland / North. ppSw / ppN: per-push rate after the season limit.
-const SSA_SNOW = [{k:"standard",n:"Standard lot",sw:550,n2:590,ppSw:45,ppN:50},{k:"corner",n:"Corner lot",sw:750,n2:790,ppSw:60,ppN:65}];
-const SSA_TERM = { fall:["Fall Cleanup","October - November"], lights:["Holiday Lighting","November - January"], snow:["Snow & Ice Removal","November – March 15"] };
-const SSA_ART = [{"n": 3, "title": "Fall Cleanup Terms", "svc": "fall", "items": [["3.1", "Scheduling.", "Visits are scheduled by the Company and will occur based on the service plan purchased."], ["3.2", "Debris Disposal.", "Leaves and yard waste will be collected and set outside the house for the city service to collect"], ["3.3", "Gutters.", "Gutter cleaning covers structures safely reachable by ladder. If the crew determines a gutter is unsafe to clean, the customer will be notified"], ["3.4", "Concealed Items.", "The Company is not responsible for damage to items concealed by leaves or vegetation, including hoses, toys, unmarked sprinkler heads and low-voltage wiring."]]}, {"n": 4, "title": "Snow and Ice Removal Terms", "svc": "snow", "items": [["4.1", "Trigger Depth.", "Service is performed after a storm ends, and only when more than 1 inch of snow has accumulated, as measured by the Company at the Property. Drifting snow does not count toward the trigger depth."], ["4.2", "Response Time.", "The Company will clear the Property within 24 hours of the end of the storm. The Company determines when a storm has ended. When a storm brings more than 5 inches of snow, the Company may, at its sole discretion, clear the Property twice, with the first pass made during the storm. The Company is not obligated to make more than one pass per storm and does not guarantee completion by a specific time."], ["4.3", "Route Priority.", "The Company sets its service routes to serve every customer in an efficient and timely manner. Commercial and emergency-access accounts may be serviced first."], ["4.4", "Municipal Plow Windrows.", "Snow deposited at the driveway apron by city or county plows after a Company visit will be cleared on the next scheduled visit, unless the Customer requests and pays for a return trip at the per-push rate."], ["4.5", "Ice Conditions.", "Snow removal does not eliminate all ice. Salt or ice melt is applied on the designated parameters in Section 1.3. The Customer acknowledges that melting, refreezing and runoff can create ice between visits that is outside the Company’s control."], ["4.6", "Snow Placement.", "The Company will pile snow in reasonable locations on the Property and will not push snow into public streets."], ["4.7", "Site Markers.", "The Company may install stakes or markers along drive edges, curbs, beds and fixtures before the first snowfall. The Customer shall leave markers in place until the season ends. If removed, the customer is liable for any and all damages incurred."]]}, {"n": 5, "title": "Holiday Lighting Terms", "svc": "lights", "items": [["5.1", "Installation and Removal.", "Installation and removal will be completed by the dates in Section 1.4, weather permitting."], ["5.2", "Ownership of Materials.", "Company-supplied lights, clips, cords and timers remain the property of the Company and are leased to the Customer for the season. The Customer shall pay replacement cost for leased materials lost, stolen, or damaged. Additional Customer-owned lights remain the Customer’s property, and the Company is not responsible for their operation or maintenance."], ["5.3", "Electrical Supply.", "The Customer shall provide working, GFCI-protected exterior outlets of adequate capacity. The Company does not perform electrical wiring and is not responsible for tripped breakers, outlet failures or electricity costs."], ["5.4", "Maintenance.", "The Company provides one free service visit. Any additional maintenance visit will result in a charge to the client. Damage caused by weather, animals, vandalism or the Customer will be billed at the service-call rate."], ["5.5", "Attachment.", "The Company uses clips and fasteners designed to minimize damage. The Company is not responsible for minor marks from normal clip installation or for damage resulting from pre-existing rot, loose gutters, brittle shingles or structural weakness."]]}, {"n": 6, "title": "Payment Terms", "svc": "", "items": [["6.1", "Deposit.", "A full deposit is required at the signing of the contract. No service will be scheduled until the deposit is received."], ["6.2", "Payment Methods.", ""], ["6.3", "Late Payment.", "Late payments incur a 10% penalty fee. The Company may suspend services while an account is past due; suspension does not reduce the amount owed."], ["6.4", "Returned Payments.", "Each returned check or reversed payment that results in a late payment will incur the same 10% penalty fee plus any additional charges incurred by the Company related towards collecting payment."], ["6.5", "Collection Costs.", "To the extent permitted by Michigan law, the Customer shall pay reasonable collection costs and attorney fees incurred by the Company to collect any unpaid balance."], ["6.6", "Billing Disputes.", "The Customer must dispute any invoice in writing within 30 days of its date. Undisputed amounts remain due when payable."]]}, {"n": 7, "title": "Customer Obligations", "svc": "", "items": [["7.1", "", "Provide access to all service areas, including unlocked gates."], ["7.2", "", "Keep service areas clear of vehicles, refuse containers, toys, hoses and other objects. Blocked areas may be skipped or serviced around and will still be billed."], ["7.3", "", "Identify or mark concealed or fragile items before service, including sprinkler heads, landscape lighting, buried cables, invisible pet fencing, low walls, decorative stones and curbing."], ["7.4", "", "Keep pets secured during service visits."], ["7.5", "", "Report any damage or service deficiency in writing (text or email is acceptable) within forty-eight (48) hours of the visit, with photographs when possible. Late claims may be denied."], ["7.6", "", "Promptly notify the Company of changes to the Property, including new landscaping, construction, or a change in ownership or occupancy."]]}, {"n": 8, "title": "Insurance, Liability and Force Majeure", "svc": "", "items": [["8.1", "Insurance.", "The Company maintains general liability insurances related to the services provided."], ["8.2", "Repair of Damage.", "If the Company’s negligence damages the Property, the Company will, at its option, repair the damage or pay the reasonable cost of repair, provided the Customer gives timely notice under Section 7.5."], ["8.3", "Exclusions.", "The Company is not responsible for: ordinary wear to turf, lawn edges and gravel from plowing; damage to concealed, unmarked or undisclosed items; pre-existing conditions; effects of ordinary salt or ice-melt use (including concrete scaling and damage to plants or turf) where such service was requested; or damage to concrete, asphalt or pavers in poor condition."], ["8.4", "Changing Conditions.", "Snow and ice conditions may change after the Company leaves the Property. The Customer remains responsible for monitoring the Property between visits, warning visitors of hazards, and requesting additional service when needed. The Company is responsible only for its own negligence in performing the services selected in Article 2."], ["8.5", "Limitation of Liability.", "Except for gross negligence or willful misconduct, the Company’s total liability under this Agreement shall not exceed the amount paid by the Customer for the season in which the claim arose. Neither Party is liable for indirect, incidental or consequential damages, including lost profits or rental income."], ["8.6", "Force Majeure.", "The Company is not in breach for delays or failures caused by severe weather, travel bans, equipment failure, fuel shortages, illness, road closures or other events beyond its reasonable control. Service will resume as soon as reasonably practicable."]]}, {"n": 9, "title": "Cancellation and Termination", "svc": "", "items": [["9.1", "Customer’s Three-Day Right to Cancel.", "The Customer may cancel this Agreement, without any penalty or obligation, at any time before midnight of the third business day after the date of this Agreement, by written notice to the Company. If the Customer cancels within that period, the Company will refund all payments made under this Agreement within 10 business days after receiving the notice. See the Notice of Cancellation at the end of this Agreement."], ["9.2", "By Company.", "The Company may terminate this Agreement on 3 days’ written notice, or immediately for non-payment, unsafe conditions, or abusive conduct toward Company personnel. The Company will refund prepaid amounts for services not performed."], ["9.3", "No Automatic Renewal.", "This Agreement does not renew automatically. The Company may offer renewal in writing before the next season."]]}, {"n": 10, "title": "General Provisions", "svc": "", "items": [["10.1", "Independent Contractor.", "The Company is an independent contractor and controls the means, methods, equipment, and personnel used to perform the services, and may use subcontractors."], ["10.2", "Photographs.", "The Company may photograph the Property before and after service for its records."], ["10.3", "Entire Agreement; Amendments.", "This Agreement, with any attached exhibits, is the entire agreement of the Parties and supersedes all prior discussions. Amendments must be in writing and signed or confirmed by email by both Parties."], ["10.4", "Governing Law; Venue.", "This Agreement is governed by the laws of the State of Michigan. Any dispute shall be brought in the courts of Wayne County, Michigan, including small claims court where eligible."], ["10.5", "Severability.", "If any provision is held unenforceable, the remaining provisions remain in full force and effect."], ["10.6", "Notices.", "Notices under this Agreement may be delivered by hand, mail, or email to the addresses in Article 1."], ["10.7", "Counterparts; Electronic Signatures.", "This Agreement may be signed in counterparts and by electronic signature, each of which is deemed an original."]]}];
+  {k:"showcase",n:"Showcase",d:"Everything in Full Front, plus 2 more shrubs (6 total), 1 medium tree wrapped, and a full season Fall Cleanup.",sw:1650,n2:1960},
+  {k:"fullfront",n:"Full Front",d:"Roofline, plus up to 4 front shrubs wrapped.",sw:925,n2:1080},
+  {k:"roofline",n:"Roofline",d:"Front roofline, up to 120 ft, and a wreath hung on the front door.",sw:645,n2:825} ];
+const SSA_LIGHTS_NOTE = "The Company owns all lights and equipment; the Customer never buys or stores anything. Every package includes LED lights, installation by the Company's crew, a timer supplied and set, one service call during the season (Section 5.4), a wreath hung on the front door, every light lit by Thanksgiving (November 26), and removal by the end of January.";
+const SSA_ADDONS = [["shrub","Extra shrub",65],["medTree","Medium tree",235],["lgTree","Large tree",335],["wreath","Extra wreath, hung",55]];
+const SSA_L_ADJ = [["two","Two-storey home",155],["twoShow","Two-storey home (Showcase)",235],["steep","Steep roof over 7/12 pitch",130]];
+// sw / n2: season price South (and Westland) / North. ppSw / ppN: per-visit rate after the sixteenth visit.
+const SSA_SNOW = [{k:"standard",n:"Standard lot",sw:570,n2:610,ppSw:45,ppN:50},{k:"corner",n:"Corner lot",sw:775,n2:820,ppSw:60,ppN:65}];
+const SSA_NEIGHBOR = 50;
+const SSA_CALL = { plain:40, ladder:65 };
+const SSA_TERM = { fall:["Fall Cleanup","Two visits, October to November, timed to the city leaf pickup for the Property's section"], lights:["Holiday Lighting","Installed by November 26; removed by the end of January"], snow:["Snow & Ice Removal","November 1 to March 15"] };
+const SSA_ART = [
+ {n:3, title:"Fall Cleanup Terms", svc:"fall", items:[
+  ["3.1","Scheduling.","The Company schedules two visits, each timed to the city curbside leaf pickup for the Property's section. Gutters are cleared on the final visit."],
+  ["3.2","Debris Disposal.","Leaves and yard waste are blown to the curb for the city's collection service. The Company does not bag or haul leaves."],
+  ["3.3","Gutters.","Gutter cleaning covers gutters safely reachable by ladder. If the crew determines a gutter is unsafe to clean, the Company will notify the Customer."],
+  ["3.4","Concealed Items.","The Company is not responsible for damage to items concealed by leaves or vegetation, including hoses, toys, unmarked sprinkler heads and low-voltage wiring."]]},
+ {n:4, title:"Snow and Ice Removal Terms", svc:"snow", items:[
+  ["4.1","Trigger Depth.","Service is performed when 1 inch or more of snow has accumulated, as measured by the Company at the Property. Drifting snow does not count toward the trigger depth."],
+  ["4.2","Timing.","The Company is not required to begin service until a storm has stopped, and will clear the Property within 24 hours after the storm stops. The Company determines when a storm has stopped. The Company may, at its sole discretion, begin clearing during a storm and make more than one pass. Passes made during a storm that brings 5 inches or less count as one visit together with the pass after it; when a storm brings more than 5 inches, each pass counts as a separate visit. The Company does not guarantee completion by a specific time."],
+  ["4.3","Route Priority.","The Company sets its service routes to serve every customer in an efficient and timely manner. Commercial and emergency-access accounts may be serviced first."],
+  ["4.4","Municipal Plow Windrows.","Snow deposited at the driveway apron by city or county plows after a Company visit will be cleared on the next visit, unless the Customer requests a return trip. A return trip counts as a visit under Section 4.8."],
+  ["4.5","Salt and Ice.","Salt is applied to the cleared areas after every visit. Snow removal does not eliminate all ice. The Customer acknowledges that melting, refreezing and runoff can create ice between visits that is outside the Company’s control."],
+  ["4.6","Snow Placement.","The Company will pile snow in reasonable locations on the Property and will not push snow into public streets."],
+  ["4.7","Site Markers.","The Company may install stakes or markers along drive edges, curbs, beds and fixtures before the first snowfall. The Customer shall leave markers in place until the season ends. If they are removed, the Customer is liable for any resulting damage."],
+  ["4.8","",""],
+  ["4.9","Service Hours.","The Company does not operate equipment at residential properties before 7:00 a.m. or after 11:00 p.m."],
+  ["4.10","Visit Photos.","The Company takes a time-stamped photo of the Property after every visit and sends it to the Customer. These photos are the Company’s record that the visit was made."]]},
+ {n:5, title:"Holiday Lighting Terms", svc:"lights", items:[
+  ["5.1","Installation and Removal.","Installation and removal will be completed by the dates in Section 1.4, weather permitting."],
+  ["5.2","Ownership of Materials.","All lights, clips, cords and timers are owned by the Company and are provided to the Customer for the season only. The Customer shall pay the replacement cost of Company materials that are lost, stolen, or damaged while at the Property, other than through normal use or the Company’s own fault."],
+  ["5.3","Electrical Supply.","The Customer shall provide working, GFCI-protected exterior outlets of adequate capacity. The Company does not perform electrical wiring and is not responsible for tripped breakers, outlet failures or electricity costs."],
+  ["5.4","Service Calls.",`The Company will respond to a service call within 48 hours of the Customer’s request. The first service call of the season is included. Each additional service call is charged to the payment method on file after the call: $${SSA_CALL.plain} when the repair needs no ladder, $${SSA_CALL.ladder} when it needs a ladder. Replacement materials needed because of damage by the Customer, vandalism, theft, or animals are charged at replacement cost under Section 5.2.`],
+  ["5.5","Attachment.","The Company uses clips and fasteners designed to minimize damage. The Company is not responsible for minor marks from normal clip installation or for damage resulting from pre-existing rot, loose gutters, brittle shingles or structural weakness."]]},
+ {n:6, title:"Payment Terms", svc:"", items:[
+  ["6.1","Payment Schedule.","Fall Cleanup and Snow Removal are paid in full at signing. Holiday Lighting is paid fifty percent (50%) at signing and the balance on the day installation is complete. Visits past the season limit are charged under Section 4.8, and additional lighting service calls under Section 5.4. No service is scheduled until the amount due at signing has been paid."],
+  ["6.2","Payment Method on File.","The Customer shall keep a valid credit or debit card on file with the Company for the length of this Agreement. With the Company’s approval, the Customer may instead keep a bank account on file for electronic (ACH) payment. A Customer who does not keep a payment method on file may instead pay every amount under this Agreement in advance by check at signing, payable to Mangiapane Brothers LLC; no service is scheduled until the check is received. Payment information is stored by the Company’s payment processor, QuickBooks Payments (Intuit Inc.). The Company keeps only the card brand and last four digits."],
+  ["6.3","Due Dates and Declined Payments.","Each amount is due on the day stated in this Agreement. If a charge to the payment method on file is declined or fails for any reason, including an expired card or insufficient funds, the amount is past due as of that day. The Company will notify the Customer, and the Customer shall pay the amount or provide a working payment method. While any amount is past due, the Company may retry the charge, suspend service, and collect the amount under Section 6.5. Suspension does not reduce the amount owed. Any additional time the Company allows is at its discretion and does not waive this Section."],
+  ["6.4","Reversed Payments.","If a payment is reversed, charged back, or returned after the Company has performed the service it paid for, the amount remains due, and the Customer shall also pay any fees the Company is charged for the reversal."],
+  ["6.5","Collection Costs.","To the extent permitted by Michigan law, the Customer shall pay reasonable collection costs and attorney fees incurred by the Company to collect any unpaid balance."],
+  ["6.6","Billing Disputes.","The Customer must dispute any charge in writing (text or email is acceptable) within 30 days of the receipt for it. Undisputed amounts remain due when payable."],
+  ["6.7","Authorization to Charge.","By signing this Agreement, the Customer authorizes Mangiapane Brothers LLC to charge the payment method on file, without a separate approval each time, for: (a) each amount due under Section 6.1 when it comes due; (b) visits after the season limit under Section 4.8; (c) additional lighting service calls under Section 5.4; (d) replacement of Company materials under Section 5.2; and (e) any additional service the Customer requests in writing (text or email is acceptable) at the price agreed for it. This authorization remains in effect until every amount owed under this Agreement has been paid. The Customer may replace the payment method on file at any time by contacting the Company."],
+  ["6.8","Receipts.","The Company emails a receipt for every charge to the email address(es) in Article 1, showing the service, the Property, the date of service, and the amount. The Company does not send notice before a charge; the receipt is the Customer’s record. Charges appear on statements as Mangiapane Brothers."]]},
+ {n:7, title:"Customer Obligations", svc:"", items:[
+  ["7.1","","Provide access to all service areas, including unlocked gates."],
+  ["7.2","","Keep service areas clear of vehicles, refuse containers, toys, hoses and other objects. Blocked areas may be skipped or serviced around and will still be charged."],
+  ["7.3","","Identify or mark concealed or fragile items before service, including sprinkler heads, landscape lighting, buried cables, invisible pet fencing, low walls, decorative stones and curbing."],
+  ["7.4","","Keep pets secured during service visits."],
+  ["7.5","","Report any damage or service deficiency in writing (text or email is acceptable) within forty-eight (48) hours of the visit, with photographs when possible. Late claims may be denied."],
+  ["7.6","","Promptly notify the Company of changes to the Property, including new landscaping, construction, or a change in ownership or occupancy."]]},
+ {n:8, title:"Insurance, Liability and Force Majeure", svc:"", items:[
+  ["8.1","Insurance.","The Company maintains general liability insurances related to the services provided."],
+  ["8.2","Repair of Damage.","If the Company’s negligence damages the Property, the Company will, at its option, repair the damage or pay the reasonable cost of repair, provided the Customer gives timely notice under Section 7.5."],
+  ["8.3","Exclusions.","The Company is not responsible for: ordinary wear to turf, lawn edges and gravel from plowing; damage to concealed, unmarked or undisclosed items; pre-existing conditions; effects of ordinary salt or ice-melt use (including concrete scaling and damage to plants or turf) where such service was requested; or damage to concrete, asphalt or pavers in poor condition."],
+  ["8.4","Changing Conditions.","Snow and ice conditions may change after the Company leaves the Property. The Customer remains responsible for monitoring the Property between visits, warning visitors of hazards, and requesting additional service when needed. The Company is responsible only for its own negligence in performing the services selected in Article 2."],
+  ["8.5","Limitation of Liability.","Except for gross negligence or willful misconduct, the Company’s total liability under this Agreement shall not exceed the amount paid by the Customer for the season in which the claim arose. Neither Party is liable for indirect, incidental or consequential damages, including lost profits or rental income."],
+  ["8.6","Force Majeure.","The Company is not in breach for delays or failures caused by severe weather, travel bans, equipment failure, fuel shortages, illness, road closures or other events beyond its reasonable control. Service will resume as soon as reasonably practicable."]]},
+ {n:9, title:"Cancellation and Termination", svc:"", items:[
+  ["9.1","Customer’s Three-Day Right to Cancel.","The Customer may cancel this Agreement, without any penalty or obligation, at any time before midnight of the third business day after the date of this Agreement, by written notice to the Company. If the Customer cancels within that period, the Company will refund all payments made under this Agreement, to the original payment method, within 10 business days after receiving the notice. See the Notice of Cancellation at the end of this Agreement."],
+  ["9.2","By Company.","The Company may terminate this Agreement on 3 days’ written notice, or immediately for non-payment, unsafe conditions, or abusive conduct toward Company personnel. The Company will refund prepaid amounts for services not performed, to the original payment method."],
+  ["9.3","No Automatic Renewal.","This Agreement does not renew automatically. The Company may offer renewal in writing before the next season."]]},
+ {n:10, title:"General Provisions", svc:"", items:[
+  ["10.1","Independent Contractor.","The Company is an independent contractor and controls the means, methods, equipment, and personnel used to perform the services, and may use subcontractors."],
+  ["10.2","Photographs.","The Company photographs the Property before and after service. Photos may be sent to the Customer with receipts and visit records and are kept as the Company’s service records."],
+  ["10.3","Entire Agreement; Amendments.","This Agreement, with any attached exhibits, is the entire agreement of the Parties and supersedes all prior discussions. Amendments must be in writing and signed or confirmed by email by both Parties."],
+  ["10.4","Governing Law; Venue.","This Agreement is governed by the laws of the State of Michigan. Any dispute shall be brought in the courts of Wayne County, Michigan, including small claims court where eligible."],
+  ["10.5","Severability.","If any provision is held unenforceable, the remaining provisions remain in full force and effect."],
+  ["10.6","Notices.","Notices under this Agreement may be delivered by hand, mail, or email to the addresses in Article 1."],
+  ["10.7","Counterparts; Electronic Signatures and Records.","This Agreement may be signed in counterparts and by electronic signature, each of which is deemed an original. The Customer agrees to receive this Agreement, the Notice of Cancellation, receipts, and other notices electronically at the email address(es) in Article 1, and may ask for a paper copy at any time at no charge."]]}];
 const SSA_LOGO = "data:image/png;base64,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";
 const SSA_HEAD = `<div class="ssahead"><img src="${SSA_LOGO}" alt="Mangiapane Brothers Lawn &amp; Snow LLC"><span>${SSA_NAME}</span></div>`;
 
+const ssaZoneOf = region => region==="Newburgh / 7 Mile" ? "north" : region==="Westland" ? "westland" : "south";
 const ssaBlank = c => ({
-  zone: c.region==="Newburgh / 7 Mile" ? "north" : "south",
-  ptype:"Residential", prop:c.address||"", areas:"", pre:"", email:c.email||"",
-  fall:{ on:hasSvc(c,"fall"), two:false, corner:false, oak:false, big:false, bigPrice:"" },
-  lights:{ on:hasSvc(c,"lights"), pkg:"", westland:c.region==="Westland", color:"", shrub:0, medTree:0, lgTree:0, wreath:0, two:false, twoShow:false, steep:false, ft:0 },
-  snow:{ on:hasSvc(c,"snow"), lot:"" } });
-// Showcase outside Westland carries a full Fall Cleanup inside its price.
-const ssaShowcaseFall = S => S.lights.on && S.lights.pkg==="showcase" && !(S.zone==="south" && S.lights.westland);
+  zone: ssaZoneOf(c.region),
+  ptype:"Residential", prop:c.address||"", areas:"", pre:"", email:c.email||"", email2:c.email2||"",
+  neighborName:"", neighborAddr:"",
+  fall:{ on:hasSvc(c,"fall"), two:false, corner:false, oak:false, gutters:false, big:false, bigPrice:"", nb:false },
+  lights:{ on:hasSvc(c,"lights"), pkg:"", color:"", shrub:0, medTree:0, lgTree:0, wreath:0, two:false, twoShow:false, steep:false, ft:0, nb:false },
+  snow:{ on:hasSvc(c,"snow"), lot:"", nb:false } });
+// Showcase carries a full season Fall Cleanup inside its price. It is sold only in Livonia (South or North).
+const ssaShowcaseFall = S => S.lights.on && S.lights.pkg==="showcase" && S.zone!=="westland";
+const r2 = n => Math.round(n*100)/100;
+// Prices, the neighbor credit, and the payment schedule: what is charged at signing, and what on install day.
 function ssaCalc(S){
-  const f=S.fall, l=S.lights, s=S.snow, north=S.zone==="north", fl=[], ll=[], sl=[]; let fall=0, lights=0, snow=0;
-  if(f.on){ fall+=SSA_FALL[S.zone]; fl.push([`Full Fall Cleanup (${north?"North":"South"})`,SSA_FALL[S.zone]]);
+  const f=S.fall, l=S.lights, s=S.snow, north=S.zone==="north", area=SSA_ZONES[S.zone]||"", fl=[], ll=[], sl=[];
+  let fall=0, lights=0, snow=0, lightsGross=0;
+  const credit = ["Neighbor credit (Section 6.9)", -SSA_NEIGHBOR];
+  if(f.on && S.zone!=="westland"){ fall+=SSA_FALL[S.zone]; fl.push([`Full Fall Cleanup, ${area}`,SSA_FALL[S.zone]]);
     SSA_FALL_ADJ.forEach(([k,n,p])=>{ if(f[k]){ fall+=p; fl.push([n,p]); } });
-    if(f.big){ const p=+f.bigPrice||0; fall+=p; fl.push(["Lawn over 10,000 sq ft (walk-through)",p]); } }
-  if(l.on && l.pkg){ const P=SSA_PKG.find(x=>x.k===l.pkg), wl=l.pkg==="showcase"&&!north&&l.westland; const p = north?P.n2:(wl?P.wl:P.sw);
-    lights+=p; ll.push([`${P.n} (${north?"North":(wl?"Westland":"South / Westland")})`,p]);
+    if(f.big){ const p=+f.bigPrice||0; fall+=p; fl.push(["Turf over 10,000 sq ft (walked)",p]); }
+    if(f.nb){ fall-=SSA_NEIGHBOR; fl.push(credit); } }
+  if(l.on && l.pkg){ const P=SSA_PKG.find(x=>x.k===l.pkg); const p = north?P.n2:P.sw;
+    lights+=p; ll.push([`${P.n}, ${area}`,p]);
     SSA_ADDONS.forEach(([k,n,pr])=>{ if(l[k]>0){ lights+=l[k]*pr; ll.push([`${n} × ${l[k]}`,l[k]*pr]); } });
     SSA_L_ADJ.forEach(([k,n,pr])=>{ if(!l[k]) return; if(k==="two"&&l.pkg==="showcase") return; if(k==="twoShow"&&l.pkg!=="showcase") return; lights+=pr; ll.push([n,pr]); });
-    if(l.ft>0){ lights+=l.ft*6; ll.push([`Roofline beyond 120 ft: ${l.ft} ft × $6`,l.ft*6]); } }
-  if(s.on && s.lot){ const P=SSA_SNOW.find(x=>x.k===s.lot); snow=north?P.n2:P.sw; sl.push([`${P.n} (${north?"North":"South / Westland"})`,snow]); }
-  return { fall, lights, snow, total:fall+lights+snow, fl, ll, sl };
+    if(l.ft>0){ lights+=l.ft*6; ll.push([`Roofline beyond 120 ft: ${l.ft} ft × $6`,l.ft*6]); }
+    lightsGross=lights;
+    if(l.nb){ lights-=SSA_NEIGHBOR; ll.push(credit); } }
+  if(s.on && s.lot){ const P=SSA_SNOW.find(x=>x.k===s.lot); snow=north?P.n2:P.sw; sl.push([`${P.n}, season, ${area}`,snow]);
+    if(s.nb){ snow-=SSA_NEIGHBOR; sl.push(credit); } }
+  // Lights: half of the price before the credit at signing; the credit comes off the install-day balance.
+  const lightsHalf = r2(lightsGross/2);
+  const dueNow = r2(fall + snow + lightsHalf), dueInstall = r2(lights - lightsHalf);
+  return { fall, lights, snow, total:r2(fall+lights+snow), fl, ll, sl, lightsGross, dueNow, dueInstall };
 }
 // Newest signed, not voided agreement on a client, and whether a seasonal service is still not covered by one.
 function ssaSigned(c){ return Object.entries(c.contracts||{}).filter(([,m])=>m.tpl==="seasonal"&&m.status==="signed"&&!m.voided).sort((a,b)=>b[1].signedAt-a[1].signedAt)[0]||null; }
 function ssaOpen(c, sid){ const sg=ssaSigned(c), cov=(sg&&sg[1].covers)||{}; return svcList(c).some(s=>SSA_TYPES.includes(s.type) && (!sid||s.sid===sid) && !cov[s.type]); }
+// On a lead card: Email contract until it is signed, then Signed · View. An open link shows its live status.
+function leadCtrHtml(id, c){
+  const sg=ssaSigned(c), r=c.signReq;
+  if(sg) return `<div class="leadctr"><button type="button" class="small signedbtn" data-lead-view="${id}|${sg[0]}">\u2713 Signed \u00B7 View</button></div>`;
+  const open = r && OPEN_REQ.includes(r.status), signedReq = r && r.status==="signed";
+  return `<div class="leadctr">${open||signedReq?`<button type="button" class="small" data-lead-status="${id}" title="${esc(reqStatusText(r))}">${esc(reqStatusText(r))}</button>`:""}
+    ${signedReq?"":`<button type="button" class="small primary" data-lead-send="${id}">${open?"Resend contract":"Email contract"}</button>`}</div>`;
+}
+function showSentFor(clientId){ signCtx={ mode:"sent", clientId, S:signCtx?.S }; showSent(); if(!$("#signDlg").open) $("#signDlg").showModal(); }
 function ssaRowHtml(c, dirty){
   const sg=ssaSigned(c), open=ssaOpen(c), has=svcList(c).some(s=>SSA_TYPES.includes(s.type));
   const covered = sg ? SSA_TYPES.filter(t=>(sg[1].covers||{})[t]).map(t=>SERVICE_TYPES[t].label).join(", ") : "";
   return `<div class="ctr"><div class="t"><b>${SSA_NAME}</b><div class="meta">${sg ? "Covers: "+esc(covered)+(open?". A service was added since; sign a new agreement to cover it.":"") : "Fall cleanup, Christmas lights and snow. You choose the services and options, the customer only signs."}${c.ssaDraft&&!sg?" Setup saved, not signed.":""}</div></div>
     ${sg?`<span class="pill signed">Signed ${fmtDate(new Date(sg[1].signedAt).toLocaleDateString("en-CA",{timeZone:TZ}))}</span><button type="button" class="small" data-view-ctr="${sg[0]}">View</button>`:(has?`<span class="pill unsigned">Not signed</span>`:"")}
-    <button type="button" class="small ${sg&&!open?"":"primary"}" data-ssa="1" ${dirty?"disabled":""}>${sg?"New agreement":"Set up and sign"}</button></div>`;
+    ${!sg&&c.signReq&&OPEN_REQ.includes(c.signReq.status)?`<span class="pill open" title="${esc((c.signReq.to||[]).join(", "))}">${esc(reqStatusText(c.signReq))}</span>`:""}
+    <button type="button" class="small ${sg&&!open?"":"primary"}" data-ssa="1" ${dirty?"disabled":""}>${sg?"New agreement":"Set up, email or sign"}</button></div>`;
 }
 // Tables in contract text: lines starting with "|". "|=" is a header row, "|+" a total row.
 function ssaTable(lines, inline){
   return "<table>"+lines.map(l=>{ const kind=l[1]==="="?"h":l[1]==="+"?"t":""; const cells=l.replace(/^\|[=+]?/,"").split(/\s*\|\s*/).map(x=>x.trim());
-    return `<tr${kind==="t"?' class="tot"':""}>`+cells.map((x,i)=> kind==="h" ? `<th>${inline(x)}</th>` : `<td${i===cells.length-1&&/^[+]?\$/.test(x)?' class="r"':""}>${inline(x)}</td>`).join("")+"</tr>"; }).join("")+"</table>";
+    return `<tr${kind==="t"?' class="tot"':""}>`+cells.map((x,i)=> kind==="h" ? `<th>${inline(x)}</th>` : `<td${i===cells.length-1&&/^[+−-]?\$/.test(x)?' class="r"':""}>${inline(x)}</td>`).join("")+"</tr>"; }).join("")+"</table>";
 }
 // The agreement as text, holding only what applies to the services chosen. Article numbers are kept as in
 // the full agreement so the cross references inside the clauses (Section 1.3, 6.1, 7.5) stay true.
 function ssaText(c, S, k, agNo){
   const t = v => String(v||"").replace(/[|\r\n]+/g," ").trim();
-  const on = { fall:S.fall.on, lights:S.lights.on, snow:S.snow.on }, termFall = on.fall || ssaShowcaseFall(S);
+  const sm = v => v<0 ? "−"+(money(-v)||"$0") : (money(v)||"$0");
+  const on = { fall:S.fall.on && S.zone!=="westland", lights:S.lights.on, snow:S.snow.on }, termFall = on.fall || ssaShowcaseFall(S);
+  const pp = ssaPerPush(S), nbAny = (on.fall&&S.fall.nb)||(on.lights&&S.lights.nb)||(on.snow&&S.snow.nb);
+  const md = today().slice(5), bundle = on.lights && termFall && md<="10-15";
   const o=[]; const P = (...x) => o.push(x.join("\n"));
-  const lineTable = (rows, label, total) => ["|= Item | Price", ...rows.map(r=>`| ${r[0]} | ${money(r[1])||"$0"}`), `|+ ${label} | ${money(total)||"$0"}`].join("\n");
+  const lineTable = (rows, label, total) => ["|= Item | Price", ...rows.map(r=>`| ${r[0]} | ${sm(r[1])}`), `|+ ${label} | ${sm(total)}`].join("\n");
   P("# SEASONAL SERVICES AGREEMENT");
   P([termFall&&"Fall Cleanup", on.lights&&"Holiday Lighting", on.snow&&"Snow & Ice Removal"].filter(Boolean).join(" • "));
   P(`**Agreement No.:** ${agNo}`, `**Effective Date:** ${fmtLong(today())}`);
-  P("This Seasonal Services Agreement is entered into by and between **Mangiapane Brothers LLC** and the customer identified below. The Company and the Customer are each a “Party” and together the “Parties.” The Parties agree as follows:");
+  P("This Seasonal Services Agreement is entered into by and between **Mangiapane Brothers LLC** (the “Company”) and the customer identified below (the “Customer”). The Company and the Customer are each a “Party” and together the “Parties.” The Parties agree as follows:");
   P("## Article 1: Parties, Property and Term");
-  P("|= | Customer Information", `| Name | ${t(c.name)}`, `| Address | ${t(c.address)}`, `| Phone | ${t(c.phone)}`, `| Email | ${t(S.email)||"Not provided"}`);
+  P("|= | Customer Information", `| Name | ${t(c.name)}`, `| Address | ${t(c.address)}`, `| Phone | ${t(c.phone)}`, `| Email | ${t(S.email)||"Not provided"}`, ...(S.email2?[`| Second email | ${t(S.email2)}`]:[]));
   P(`**1.1 Service Property.** The services will be performed at: ${t(S.prop)}`);
   P(`**1.2 Property Type.** ${t(S.ptype)}`);
-  P(`**1.3 Service Areas.** Driveway, walks, steps, public sidewalk, parking areas and other areas to be serviced: ${t(S.areas)||"As walked with the Customer at signing"}`);
+  P(`**1.3 Service Areas.** ${t(S.areas) || (on.snow ? "Driveway, apron, front walk to the door, porch steps, and the public sidewalk across the front of the lot." : "As walked with the Customer at signing.")}`);
   P("**1.4 Term.** This Agreement begins on the Effective Date and covers the season(s) below. It ends when the last selected season ends unless renewed in writing.");
   P("|= Service | Timeframe", ...[termFall&&"fall", on.lights&&"lights", on.snow&&"snow"].filter(Boolean).map(x=>`| ${SSA_TERM[x][0]} | ${SSA_TERM[x][1]}`));
   P("## Article 2: Services and Pricing");
-  P("The Customer purchases only the services marked below at the prices stated. Applicable Michigan sales tax will be added where required by law. If payment is provided by card, the Customer will pay the additional service charge.");
+  P("The Customer purchases only the services listed below at the prices stated. All prices include card processing; there is no separate card fee.");
   if(on.fall){ P("### 2.1 Fall Cleanup"); P(`**Full Fall Cleanup.** ${SSA_FALL_DESC}`); P(lineTable(k.fl,"Fall Cleanup Total",k.fall)); }
   if(on.lights){ const pk=SSA_PKG.find(x=>x.k===S.lights.pkg);
-    P("### 2.2 Christmas Lights"); P(`**${pk.n}.** ${pk.d}`); P(SSA_LIGHTS_NOTE); P(`**Light Color:** ${t(S.lights.color)}`); P(lineTable(k.ll,"Christmas Lights Total",k.lights)); }
-  if(on.snow){ P("### 2.3 Snow Removal"); P(lineTable(k.sl,"Snow Removal Total",k.snow)); }
+    P("### 2.2 Holiday Lighting"); P(`**${pk.n}.** ${pk.d}`); P(SSA_LIGHTS_NOTE); P(`**Light Color:** ${t(S.lights.color)}`); P(lineTable(k.ll,"Holiday Lighting Total",k.lights)); }
+  if(on.snow){ P("### 2.3 Snow Removal"); P([...lineTable(k.sl,"Snow Removal Season Total",k.snow).split("\n"), `| Each visit after the sixteenth (Section 4.8) | ${money(pp)}`].join("\n")); }
+  if(bundle){ P("### 2.4 Priority Scheduling"); P("Because Fall Cleanup and Holiday Lighting were both signed by October 15, the Customer receives a locked installation week and first place on the route for both leaf visits. No price reduction applies."); }
   for(const A of SSA_ART){
     if(A.svc && !(A.svc==="fall" ? termFall : on[A.svc])) continue;
     P(`## Article ${A.n}: ${A.title}`);
     if(A.n===7) P("The Customer shall:");
     for(const [num,head,body] of A.items){
-      if(num==="6.2"){ P(`**6.2 Payment Methods.** Cash, Check, Credit/Debit Card, Electronic transfer.`); P("Card payments and other electronic transfers may be subject to a 3% processing fee."); continue; }
+      if(num==="4.8"){ P(`**4.8 Season Limit.** The season price covers up to sixteen (${SSA_PUSHES}) visits, counted under Section 4.2. Each visit after the sixteenth is charged to the payment method on file after that visit, at the per-visit rate in Section 2.3 (${money(pp)}).`); continue; }
       P(head ? `**${num} ${head}** ${body}` : `**${num}** ${body}`);
     }
-    if(A.n===4) P(`**4.8 Season Limit.** The season price covers up to sixteen (${SSA_PUSHES}) snow removal visits. Each visit after the sixteenth will be invoiced at the per-push rate of ${money(ssaPerPush(S))} for the Property’s area and lot type. Each pass counts as one visit, so a storm cleared in two passes under Section 4.2 counts as two visits.`);
-    if(A.n===6) P("|= Summary | Amount", ...[on.fall&&["2.1 Fall Cleanup",k.fall], on.lights&&[`2.2 Christmas Lights (${t(S.lights.color)})`,k.lights], on.snow&&["2.3 Snow Removal",k.snow]].filter(Boolean).map(r=>`| ${r[0]} | ${money(r[1])||"$0"}`), `|+ Total due at signing (full deposit, Section 6.1) | ${money(k.total)||"$0"}`);
+    if(A.n===6){
+      if(nbAny) P(`**6.9 Neighbor Credit.** When two households on the same street sign the same service for the same season, each receives a $${SSA_NEIGHBOR} credit on that service, once per account per service, provided both sign before the service deadline (October 24 for Fall Cleanup, October 20 for Holiday Lighting, the first snow dispatch for Snow Removal). The credit is taken off the amount charged at signing for Fall Cleanup, off the installation-day balance for Holiday Lighting, and off the season price for Snow Removal. Neighbor: ${t(S.neighborName)}, ${t(S.neighborAddr)}.`);
+      P("|= Payment Summary | Amount",
+        ...[on.fall&&["2.1 Fall Cleanup",k.fall], on.lights&&[`2.2 Holiday Lighting (${t(S.lights.color)})`,k.lights], on.snow&&["2.3 Snow Removal (season)",k.snow]].filter(Boolean).map(r=>`| ${r[0]} | ${sm(r[1])}`),
+        `|+ Charged at signing (Section 6.1) | ${sm(k.dueNow)}`,
+        ...(on.lights?[`|+ Charged when lighting installation is complete | ${sm(k.dueInstall)}`]:[]),
+        ...(on.snow?[`| Each snow visit after the sixteenth, charged after the visit | ${money(pp)}`]:[]),
+        ...(on.lights?[`| Each lighting service call after the first | No ladder $${SSA_CALL.plain} / ladder $${SSA_CALL.ladder}`]:[]));
+    }
     if(A.n===7) P(`**Pre-existing conditions noted at signing:** ${t(S.pre)||"None noted"}`);
   }
   P("## Signatures");
@@ -1570,7 +1736,6 @@ function ssaText(c, S, k, agNo){
   P("**If you cancel within that period, all payments you have made will be refunded in full within 10 business days after the Company receives your cancellation notice.**");
   return o.join("\n\n");
 }
-
 // Snow: the season price covers this many visits; each one after is invoiced at the per-push rate for the area and lot.
 const SSA_PUSHES = 16;
 const ssaPerPush = S => { const P=SSA_SNOW.find(x=>x.k===S.snow.lot); return P ? (S.zone==="north"?P.ppN:P.ppSw) : 0; };
@@ -1610,7 +1775,7 @@ function ssaNotice(agNo){
 function openSeasonal(clientId){
   askDriveToken().catch(()=>{});
   const c=clients[clientId]; if(!c) return toast("Save the client first.");
-  if(dialogDirty()) return toast("Save the client first, then open the agreement.");
+  if($("#clientDlg").open && openId===clientId && dialogDirty()) return toast("Save the client first, then open the agreement.");
   const base=ssaBlank(c), d=c.ssaDraft||{};
   const S={ ...base, ...d, fall:{...base.fall,...(d.fall||{})}, lights:{...base.lights,...(d.lights||{})}, snow:{...base.snow,...(d.snow||{})} };
   if(!S.prop) S.prop=c.address||""; if(!S.email) S.email=c.email||"";
@@ -1624,69 +1789,91 @@ $("#signDlg").addEventListener("close", ssaBarOff);
 function ssaSetup(){
   const X=signCtx, S=X.S, c=clients[X.clientId]; X.mode="ssa-setup"; X.pad=null; ssaBarOff();
   const ck=(id,label,on)=>`<label class="row ssack"><input type="checkbox" id="${id}" ${on?"checked":""}> <span>${label}</span></label>`;
+  const nb=(id,on)=>ck(id,`Neighbor credit −$${SSA_NEIGHBOR} (same street, same service, both signed by the deadline)`,on);
   $("#signTitle").textContent = SSA_NAME+": setup";
   $("#signBody").innerHTML = `<div class="signpanel" id="ssaForm" style="margin-top:0">
     <h4>${esc(c.name)}</h4>
     <div class="meta">${esc(c.address||"No address on file")} · ${esc(c.phone||"no phone")}. These come from the client record; close this and edit the client to change them.</div>
     <div class="grid2">
-      <div><label>Email for the customer's copy</label><input id="ss-email" type="email" value="${esc(S.email)}" placeholder="name@example.com" autocomplete="off"></div>
-      <div><label>Pricing area</label><select id="ss-zone">${opts(["south","north"],S.zone,{south:"South / Westland",north:"North"})}</select></div>
-      <div style="grid-column:1/-1"><label>Service property (1.1)</label><input id="ss-prop" value="${esc(S.prop)}"></div>
+      <div><label>Email for the customer's copy and receipts</label><input id="ss-email" type="email" value="${esc(S.email)}" placeholder="name@example.com" autocomplete="off"></div>
+      <div><label>Second email (optional)</label><input id="ss-email2" type="email" value="${esc(S.email2||"")}" placeholder="spouse@example.com" autocomplete="off"></div>
+      <div><label>Pricing area</label><select id="ss-zone">${opts(Object.keys(SSA_ZONES),S.zone,SSA_ZONES)}</select></div>
       <div><label>Property type (1.2)</label><select id="ss-ptype">${opts(["Residential","Commercial","Multi-Unit / HOA"],S.ptype)}</select></div>
-      <div><label>Service areas (1.3)</label><input id="ss-areas" value="${esc(S.areas)}" placeholder="Driveway, front walk, steps, public sidewalk"></div>
+      <div style="grid-column:1/-1"><label>Service property (1.1)</label><input id="ss-prop" value="${esc(S.prop)}"></div>
+      <div style="grid-column:1/-1"><label>Service areas (1.3), leave empty for the standard snow areas</label><input id="ss-areas" value="${esc(S.areas)}" placeholder="Driveway, apron, front walk to the door, porch steps, public sidewalk"></div>
       <div style="grid-column:1/-1"><label>Pre-existing conditions noted at signing (Article 7)</label><input id="ss-pre" value="${esc(S.pre)}" placeholder="Cracked apron, loose gutter on garage. Leave empty for none."></div>
     </div>
     <div class="sect">Services</div>
     <div class="svc svcbar fall">${ck("ss-fall",`<b>Fall Cleanup</b> <span class="meta" id="ss-fall-p"></span>`,S.fall.on)}
+      <div class="warnline" id="ss-fall-wl" hidden>Fall Cleanup is not offered in Westland.</div>
       <div id="ss-fall-box" class="ssabox">${SSA_FALL_ADJ.map(([k,n,p])=>ck("ss-f-"+k,`${n} +$${p}`,S.fall[k])).join("")}
-        <div class="row">${ck("ss-f-big","Lawn over 10,000 sq ft, walk-through price $",S.fall.big)}<input id="ss-f-bigp" type="number" inputmode="decimal" min="0" style="width:110px" value="${esc(S.fall.bigPrice)}"></div></div></div>
+        <div class="row">${ck("ss-f-big","Turf over 10,000 sq ft, walked price $",S.fall.big)}<input id="ss-f-bigp" type="number" inputmode="decimal" min="0" style="width:110px" value="${esc(S.fall.bigPrice)}"></div>
+        ${nb("ss-f-nb",S.fall.nb)}</div></div>
     <div class="svc svcbar lights">${ck("ss-lights",`<b>Christmas Lights</b> <span class="meta" id="ss-lights-p"></span>`,S.lights.on)}
       <div id="ss-lights-box" class="ssabox">
-        <div class="grid2"><div><label>Package</label><select id="ss-l-pkg"><option value="">Choose</option>${SSA_PKG.map(P=>`<option value="${P.k}"${S.lights.pkg===P.k?" selected":""}>${P.n} ($${P.sw.toLocaleString()} South, $${P.n2.toLocaleString()} North)</option>`).join("")}</select></div>
+        <div class="grid2"><div><label>Package</label><select id="ss-l-pkg"><option value="">Choose</option>${SSA_PKG.map(P=>`<option value="${P.k}"${S.lights.pkg===P.k?" selected":""}>${P.n} ($${P.sw.toLocaleString()} South and Westland, $${P.n2.toLocaleString()} North)</option>`).join("")}</select></div>
           <div><label>Light color</label><select id="ss-l-color"><option value="">Choose</option>${opts(["Warm white","Multicolor"],S.lights.color)}</select></div></div>
-        <div id="ss-l-wl-row">${ck("ss-l-wl","Westland home: Showcase without Fall Cleanup, $1,160",S.lights.westland)}</div>
+        <div class="warnline" id="ss-l-wl" hidden>Showcase includes the Fall Cleanup, which is not offered in Westland. Sell Full Front plus add-ons instead.</div>
         <label>Add-ons (quantity)</label>
         <div class="row">${SSA_ADDONS.map(([k,n,p])=>`<span class="ssaqty"><input id="ss-a-${k}" type="number" inputmode="numeric" min="0" value="${S.lights[k]||0}"> ${n} $${p}</span>`).join("")}</div>
-        <div id="ss-la-two-row">${ck("ss-la-two","Two-story home +$150",S.lights.two)}</div>
-        <div id="ss-la-twoShow-row">${ck("ss-la-twoShow","Two-story home (Showcase) +$225",S.lights.twoShow)}</div>
-        ${ck("ss-la-steep","Steep roof over 7/12 pitch +$125",S.lights.steep)}
-        <div class="row"><span>Roofline beyond 120 ft, $6 per ft:</span><input id="ss-l-ft" type="number" inputmode="numeric" min="0" style="width:100px" value="${S.lights.ft||""}"><span>ft</span></div></div></div>
+        <div id="ss-la-two-row">${ck("ss-la-two",`Two-storey home +$${SSA_L_ADJ[0][2]}`,S.lights.two)}</div>
+        <div id="ss-la-twoShow-row">${ck("ss-la-twoShow",`Two-storey home (Showcase) +$${SSA_L_ADJ[1][2]}`,S.lights.twoShow)}</div>
+        ${ck("ss-la-steep",`Steep roof over 7/12 pitch +$${SSA_L_ADJ[2][2]}`,S.lights.steep)}
+        <div class="row"><span>Roofline beyond 120 ft, $6 per ft:</span><input id="ss-l-ft" type="number" inputmode="numeric" min="0" style="width:100px" value="${S.lights.ft||""}"><span>ft</span></div>
+        ${nb("ss-l-nb",S.lights.nb)}</div></div>
     <div class="svc svcbar snow">${ck("ss-snow",`<b>Snow Removal</b> <span class="meta" id="ss-snow-p"></span>`,S.snow.on)}
-      <div id="ss-snow-box" class="ssabox"><label>Lot</label><select id="ss-s-lot"><option value="">Choose</option>${SSA_SNOW.map(P=>`<option value="${P.k}"${S.snow.lot===P.k?" selected":""}>${P.n} ($${P.sw} South, $${P.n2} North)</option>`).join("")}</select></div></div>
-    <div class="pstotal"><span>Total due at signing</span><b id="ss-total">$0</b></div>
+      <div id="ss-snow-box" class="ssabox"><label>Lot</label><select id="ss-s-lot"><option value="">Choose</option>${SSA_SNOW.map(P=>`<option value="${P.k}"${S.snow.lot===P.k?" selected":""}>${P.n} ($${P.sw} South and Westland, $${P.n2} North)</option>`).join("")}</select>
+        ${nb("ss-s-nb",S.snow.nb)}</div></div>
+    <div id="ss-nb-box" class="grid2" hidden>
+      <div><label>Neighbor's name</label><input id="ss-nb-name" value="${esc(S.neighborName||"")}" autocomplete="off"></div>
+      <div><label>Neighbor's address</label><input id="ss-nb-addr" value="${esc(S.neighborAddr||"")}" autocomplete="off"></div></div>
+    <div class="pstotal"><span>Charged today</span><b id="ss-now">$0</b></div>
+    <div class="meta" id="ss-later-amt"></div>
     <div class="warnline" id="ss-warn" hidden></div>
     <div class="meta" id="ss-err" style="color:var(--red);font-weight:600;margin-top:8px"></div>
-    <div class="actions"><button type="button" class="left" id="ss-later">Save setup for later</button><button type="button" class="primary big" id="ss-go">Show agreement to customer</button></div>
-    <p class="meta" style="margin:8px 0 0">The customer sees only the services ticked here, with their terms, and signs at the bottom. Your signature is added when you lock it.</p>
+    <div class="actions"><button type="button" class="left" id="ss-later">Save for later</button><button type="button" id="ss-go">Sign here on this device</button><button type="button" class="primary big" id="ss-send">Email contract to sign</button></div>
+    <p class="meta" style="margin:8px 0 0">${svcReady()?`<b>Email contract to sign</b> sends one link to ${esc([S.email,S.email2].filter(Boolean).join(" and ")||"the customer's email")}: the quote, the agreement, a typed-name signature, then their card on the next screen.`:`Emailing the contract needs the signing service: More, Contracts, Signing service.`} <b>Sign here</b> is for door to door and landscaping: the customer signs on this screen, then you take the card.</p>
   </div>`;
   const form=$("#ssaForm"); form.oninput=ssaSync; form.onchange=ssaSync; ssaSync();
   $("#ss-later").onclick = async () => { ssaSync(); try{ await ssaSaveDraft(); toast("Setup saved on the client."); $("#signDlg").close(); }catch(e){ toast("Not saved: "+(e.code||e.message)); } };
   $("#ss-go").onclick = () => { ssaSync(); const e=ssaErrors(); $("#ss-err").textContent = e.length ? "Still needed: "+e.join(", ")+"." : ""; if(!e.length) ssaShow(); };
+  $("#ss-send").onclick = () => { ssaSync(); const e=ssaErrors(); if(!S.email) e.unshift("the customer's email"); $("#ss-err").textContent = e.length ? "Still needed: "+e.join(", ")+"." : ""; if(!e.length) ssaSend(); };
+  if(!S.email) setTimeout(()=>{ const el=$("#ss-email"); if(el && signCtx===X) el.focus({preventScroll:true}); }, 50);
 }
 function ssaSync(){
   const X=signCtx; if(!X || X.mode!=="ssa-setup") return; const S=X.S, g=id=>document.getElementById(id), n=id=>Math.max(0,parseInt(g(id).value)||0);
-  S.email=g("ss-email").value.trim(); S.zone=g("ss-zone").value; S.prop=g("ss-prop").value.trim(); S.ptype=g("ss-ptype").value; S.areas=g("ss-areas").value.trim(); S.pre=g("ss-pre").value.trim();
-  S.fall.on=g("ss-fall").checked; SSA_FALL_ADJ.forEach(([k])=>S.fall[k]=g("ss-f-"+k).checked); S.fall.bigPrice=g("ss-f-bigp").value; S.fall.big=g("ss-f-big").checked;
-  S.lights.on=g("ss-lights").checked; S.lights.pkg=g("ss-l-pkg").value; S.lights.color=g("ss-l-color").value; S.lights.westland=g("ss-l-wl").checked;
+  S.email=g("ss-email").value.trim(); S.email2=g("ss-email2").value.trim(); S.zone=g("ss-zone").value; S.prop=g("ss-prop").value.trim(); S.ptype=g("ss-ptype").value; S.areas=g("ss-areas").value.trim(); S.pre=g("ss-pre").value.trim();
+  S.fall.on=g("ss-fall").checked; SSA_FALL_ADJ.forEach(([k])=>S.fall[k]=g("ss-f-"+k).checked); S.fall.bigPrice=g("ss-f-bigp").value; S.fall.big=g("ss-f-big").checked; S.fall.nb=g("ss-f-nb").checked;
+  S.lights.on=g("ss-lights").checked; S.lights.pkg=g("ss-l-pkg").value; S.lights.color=g("ss-l-color").value; S.lights.nb=g("ss-l-nb").checked;
   SSA_ADDONS.forEach(([k])=>S.lights[k]=n("ss-a-"+k)); SSA_L_ADJ.forEach(([k])=>S.lights[k]=g("ss-la-"+k).checked); S.lights.ft=n("ss-l-ft");
-  S.snow.on=g("ss-snow").checked; S.snow.lot=g("ss-s-lot").value;
-  const k=ssaCalc(S), show=S.lights.pkg==="showcase";
-  g("ss-fall-box").hidden=!S.fall.on; g("ss-lights-box").hidden=!S.lights.on; g("ss-snow-box").hidden=!S.snow.on;
-  g("ss-l-wl-row").hidden=!(show && S.zone==="south"); g("ss-la-two-row").hidden=show; g("ss-la-twoShow-row").hidden=!show;
-  g("ss-fall-p").textContent = S.fall.on ? money(k.fall) : "$"+SSA_FALL[S.zone]; g("ss-lights-p").textContent = S.lights.on&&S.lights.pkg ? money(k.lights) : ""; g("ss-snow-p").textContent = S.snow.on&&S.snow.lot ? money(k.snow) : "";
-  g("ss-total").textContent = money(k.total)||"$0";
+  S.snow.on=g("ss-snow").checked; S.snow.lot=g("ss-s-lot").value; S.snow.nb=g("ss-s-nb").checked;
+  S.neighborName=g("ss-nb-name").value.trim(); S.neighborAddr=g("ss-nb-addr").value.trim(); S.payUrl=(g("ss-payurl")?.value||"").trim();
+  const wl=S.zone==="westland", k=ssaCalc(S), show=S.lights.pkg==="showcase";
+  g("ss-fall-wl").hidden=!(wl && S.fall.on); g("ss-fall-box").hidden=!S.fall.on || wl;
+  g("ss-lights-box").hidden=!S.lights.on; g("ss-snow-box").hidden=!S.snow.on;
+  g("ss-l-wl").hidden=!(wl && show); g("ss-la-two-row").hidden=show; g("ss-la-twoShow-row").hidden=!show;
+  g("ss-nb-box").hidden=!((S.fall.on&&S.fall.nb)||(S.lights.on&&S.lights.nb)||(S.snow.on&&S.snow.nb));
+  g("ss-fall-p").textContent = wl ? "" : S.fall.on ? money(k.fall) : "$"+SSA_FALL[S.zone];
+  g("ss-lights-p").textContent = S.lights.on&&S.lights.pkg ? money(k.lights) : ""; g("ss-snow-p").textContent = S.snow.on&&S.snow.lot ? money(k.snow) : "";
+  g("ss-now").textContent = money(k.dueNow)||"$0";
+  g("ss-later-amt").textContent = [S.lights.on&&S.lights.pkg ? `${money(k.dueInstall)} more is charged when the lights are installed.` : "", S.snow.on&&S.snow.lot ? `Snow visits after the sixteenth: ${money(ssaPerPush(S))} each, charged after the visit.` : ""].filter(Boolean).join(" ");
   const w=g("ss-warn"); const dbl = S.fall.on && ssaShowcaseFall(S);
   w.hidden=!dbl; w.textContent = dbl ? "Showcase already includes a full Fall Cleanup. With Fall Cleanup also ticked, the customer is charged for it twice." : "";
 }
 function ssaErrors(){
-  const S=signCtx.S, e=[];
+  const S=signCtx.S, e=[], wl=S.zone==="westland";
   if(!S.prop) e.push("service property");
   if(!S.fall.on && !S.lights.on && !S.snow.on) e.push("at least one service");
-  if(S.fall.on && S.fall.big && !(+S.fall.bigPrice>0)) e.push("walk-through price for the large lawn");
+  if(wl && S.fall.on) e.push("untick Fall Cleanup (not offered in Westland)");
+  if(wl && S.lights.on && S.lights.pkg==="showcase") e.push("a lights package other than Showcase (Westland)");
+  if(S.fall.on && S.fall.big && !(+S.fall.bigPrice>0)) e.push("the walked price for the large lawn");
   if(S.lights.on && !S.lights.pkg) e.push("lights package");
   if(S.lights.on && !S.lights.color) e.push("light color");
   if(S.snow.on && !S.snow.lot) e.push("snow lot type");
+  if(((S.fall.on&&S.fall.nb)||(S.lights.on&&S.lights.nb)||(S.snow.on&&S.snow.nb)) && (!S.neighborName||!S.neighborAddr)) e.push("the neighbor's name and address for the credit");
   if(S.email && !/^\S+@\S+\.\S+$/.test(S.email)) e.push("a valid email, or leave it empty");
+  if(S.email2 && !/^\S+@\S+\.\S+$/.test(S.email2)) e.push("a valid second email, or leave it empty");
+  if(S.payUrl && !/^https:\/\/\S+$/.test(S.payUrl)) e.push("a QuickBooks link starting with https://, or leave it empty");
   return e;
 }
 function ssaSaveDraft(){ const X=signCtx; return db.ref().update({ ["clients/"+X.clientId+"/ssaDraft"]: JSON.parse(JSON.stringify(X.S)), ["clients/"+X.clientId+"/updatedAt"]: Date.now(), ["clients/"+X.clientId+"/updatedBy"]: me.email }); }
@@ -1718,7 +1905,7 @@ async function ssaShow(){
     <div class="doc ssanotice" id="docNotice">${renderDocHtml(X.notice,"view")}</div>
     `;
   ssaBarOff(); const bar=document.createElement("div"); bar.className="ssabar"; bar.id="ssaBar";
-  bar.innerHTML=`<span>Total due at signing <b>${money(X.k.total)||"$0"}</b></span><button type="button" id="ssaToSign">Go to signature</button>`; $("#signDlg").appendChild(bar);
+  bar.innerHTML=`<span>Charged today <b>${money(X.k.dueNow)||"$0"}</b></span><button type="button" id="ssaToSign">Go to signature</button>`; $("#signDlg").appendChild(bar);
   $("#signBody").scrollTop=0;
   X.pad = makePad($("#padClient"));
   $("#padClientClear").onclick = () => X.pad.clear();
@@ -1726,6 +1913,45 @@ async function ssaShow(){
   $("#ssaBack").onclick = () => ssaSetup();
   renderCompanySig();
   $("#sgLock").onclick = lockSeasonal;
+}
+// What the signed agreement stores about the services chosen. Shared by the iPad signing and the emailed link.
+function ssaDetails(S, k, agNo){
+  const fallOn=S.fall.on && S.zone!=="westland";
+  const nbAny=(fallOn&&S.fall.nb)||(S.lights.on&&S.lights.nb)||(S.snow.on&&S.snow.nb);
+  const details = { agreementNo:agNo, version:SSA_VERSION, zone:S.zone, propertyType:S.ptype, serviceProperty:S.prop, serviceAreas:S.areas, preExisting:S.pre, email:S.email, email2:S.email2||"",
+    total:k.total, dueNow:k.dueNow, dueInstall:k.dueInstall };
+  if(nbAny) details.neighbor = { name:S.neighborName, address:S.neighborAddr, fall:fallOn&&S.fall.nb, lights:S.lights.on&&S.lights.nb, snow:S.snow.on&&S.snow.nb };
+  if(fallOn) details.fall = { lines:k.fl, total:k.fall, options:{ two:S.fall.two, corner:S.fall.corner, oak:S.fall.oak, gutters:S.fall.gutters, big:S.fall.big, bigPrice:S.fall.big?(+S.fall.bigPrice||0):0 } };
+  if(S.lights.on) details.lights = { lines:k.ll, total:k.lights, gross:k.lightsGross, package:S.lights.pkg, color:S.lights.color, includesFallCleanup:ssaShowcaseFall(S),
+    addons:Object.fromEntries(SSA_ADDONS.map(([a])=>[a,S.lights[a]||0]).filter(x=>x[1]>0)), options:{ two:S.lights.pkg!=="showcase"&&S.lights.two, twoShow:S.lights.pkg==="showcase"&&S.lights.twoShow, steep:S.lights.steep }, extraFeet:S.lights.ft||0,
+    serviceCall:{ included:1, noLadder:SSA_CALL.plain, ladder:SSA_CALL.ladder } };
+  if(S.snow.on) details.snow = { lines:k.sl, total:k.snow, lot:S.snow.lot, includedPushes:SSA_PUSHES, perPushAfter:ssaPerPush(S) };
+  return details;
+}
+const ssaSummary = (S,k) => { const fallOn=S.fall.on && S.zone!=="westland"; return [fallOn&&"Fall Cleanup "+money(k.fall), S.lights.on&&"Christmas Lights "+money(k.lights), S.snow.on&&"Snow Removal "+money(k.snow)].filter(Boolean).join(" · "); };
+const ssaCovers = S => { const fallOn=S.fall.on && S.zone!=="westland", c={}; if(fallOn||ssaShowcaseFall(S)) c.fall=true; if(S.lights.on) c.lights=true; if(S.snow.on) c.snow=true; return c; };
+// The client changes a signed agreement makes: services at the agreement price, Active status, emails, payment
+// method missing until recorded, and the charges on the payment schedule. cid is "{{CID}}" for an emailed link
+// (the signing service fills in the contract id when the customer signs).
+function ssaApply(c, id, S, k, agNo, now, cid){
+  const fallOn=S.fall.on && S.zone!=="westland", incFall=ssaShowcaseFall(S) && !fallOn, upd={};
+  if(S.email && S.email!==(c.email||"")) upd["clients/"+id+"/email"]=S.email;
+  if((S.email2||"")!==(c.email2||"")) upd["clients/"+id+"/email2"]=S.email2||null;
+  if(!payOnFileOk(c)) upd["clients/"+id+"/payOnFile"] = { status:"missing", since:now };
+  const desc = `${SSA_NAME} ${agNo}`;
+  if(k.dueNow>0) upd["sync/qb/"+db.ref("sync/qb").push().key] = { type:"charge", trigger:"signing", status:"pending", clientId:id, contractId:cid, amount:k.dueNow, date:today(), description:`${desc}: due at signing`, createdAt:now, createdBy:me.email };
+  if(S.lights.on && k.dueInstall>0) upd["sync/qb/"+db.ref("sync/qb").push().key] = { type:"charge", trigger:"install", status:"scheduled", clientId:id, contractId:cid, amount:k.dueInstall, description:`${desc}: Christmas Lights balance, install day`, createdAt:now, createdBy:me.email };
+  const put = (type, fields, fresh, note) => { const e=Object.entries(c.services||{}).find(([,s])=>s.type===type), sid = e ? e[0] : "s"+now.toString(36)+type;
+    const all = { ...(e?{}:{ type, createdAt:now, ...fresh }), ...fields, notes: e&&e[1].notes && !String(e[1].notes).includes(note) ? e[1].notes+"; "+note : note };
+    for(const [f,v] of Object.entries(all)) upd[`clients/${id}/services/${sid}/${f}`]=v; };
+  const noteOf = lines => lines.map(r=>r[0]).join(", ")+` (${agNo})`;
+  if(fallOn) put("fall", { package:"Two passes", price:k.fall }, { route:"Route 1", pass1:false, pass2:false }, noteOf(k.fl));
+  else if(incFall) put("fall", { package:"Two passes" }, { route:"Route 1", price:0, pass1:false, pass2:false }, `Included in the Showcase lights package (${agNo})`);
+  if(S.lights.on) put("lights", { price:k.lights }, { install:"", takedown:"", gutters:false }, S.lights.color+": "+noteOf(k.ll));
+  if(S.snow.on) put("snow", { price:k.snow }, { crew:"", start:"2026-11-01", end:"2027-03-15" }, noteOf(k.sl));
+  if(LEAD_STAGES.includes(c.status)){ upd["clients/"+id+"/status"]="active"; if(!c.wonAt) upd["clients/"+id+"/wonAt"]=now; }
+  Object.assign(upd, qbCustomerRow(id));
+  return upd;
 }
 async function lockSeasonal(){
   const X=signCtx; if(!X || X.busy || X.kind!=="seasonal") return;
@@ -1735,47 +1961,113 @@ async function lockSeasonal(){
   let companySig = X.mySig?.data || null, saveSig=false;
   if(!companySig){ if(!X.cpad || X.cpad.isEmpty()){ $("#padCompany").scrollIntoView({block:"center"}); return toast("Draw your company signature once."); } companySig=X.cpad.data(); saveSig=true; }
   X.busy=true; $("#sgLock").disabled=true; $("#sgStatus").textContent="Saving…";
-  const now=Date.now(), incFall=ssaShowcaseFall(S) && !S.fall.on;
-  // Only the services chosen are stored.
-  const details = { agreementNo:X.agNo, zone:S.zone, propertyType:S.ptype, serviceProperty:S.prop, serviceAreas:S.areas, preExisting:S.pre, email:S.email, total:k.total };
-  if(S.fall.on) details.fall = { lines:k.fl, total:k.fall, options:{ two:S.fall.two, corner:S.fall.corner, oak:S.fall.oak, big:S.fall.big, bigPrice:S.fall.big?(+S.fall.bigPrice||0):0 } };
-  if(S.lights.on) details.lights = { lines:k.ll, total:k.lights, package:S.lights.pkg, color:S.lights.color, westland:S.zone==="south"&&S.lights.pkg==="showcase"&&S.lights.westland, includesFallCleanup:ssaShowcaseFall(S),
-    addons:Object.fromEntries(SSA_ADDONS.map(([a])=>[a,S.lights[a]||0]).filter(x=>x[1]>0)), options:{ two:S.lights.pkg!=="showcase"&&S.lights.two, twoShow:S.lights.pkg==="showcase"&&S.lights.twoShow, steep:S.lights.steep }, extraFeet:S.lights.ft||0 };
-  if(S.snow.on) details.snow = { lines:k.sl, total:k.snow, lot:S.snow.lot, includedPushes:SSA_PUSHES, perPushAfter:ssaPerPush(S) };
-  const summary = [S.fall.on&&"Fall Cleanup "+money(k.fall), S.lights.on&&"Christmas Lights "+money(k.lights), S.snow.on&&"Snow Removal "+money(k.snow)].filter(Boolean).join(" · ");
+  const now=Date.now(), summary=ssaSummary(S,k);
   const payload = JSON.parse(JSON.stringify({ v:1, kind:"seasonal", clientId:id, tpl:"seasonal", tplName:SSA_NAME, tplVersion:SSA_VERSION, sample:false, sid:"", serviceType:"seasonal",
-    serviceSummary:summary, amount:k.total, agreementNo:X.agNo, details, text:X.text, notice:X.notice, cancelBy:ssaCancelBy(today()), choices:{}, initials:{}, signerName, signedDate:today(), signedAt:now, signature:X.pad.data(),
+    serviceSummary:summary, amount:k.total, agreementNo:X.agNo, details:ssaDetails(S,k,X.agNo), text:X.text, notice:X.notice, cancelBy:ssaCancelBy(today()), choices:{}, initials:{}, signerName, signedDate:today(), signedAt:now, signature:X.pad.data(),
     companySig, companySigner: X.mySig?.name || me.displayName || me.email, witness:me.email, device:navigator.userAgent.slice(0,300) }));
   const hash = await sha256(canon(payload));
   const cid = db.ref("contracts/"+id).push().key;
-  const covers = {}; if(S.fall.on||incFall) covers.fall=true; if(S.lights.on) covers.lights=true; if(S.snow.on) covers.snow=true;
   const upd = {
     ["contracts/"+id+"/"+cid]: { ...payload, status:"signed", hash },
-    ["clients/"+id+"/contracts/"+cid]: { tpl:"seasonal", sid:"", name:SSA_NAME, sample:false, status:"signed", signedAt:now, covers, agreementNo:X.agNo, amount:k.total },
+    ["clients/"+id+"/contracts/"+cid]: { tpl:"seasonal", sid:"", name:SSA_NAME, sample:false, status:"signed", signedAt:now, covers:ssaCovers(S), agreementNo:X.agNo, amount:k.total, dueNow:k.dueNow, dueInstall:k.dueInstall },
     ["clients/"+id+"/ssaDraft"]: null,
     ["clients/"+id+"/lastContactAt"]: now, ["clients/"+id+"/updatedAt"]: now, ["clients/"+id+"/updatedBy"]: me.email,
-    ["clientLog/"+id+"/"+db.ref("clientLog").push().key]: { text:`Signed ${SSA_NAME} ${X.agNo}: ${summary}. Total ${money(k.total)}.`, at:now, by:me.email, source:"contract" }
+    ["clientLog/"+id+"/"+db.ref("clientLog").push().key]: { text:`Signed ${SSA_NAME} ${X.agNo} (version ${SSA_VERSION}) on this device: ${summary}. Total ${money(k.total)}; charged at signing ${money(k.dueNow)}${S.lights.on?`, at install ${money(k.dueInstall)}`:""}.`, at:now, by:me.email, source:"contract" },
+    ...ssaApply(c, id, S, k, X.agNo, now, cid)
   };
-  if(S.email && S.email!==(c.email||"")) upd["clients/"+id+"/email"]=S.email;
-  // The services on the client record follow the agreement, so the Fall, Lights and Snow tabs fill themselves.
-  const put = (type, fields, fresh, note) => { const e=Object.entries(c.services||{}).find(([,s])=>s.type===type), sid = e ? e[0] : "s"+now.toString(36)+type;
-    const all = { ...(e?{}:{ type, createdAt:now, ...fresh }), ...fields, notes: e&&e[1].notes && !String(e[1].notes).includes(note) ? e[1].notes+"; "+note : note };
-    for(const [f,v] of Object.entries(all)) upd[`clients/${id}/services/${sid}/${f}`]=v; };
-  const noteOf = lines => lines.map(r=>r[0]).join(", ")+` (${X.agNo})`;
-  if(S.fall.on) put("fall", { package:"Two passes", price:k.fall }, { route:"Route 1", pass1:false, pass2:false }, noteOf(k.fl));
-  else if(incFall) put("fall", { package:"Two passes" }, { route:"Route 1", price:0, pass1:false, pass2:false }, `Included in the Showcase lights package (${X.agNo})`);
-  if(S.lights.on) put("lights", { price:k.lights }, { install:"", takedown:"", gutters:false }, S.lights.color+": "+noteOf(k.ll));
-  if(S.snow.on) put("snow", { price:k.snow }, { crew:"", start:"2026-11-01", end:"2027-03-15" }, noteOf(k.sl));
-  if(LEAD_STAGES.includes(c.status)){ upd["clients/"+id+"/status"]="active"; if(!c.wonAt) upd["clients/"+id+"/wonAt"]=now; }
+  // An open emailed link for this client is replaced by this signing.
+  if(c.signReq && ["queued","sent","error"].includes(c.signReq.status)){ upd["sync/sign/"+c.signReq.token+"/status"]="cancelled"; upd["clients/"+id+"/signReq/status"]="cancelled"; }
+  // With the signing service set up, it saves the PDF to admin@'s Drive and emails both addresses.
+  const to=[S.email, S.email2].filter(Boolean);
+  if(svcReady()) upd["sync/mail/"+cid] = { kind:"contract", clientId:id, contractId:cid, to, status:"queued", createdAt:now, createdBy:me.email };
   if(saveSig) upd["adminSigs/"+mySigKey()] = { data:companySig, name:me.displayName||me.email, savedAt:now };
-  Object.assign(upd, qbCustomerRow(id));
   try { await db.ref().update(upd); }
   catch(e){ X.busy=false; $("#sgLock").disabled=false; $("#sgStatus").textContent=""; return toast("Not saved. Check the connection and press Sign and lock again. ("+(e.code||e.message)+")"); }
   toast("Signed and locked."); ssaBarOff();
   const rec={ ...payload, status:"signed", hash };
   await viewContract(id, cid, rec);
-  driveStatus(id, cid, rec, true);
+  if(svcReady()) svcCall("mail", { k:cid }); else driveStatus(id, cid, rec, true);
   openPaySheet(id, cid, rec);
+}
+
+// ---------- Email the contract: one link for phone sales ----------
+const SIGN_PAGE = "https://apps.mangbrothers.com/sign.html";
+const svcInfo = () => templates._signing || null;
+const svcReady = () => !!(svcInfo()?.url);
+const svcDeploy = url => (/\/macros\/s\/([\w-]+)\/exec/.exec(String(url||""))||[])[1] || "";
+function svcCall(action, params){
+  const s=svcInfo(); if(!s?.url) return Promise.resolve(null);
+  return fetch(s.url+"?"+new URLSearchParams({ action, ...(params||{}) }), { redirect:"follow" }).then(r=>r.json()).catch(()=>null);
+}
+const OPEN_REQ = ["queued","sent","error"];
+function randToken(){ const a=new Uint8Array(24); crypto.getRandomValues(a); return [...a].map(b=>"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"[b%62]).join("")+Date.now().toString(36); }
+async function ssaSend(){
+  const X=signCtx; if(!X || X.busy) return;
+  const c=clients[X.clientId], S=X.S, id=X.clientId;
+  if(!svcReady()) return toast("Set up the signing service first: More, Contracts, Signing service.");
+  const to=[S.email, S.email2].filter(Boolean);
+  if(!to.length) { $("#ss-err").textContent="Still needed: the customer's email."; $("#ss-email").focus(); return; }
+  const mySig = X.mySig!==undefined ? X.mySig : await loadMySig(); X.mySig=mySig;
+  if(!mySig?.data) return toast("Draw your countersignature once first: More, Contracts, Your countersignature.");
+  X.busy=true; const btn=$("#ss-send"); if(btn){ btn.disabled=true; btn.textContent="Sending…"; }
+  try{
+    ssaSaveDraft().catch(()=>{});
+    X.agNo = X.agNo || `MB-${today().replace(/-/g,"")}-${Math.random().toString(36).slice(2,6).toUpperCase().padEnd(4,"X")}`;
+    const k=ssaCalc(S), d=today(), L=fmtLong(d), CB=fmtLong(ssaCancelBy(d)), now=Date.now();
+    // Dates become placeholders the signing service fills in on the day the customer signs.
+    const textT = ssaText(c,S,k,X.agNo).split(L).join("{{SIGNED_LONG}}");
+    const noticeT = ssaNotice(X.agNo).split(CB).join("{{CANCEL_BY_LONG}}").split(L).join("{{SIGNED_LONG}}");
+    const token = randToken(), svc=svcInfo();
+    const link = `${SIGN_PAGE}?t=${token}&s=${svcDeploy(svc.url)}`;
+    const fallOn=S.fall.on && S.zone!=="westland";
+    const lines = [fallOn&&["Fall Cleanup",k.fall], S.lights.on&&[`Christmas Lights (${S.lights.color})`,k.lights], S.snow.on&&["Snow Removal, season",k.snow]].filter(Boolean);
+    const apply = Object.entries(ssaApply(c, id, S, k, X.agNo, now, "{{CID}}"));
+    const req = { status:"queued", clientId:id, tplName:SSA_NAME, tplVersion:SSA_VERSION, agreementNo:X.agNo, amount:k.total, dueNow:k.dueNow, dueInstall:k.dueInstall,
+      perVisit: S.snow.on ? ssaPerPush(S) : null, lines, serviceSummary:ssaSummary(S,k), details:ssaDetails(S,k,X.agNo), covers:ssaCovers(S),
+      textT, noticeT, signerName:c.name, to, companySig:mySig.data, companySigner:mySig.name||me.displayName||me.email,
+      createdAt:now, createdBy:me.email, expiresAt:now+7*864e5, link, apply, payUrl:(S.payUrl||"").trim() };
+    const upd = {
+      ["sync/sign/"+token]: JSON.parse(JSON.stringify(req)),
+      ["clients/"+id+"/signReq"]: { token, status:"queued", createdAt:now, createdBy:me.email, to, link, agreementNo:X.agNo, amount:k.total, dueNow:k.dueNow },
+      ["clients/"+id+"/lastContactAt"]: now,
+      ["clientLog/"+id+"/"+db.ref("clientLog").push().key]: { text:`Emailed ${SSA_NAME} ${X.agNo} to ${to.join(" and ")}: ${ssaSummary(S,k)}. Total ${money(k.total)}; charged at signing ${money(k.dueNow)}.`, at:now, by:me.email, source:"contract" }
+    };
+    if(c.signReq && OPEN_REQ.includes(c.signReq.status) && c.signReq.token!==token) upd["sync/sign/"+c.signReq.token+"/status"]="cancelled";
+    if(LEAD_STAGES.includes(c.status) && c.status!=="quoted") upd["clients/"+id+"/status"]="quoted";
+    await db.ref().update(upd);
+    svcCall("send", { t:token });
+    X.sentToken=token; showSent();
+  }catch(e){ toast("Not sent: "+(e.code||e.message)); }
+  finally{ X.busy=false; if(btn){ btn.disabled=false; btn.textContent="Email contract to sign"; } }
+}
+// What the rep sees while the customer is on the phone: live status of the link.
+function reqStatusText(r){
+  if(!r) return "";
+  if(r.status==="signed"){
+    if(!r.pay) return "Signed. Waiting for the payment method.";
+    if(r.pay==="check") return "Signed. Customer is mailing a check.";
+    return r.payDoneAt ? `Signed. ${r.pay==="ach"?"Bank account":"Card"} received: enter it in QuickBooks and run today's charge.` : `Signed. Waiting for the ${r.pay==="ach"?"bank account":"card"}.`;
+  }
+  return { queued:"Sending…", sent: r.openedAt ? `Opened ${ago(r.openedAt)}. Waiting for the signature.` : `Sent ${r.sentAt?ago(r.sentAt):""}. Not opened yet.`, error:`Email failed: ${r.error||""}`, expired:"Link expired.", cancelled:"Link cancelled." }[r.status] || r.status;
+}
+let sentTimer=null;
+function showSent(){
+  const X=signCtx, id=X.clientId; ssaBarOff(); X.mode="sent";
+  const paint=()=>{ const c=clients[id]||{}, r=c.signReq||{}; const box=$("#sentStatus"); if(!box){ clearInterval(sentTimer); return; }
+    box.textContent=reqStatusText(r); box.className = r.status==="signed" ? "pill signed" : r.status==="error" ? "pill pastdue" : "pill open"; };
+  const c=clients[id]||{}, r=c.signReq||{};
+  $("#signTitle").textContent = "Contract sent";
+  $("#signBody").innerHTML = `<div class="signpanel" style="margin-top:0">
+    <h4>Sent to ${esc((r.to||[]).join(" and "))}</h4>
+    <p style="margin:6px 0 10px"><span id="sentStatus" class="pill open"></span></p>
+    <div class="meta" style="font-size:15px;line-height:1.55;color:var(--ink)">Say: <i>"I just sent it. Open the email from Mangiapane Brothers called Your Mangiapane Brothers quote and agreement, and tap Review, sign, and add your card. You will see the official quote with our agreement. Type your name at the bottom to sign, then enter your card on the next screen."</i></div>
+    <p class="meta" style="margin:10px 0 0">If it has not arrived in a minute, have them check spam, or copy the link and text it from Quo.</p>
+    <div class="actions"><button type="button" class="left" id="sentCopy">Copy link</button><button type="button" id="sentEdit">Change and resend</button><button type="button" id="sentResend">Send the email again</button><button type="button" class="primary" id="sentDone">Done</button></div></div>`;
+  paint(); clearInterval(sentTimer); sentTimer=setInterval(paint, 1500);
+  $("#sentCopy").onclick=()=>navigator.clipboard.writeText(r.link||"").then(()=>toast("Link copied."));
+  $("#sentResend").onclick=async()=>{ const rr=(clients[id]||{}).signReq; if(!rr) return; await db.ref().update({ ["sync/sign/"+rr.token+"/status"]:"queued", ["sync/sign/"+rr.token+"/expiresAt"]:Date.now()+7*864e5, ["clients/"+id+"/signReq/status"]:"queued" }); svcCall("send",{t:rr.token}); toast("Sending again."); };
+  $("#sentEdit").onclick=()=>{ clearInterval(sentTimer); openSeasonal(id); };
+  $("#sentDone").onclick=()=>{ clearInterval(sentTimer); $("#signDlg").close(); };
 }
 
 // ---------- import ----------
@@ -1844,21 +2136,62 @@ async function doImport(){
   toast(`Imported ${n}${skipped?`, skipped ${skipped}${byPhone?` (${byPhone} by phone)`:""}`:""}`); setNav("clients");
 }
 
+// ---------- Charges to run: the payment schedule, cleared by a person in QuickBooks ----------
+// Until the QuickBooks Payments API is approved, a person charges the card on file in QuickBooks
+// (Customers > the client > Receive payment, card on file) and then marks the charge here.
+// Claude never charges a card. Declined means past due as of today (no late fee; grace is a judgment call).
+const CHARGE_LABEL = { signing:"Due at signing", install:"Lights balance, install day", overage:"Snow visit past 16", call:"Lights service call", completion:"On completion" };
+function chargesHtml(){
+  const all=Object.entries(qbRows).filter(([,r])=>r.type==="charge");
+  const by=s=>all.filter(([,r])=>r.status===s).sort((a,b)=>(a[1].createdAt||0)-(b[1].createdAt||0));
+  const pend=[...by("declined"),...by("pending")], sched=by("scheduled"), chk=by("awaiting-check");
+  const row=([rid,r],btns)=>{ const c=clients[r.clientId]||{}; return `<tr><td><b>${esc(c.name||"(deleted client)")}</b>${r.status==="declined"?' <span class="pill pastdue">declined, past due</span>':""}<div class="meta">${esc(CHARGE_LABEL[r.trigger]||r.trigger||"")} · ${esc(r.description||"")}</div><div class="meta">${payOnFileLabel(c)||"No payment method recorded"}</div></td><td class="num"><b>${money(r.amount)}</b></td><td class="num" style="white-space:nowrap">${btns(rid)}</td></tr>`; };
+  const tbl=(rows,btns)=>`<div style="overflow-x:auto"><table><tbody>${rows.map(x=>row(x,btns)).join("")}</tbody></table></div>`;
+  const sum=a=>money(a.reduce((s,[,r])=>s+(+r.amount||0),0))||"$0";
+  return `<div class="card"><h2>Charges to run <span class="meta">${pend.length} due now · ${sum(pend)}</span></h2>
+    <p class="meta">Charge each one in QuickBooks: Customers, then the client, then Receive payment with the card on file. Then tap Charged here. If the card is declined, tap Declined: the amount is past due as of today and the client is flagged. Nothing here charges a card by itself.</p>
+    ${pend.length?tbl(pend,rid=>`<button class="small primary" data-chg="${rid}" data-to="done">Charged</button> <button class="small danger" data-chg="${rid}" data-to="declined">Declined</button>`):`<div class="meta">Nothing to charge right now.</div>`}
+    ${sched.length?`<div class="sect">Waiting for install day <span class="n">${sched.length} · ${sum(sched)}</span></div>${tbl(sched,rid=>`<button class="small" data-chg="${rid}" data-to="pending">Installed: ready to charge</button>`)}`:""}
+    ${chk.length?`<div class="sect">Waiting for a prepay check <span class="n">${chk.length}</span></div>${tbl(chk,rid=>`<button class="small" data-chg="${rid}" data-to="check">Check received</button>`)}`:""}
+  </div>`;
+}
+function wireCharges(m){
+  m.querySelectorAll("[data-chg]").forEach(b=>b.onclick=()=>moveCharge(b.dataset.chg, b.dataset.to));
+}
+async function moveCharge(rid, to){
+  const r=qbRows[rid]; if(!r) return; const c=clients[r.clientId]||{}, now=Date.now(), name=c.name||"client"; let payOkKey=null;
+  const upd={ [`sync/qb/${rid}/status`]: to==="check"?"done":to, [`sync/qb/${rid}/updatedAt`]: now, [`sync/qb/${rid}/updatedBy`]: me.email };
+  let text="", label="";
+  if(to==="done"||to==="check"){ upd[`sync/qb/${rid}/doneAt`]=now; upd[`sync/qb/${rid}/doneBy`]=me.email; upd[`sync/qb/${rid}/via`]= to==="check"?"check":"QuickBooks";
+    text=`Charged ${money(r.amount)}: ${r.description||""}${to==="check"?" (paid by check)":""}.`; label=`${name}: charged ${money(r.amount)}`;
+    if(to==="check") upd["sync/qb/"+db.ref("sync/qb").push().key]={ type:"record-payment", method:"Check", clientId:r.clientId, contractId:r.contractId||"", amount:r.amount, date:today(), description:r.description||"", status:"pending", createdAt:now, createdBy:me.email };
+    const stillOpen=Object.entries(qbRows).some(([x,o])=>x!==rid && o.type==="charge" && o.clientId===r.clientId && (o.status==="pending"||o.status==="declined"));
+    upd[`clients/${r.clientId}/payStatus`]= stillOpen ? "open" : "paid";
+    if(to==="done" && clients[r.clientId] && !c.payConfirmedAt){ upd[`clients/${r.clientId}/payConfirmedAt`]=now;
+      if(svcReady()){ payOkKey=db.ref("sync/mail").push().key; upd["sync/mail/"+payOkKey]={ kind:"payok", clientId:r.clientId, contractId:r.contractId||"", amount:r.amount, description:r.description||"", date:today(), to:[c.email,c.email2].filter(Boolean), status:"queued", createdAt:now, createdBy:me.email }; } } }
+  else if(to==="declined"){ upd[`sync/qb/${rid}/declinedAt`]=now; upd[`clients/${r.clientId}/payStatus`]="pastdue";
+    text=`Card declined for ${money(r.amount)} (${r.description||""}). Past due as of ${fmtLong(today())}. Contact the client for a working payment method.`; label=`${name}: declined, past due`; }
+  else if(to==="pending"){ upd[`sync/qb/${rid}/date`]=today(); text=`Ready to charge ${money(r.amount)}: ${r.description||""}.`; label=`${name}: ready to charge`; }
+  if(clients[r.clientId]) upd[`clientLog/${r.clientId}/${db.ref("clientLog").push().key}`]={ text, at:now, by:me.email, source:"payment" };
+  await commit(label, upd); if(payOkKey){ svcCall("mail",{ k:payOkKey }); toast("Payment confirmed email going to the client."); } render();
+}
+
 // ---------- QuickBooks queue and export ----------
-const QB_LABEL = { customer:"Create or match customer", invoice:"Create invoice", "match-payment":"Match GoPayment sale", "record-payment":"Record payment" };
+const QB_LABEL = { customer:"Create or match customer", invoice:"Create invoice", "match-payment":"Match GoPayment sale", "record-payment":"Record payment", charge:"Charge card on file", paylink:"Make and send a QuickBooks payment link" };
 function qbExport(){
-  const rows = Object.entries(qbRows).filter(([,r])=>r.status==="pending").sort((a,b)=>a[1].createdAt-b[1].createdAt).map(([rowId,r])=>{
+  const rows = Object.entries(qbRows).filter(([,r])=>r.status==="pending" && r.type!=="charge").sort((a,b)=>a[1].createdAt-b[1].createdAt).map(([rowId,r])=>{
     const c=clients[r.clientId]||{};
-    return { rowId, type:r.type, amount:r.amount??null, method:r.method||"", date:r.date||"", description:r.description||"", contractId:r.contractId||"",
+    return { rowId, type:r.type, amount:r.amount??null, method:r.method||"", date:r.date||"", description:r.description||"", contractId:r.contractId||"", ...(r.type==="paylink"?{ sendTo:Array.isArray(r.to)?r.to:Object.values(r.to||{}) }:{}),
       client:{ id:r.clientId, name:c.name||"", phone:c.phone||"", phoneE164:c.phoneKey||phoneKey(c.phone), email:c.email||"", address:c.address||"", quickbooksId:c.qbId||"" } };
   });
   return { exportedAt:new Date().toISOString(), company:COMPANY,
     instructions:[
       "Work through rows in order with the QuickBooks connector.",
       "customer: search QuickBooks by phone, then by name. If found, return its id. Create a customer only if none matches. GoPayment may already have created one.",
-      "match-payment: the card was charged in QuickBooks GoPayment at signing. Do NOT create an invoice. Find that day's GoPayment sale for the amount (service price plus the fee shown), confirm it sits on the right customer, return its number.",
-      "record-payment: paid at signing by Zelle, check, cash, Venmo or PayPal. Record it against the customer. When fee is above zero, record it as a separate card and app fee line. Return the reference.",
+      "match-payment: the card was charged in QuickBooks GoPayment at signing. Do NOT create an invoice and do NOT charge anything. Find that day's GoPayment sale for the amount, confirm it sits on the right customer, return its number. Prices include card processing; there is no separate fee line.",
+      "record-payment: a payment received outside a card on file (a prepay check). Record it against the customer for the amount. Return the reference.",
       "invoice: create an invoice for the amount and description, due on receipt, mailed with the ways-to-pay section. Return the invoice number.",
+      "paylink: the customer signed and chose card (method card) or bank account (method ach) but has no QuickBooks page yet. Create a single-use payment link on that customer for the amount (or the smallest allowed amount if 0, noting it), with card enabled, and bank transfer enabled only for method ach. Send it with send_payment_link to sendTo. Do NOT charge anything. Return the link in note.",
       "Return JSON in resultFormat so it can be pasted into the CRM. Mark a row error with a note rather than guessing."
     ],
     rows,
@@ -1899,9 +2232,9 @@ function download(name, text, type){ const a=document.createElement("a"); a.href
 function renderTools(m){
   const n=live().length, active=live().filter(([,c])=>c.status==="active").length;
   const all=Object.entries(qbRows).sort((a,b)=>b[1].createdAt-a[1].createdAt);
-  const pending=all.filter(([,r])=>r.status==="pending"), recent=all.filter(([,r])=>r.status!=="pending").slice(0,15);
+  const pending=all.filter(([,r])=>r.status==="pending" && r.type!=="charge"), recent=all.filter(([,r])=>r.status!=="pending" && r.type!=="charge").slice(0,15);
   const rowHtml = ([rid,r]) => `<tr><td>${esc(QB_LABEL[r.type]||r.type)}</td><td>${esc(clients[r.clientId]?.name||"(deleted client)")}</td><td>${esc(r.description||"")}</td><td class="num">${money(r.amount)}</td><td>${r.status==="pending"?'<span class="pill open">waiting</span>':r.status==="done"?'<span class="pill paid">done</span>':'<span class="pill pastdue">error</span>'}${r.result?.note?`<div class="meta">${esc(r.result.note)}</div>`:""}</td><td class="meta">${fmtStamp(r.createdAt)}</td></tr>`;
-  m.innerHTML = `<div class="card">
+  m.innerHTML = chargesHtml() + `<div class="card">
     <h2>QuickBooks queue <span class="meta">${pending.length} waiting for Claude</span></h2>
     <p class="meta">The page adds work here when a client becomes active or a contract is signed. Sample contracts never add work. Copy the queue, paste it into Claude, and ask it to run it with the QuickBooks connector. Paste Claude's answer in the box below to write the QuickBooks numbers back onto the clients.</p>
     <div class="row" style="margin:8px 0"><button class="primary" id="qbCopy" ${pending.length?"":"disabled"}>Copy queue for Claude</button><button id="qbDl" ${pending.length?"":"disabled"}>Download</button></div>
@@ -1917,6 +2250,7 @@ function renderTools(m){
     <div class="tool"><div><h3>Clients as CSV</h3><p>Name, phone, address, region, status, services, billing. Opens in Excel or Sheets.</p></div><div class="row"><button id="csvDl">Download</button></div></div>
     <div class="tool"><div><h3>Backup (.json)</h3><p>Raw database copy of clients, notes, templates, and the queue. Signed contracts are backed up separately by Claude. Keep one somewhere safe now and then.</p></div><div class="row"><button id="bakDl">Download</button></div></div>
   </div>`;
+  wireCharges(m);
   $("#qbCopy").onclick = () => navigator.clipboard.writeText(JSON.stringify(qbExport(),null,2)).then(()=>toast("Copied. Paste it into Claude."));
   $("#qbDl").onclick = () => download(`mb-quickbooks-queue-${today()}.json`, JSON.stringify(qbExport(),null,2), "application/json");
   $("#qbApplyGo").onclick = () => { const t=$("#qbApply").value.trim(); if(t) applyQbResults(t); };

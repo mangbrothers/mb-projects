@@ -1,0 +1,304 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="referrer" content="no-referrer">
+<title>Your agreement · Mangiapane Brothers</title>
+<!--
+  Customer page for agreements emailed from the CRM (phone sales). One link: read the quote and agreement,
+  sign with a typed name, choose a payment method (card first; bank account and check under More options),
+  then a confirmation page. It holds nothing private. The link carries a one-time token (t) and the address
+  of the signing service (s), a Google Apps Script on admin@mangbrothers.com. Card and bank numbers are
+  entered on this page after signing and saved by the signing service for the office (interim, until the QuickBooks Payments API).
+-->
+<style>
+  :root{color-scheme:light dark;
+    --bg:#f3f5f2;--card:#ffffff;--line:#d5dbd3;--ink:#16233a;--ink2:#4a5a62;--muted:#768276;
+    --brand:#1f6b33;--brand-ink:#ffffff;--brand-soft:#e3f0e5;--red:#a63b3b;--amber:#7a4f0e;--amber-soft:#fbf1dc;--amber-line:#d9a441}
+  @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+    --bg:#101612;--card:#18211b;--line:#2d3a30;--ink:#e8efe9;--ink2:#b4c2b6;--muted:#82907f;
+    --brand:#5fbf78;--brand-ink:#0f1511;--brand-soft:#173322;--red:#e07a7a;--amber:#f0c674;--amber-soft:#3a2d14;--amber-line:#8a6a2a}}
+  :root[data-theme="dark"]{
+    --bg:#101612;--card:#18211b;--line:#2d3a30;--ink:#e8efe9;--ink2:#b4c2b6;--muted:#82907f;
+    --brand:#5fbf78;--brand-ink:#0f1511;--brand-soft:#173322;--red:#e07a7a;--amber:#f0c674;--amber-soft:#3a2d14;--amber-line:#8a6a2a}
+  *{box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%}
+  body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;padding-bottom:84px}
+  a{color:var(--brand)}
+  header{background:var(--card);border-bottom:1px solid var(--line);padding:12px 16px}
+  header .in{max-width:760px;margin:0 auto;display:flex;align-items:center;gap:12px}
+  header img{height:46px;width:auto;background:#fff;border-radius:4px}
+  header .tag{margin-left:auto;text-align:right;color:var(--ink2);font-size:13px;line-height:1.3;max-width:300px}
+  main{max-width:760px;margin:0 auto;padding:16px}
+  .steps{display:flex;gap:6px;margin:0 0 12px;font-size:13px;color:var(--ink2);flex-wrap:wrap}
+  .steps span{padding:4px 10px;border-radius:999px;border:1px solid var(--line);background:var(--card)}
+  .steps span.on{background:var(--brand);color:var(--brand-ink);border-color:var(--brand);font-weight:700}
+  .steps span.ok{border-color:var(--brand);color:var(--brand)}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px 18px;margin:0 0 14px}
+  .card h1{font-size:22px;margin:0 0 6px}
+  .card h2{font-size:18px;margin:0 0 6px}
+  .meta{color:var(--ink2);font-size:14px}
+  .quote{width:100%;border-collapse:collapse;font-size:15px;margin:8px 0 0}
+  .quote td{padding:8px 0;border-bottom:1px solid var(--line);vertical-align:top}
+  .quote td:last-child{text-align:right;white-space:nowrap;padding-left:12px}
+  .quote tr.big td{font-weight:700;font-size:17px}
+  .doc{background:#fff;color:#16233a;border:1px solid #d3dae3;border-radius:8px;padding:24px 22px;margin:0 0 14px;font:16px/1.55 Georgia,"Times New Roman",serif}
+  .doc h2{font:700 21px/1.25 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;margin:0 0 12px}
+  .doc h3{font:700 16px/1.3 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;margin:20px 0 6px}
+  .doc h4{font:700 15px/1.3 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;margin:16px 0 4px}
+  .doc p{margin:0 0 10px} .doc ul,.doc ol{margin:0 0 10px;padding-left:24px}
+  .doc table{width:100%;border-collapse:collapse;margin:6px 0 14px;font:15px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+  .doc th{background:#1f3864;color:#fff;text-align:left;font-weight:700;padding:8px 10px;font-size:13px;border:1px solid #1f3864}
+  .doc td{border:1px solid #b9bec7;padding:7px 10px;color:#16233a;vertical-align:top}
+  .doc td.r{text-align:right;white-space:nowrap;width:120px;font-weight:600}
+  .doc tr.tot td{background:#f3ebd3;font-weight:700}
+  .ssahead{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;border-bottom:1px solid #b9bec7;padding-bottom:8px;margin-bottom:14px;font:14px/1.3 -apple-system,sans-serif;color:#5d6470}
+  .ssahead img{height:52px;width:auto} .ssahead span{text-align:right}
+  .notice{border:2px dashed #16233a}
+  .notice h3{margin-top:0;text-align:center;letter-spacing:.04em}
+  label.ck{display:flex;gap:12px;align-items:flex-start;margin:4px 0 14px;font-size:15px;cursor:pointer}
+  label.ck input{width:24px;height:24px;flex:none;margin:1px 0 0;accent-color:var(--brand)}
+  .field label{display:block;font-size:14px;color:var(--ink2);margin:0 0 4px}
+  .field input{width:100%;font:22px/1.3 "Brush Script MT","Segoe Script","Snell Roundhand",cursive;padding:10px 12px;border:1px solid var(--line);border-bottom:2px solid var(--ink);border-radius:8px 8px 0 0;background:var(--card);color:var(--ink)}
+  button,.btn{font:inherit;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--ink);padding:9px 14px;min-height:44px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;text-decoration:none}
+  .primary{background:var(--brand);color:var(--brand-ink);border-color:var(--brand);font-weight:700;font-size:17px;padding:12px 20px}
+  .wide{width:100%}
+  button:disabled{opacity:.55;cursor:default}
+  .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  .err{color:var(--red);font-weight:600;margin:10px 0 0}
+  .bar{position:fixed;left:0;right:0;bottom:0;background:#1f3864;color:#fff;padding:10px 16px calc(10px + env(safe-area-inset-bottom,0px));display:flex;justify-content:space-between;align-items:center;gap:12px;z-index:5}
+  .bar b{font-size:20px;margin-left:6px}
+  .bar button{background:#fff;color:#1f3864;border:0;font-weight:700;flex:none}
+  .opt{border:1px solid var(--line);border-radius:10px;padding:14px;margin-top:10px}
+  .opt.main{border:2px solid var(--brand);background:var(--brand-soft)}
+  .opt h3{margin:0 0 4px;font-size:17px}
+  .opt p{margin:0 0 10px;color:var(--ink2);font-size:15px}
+  .more{background:none;border:0;color:var(--brand);font-weight:600;padding:12px 0 0;min-height:0}
+  .field2{margin:0 0 12px;position:relative}
+  .field2 label{display:block;font-size:14px;color:var(--ink2);margin:0 0 4px}
+  .field2 input,.field2 select{width:100%;font-size:18px;padding:12px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink);box-sizing:border-box;min-height:48px}
+  .field2 .brand{position:absolute;right:12px;top:40px;font-size:13px;font-weight:700;color:var(--ink2)}
+  .two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .three{display:grid;grid-template-columns:1.2fr 1fr 1fr;gap:10px}
+  .banner{background:var(--amber-soft);color:var(--amber);border:1px solid var(--amber-line);border-radius:10px;padding:12px 14px;font-weight:700;margin:0 0 12px}
+  .done{border-color:var(--brand);background:var(--brand-soft)}
+  .tick{display:inline-flex;width:34px;height:34px;border-radius:50%;background:var(--brand);color:var(--brand-ink);align-items:center;justify-content:center;font-weight:700;margin-right:8px;vertical-align:-6px}
+  .center{text-align:center;padding:40px 16px;color:var(--ink2)}
+  @media(max-width:520px){.doc{padding:16px 14px;font-size:15.5px}.doc td.r{width:auto}header img{height:38px}header .tag{display:none}}
+  @media print{header,.bar,#signCard,.steps,button,.btn{display:none!important}body{background:#fff;padding:0}.doc{border:0;padding:0}main{max-width:none;padding:0}}
+</style>
+</head>
+<body>
+<header><div class="in"><img src="mb-logo.png" alt="Mangiapane Brothers Lawn &amp; Snow"><div class="tag">Full-Service Property Maintenance for Those Who Take Pride in Their Home</div></div></header>
+<main id="main"><div class="center">Loading your agreement…</div></main>
+
+<script>
+"use strict";
+const PHONE = "734-450-2400", EMAIL = "admin@mangbrothers.com";
+const q = new URLSearchParams(location.search);
+const TOKEN = (q.get("t")||"").replace(/[^\w-]/g,""), DEPLOY = (q.get("s")||"").replace(/[^\w-]/g,"");
+const SVC = DEPLOY ? `https://script.google.com/macros/s/${DEPLOY}/exec` : "";
+const $ = s => document.querySelector(s);
+const esc = s => String(s==null?"":s).replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const money = v => { if(v===""||v==null||isNaN(+v)) return ""; const n=+v, neg=n<0, a=Math.abs(n), cents=Math.round(a*100)%100!==0; return (neg?"−":"")+"$"+a.toLocaleString("en-US",{minimumFractionDigits:cents?2:0,maximumFractionDigits:2}); };
+const fmtStamp = ms => ms ? new Date(ms).toLocaleString("en-US",{timeZone:"America/Detroit",month:"long",day:"numeric",year:"numeric",hour:"numeric",minute:"2-digit"}) : "";
+const first = A => String(A.signerName||"").split(" ")[0];
+const contact = `Questions: call <a href="tel:+17344502400">${PHONE}</a> or email <a href="mailto:${EMAIL}">${EMAIL}</a>.`;
+const steps = n => `<div class="steps">${["Sign","Payment method","Done"].map((s,i)=>`<span class="${i===n?"on":i<n?"ok":""}">${i<n?"✓ ":""}${i+1}. ${s}</span>`).join("")}</div>`;
+
+// Same text rules as the CRM: headings, bold, lists and tables ("|" lines; "|=" header, "|+" total).
+function table(lines, inline){
+  return "<table>"+lines.map(l=>{ const kind=l[1]==="="?"h":l[1]==="+"?"t":""; const cells=l.replace(/^\|[=+]?/,"").split(/\s*\|\s*/).map(x=>x.trim());
+    return `<tr${kind==="t"?' class="tot"':""}>`+cells.map((x,i)=> kind==="h" ? `<th>${inline(x)}</th>` : `<td${i===cells.length-1&&/^[+−-]?\$/.test(x)?' class="r"':""}>${inline(x)}</td>`).join("")+"</tr>"; }).join("")+"</table>";
+}
+function renderDoc(text){
+  const inline = s => esc(s).replace(/\*\*(.+?)\*\*/g,"<b>$1</b>");
+  return String(text||"").replace(/\r/g,"").split(/\n{2,}/).map(b=>{
+    let lines=b.split("\n").filter(l=>l.trim()!==""); if(!lines.length) return "";
+    let head=""; const h=/^(#{1,3})\s+(.*)$/.exec(lines[0]);
+    if(h){ const n=h[1].length+1; head=`<h${n}>${inline(h[2])}</h${n}>`; lines=lines.slice(1); if(!lines.length) return head; }
+    if(lines.every(l=>/^\|/.test(l))) return head+table(lines, inline);
+    if(lines.every(l=>/^\s*[-*]\s+/.test(l))) return head+"<ul>"+lines.map(l=>"<li>"+inline(l.replace(/^\s*[-*]\s+/,""))+"</li>").join("")+"</ul>";
+    if(lines.every(l=>/^\s*\d+[.)]\s+/.test(l))) return head+"<ol>"+lines.map(l=>"<li>"+inline(l.replace(/^\s*\d+[.)]\s+/,""))+"</li>").join("")+"</ol>";
+    return head+"<p>"+lines.map(inline).join("<br>")+"</p>";
+  }).join("");
+}
+// The quote: one row per service, the total, then what is charged when.
+function quoteRows(A, withLines){
+  const r=(a,b,big)=>`<tr${big?' class="big"':""}><td>${a}</td><td>${b}</td></tr>`;
+  return `<table class="quote">${withLines?(A.lines||[]).map(l=>r(esc(l[0]),esc(money(l[1])))).join("")+r("Total",esc(money(A.total))):""}
+    ${r("Charged today",esc(money(A.dueNow)||"$0"),true)}
+    ${A.dueInstall>0?r("Charged when your lights are installed",esc(money(A.dueInstall))):""}
+    ${A.perVisit?r("Each snow visit after the sixteenth",esc(money(A.perVisit))):""}</table>`;
+}
+
+async function call(action, body){
+  if(!SVC || !TOKEN) throw new Error("This link is incomplete.");
+  const r = body
+    ? await fetch(SVC, { method:"POST", redirect:"follow", headers:{ "Content-Type":"text/plain;charset=utf-8" }, body:JSON.stringify({ action, t:TOKEN, ...body }) })
+    : await fetch(`${SVC}?action=${action}&t=${encodeURIComponent(TOKEN)}`, { redirect:"follow" });
+  if(!r.ok) throw new Error("Our system did not answer ("+r.status+").");
+  return r.json();
+}
+function message(title, text){
+  document.body.style.paddingBottom="0";
+  $("#main").innerHTML = `<div class="card"><h1>${esc(title)}</h1><p>${text}</p><p class="meta">${contact}</p></div>`;
+}
+function dropBar(){ const b=$("#bar"); if(b) b.remove(); document.body.style.paddingBottom="0"; }
+
+// ---------- step 1: read and sign ----------
+function showSign(A){
+  const head = `<div class="ssahead"><img src="mb-logo.png" alt="Mangiapane Brothers"><span>${esc(A.tplName||"Seasonal Services Agreement")}</span></div>`;
+  $("#main").innerHTML = `${steps(0)}
+    <div class="card"><h1>Hello ${esc(first(A))},</h1>
+      <p style="margin:0 0 6px">Here is your official quote and agreement with Mangiapane Brothers, as we discussed. There are two steps: sign the agreement, then add your card. It takes about five minutes.</p>
+      ${quoteRows(A, true)}
+      <p class="meta" style="margin:10px 0 0">Agreement ${esc(A.agreementNo)}. This link works until ${esc(fmtStamp(A.expiresAt))}.</p></div>
+    <div class="doc">${head}${renderDoc(A.text)}</div>
+    <div class="card" id="signCard"><h2>Sign the agreement</h2>
+      <label class="ck"><input type="checkbox" id="consent"><span>I have read this agreement. I agree to sign it electronically, that my typed name is my signature and is as binding as one on paper, and to receive my copy, receipts, and notices by email at ${esc((A.to||[]).join(" and "))}.</span></label>
+      <div class="field"><label for="typed">Type your full name to sign</label><input id="typed" autocomplete="name" autocapitalize="words" spellcheck="false" placeholder="${esc(A.signerName||"Your full name")}"></div>
+      <p class="meta" style="margin:8px 0 4px">Date: <b>${esc(A.todayLong)}</b>. Countersigned for Mangiapane Brothers LLC by ${esc(A.companySigner||"the Company")}.</p>
+      <button type="button" class="primary wide" id="go" style="margin-top:10px">Sign and continue to payment</button>
+      <div class="err" id="err" hidden></div></div>
+    <div class="doc notice">${renderDoc(A.notice)}</div>
+    <p class="meta">${contact}</p>`;
+  const bar=document.createElement("div"); bar.className="bar"; bar.id="bar";
+  bar.innerHTML=`<span>Charged today <b>${money(A.dueNow)||"$0"}</b></span><button type="button" id="toSign">Go to signature</button>`;
+  document.body.appendChild(bar);
+  $("#toSign").onclick = () => $("#signCard").scrollIntoView({ behavior:"smooth", block:"start" });
+  const err = t => { const e=$("#err"); e.hidden=!t; e.textContent=t||""; };
+  $("#go").onclick = async () => {
+    const typed=$("#typed").value.replace(/\s+/g," ").trim();
+    if(!$("#consent").checked){ err("Tick the box above your name first."); return; }
+    if(typed.length<3 || !/[A-Za-z]/.test(typed)){ err("Type your full name to sign."); $("#typed").focus(); return; }
+    err(""); const b=$("#go"); b.disabled=true; b.textContent="Signing…";
+    try{
+      const R = await call("sign", { typedName:typed, consent:true, ua:navigator.userAgent.slice(0,300), screen:`${screen.width}x${screen.height}` });
+      if(!R.ok) throw new Error(R.error||"Not signed.");
+      dropBar(); route({ ...A, ...R });
+    }catch(e){ b.disabled=false; b.textContent="Sign and continue to payment"; err(e.message+" Nothing was signed. Try again, or call "+PHONE+"."); }
+  };
+}
+
+// ---------- step 2: payment method ----------
+// Interim ("store" mode, until the QuickBooks Payments API): the details go to Mangiapane Brothers' signing service,
+// which saves them for the office to enter in QuickBooks. The security code is not asked for in this mode.
+// "token" mode (after Intuit approval) shows the security code and sends the card to Intuit instead.
+const digits = v => String(v||"").replace(/\D/g,"");
+function luhn(n){ let s=0, alt=false; for(let i=n.length-1;i>=0;i--){ let d=+n[i]; if(alt){ d*=2; if(d>9) d-=9; } s+=d; alt=!alt; } return s%10===0; }
+function brandOf(n){ return /^4/.test(n)?"Visa":/^(5[1-5]|2[2-7])/.test(n)?"Mastercard":/^3[47]/.test(n)?"Amex":/^(6011|65|64[4-9]|622)/.test(n)?"Discover":""; }
+function abaOk(r){ if(!/^\d{9}$/.test(r)) return false; const d=r.split("").map(Number); return (3*(d[0]+d[3]+d[6])+7*(d[1]+d[4]+d[7])+(d[2]+d[5]+d[8]))%10===0; }
+function showPay(A){
+  dropBar();
+  const token = A.cardMode==="token";
+  $("#main").innerHTML = `${steps(1)}
+    <div class="card done"><h2 style="margin:0"><span class="tick">✓</span>Signed. Thank you, ${esc(first(A))}.</h2>
+      <p class="meta" style="margin:8px 0 0">Agreement ${esc(A.agreementNo)}. Your signed copy is on its way to ${esc((A.to||[]).join(" and "))}.</p></div>
+    <div class="card"><h2>Last step: your card on file</h2>
+      ${quoteRows(A, false)}
+      <form class="opt main" id="cardForm" autocomplete="on" onsubmit="return false">
+        <div class="field2"><label for="ccName">Name on card</label><input id="ccName" name="ccname" autocomplete="cc-name" autocapitalize="words" value="${esc(A.signerName||"")}"></div>
+        <div class="field2"><label for="ccNum">Card number</label><input id="ccNum" name="cardnumber" autocomplete="cc-number" inputmode="numeric" placeholder="1234 5678 9012 3456" maxlength="23"><span class="brand" id="ccBrand"></span></div>
+        <div class="${token?"three":"two"}"><div class="field2"><label for="ccExp">Expiration</label><input id="ccExp" name="exp-date" autocomplete="cc-exp" inputmode="numeric" placeholder="MM/YY" maxlength="5"></div>
+          ${token?`<div class="field2"><label for="ccCvc">Security code</label><input id="ccCvc" name="cvc" autocomplete="cc-csc" inputmode="numeric" maxlength="4" placeholder="123"></div>`:""}
+          <div class="field2"><label for="ccZip">Billing ZIP</label><input id="ccZip" name="postal" autocomplete="billing postal-code" inputmode="numeric" placeholder="48150" maxlength="10"></div></div>
+        <button type="button" class="primary wide" id="cardGo">Save my card and finish</button>
+        <p class="meta" style="margin:10px 0 0">${A.dueNow>0?`Today's ${esc(money(A.dueNow))} is charged later today. You should see a charge email and a confirmation from us come through at some point today.`:"Nothing is charged today."} Later charges follow your agreement, with a receipt each time. There is no card fee.</p>
+      </form>
+      <button type="button" class="more" id="moreBtn" aria-expanded="false">More options ▾</button>
+      <div id="more" hidden>
+        <form class="opt" id="achForm" onsubmit="return false"><h3>Bank account (ACH)</h3><p>Use a checking or savings account instead of a card.</p>
+          <div class="field2"><label for="baName">Name on the account</label><input id="baName" autocomplete="name" value="${esc(A.signerName||"")}"></div>
+          <div class="two"><div class="field2"><label for="baType">Account type</label><select id="baType"><option value="checking">Checking</option><option value="savings">Savings</option></select></div>
+            <div class="field2"><label for="baRouting">Routing number</label><input id="baRouting" inputmode="numeric" maxlength="9" placeholder="9 digits" autocomplete="off"></div></div>
+          <div class="field2"><label for="baAcct">Account number</label><input id="baAcct" inputmode="numeric" maxlength="17" autocomplete="off"></div>
+          <div class="field2"><label for="baAcct2">Account number again</label><input id="baAcct2" inputmode="numeric" maxlength="17" autocomplete="off"></div>
+          <button type="button" class="wide" id="achGo">Save my bank account and finish</button></form>
+        <div class="opt"><h3>Prepay by check</h3><p>Pay the full ${esc(money(A.total))} by check instead of keeping a payment method on file. Your spot is not confirmed until we receive the check.</p><button type="button" class="wide" data-choice="check">Pay by check</button></div>
+      </div>
+      <div class="err" id="err" hidden></div></div>
+    <p class="meta">${contact}</p>`;
+  $("#moreBtn").onclick = () => { const m=$("#more"); m.hidden=!m.hidden; $("#moreBtn").setAttribute("aria-expanded",String(!m.hidden)); $("#moreBtn").textContent = m.hidden ? "More options ▾" : "Fewer options ▴"; };
+  const err = t => { const e=$("#err"); e.hidden=!t; e.textContent=t||""; if(t) e.scrollIntoView({block:"center"}); };
+  const num=$("#ccNum"), exp=$("#ccExp");
+  num.oninput = () => { const d=digits(num.value).slice(0,19); num.value = d.replace(/(\d{4})(?=\d)/g,"$1 "); $("#ccBrand").textContent = brandOf(d); };
+  exp.oninput = () => { let d=digits(exp.value).slice(0,4); if(d.length===1 && +d>1) d="0"+d; exp.value = d.length>2 ? d.slice(0,2)+"/"+d.slice(2) : d; };
+  const submit = async (btn, body) => {
+    btn.disabled=true; const was=btn.textContent; btn.textContent="Saving…";
+    try{ const R=await call("paydetails", body); if(!R.ok) throw new Error(R.error||"Not saved."); route({ ...A, ...R }); }
+    catch(e){ btn.disabled=false; btn.textContent=was; err(e.message); }
+  };
+  $("#cardGo").onclick = () => {
+    const n=digits(num.value), m=/^(\d{2})\/(\d{2})$/.exec(exp.value), zip=$("#ccZip").value.trim(), name=$("#ccName").value.trim();
+    if(name.length<2) return err("Enter the name on the card.");
+    if(n.length<13 || !luhn(n)) return err("That card number is not valid. Check it and try again.");
+    if(!m || +m[1]<1 || +m[1]>12) return err("Enter the expiration as MM/YY.");
+    if(!/^\d{5}(-\d{4})?$/.test(zip)) return err("Enter the billing ZIP code.");
+    err(""); submit($("#cardGo"), { method:"card", card:{ number:n, exp:exp.value, name, zip } });
+  };
+  $("#achGo").onclick = () => {
+    const r=digits($("#baRouting").value), a=digits($("#baAcct").value), a2=digits($("#baAcct2").value), name=$("#baName").value.trim();
+    if(name.length<2) return err("Enter the name on the account.");
+    if(!abaOk(r)) return err("That routing number is not valid. It is the 9 digits at the bottom left of a check.");
+    if(a.length<4) return err("Enter the account number.");
+    if(a!==a2) return err("The two account numbers do not match.");
+    err(""); submit($("#achGo"), { method:"ach", ach:{ routing:r, account:a, account2:a2, name, type:$("#baType").value } });
+  };
+  document.querySelectorAll("[data-choice]").forEach(el => el.onclick = async () => {
+    el.disabled=true;
+    try{ const R=await call("pay", { choice:el.dataset.choice }); if(!R.ok) throw new Error(R.error||"Not saved."); route({ ...A, ...R }); }
+    catch(e){ el.disabled=false; err(e.message+" Try again, or call "+PHONE+"."); }
+  });
+}
+
+// ---------- done ----------
+function showDone(A){
+  dropBar();
+  const ch = A.pay ? A.pay.choice : "", check = ch==="check";
+  const methodLine = check ? "Check, waiting for it to arrive" : (A.payLabel || (ch==="ach" ? "Bank account" : "Card"));
+  const C = A.check||{};
+  const r=(a,b)=>`<tr><td>${a}</td><td>${b}</td></tr>`;
+  $("#main").innerHTML = `${steps(2)}
+    ${check?`<div class="banner">Your spot is not confirmed until we receive your check.</div>`:""}
+    <div class="card done"><h1><span class="tick">✓</span>${check?"Almost done":"You are all set"}, ${esc(first(A))}.</h1>
+      <p style="margin:6px 0 0">${check?"Your agreement is signed. Mail your check and we will confirm your spot as soon as it arrives.":`Your agreement is signed and your ${ch==="ach"?"bank account":"card"} is on file. ${A.dueNow>0?"You should see a charge email and a confirmation from us come through at some point today.":"We will be in touch to schedule your service."}`}</p></div>
+    ${check?`<div class="card"><h2>Mail your check</h2><table class="quote">
+      ${r("Amount","<b>"+esc(money(C.amount))+"</b>")}${r("Payable to",esc(C.payable||"Mangiapane Brothers LLC"))}${r("Mail to",esc(C.mailTo||""))}${r("Memo line",esc(C.memo||A.agreementNo))}</table></div>`:""}
+    <div class="card"><h2>Summary</h2><table class="quote">
+      ${r("Agreement",esc(A.agreementNo))}
+      ${A.signedAt?r("Signed",esc(fmtStamp(A.signedAt))):""}
+      ${r("Signed copy sent to",esc((A.to||[]).join(" and ")))}
+      ${r("Payment method",esc(methodLine))}
+      ${check?"":r("Charged today",esc(money(A.dueNow)||"$0"))}
+      ${A.dueInstall>0&&!check?r("Charged when your lights are installed",esc(money(A.dueInstall))):""}
+      ${A.perVisit&&!check?r("Each snow visit after the sixteenth",esc(money(A.perVisit))):""}</table>
+      ${check?"":`<p class="meta" style="margin:10px 0 0">A receipt is emailed for every charge.</p>`}
+      ${A.cancelByLong?`<p class="meta" style="margin:8px 0 0">You may cancel without penalty until midnight of ${esc(A.cancelByLong)}. The Notice of Cancellation is at the end of your signed copy.</p>`:""}</div>
+    <p class="meta">${contact}</p>`;
+  window.scrollTo(0,0);
+}
+
+function route(A){
+  if(A.status!=="signed") return showSign(A);
+  if(!A.pay) return showPay(A);
+  if(A.pay.choice!=="check" && !A.pay.detailsAt) return showPay(A);
+  return showDone(A);
+}
+
+(async function start(){
+  if(!TOKEN || !SVC) return message("This link is incomplete", "Open the link exactly as it came in the email, or ask us to send it again.");
+  let A;
+  try{ A = await call("get"); }
+  catch(e){ return message("We could not load your agreement", esc(e.message)+" Check your connection and reload this page."); }
+  if(!A.ok) return message("We could not load your agreement", esc(A.error||""));
+  if(A.status==="cancelled") return message("This link is no longer active", "This agreement link was withdrawn, usually because a corrected one was sent. Check your email for a newer link.");
+  if(A.status==="expired") return message("This link has expired", "Agreement links work for 7 days. Call us and we will send a new one.");
+  if(A.status!=="ready" && A.status!=="signed") return message("This link is not valid", "We could not find this agreement.");
+  route(A);
+})();
+</script>
+</body>
+</html>

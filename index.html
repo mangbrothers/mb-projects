@@ -442,7 +442,7 @@ auth.onAuthStateChanged(async user => {
   try {
     if(isAdmin){
       // bootstrap the admin into the allowlist so the read rules pass, then give pre-tier entries the admin tier (one time)
-      await db.ref("allowed/"+emailKey(user.email)).update({ name: user.displayName || "Russel", email: user.email.toLowerCase(), tier: "admin" });
+      { const ref=db.ref("allowed/"+emailKey(user.email)); const cur=(await ref.once("value")).val()||{}; await ref.update({ name: cur.name || user.displayName || "Russel", email: user.email.toLowerCase(), tier: "admin" }); } // keep a name set on the Team tab
       try { const all=(await db.ref("allowed").once("value")).val()||{}; const upd={}; for(const [k,v] of Object.entries(all)) if(v && !v.tier) upd["allowed/"+k+"/tier"]="admin"; if(Object.keys(upd).length) await db.ref().update(upd); } catch(e){}
     }
     const mine = (await db.ref("allowed/"+emailKey(user.email)).once("value")).val();
@@ -940,12 +940,12 @@ function renderTeam(m){
   const order={admin:0,crew:1,walker:2};
   const list=Object.entries(team).sort((a,b)=>(order[a[1].tier]??3)-(order[b[1].tier]??3) || (a[1].name||"").localeCompare(b[1].name||""));
   const isR = t => (t.email||"").toLowerCase()===ADMIN_EMAIL.toLowerCase();
-  const rows=list.map(([k,t])=>`<tr><td>${esc(t.name)}</td><td>${esc(t.email)}</td>
+  const rows=list.map(([k,t])=>`<tr><td><span data-namebox="${k}">${esc(t.name)} <button class="small" data-rename="${k}" title="Change the name">Edit</button></span></td><td>${esc(t.email)}</td>
     <td>${isR(t)?'<span class="meta">Admin (owner)</span>':`<select data-tier="${k}" style="width:auto">${!t.tier?'<option value="" selected>No access level</option>':""}${Object.entries(TIERS).map(([v,l])=>`<option value="${v}" ${t.tier===v?"selected":""}>${esc(l)}</option>`).join("")}</select>`}
       ${t.tier==="crew"?` <select data-crew="${k}" style="width:auto"><option value="">No crew</option>${CREWS.map(c=>`<option ${t.crew===c?"selected":""}>${c}</option>`).join("")}</select>`:""}</td>
     <td>${isR(t)?"":`<button class="small danger" data-rm="${k}">Remove</button>`}</td></tr>`).join("");
   m.innerHTML = `<div class="card"><h2>Team and access</h2><p class="meta">One sign-in list for every page. The access level decides where a person lands: <b>Admin</b> opens Projects and the CRM, including client prices. <b>Crew</b> sees only the Employee View (his jobs, schedule, hours). <b>Walker</b> sees only the door hanger Routes page. Only admins can change this list. Names of admins are what show up as owners and assignees.</p>
-    <table><thead><tr><th>Name</th><th>Google email</th><th>Access</th><th></th></tr></thead><tbody>${rows}</tbody></table>
+    <div style="overflow-x:auto"><table><thead><tr><th>Name</th><th>Google email</th><th>Access</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>
     <div class="grid2" style="margin-top:12px"><div><label>Name</label><input id="tmName" placeholder="First name"></div><div><label>Google email</label><input id="tmEmail" type="email" placeholder="name@gmail.com"></div>
       <div><label>Access level</label><select id="tmTier"><option value="">Pick one</option>${Object.entries(TIERS).map(([v,l])=>`<option value="${v}">${esc(l)}</option>`).join("")}</select></div>
       <div id="tmCrewBox" hidden><label>Crew</label><select id="tmCrew">${CREWS.map(c=>`<option>${c}</option>`).join("")}</select></div></div>
@@ -961,6 +961,31 @@ function renderTeam(m){
   m.querySelectorAll("[data-tier]").forEach(sel=>sel.onchange=()=>{ const k=sel.dataset.tier; if(!sel.value) return; commit(`${team[k].name}: access set to ${sel.value}`, { ["allowed/"+k+"/tier"]: sel.value }); });
   m.querySelectorAll("[data-crew]").forEach(sel=>sel.onchange=()=>{ const k=sel.dataset.crew; commit(`${team[k].name}: ${sel.value||"no crew"}`, { ["allowed/"+k+"/crew"]: sel.value||null }); });
   m.querySelectorAll("[data-rm]").forEach(b=>b.onclick=()=>commit("Removed "+team[b.dataset.rm].name+" from the list", { ["allowed/"+b.dataset.rm]: null }));
+  m.querySelectorAll("[data-rename]").forEach(b=>b.onclick=()=>{
+    const k=b.dataset.rename, box=m.querySelector(`[data-namebox="${k}"]`);
+    box.innerHTML=`<input data-newname value="${esc(team[k].name||"")}" style="width:160px;display:inline-block"> <button class="small primary" data-savename>Save</button> <button class="small" data-cancelname>Cancel</button>`;
+    const inp=box.querySelector("[data-newname]"); inp.focus(); inp.select();
+    box.querySelector("[data-cancelname]").onclick=()=>renderTeam(m);
+    const save=()=>renameMember(k, inp.value.trim());
+    box.querySelector("[data-savename]").onclick=save;
+    inp.onkeydown=e=>{ if(e.key==="Enter"){ e.preventDefault(); save(); } if(e.key==="Escape") renderTeam(m); };
+  });
+}
+// Renaming a person also moves every project they own and every task assigned to them to the new name,
+// because owners and assignees are stored by name. All of it is one change, so Undo reverses all of it.
+async function renameMember(k, name){
+  const t=team[k]; if(!t) return; const old=t.name||"";
+  if(!name) return toast("The name cannot be empty");
+  if(name===old) return render();
+  if(Object.entries(team).some(([x,o])=>x!==k && (o.name||"").toLowerCase()===name.toLowerCase())) return toast(`${name} is already on the list. Use a different name.`);
+  const shared=Object.entries(team).some(([x,o])=>x!==k && (o.name||"")===old);
+  const upd={ ["allowed/"+k+"/name"]: name };
+  let np=0, nt=0;
+  if(old && !shared){
+    Object.entries(projects).forEach(([id,p])=>{ if((p.owner||"")===old){ upd["projects/"+id+"/owner"]=name; np++; } });
+    Object.entries(tasks).forEach(([id,x])=>{ if((x.assignee||"")===old){ upd["tasks/"+id+"/assignee"]=name; nt++; } });
+  }
+  await commit(`Renamed ${old||t.email} to ${name}${np||nt?` (${np} project${np===1?"":"s"}, ${nt} task${nt===1?"":"s"} moved)`:""}`, upd);
 }
 
 let archiveQuery="";
