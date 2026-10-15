@@ -189,6 +189,24 @@ function showSign(A){
 // "token" (v2, after Intuit approval): the card form below, with the security code, sends the card straight to Intuit
 // from this browser for a one-time token. Only the token comes to us. Bank accounts get the emailed QuickBooks page.
 const INTUIT_TOKENS = { sandbox:"https://sandbox.api.intuit.com/quickbooks/v4/payments/tokens", production:"https://api.intuit.com/quickbooks/v4/payments/tokens" };
+// reCAPTCHA v3 (required by Intuit for payment apps). The site key comes from the signing service; the secret never leaves it.
+let captchaReady = null;
+function loadCaptcha(key){
+  if(!key) return Promise.reject(new Error("no key"));
+  if(captchaReady) return captchaReady;
+  captchaReady = new Promise((ok, no) => {
+    const sc = document.createElement("script");
+    sc.src = "https://www.google.com/recaptcha/api.js?render=" + encodeURIComponent(key);
+    sc.async = true; sc.onerror = () => { captchaReady = null; no(new Error("blocked")); };
+    sc.onload = () => window.grecaptcha ? grecaptcha.ready(ok) : no(new Error("blocked"));
+    document.head.appendChild(sc);
+  });
+  return captchaReady;
+}
+async function captchaToken(key){
+  try{ await loadCaptcha(key); return await grecaptcha.execute(key, { action:"card" }); }
+  catch(e){ const x = new Error("Our security check could not load in this browser. A content blocker or privacy setting can cause this. Turn it off for this page and try again, or tap \"Email me a secure QuickBooks page instead\" below."); x.netFail = true; throw x; }
+}
 async function intuitToken(card, env){
   let r;
   try{ r = await fetch(INTUIT_TOKENS[env==="production"?"production":"sandbox"], { method:"POST", headers:{ "Content-Type":"application/json", "Accept":"application/json" }, body:JSON.stringify({ card }) }); }
@@ -220,6 +238,7 @@ function showPay(A){
         <button type="button" class="more" id="cardLink" style="margin-top:8px">Having trouble? Email me a secure QuickBooks page instead</button>
         <p class="meta" style="margin:10px 0 0">${A.dueNow>0?`Today's ${esc(money(A.dueNow))} is charged when you save your card, and a receipt is emailed to you.`:"Nothing is charged today."} Later charges follow your agreement, with a receipt each time. There is no card fee.</p>
         <p class="meta" style="margin:6px 0 0">Payments are processed by QuickBooks Payments, provided by Intuit Payments Inc. Your card goes straight to them; we never receive or store your card number or security code.</p>
+        <p class="meta" style="margin:6px 0 0">This page is protected by reCAPTCHA, and the Google <a href="https://policies.google.com/privacy" target="_blank" rel="noopener">Privacy Policy</a> and <a href="https://policies.google.com/terms" target="_blank" rel="noopener">Terms of Service</a> apply.</p>
       </form>
       <button type="button" class="more" id="moreBtn" aria-expanded="false">More options ▾</button>
       <div id="more" hidden>
@@ -230,6 +249,7 @@ function showPay(A){
     <p class="meta">${contact}</p>`;
   $("#moreBtn").onclick = () => { const m=$("#more"); m.hidden=!m.hidden; $("#moreBtn").setAttribute("aria-expanded",String(!m.hidden)); $("#moreBtn").textContent = m.hidden ? "More options ▾" : "Fewer options ▴"; };
   const err = t => { const e=$("#err"); e.hidden=!t; e.textContent=t||""; if(t) e.scrollIntoView({block:"center"}); };
+  loadCaptcha(A.captchaKey).catch(()=>{});
   const num=$("#ccNum"), exp=$("#ccExp");
   num.oninput = () => { const d=digits(num.value).slice(0,19); num.value = d.replace(/(\d{4})(?=\d)/g,"$1 "); $("#ccBrand").textContent = brandOf(d); };
   exp.oninput = () => { let d=digits(exp.value).slice(0,4); if(d.length===1 && +d>1) d="0"+d; exp.value = d.length>2 ? d.slice(0,2)+"/"+d.slice(2) : d; };
@@ -249,8 +269,12 @@ function showPay(A){
     let cardToken;
     try{ cardToken = await intuitToken({ number:n, expMonth:m[1], expYear:"20"+m[2], cvc, name, address:{ postalCode:zip } }, A.payEnv); }
     catch(e){ btn.disabled=false; btn.textContent=was; return err(e.message); }
-    num.value=""; $("#ccCvc").value=""; btn.disabled=false; btn.textContent=was;
-    submit(btn, { method:"card", cardToken });
+    num.value=""; $("#ccCvc").value="";
+    let captcha;
+    try{ captcha = await captchaToken(A.captchaKey); }
+    catch(e){ btn.disabled=false; btn.textContent=was; return err(e.message); }
+    btn.disabled=false; btn.textContent=was;
+    submit(btn, { method:"card", cardToken, captcha });
   };
   $("#cardLink").onclick = async () => {
     const el=$("#cardLink"); el.disabled=true;
