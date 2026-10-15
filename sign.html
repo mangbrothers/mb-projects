@@ -44,7 +44,9 @@
   .meta{color:var(--ink2);font-size:14px}
   .quote{width:100%;border-collapse:collapse;font-size:15px;margin:8px 0 0}
   .quote td{padding:8px 0;border-bottom:1px solid var(--line);vertical-align:top}
-  .quote td:last-child{text-align:right;white-space:nowrap;padding-left:12px}
+  .quote td:first-child{padding-right:12px}
+  .quote td:last-child{text-align:right;padding-left:0;overflow-wrap:anywhere}
+  .quote tr.big td:last-child,.quote td.amt{white-space:nowrap}
   .quote tr.big td{font-weight:700;font-size:17px}
   .doc{background:#fff;color:#16233a;border:1px solid #d3dae3;border-radius:8px;padding:24px 22px;margin:0 0 14px;font:16px/1.55 Georgia,"Times New Roman",serif}
   .doc h2{font:700 21px/1.25 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;margin:0 0 12px}
@@ -349,7 +351,7 @@ function showDone(A){
   dropBar();
   const ch = A.pay ? A.pay.choice : "", check = ch==="check";
   const linkMode = (A.cardMode!=="token" || ch==="ach" || !!(A.pay && A.pay.link)) && !A.payLabel;
-  const methodLine = check ? "Check, waiting for it to arrive" : A.payLabel ? A.payLabel : `${ch==="ach"?"Bank account":"Card"}. We are emailing your secure QuickBooks page shortly.`;
+  const methodLine = check ? "Check, waiting for it to arrive" : A.payLabel ? A.payLabel : `${ch==="ach"?"Bank account":"Card"}, on the QuickBooks page we email you`;
   // Card saved on this page: say plainly whether today's charge went through (chargedNow from the signing service).
   const charged = A.chargedNow==="charged", chargePending = A.chargedNow==="pending" || A.chargedNow==="declined";
   const savedLine = !(A.dueNow>0) ? "We will be in touch to schedule your service."
