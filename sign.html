@@ -11,8 +11,9 @@
   sign with a typed name, choose a payment method (card first; bank account and check under More options),
   then a confirmation page. It holds nothing private. The link carries a one-time token (t) and the address
   of the signing service (s), a Google Apps Script on admin@mangbrothers.com. Card and bank numbers are
-  never received or stored by Mangiapane Brothers: they go to QuickBooks Payments (an emailed QuickBooks page now; after Intuit
-  approval, a form here that sends them straight to Intuit).
+  never received or stored by Mangiapane Brothers: the card form here sends the card straight to Intuit (QuickBooks Payments)
+  for a one-time token. If the signing service switches card mode off, the card step emails a QuickBooks page instead.
+  Agreement numbers starting TEST- are test agreements: a red banner on every step, no service, $1 charges.
 -->
 <style>
   :root{color-scheme:light dark;
@@ -83,6 +84,7 @@
   .field2 .brand{position:absolute;right:12px;top:40px;font-size:13px;font-weight:700;color:var(--ink2)}
   .two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
   .three{display:grid;grid-template-columns:1.2fr 1fr 1fr;gap:10px}
+  .testbar{border:2px solid var(--red);color:var(--red);border-radius:10px;padding:10px 14px;font-weight:700;margin:0 0 12px;background:var(--card)}
   .banner{background:var(--amber-soft);color:var(--amber);border:1px solid var(--amber-line);border-radius:10px;padding:12px 14px;font-weight:700;margin:0 0 12px}
   .done{border-color:var(--brand);background:var(--brand-soft)}
   .tick{display:inline-flex;width:34px;height:34px;border-radius:50%;background:var(--brand);color:var(--brand-ink);align-items:center;justify-content:center;font-weight:700;margin-right:8px;vertical-align:-6px}
@@ -107,7 +109,10 @@ const money = v => { if(v===""||v==null||isNaN(+v)) return ""; const n=+v, neg=n
 const fmtStamp = ms => ms ? new Date(ms).toLocaleString("en-US",{timeZone:"America/Detroit",month:"long",day:"numeric",year:"numeric",hour:"numeric",minute:"2-digit"}) : "";
 const first = A => String(A.signerName||"").split(" ")[0];
 const contact = `Questions: call <a href="tel:+17344502400">${PHONE}</a> or email <a href="mailto:${EMAIL}">${EMAIL}</a>.`;
-const steps = n => `<div class="steps">${["Sign","Payment method","Done"].map((s,i)=>`<span class="${i===n?"on":i<n?"ok":""}">${i<n?"✓ ":""}${i+1}. ${s}</span>`).join("")}</div>`;
+const TEST_TEXT = "TEST AGREEMENT. No service will be performed. Charges are $1.00 and can be refunded.";
+let IS_TEST = false;
+const testBar = () => IS_TEST ? `<div class="testbar" role="note">${TEST_TEXT}</div>` : "";
+const steps = n => testBar() + `<div class="steps">${["Sign","Payment method","Done"].map((s,i)=>`<span class="${i===n?"on":i<n?"ok":""}">${i<n?"✓ ":""}${i+1}. ${s}</span>`).join("")}</div>`;
 
 // Same text rules as the CRM: headings, bold, lists and tables ("|" lines; "|=" header, "|+" total).
 function table(lines, inline){
@@ -145,7 +150,7 @@ async function call(action, body){
 }
 function message(title, text){
   document.body.style.paddingBottom="0";
-  $("#main").innerHTML = `<div class="card"><h1>${esc(title)}</h1><p>${text}</p><p class="meta">${contact}</p></div>`;
+  $("#main").innerHTML = `${testBar()}<div class="card"><h1>${esc(title)}</h1><p>${text}</p><p class="meta">${contact}</p></div>`;
 }
 function dropBar(){ const b=$("#bar"); if(b) b.remove(); document.body.style.paddingBottom="0"; }
 
@@ -185,9 +190,9 @@ function showSign(A){
 }
 
 // ---------- step 2: payment method ----------
-// "off" (now): no card form. Add my card asks the office to email a secure QuickBooks page; nothing is typed here.
-// "token" (v2, after Intuit approval): the card form below, with the security code, sends the card straight to Intuit
-// from this browser for a one-time token. Only the token comes to us. Bank accounts get the emailed QuickBooks page.
+// "token" (live): the card form below, with the security code, sends the card straight to Intuit from this browser for a
+// one-time token. Only the token comes to us. Bank accounts get the emailed QuickBooks page.
+// "off" (kill switch in the signing service): no card form. Add my card asks the office to email a secure QuickBooks page.
 const INTUIT_TOKENS = { sandbox:"https://sandbox.api.intuit.com/quickbooks/v4/payments/tokens", production:"https://api.intuit.com/quickbooks/v4/payments/tokens" };
 // reCAPTCHA v3 (required by Intuit for payment apps). The site key comes from the signing service; the secret never leaves it.
 let captchaReady = null;
@@ -235,6 +240,7 @@ function showPay(A){
           ${token?`<div class="field2"><label for="ccCvc">Security code</label><input id="ccCvc" name="cvc" autocomplete="cc-csc" inputmode="numeric" maxlength="4" placeholder="123"></div>`:""}
           <div class="field2"><label for="ccZip">Billing ZIP</label><input id="ccZip" name="postal" autocomplete="billing postal-code" inputmode="numeric" placeholder="48150" maxlength="10"></div></div>
         <button type="button" class="primary wide" id="cardGo">Save my card and finish</button>
+        <div class="err" id="err" hidden></div>
         <button type="button" class="more" id="cardLink" style="margin-top:8px">Having trouble? Email me a secure QuickBooks page instead</button>
         <p class="meta" style="margin:10px 0 0">${A.dueNow>0?`Today's ${esc(money(A.dueNow))} is charged when you save your card, and a receipt is emailed to you.`:"Nothing is charged today."} Later charges follow your agreement, with a receipt each time. There is no card fee.</p>
         <p class="meta" style="margin:6px 0 0">Payments are processed by QuickBooks Payments, provided by Intuit Payments Inc. Your card goes straight to them; we never receive or store your card number or security code.</p>
@@ -244,11 +250,12 @@ function showPay(A){
       <div id="more" hidden>
         <div class="opt"><h3>Bank account (ACH)</h3><p>Use a checking or savings account instead of a card. We email you a secure QuickBooks page to add it, so your bank details go straight to QuickBooks Payments.</p><button type="button" class="wide" data-choice="ach">Email me the bank account page</button></div>
         <div class="opt"><h3>Prepay by check</h3><p>Pay the full ${esc(money(A.total))} by check instead of keeping a payment method on file. Your spot is not confirmed until we receive the check.</p><button type="button" class="wide" data-choice="check">Pay by check</button></div>
-      </div>
-      <div class="err" id="err" hidden></div></div>
+      </div></div>
     <p class="meta">${contact}</p>`;
   $("#moreBtn").onclick = () => { const m=$("#more"); m.hidden=!m.hidden; $("#moreBtn").setAttribute("aria-expanded",String(!m.hidden)); $("#moreBtn").textContent = m.hidden ? "More options ▾" : "Fewer options ▴"; };
   const err = t => { const e=$("#err"); e.hidden=!t; e.textContent=t||""; if(t) e.scrollIntoView({block:"center"}); };
+  // While a card is being saved or confirmed, nothing else on this step can be chosen (no second way to pay).
+  const lockOthers = on => document.querySelectorAll("#cardLink,#moreBtn,[data-choice]").forEach(x => x.disabled = on);
   loadCaptcha(A.captchaKey).catch(()=>{});
   const num=$("#ccNum"), exp=$("#ccExp");
   num.oninput = () => { const d=digits(num.value).slice(0,19); num.value = d.replace(/(\d{4})(?=\d)/g,"$1 "); $("#ccBrand").textContent = brandOf(d); };
@@ -256,12 +263,12 @@ function showPay(A){
   // Each card submit has its own attempt id. If the reply is lost (the card may already be charged), the page never shows
   // a failure and never invites a second try: it reads the outcome back from the signing service by that id.
   const submit = async (btn, body) => {
-    btn.disabled=true; const was=btn.textContent; btn.textContent="Saving your card and charging today's amount…";
+    btn.disabled=true; lockOthers(true); const was=btn.textContent; btn.textContent="Saving your card and charging today's amount…";
     const attempt = "a-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2,10);
     let R;
     try{ R = await call("paydetails", { ...body, attempt }); }
     catch(e){ return recheck(attempt, btn); }
-    if(!R || !R.ok){ btn.disabled=false; btn.textContent=was; return err((R && R.error) || "Not saved."); }
+    if(!R || !R.ok){ btn.disabled=false; lockOthers(false); btn.textContent=was; return err((R && R.error) || "Not saved."); }
     route({ ...A, ...R });
   };
   const recheck = async (attempt, btn) => {
@@ -311,7 +318,7 @@ function showPay(A){
   });
 }
 
-// Before Intuit approval: the card is entered on a QuickBooks page we email, never on this page.
+// Card mode off (the kill switch): the card is entered on a QuickBooks page we email, never on this page.
 function showPayLink(A){
   $("#main").innerHTML = `${steps(1)}
     <div class="card done"><h2 style="margin:0"><span class="tick">✓</span>Signed. Thank you, ${esc(first(A))}.</h2>
@@ -343,12 +350,19 @@ function showDone(A){
   const ch = A.pay ? A.pay.choice : "", check = ch==="check";
   const linkMode = (A.cardMode!=="token" || ch==="ach" || !!(A.pay && A.pay.link)) && !A.payLabel;
   const methodLine = check ? "Check, waiting for it to arrive" : A.payLabel ? A.payLabel : `${ch==="ach"?"Bank account":"Card"}. We are emailing your secure QuickBooks page shortly.`;
+  // Card saved on this page: say plainly whether today's charge went through (chargedNow from the signing service).
+  const charged = A.chargedNow==="charged", chargePending = A.chargedNow==="pending" || A.chargedNow==="declined";
+  const savedLine = !(A.dueNow>0) ? "We will be in touch to schedule your service."
+    : charged ? `Today's ${money(A.dueNow)} was charged to ${A.payLabel||"your card"}. Your receipt is on its way to your email.`
+    : chargePending ? `Today's ${money(A.dueNow)} has not gone through yet. We will run it shortly and email your receipt. You do not need to do anything or enter your card again.`
+    : `Today's ${money(A.dueNow)} is charged to your card, and your receipt is emailed to you.`;
+  const todayCell = check ? "" : !(A.dueNow>0) ? "$0" : charged ? `${money(A.dueNow)}, paid` : chargePending ? `${money(A.dueNow)}, processing` : money(A.dueNow);
   const C = A.check||{};
   const r=(a,b)=>`<tr><td>${a}</td><td>${b}</td></tr>`;
   $("#main").innerHTML = `${steps(2)}
     ${check?`<div class="banner">Your spot is not confirmed until we receive your check.</div>`:""}
     <div class="card done"><h1><span class="tick">✓</span>${check||linkMode?"Almost done":"You are all set"}, ${esc(first(A))}.</h1>
-      <p style="margin:6px 0 0">${check?"Your agreement is signed. Mail your check and we will confirm your spot as soon as it arrives.":linkMode ? `Your agreement is signed. Watch your email for the secure QuickBooks page to add your ${ch==="ach"?"bank account":"card"}${A.dueNow>0?`, where today's ${money(A.dueNow)} is paid`:""}.` : `Your agreement is signed and your ${ch==="ach"?"bank account":"card"} is on file. ${A.dueNow>0?"You should see a charge email and a confirmation from us come through at some point today.":"We will be in touch to schedule your service."}`}</p></div>
+      <p style="margin:6px 0 0">${check?"Your agreement is signed. Mail your check and we will confirm your spot as soon as it arrives.":linkMode ? `Your agreement is signed. Watch your email for the secure QuickBooks page to add your ${ch==="ach"?"bank account":"card"}${A.dueNow>0?`, where today's ${money(A.dueNow)} is paid`:""}.` : `Your agreement is signed and your ${ch==="ach"?"bank account":"card"} is on file. ${savedLine}`}</p></div>
     ${check?`<div class="card"><h2>Mail your check</h2><table class="quote">
       ${r("Amount","<b>"+esc(money(C.amount))+"</b>")}${r("Payable to",esc(C.payable||"Mangiapane Brothers LLC"))}${r("Mail to",esc(C.mailTo||""))}${r("Memo line",esc(C.memo||A.agreementNo))}</table></div>`:""}
     <div class="card"><h2>Summary</h2><table class="quote">
@@ -356,7 +370,7 @@ function showDone(A){
       ${A.signedAt?r("Signed",esc(fmtStamp(A.signedAt))):""}
       ${r("Signed copy sent to",esc((A.to||[]).join(" and ")))}
       ${r("Payment method",esc(methodLine))}
-      ${check?"":r("Charged today",esc(money(A.dueNow)||"$0"))}
+      ${check?"":r("Charged today",esc(linkMode ? (money(A.dueNow)||"$0") : todayCell))}
       ${A.dueInstall>0&&!check?r("Charged when your lights are installed",esc(money(A.dueInstall))):""}
       ${A.perVisit&&!check?r("Each snow visit after the sixteenth",esc(money(A.perVisit))):""}</table>
       ${check?"":`<p class="meta" style="margin:10px 0 0">A receipt is emailed for every charge.</p>`}
@@ -366,6 +380,7 @@ function showDone(A){
 }
 
 function route(A){
+  if(A.test) IS_TEST = true;
   if(A.status!=="signed") return showSign(A);
   // A card is being saved and charged right now (another tab, or a reload mid-charge): wait for the result, never show "all set" early.
   if(A.payBusy && A.payBusy.at && Date.now() - A.payBusy.at < 120000){ dropBar(); return message("We are confirming your payment", "Please do not enter your card again. Reload this page in a minute to see the result, or call "+esc(PHONE)+"."); }

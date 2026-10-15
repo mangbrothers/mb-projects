@@ -89,6 +89,7 @@
   .pill.sample{background:var(--amber-soft);color:var(--amber);border:1px solid var(--amber)}
   .pill.signed{background:var(--green-soft);color:var(--green)}
   .pill.voided{background:var(--surface2);color:var(--muted);text-decoration:line-through}
+  @media(max-width:600px){#chargesCard tr{display:grid;grid-template-columns:1fr auto;border-bottom:1px solid var(--line)}#chargesCard td{border-bottom:0}#chargesCard td:last-child{grid-column:1/-1;text-align:left;white-space:normal!important;padding-top:0}}
   .tag{display:inline-block;font-size:11px;padding:1px 7px;border-radius:4px;font-weight:600;letter-spacing:.02em;white-space:nowrap;border:1px solid transparent}
   .tag.lawn{background:var(--s-lawn-soft);color:var(--s-lawn)}
   .tag.fall{background:var(--s-fall-soft);color:var(--s-fall)}
@@ -1158,7 +1159,8 @@ async function lockContract(){
 // ---------- Payment on file: the step right after every signing ----------
 // Card on file is required for every client (Oct 13, 2026). The sheet shows what is charged today, then always
 // asks for the payment method on file, even when nothing is due today. Card and bank numbers never come into
-// this tool: they are entered in QuickBooks. Only the card brand and the last four digits are kept here.
+// this tool. A card the customer typed on the signing page went straight to Intuit and is already on file here
+// (brand and last 4, with qbCardId); this sheet is for cards taken in person (GoPayment) or by emailed link.
 // The exceptions: a bank account (ACH) with approval, or prepaying everything by check.
 const CARD_BRANDS = ["Visa","Mastercard","American Express","Discover"];
 const POF_LABEL = { card:"Card on file", ach:"Bank account (ACH) on file", check:"Prepaid by check" };
@@ -1166,13 +1168,12 @@ const payOnFileOk = c => { const p=c?.payOnFile; return !!p && (p.status==="on-f
 function payOnFileLabel(c){
   const p=c?.payOnFile; if(!p) return "";
   if(p.status==="missing") return "No payment method on file";
-  if(p.status==="received") return `${p.method==="ach"?"Bank account":esc(p.brand||"Card")} ending ${esc(p.last4||"")} from the customer: enter it in QuickBooks`;
   if(p.status==="pending") return `${p.method==="ach"?"Bank account":"Card"}: link sent, waiting for it in QuickBooks`;
   if(p.status==="check-awaiting") return "Check prepay: waiting for the check";
   if(p.status==="check-received") return "Prepaid by check";
   return p.method==="ach" ? `Bank account (ACH) ending ${esc(p.last4||"")}` : `${esc(p.brand||"Card")} ending ${esc(p.last4||"")}`;
 }
-const payFilePill = c => !c?.payOnFile ? "" : payOnFileOk(c) ? `<span class="pill paid" title="${payOnFileLabel(c)}">${c.payOnFile.method==="check"?"Check prepay":c.payOnFile.method==="ach"?"ACH":"Card"} ${esc(c.payOnFile.last4||"")}</span>` : c.payOnFile.status==="received" ? `<span class="pill open" title="${payOnFileLabel(c)}">Enter in QB ${esc(c.payOnFile.last4||"")}</span>` : `<span class="pill pastdue">${c.payOnFile.status==="missing"?"No card":"Pending"}</span>`;
+const payFilePill = c => !c?.payOnFile ? "" : payOnFileOk(c) ? `<span class="pill paid" title="${payOnFileLabel(c)}">${c.payOnFile.method==="check"?"Check prepay":c.payOnFile.method==="ach"?"ACH":"Card"} ${esc(c.payOnFile.last4||"")}</span>` : `<span class="pill pastdue">${c.payOnFile.status==="missing"?"No card":"Pending"}</span>`;
 const chargesFor = (clientId, cid) => Object.entries(qbRows).filter(([,r])=>r.type==="charge" && r.clientId===clientId && (!cid || r.contractId===cid));
 // The amount on the signed contract: the price stored with it, or the first dollar figure in its text.
 function contractAmount(rec){
@@ -1197,9 +1198,6 @@ function openPaySheet(clientId, cid, rec){
       ${pp?`<div class="meta" style="margin-top:6px">Snow visits after the sixteenth: ${money(pp)} each, charged after the visit.</div>`:""}
       <div class="meta" style="margin-top:6px">A receipt is emailed for every charge. There is no card fee.</div>
       <h4>Payment method on file</h4>
-      ${pof.status==="received"?`<div class="payopt" style="border-color:var(--amber)"><div class="ph"><b>From the customer: ${pof.method==="ach"?"bank account":esc(pof.brand||"card")} ending ${esc(pof.last4||"")}${pof.exp?`, exp ${esc(pof.exp)}`:""}</b></div>
-        <div class="pb">1. ${pof.driveFileId?`<a href="https://drive.google.com/file/d/${esc(pof.driveFileId)}/view" target="_blank" rel="noopener">Open the details file</a> (signed in as admin@ only)`:"The details file was already deleted"}.<br>2. Save it on the customer in QuickBooks and run ${dueNow>0?`today's <b>${money(dueNow)}</b>`:"nothing today"}.<br>3. Press the button. The file is deleted from Drive and the CRM keeps the last 4 only.</div>
-        <div class="actions" style="justify-content:flex-start"><button type="button" class="primary" id="pofEntered">Saved in QuickBooks, delete the file</button></div></div>`:""}
       ${payOnFileOk(c)?`<div class="payopt nofee"><div class="ph"><b>Already on file</b></div><div class="pb">${payOnFileLabel(c)}. Choose below only to replace it.</div></div>`:""}
       ${opt("card_now","Scan the card now (GoPayment)",`In person. Open QuickBooks GoPayment, ${dueNow>0?`charge <b>${money(dueNow)}</b>, and save the card to the customer.`:"and save the card to the customer. <b>Nothing is charged today.</b>"}`)}
       ${opt("card_link","Email the customer a QuickBooks card link","They enter the card on the QuickBooks page. It shows as pending until it appears in QuickBooks.")}
@@ -1235,7 +1233,6 @@ function openPaySheet(clientId, cid, rec){
   const choice=()=>host.querySelector('input[name="pofm"]:checked')?.value||"";
   host.querySelectorAll('input[name="pofm"]').forEach(r=>r.onchange=()=>{ host.querySelector("#pofCard").hidden=choice()!=="card_now"; host.querySelector("#pofCheck").hidden=choice()!=="check"; host.querySelector("#pofLink").hidden=!["card_link","ach"].includes(choice()); });
   const moreBtn=host.querySelector("#pofMoreBtn"); moreBtn.onclick=()=>{ const box=host.querySelector("#pofMore"); box.hidden=!box.hidden; moreBtn.setAttribute("aria-expanded",String(!box.hidden)); moreBtn.textContent = box.hidden ? "More options \u25BE" : "Fewer options \u25B4"; };
-  const ent=host.querySelector("#pofEntered"); if(ent) ent.onclick=async()=>{ ent.disabled=true; const ok=await enteredInQb(clientId, cid); if(ok){ sheet.style.transition="transform .2s"; sheet.style.transform="translateY(100%)"; host.style.opacity="0"; setTimeout(()=>host.remove(),200); } else ent.disabled=false; };
   const l4=host.querySelector("#pofLast4"); l4.oninput=()=>{ l4.value=l4.value.replace(/\D/g,"").slice(0,4); };
   host.querySelector("#pofSave").onclick=async()=>{
     const m=choice(), err=host.querySelector("#pofErr"); err.textContent="";
@@ -1246,15 +1243,6 @@ function openPaySheet(clientId, cid, rec){
     if(m==="card_now"){ if(!f.brand) return err.textContent="Choose the card brand."; if(!/^\d{4}$/.test(f.last4)) return err.textContent="Enter the last 4 digits of the card, and nothing more."; }
     const ok=await recordPayOnFile(clientId, cid, rec, m, f); if(ok){ sheet.style.transition="transform .2s"; sheet.style.transform="translateY(100%)"; host.style.opacity="0"; setTimeout(()=>host.remove(),200); }
   };
-}
-// The card or bank account the customer entered after signing is now saved in QuickBooks: mark it on file and delete the Drive file.
-async function enteredInQb(clientId, cid){
-  const c=clients[clientId]||{}, p=c.payOnFile||{}, now=Date.now();
-  const upd={ [`clients/${clientId}/payOnFile/status`]:"on-file", [`clients/${clientId}/payOnFile/enteredAt`]:now, [`clients/${clientId}/payOnFile/enteredBy`]:me.email,
-    [`clientLog/${clientId}/${db.ref("clientLog").push().key}`]:{ text:`${p.method==="ach"?"Bank account":(p.brand||"Card")} ending ${p.last4||""} saved in QuickBooks. Details file deleted from Drive.`, at:now, by:me.email, source:"payment" } };
-  let k=null; if(p.driveFileId && svcReady()){ k=db.ref("sync/mail").push().key; upd["sync/mail/"+k]={ kind:"purgepay", clientId, fileId:p.driveFileId, status:"queued", createdAt:now, createdBy:me.email }; }
-  try{ await db.ref().update(upd); if(k) svcCall("mail",{k}); toast("On file. The details file is being deleted."); return true; }
-  catch(e){ toast("Not saved: "+(e.code||e.message)); return false; }
 }
 function payLine(clientId, cid, rec){
   const c=clients[clientId]||{}, ch=chargesFor(clientId, cid);
@@ -1492,7 +1480,7 @@ function renderContractsView(m){
   m.querySelectorAll("[data-tpl]").forEach(b=>b.onclick=()=>openTemplate(b.dataset.tpl));
   const svcUrlOk=()=>{ const u=$("#svcUrl").value.trim(); if(!/^https:\/\/script\.google\.com\/macros\/s\/[\w-]+\/exec$/.test(u)){ $("#svcMsg").textContent="Paste the address that ends in /exec."; return ""; } return u; };
   $("#svcTest").onclick=async()=>{ const u=svcUrlOk(); if(!u) return; $("#svcMsg").textContent="Testing…";
-    try{ const r=await (await fetch(u+"?action=ping",{redirect:"follow"})).json(); $("#svcMsg").textContent = r.ok ? `Working. Sends from ${r.from}${r.sendsAsAdmin?"":" (expected admin@mangbrothers.com)"}. Database: ${r.database}. Emails left today: ${r.quota}.` : "Answered with an error: "+(r.error||""); }
+    try{ const r=await (await fetch(u+"?action=ping",{redirect:"follow"})).json(); $("#svcMsg").textContent = r.ok ? `Working. Sends from ${r.from}${r.sendsAsAdmin?"":" (expected admin@mangbrothers.com)"}. Database: ${r.database}. Emails left today: ${r.quota}.${r.cardMode?` Card payments: ${r.cardMode==="token"?"on (card form on the signing page)":"off (emailed QuickBooks page)"}.`:""}` : "Answered with an error: "+(r.error||""); }
     catch(e){ $("#svcMsg").textContent="No answer. Check the address and that the deployment is set to Anyone."; } };
   $("#svcSave").onclick=async()=>{ const u=$("#svcUrl").value.trim(); if(u && !svcUrlOk()) return; await commit(u?"Set the signing service":"Turned off the signing service", { "contractTemplates/_signing": u ? { url:u, deploy:svcDeploy(u), updatedAt:Date.now(), updatedBy:me.email } : null }); toast(u?"Signing service saved.":"Signing service turned off."); };
   loadMySig().then(sig=>{
@@ -1664,9 +1652,9 @@ function ssaOpen(c, sid){ const sg=ssaSigned(c), cov=(sg&&sg[1].covers)||{}; ret
 // On a lead card: Email contract until it is signed, then Signed · View. An open link shows its live status.
 function leadCtrHtml(id, c){
   const sg=ssaSigned(c), r=c.signReq;
-  if(sg) return `<div class="leadctr"><button type="button" class="small signedbtn" data-lead-view="${id}|${sg[0]}">\u2713 Signed \u00B7 View</button></div>`;
+  if(sg) return `<div class="leadctr"><button type="button" class="small signedbtn" data-lead-view="${id}|${sg[0]}">\u2713 Signed \u00B7 View</button>${sg[1].test?' <span class="pill sample" style="align-self:center">TEST</span>':""} ${payFilePill(c)}</div>`;
   const open = r && OPEN_REQ.includes(r.status), signedReq = r && r.status==="signed";
-  return `<div class="leadctr">${open||signedReq?`<button type="button" class="small" data-lead-status="${id}" title="${esc(reqStatusText(r))}">${esc(reqStatusText(r))}</button>`:""}
+  return `<div class="leadctr">${open||signedReq?`<button type="button" class="small" data-lead-status="${id}" title="${esc(reqStatusText(r,c))}">${esc(reqStatusText(r,c))}</button>`:""}
     ${signedReq?"":`<button type="button" class="small primary" data-lead-send="${id}">${open?"Resend contract":"Email contract"}</button>`}</div>`;
 }
 function showSentFor(clientId){ signCtx={ mode:"sent", clientId, S:signCtx?.S }; showSent(); if(!$("#signDlg").open) $("#signDlg").showModal(); }
@@ -1675,7 +1663,7 @@ function ssaRowHtml(c, dirty){
   const covered = sg ? SSA_TYPES.filter(t=>(sg[1].covers||{})[t]).map(t=>SERVICE_TYPES[t].label).join(", ") : "";
   return `<div class="ctr"><div class="t"><b>${SSA_NAME}</b><div class="meta">${sg ? "Covers: "+esc(covered)+(open?". A service was added since; sign a new agreement to cover it.":"") : "Fall cleanup, Christmas lights and snow. You choose the services and options, the customer only signs."}${c.ssaDraft&&!sg?" Setup saved, not signed.":""}</div></div>
     ${sg?`<span class="pill signed">Signed ${fmtDate(new Date(sg[1].signedAt).toLocaleDateString("en-CA",{timeZone:TZ}))}</span><button type="button" class="small" data-view-ctr="${sg[0]}">View</button>`:(has?`<span class="pill unsigned">Not signed</span>`:"")}
-    ${!sg&&c.signReq&&OPEN_REQ.includes(c.signReq.status)?`<span class="pill open" title="${esc((c.signReq.to||[]).join(", "))}">${esc(reqStatusText(c.signReq))}</span>`:""}
+    ${!sg&&c.signReq&&OPEN_REQ.includes(c.signReq.status)?`<span class="pill open" title="${esc((c.signReq.to||[]).join(", "))}">${esc(reqStatusText(c.signReq,c))}</span>`:""}
     <button type="button" class="small ${sg&&!open?"":"primary"}" data-ssa="1" ${dirty?"disabled":""}>${sg?"New agreement":"Set up, email or sign"}</button></div>`;
 }
 // Tables in contract text: lines starting with "|". "|=" is a header row, "|+" a total row.
@@ -1778,6 +1766,7 @@ function openSeasonal(clientId){
   if($("#clientDlg").open && openId===clientId && dialogDirty()) return toast("Save the client first, then open the agreement.");
   const base=ssaBlank(c), d=c.ssaDraft||{};
   const S={ ...base, ...d, fall:{...base.fall,...(d.fall||{})}, lights:{...base.lights,...(d.lights||{})}, snow:{...base.snow,...(d.snow||{})} };
+  S.test=false; // a test agreement is chosen fresh each time, never carried in a saved draft
   if(!S.prop) S.prop=c.address||""; if(!S.email) S.email=c.email||"";
   signCtx={ mode:"ssa-setup", clientId, S };
   ssaSetup();
@@ -1799,10 +1788,13 @@ function ssaSetup(){
       <div><label>Second email (optional)</label><input id="ss-email2" type="email" value="${esc(S.email2||"")}" placeholder="spouse@example.com" autocomplete="off"></div>
       <div><label>Pricing area</label><select id="ss-zone">${opts(Object.keys(SSA_ZONES),S.zone,SSA_ZONES)}</select></div>
       <div><label>Property type (1.2)</label><select id="ss-ptype">${opts(["Residential","Commercial","Multi-Unit / HOA"],S.ptype)}</select></div>
+      <div style="grid-column:1/-1"><label class="row ssack ss-testck"><input type="checkbox" id="ss-test" ${S.test?"checked":""}> <span><b>Test agreement</b>: $1 charged at signing and $1 later from Charges to run, no service, marked TEST everywhere. For trying the system on yourself or family.</span></label></div>
       <div style="grid-column:1/-1"><label>Service property (1.1)</label><input id="ss-prop" value="${esc(S.prop)}"></div>
       <div style="grid-column:1/-1"><label>Service areas (1.3), leave empty for the standard snow areas</label><input id="ss-areas" value="${esc(S.areas)}" placeholder="Driveway, apron, front walk to the door, porch steps, public sidewalk"></div>
       <div style="grid-column:1/-1"><label>Pre-existing conditions noted at signing (Article 7)</label><input id="ss-pre" value="${esc(S.pre)}" placeholder="Cracked apron, loose gutter on garage. Leave empty for none."></div>
     </div>
+    <div class="warnline" id="ss-test-wl" hidden>TEST AGREEMENT. No service is sold. The customer is charged $1.00 at signing; a second $1.00 is charged later from Charges to run. Refund both there.</div>
+    <div id="ss-real">
     <div class="sect">Services</div>
     <div class="svc svcbar fall">${ck("ss-fall",`<b>Fall Cleanup</b> <span class="meta" id="ss-fall-p"></span>`,S.fall.on)}
       <div class="warnline" id="ss-fall-wl" hidden>Fall Cleanup is not offered in Westland.</div>
@@ -1827,6 +1819,7 @@ function ssaSetup(){
     <div id="ss-nb-box" class="grid2" hidden>
       <div><label>Neighbor's name</label><input id="ss-nb-name" value="${esc(S.neighborName||"")}" autocomplete="off"></div>
       <div><label>Neighbor's address</label><input id="ss-nb-addr" value="${esc(S.neighborAddr||"")}" autocomplete="off"></div></div>
+    </div>
     <div class="pstotal"><span>Charged today</span><b id="ss-now">$0</b></div>
     <div class="meta" id="ss-later-amt"></div>
     <div class="warnline" id="ss-warn" hidden></div>
@@ -1848,6 +1841,9 @@ function ssaSync(){
   SSA_ADDONS.forEach(([k])=>S.lights[k]=n("ss-a-"+k)); SSA_L_ADJ.forEach(([k])=>S.lights[k]=g("ss-la-"+k).checked); S.lights.ft=n("ss-l-ft");
   S.snow.on=g("ss-snow").checked; S.snow.lot=g("ss-s-lot").value; S.snow.nb=g("ss-s-nb").checked;
   S.neighborName=g("ss-nb-name").value.trim(); S.neighborAddr=g("ss-nb-addr").value.trim(); S.payUrl=(g("ss-payurl")?.value||"").trim();
+  S.test=g("ss-test").checked; g("ss-real").hidden=S.test; g("ss-test-wl").hidden=!S.test; g("ss-go").hidden=S.test;
+  ["ss-zone","ss-ptype","ss-prop","ss-areas","ss-pre"].forEach(id=>{ g(id).parentElement.hidden=S.test; });
+  if(S.test){ g("ss-now").textContent="$1"; g("ss-later-amt").textContent="A second $1 is charged later, from Charges to run."; g("ss-warn").hidden=true; return; }
   const wl=S.zone==="westland", k=ssaCalc(S), show=S.lights.pkg==="showcase";
   g("ss-fall-wl").hidden=!(wl && S.fall.on); g("ss-fall-box").hidden=!S.fall.on || wl;
   g("ss-lights-box").hidden=!S.lights.on; g("ss-snow-box").hidden=!S.snow.on;
@@ -1862,6 +1858,7 @@ function ssaSync(){
 }
 function ssaErrors(){
   const S=signCtx.S, e=[], wl=S.zone==="westland";
+  if(S.test){ if(S.email && !/^\S+@\S+\.\S+$/.test(S.email)) e.push("a valid email"); return e; }
   if(!S.prop) e.push("service property");
   if(!S.fall.on && !S.lights.on && !S.snow.on) e.push("at least one service");
   if(wl && S.fall.on) e.push("untick Fall Cleanup (not offered in Westland)");
@@ -1876,7 +1873,7 @@ function ssaErrors(){
   if(S.payUrl && !/^https:\/\/\S+$/.test(S.payUrl)) e.push("a QuickBooks link starting with https://, or leave it empty");
   return e;
 }
-function ssaSaveDraft(){ const X=signCtx; return db.ref().update({ ["clients/"+X.clientId+"/ssaDraft"]: JSON.parse(JSON.stringify(X.S)), ["clients/"+X.clientId+"/updatedAt"]: Date.now(), ["clients/"+X.clientId+"/updatedBy"]: me.email }); }
+function ssaSaveDraft(){ const X=signCtx; return db.ref().update({ ["clients/"+X.clientId+"/ssaDraft"]: JSON.parse(JSON.stringify({ ...X.S, test:false })), ["clients/"+X.clientId+"/updatedAt"]: Date.now(), ["clients/"+X.clientId+"/updatedBy"]: me.email }); }
 
 // Step 2, customer: read and sign.
 async function ssaShow(){
@@ -2010,6 +2007,7 @@ async function ssaSend(){
   const mySig = X.mySig!==undefined ? X.mySig : await loadMySig(); X.mySig=mySig;
   if(!mySig?.data) return toast("Draw your countersignature once first: More, Contracts, Your countersignature.");
   X.busy=true; const btn=$("#ss-send"); if(btn){ btn.disabled=true; btn.textContent="Sending…"; }
+  if(S.test){ try{ await ssaSendTest(c, S, id, to, mySig); } catch(e){ toast("Not sent: "+(e.code||e.message)); } finally{ X.busy=false; if(btn){ btn.disabled=false; btn.textContent="Email contract to sign"; } } return; }
   try{
     ssaSaveDraft().catch(()=>{});
     X.agNo = X.agNo || `MB-${today().replace(/-/g,"")}-${Math.random().toString(36).slice(2,6).toUpperCase().padEnd(4,"X")}`;
@@ -2040,10 +2038,51 @@ async function ssaSend(){
   }catch(e){ toast("Not sent: "+(e.code||e.message)); }
   finally{ X.busy=false; if(btn){ btn.disabled=false; btn.textContent="Email contract to sign"; } }
 }
+// A test agreement: the real email, signing page, card form, PDF and receipts, with $1 at signing, $1 later, and no service.
+// The signing service refuses it unless the flag, the TEST- number and the $1 limits all agree.
+const TEST_NAME = "Test Agreement";
+function testAgreementText(c, S, agNo){
+  const t = v => String(v||"").replace(/[|\r\n]+/g," ").trim();
+  return ["# TEST AGREEMENT", "**TEST AGREEMENT. No service will be performed. Charges are $1.00 and can be refunded.**",
+    `**Agreement No.:** ${agNo}\n**Effective Date:** {{SIGNED_LONG}}`,
+    "This test agreement is between **Mangiapane Brothers LLC** (the “Company”) and the person named below (the “Customer”). Its only purpose is to test the Company's signing and payment system.",
+    `|= Customer | \n| Name | ${t(c.name)}\n| Email | ${t(S.email)}${S.email2?`\n| Second email | ${t(S.email2)}`:""}`,
+    "## 1. No Service", "The Company will not perform any service under this agreement, and the Customer is not buying any service.",
+    "## 2. Charges", "|= Item | Price\n| Test charge at signing | $1\n| Test charge, later | $1\n|+ Total | $2",
+    "The Customer authorizes Mangiapane Brothers LLC to charge the card on file $1.00 when this agreement is signed, and $1.00 once more on a later date. A receipt is emailed for every charge. Payments are processed by QuickBooks Payments, provided by Intuit Payments Inc.",
+    "## 3. Refunds", "The Company will void or refund both charges in full on request, and may do so without a request.",
+    "## 4. Electronic Signature", "The Customer may sign by typing their name. The Customer agrees to receive this agreement, receipts and notices by email at the address above."].join("\n\n");
+}
+async function ssaSendTest(c, S, id, to, mySig){
+  const X=signCtx, now=Date.now(), d=today(), L=fmtLong(d), CB=fmtLong(ssaCancelBy(d));
+  X.agNo = X.agNo && /^TEST-/.test(X.agNo) ? X.agNo : `TEST-${d.replace(/-/g,"")}-${Math.random().toString(36).slice(2,6).toUpperCase().padEnd(4,"X")}`;
+  const agNo=X.agNo, token=randToken(), svc=svcInfo(), link=`${SIGN_PAGE}?t=${token}&s=${svcDeploy(svc.url)}`, desc=`${TEST_NAME} ${agNo}`;
+  const apply=[];
+  if(!payOnFileOk(c)) apply.push(["clients/"+id+"/payOnFile", { status:"missing", since:now }]);
+  if(S.email && S.email!==(c.email||"")) apply.push(["clients/"+id+"/email", S.email]);
+  apply.push(["sync/qb/"+db.ref("sync/qb").push().key, { type:"charge", trigger:"signing", status:"pending", test:true, clientId:id, contractId:"{{CID}}", amount:1, date:d, description:`${desc}: $1 at signing`, createdAt:now, createdBy:me.email }]);
+  apply.push(["sync/qb/"+db.ref("sync/qb").push().key, { type:"charge", trigger:"test", status:"scheduled", test:true, clientId:id, contractId:"{{CID}}", amount:1, description:`${desc}: second $1, charged later`, createdAt:now, createdBy:me.email }]);
+  const req = { status:"queued", test:true, clientId:id, tplName:TEST_NAME, tplVersion:1, agreementNo:agNo, amount:2, dueNow:1, dueInstall:0, perVisit:null,
+    lines:[["Test charge at signing",1],["Test charge, later",1]], serviceSummary:"Test agreement: $1 at signing and $1 later. No service.",
+    details:{ test:true, agreementNo:agNo, email:S.email, email2:S.email2||"", total:2, dueNow:1, dueInstall:0 }, covers:{},
+    textT:testAgreementText(c,S,agNo), noticeT:ssaNotice(agNo).split(CB).join("{{CANCEL_BY_LONG}}").split(L).join("{{SIGNED_LONG}}"),
+    signerName:c.name, to, companySig:mySig.data, companySigner:mySig.name||me.displayName||me.email,
+    createdAt:now, createdBy:me.email, expiresAt:now+7*864e5, link, apply, payUrl:"" };
+  const upd = { ["sync/sign/"+token]: JSON.parse(JSON.stringify(req)),
+    ["clients/"+id+"/signReq"]: { token, status:"queued", test:true, createdAt:now, createdBy:me.email, to, link, agreementNo:agNo, amount:2, dueNow:1 },
+    ["clientLog/"+id+"/"+db.ref("clientLog").push().key]: { text:`Emailed TEST agreement ${agNo} to ${to.join(" and ")}: $1 at signing, $1 later, no service.`, at:now, by:me.email, source:"contract" } };
+  if(c.signReq && OPEN_REQ.includes(c.signReq.status) && c.signReq.token!==token) upd["sync/sign/"+c.signReq.token+"/status"]="cancelled";
+  await db.ref().update(upd);
+  svcCall("send", { t:token });
+  X.sentToken=token; showSent();
+}
 // What the rep sees while the customer is on the phone: live status of the link.
-function reqStatusText(r){
+function reqStatusText(r, c){
   if(!r) return "";
   if(r.status==="signed"){
+    if(apiCard(c)){ const sg=Object.values(qbRows).find(x=>x.type==="charge" && x.trigger==="signing" && x.contractId===r.contractId);
+      const st = !sg ? "" : sg.status==="done" ? ` ${money(sg.amount)} charged.` : sg.status==="declined" ? " Today's charge declined." : ` ${money(sg.amount)} not charged yet: see Charges to run.`;
+      return `Signed. ${payOnFileLabel(c)} on file.${st}`; }
     if(!r.pay) return "Signed. Waiting for the payment method.";
     if(r.pay==="check") return "Signed. Customer is mailing a check.";
     return r.payDoneAt ? `Signed. ${r.pay==="ach"?"Bank account":"Card"} received: enter it in QuickBooks and run today's charge.` : `Signed. Waiting for the ${r.pay==="ach"?"bank account":"card"}.`;
@@ -2054,7 +2093,7 @@ let sentTimer=null;
 function showSent(){
   const X=signCtx, id=X.clientId; ssaBarOff(); X.mode="sent";
   const paint=()=>{ const c=clients[id]||{}, r=c.signReq||{}; const box=$("#sentStatus"); if(!box){ clearInterval(sentTimer); return; }
-    box.textContent=reqStatusText(r); box.className = r.status==="signed" ? "pill signed" : r.status==="error" ? "pill pastdue" : "pill open"; };
+    box.textContent=reqStatusText(r,c); box.className = r.status==="signed" ? "pill signed" : r.status==="error" ? "pill pastdue" : "pill open"; };
   const c=clients[id]||{}, r=c.signReq||{};
   $("#signTitle").textContent = "Contract sent";
   $("#signBody").innerHTML = `<div class="signpanel" style="margin-top:0">
@@ -2136,27 +2175,66 @@ async function doImport(){
   toast(`Imported ${n}${skipped?`, skipped ${skipped}${byPhone?` (${byPhone} by phone)`:""}`:""}`); setNav("clients");
 }
 
-// ---------- Charges to run: the payment schedule, cleared by a person in QuickBooks ----------
-// Until the QuickBooks Payments API is approved, a person charges the card on file in QuickBooks
-// (Customers > the client > Receive payment, card on file) and then marks the charge here.
-// Claude never charges a card. Declined means past due as of today (no late fee; grace is a judgment call).
-const CHARGE_LABEL = { signing:"Due at signing", install:"Lights balance, install day", overage:"Snow visit past 16", call:"Lights service call", completion:"On completion" };
+// ---------- Charges to run: the payment schedule ----------
+// A card the customer saved on the signing page (QuickBooks Payments, qbCardId on payOnFile) is charged from here
+// through the signing service: Charge card on file. The CRM writes a one-time request on the row; the service charges
+// it once, emails the receipt and writes the result back. Cards taken in GoPayment are still charged by a person in
+// QuickBooks and marked here with Charged or Declined. Claude never charges a card. Declined means past due as of today
+// (no late fee; grace is a judgment call). Test charges (TEST agreements, $1) are shown with a TEST tag and never counted.
+const CHARGE_LABEL = { signing:"Due at signing", install:"Lights balance, install day", overage:"Snow visit past 16", call:"Lights service call", completion:"On completion", test:"Test charge, later" };
+const apiCard = c => !!(c && c.payOnFile && c.payOnFile.status==="on-file" && c.payOnFile.qbCardId);
+const testPill = r => r && r.test ? ' <span class="pill sample">TEST</span>' : "";
 function chargesHtml(){
   const all=Object.entries(qbRows).filter(([,r])=>r.type==="charge");
   const by=s=>all.filter(([,r])=>r.status===s).sort((a,b)=>(a[1].createdAt||0)-(b[1].createdAt||0));
-  const pend=[...by("declined"),...by("pending")], sched=by("scheduled"), chk=by("awaiting-check");
-  const row=([rid,r],btns)=>{ const c=clients[r.clientId]||{}; return `<tr><td><b>${esc(c.name||"(deleted client)")}</b>${r.status==="declined"?' <span class="pill pastdue">declined, past due</span>':""}<div class="meta">${esc(CHARGE_LABEL[r.trigger]||r.trigger||"")} · ${esc(r.description||"")}</div><div class="meta">${payOnFileLabel(c)||"No payment method recorded"}</div></td><td class="num"><b>${money(r.amount)}</b></td><td class="num" style="white-space:nowrap">${btns(rid)}</td></tr>`; };
-  const tbl=(rows,btns)=>`<div style="overflow-x:auto"><table><tbody>${rows.map(x=>row(x,btns)).join("")}</tbody></table></div>`;
-  const sum=a=>money(a.reduce((s,[,r])=>s+(+r.amount||0),0))||"$0";
-  return `<div class="card"><h2>Charges to run <span class="meta">${pend.length} due now · ${sum(pend)}</span></h2>
-    <p class="meta">Charge each one in QuickBooks: Customers, then the client, then Receive payment with the card on file. Then tap Charged here. If the card is declined, tap Declined: the amount is past due as of today and the client is flagged. Nothing here charges a card by itself.</p>
-    ${pend.length?tbl(pend,rid=>`<button class="small primary" data-chg="${rid}" data-to="done">Charged</button> <button class="small danger" data-chg="${rid}" data-to="declined">Declined</button>`):`<div class="meta">Nothing to charge right now.</div>`}
-    ${sched.length?`<div class="sect">Waiting for install day <span class="n">${sched.length} · ${sum(sched)}</span></div>${tbl(sched,rid=>`<button class="small" data-chg="${rid}" data-to="pending">Installed: ready to charge</button>`)}`:""}
+  const pend=[...by("declined"),...by("pending")], sched=by("scheduled"), chk=by("awaiting-check"), attn=[...by("error"),...by("held"),...by("charging")];
+  const recent=all.filter(([,r])=>(r.status==="done"||r.status==="voided") && r.chargeId && (r.doneAt||0) > Date.now()-45*864e5).sort((a,b)=>(b[1].doneAt||0)-(a[1].doneAt||0));
+  const row=([rid,r],btns,extra)=>{ const c=clients[r.clientId]||{}; return `<tr><td><b>${esc(c.name||"(deleted client)")}</b>${testPill(r)}${r.status==="declined"?' <span class="pill pastdue">declined, past due</span>':""}<div class="meta">${esc(CHARGE_LABEL[r.trigger]||r.trigger||"")} · ${esc(r.description||"")}</div><div class="meta">${payOnFileLabel(c)||"No payment method recorded"}${apiCard(c)?" · saved in QuickBooks Payments":""}</div>${extra?`<div class="meta">${extra}</div>`:""}</td><td class="num"><b>${money(r.amount)}</b></td><td class="num" style="white-space:nowrap">${btns(rid,r,c)}</td></tr>`; };
+  const tbl=(rows,btns,extra)=>`<div style="overflow-x:auto"><table><tbody>${rows.map(x=>row(x,btns,extra&&extra(x[1]))).join("")}</tbody></table></div>`;
+  const sum=a=>money(a.filter(([,r])=>!r.test).reduce((s,[,r])=>s+(+r.amount||0),0))||"$0";
+  const nReal=a=>a.filter(([,r])=>!r.test).length;
+  const runBtn=(rid,r,label)=>`<button class="small primary" data-run="${rid}" data-amt="${esc(money(r.amount))}">${label}</button>`;
+  const handBtns=rid=>`<button class="small primary" data-chg="${rid}" data-to="done">Charged</button> <button class="small danger" data-chg="${rid}" data-to="declined">Declined</button>`;
+  const undoState=r=> r.status==="voided" ? '<span class="pill voided">voided</span>' : (+r.refunded||0) >= (+r.amount||0)-0.001 ? '<span class="pill voided">refunded</span>' : (+r.refunded||0)>0 ? `<span class="pill open">refunded ${money(r.refunded)}</span>` : "";
+  return `<div class="card" id="chargesCard"><h2>Charges to run <span class="meta">${nReal(pend)} due now · ${sum(pend)}</span></h2>
+    <p class="meta"><b>Charge card on file</b> charges a card the customer saved on the signing page, once, and emails the receipt. A card taken in GoPayment is charged in QuickBooks (Customers, the client, Receive payment), then marked here with Charged or Declined. Declined makes the amount past due as of today.</p>
+    ${attn.length?`<div class="sect" style="color:var(--red)">Needs attention <span class="n">${attn.length}</span></div>${tbl(attn,(rid,r,c)=>r.status==="charging"?'<span class="meta">Running…</span>':apiCard(c)?runBtn(rid,r,"Try again"):handBtns(rid),r=>esc(r.error||"")+(r.status==="error"?" Trying again cannot charge twice.":""))}`:""}
+    ${attn.length||pend.length?`<div class="sect">Due now <span class="n">${nReal(pend)} · ${sum(pend)}</span></div>`:""}
+    ${pend.length?tbl(pend,(rid,r,c)=>apiCard(c)?runBtn(rid,r,"Charge card on file"):handBtns(rid)):`<div class="meta">Nothing to charge right now.</div>`}
+    ${sched.length?`<div class="sect">Waiting for install day or a later date <span class="n">${nReal(sched)} · ${sum(sched)}</span></div>${tbl(sched,(rid,r,c)=>apiCard(c)?runBtn(rid,r,r.trigger==="test"?"Charge the second $1 now":"Charge now"):`<button class="small" data-chg="${rid}" data-to="pending">Installed: ready to charge</button>`)}`:""}
     ${chk.length?`<div class="sect">Waiting for a prepay check <span class="n">${chk.length}</span></div>${tbl(chk,rid=>`<button class="small" data-chg="${rid}" data-to="check">Check received</button>`)}`:""}
+    ${recent.length?`<div class="sect">Charged through QuickBooks Payments, last 45 days <span class="n">${recent.length}</span></div>${tbl(recent,(rid,r)=>{ const st=undoState(r); return st || `<button class="small" data-undo="${rid}" data-amt="${esc(money((+r.amount||0)-(+r.refunded||0)))}">Refund</button>`; },r=>`Charged ${esc(fmtDate(new Date(r.doneAt).toLocaleDateString("en-CA",{timeZone:"America/Detroit"})))}${r.ranBy?` by ${esc(r.ranBy)}`:""} · transaction ${esc(r.chargeId)}`)}<p class="meta">Refund voids the charge if it has not settled yet (same day), so it never posts; after that it refunds what is left. The client gets an email either way. Partial refunds: do them in QuickBooks.</p>`:""}
   </div>`;
 }
+// Two taps for anything that moves money: the first arms the button for 4 seconds, the second runs it.
+function armed(b, label){ if(b.dataset.armed==="1") return true; const was=b.textContent; b.dataset.armed="1"; b.textContent=label; b.classList.add("danger"); setTimeout(()=>{ if(b.isConnected){ b.dataset.armed=""; b.textContent=was; b.classList.remove("danger"); } },4000); return false; }
 function wireCharges(m){
   m.querySelectorAll("[data-chg]").forEach(b=>b.onclick=()=>moveCharge(b.dataset.chg, b.dataset.to));
+  m.querySelectorAll("[data-run]").forEach(b=>b.onclick=()=>{ if(armed(b,`Tap again: charge ${b.dataset.amt}`)) runCharge(b.dataset.run, b); });
+  m.querySelectorAll("[data-undo]").forEach(b=>b.onclick=()=>{ if(armed(b,`Tap again: refund ${b.dataset.amt}`)) undoCharge(b.dataset.undo, b); });
+}
+async function runCharge(rid, btn){
+  const r=qbRows[rid]; if(!r) return; if(!svcReady()) return toast("Set up the signing service first: More, Contracts, Signing service.");
+  if(btn){ btn.disabled=true; btn.textContent="Charging…"; }
+  try{ await db.ref("sync/qb/"+rid+"/runReq").set({ at:Date.now(), by:me.email }); }
+  catch(e){ if(btn) btn.disabled=false; return toast("Not started: "+(e.code||e.message)); }
+  const R=await svcCall("run",{ k:rid });
+  if(!R) toast("No answer from the signing service. Wait a minute and check this list before trying again; a retry cannot charge twice.");
+  else if(R.ok) toast(`Charged ${money(r.amount)}. The receipt is emailed to the client.`);
+  else if(R.declined) toast("Declined. The client is now past due. Contact them for another card.");
+  else toast((R.held?"Held: ":"Not charged: ")+(R.error||""));
+  render();
+}
+async function undoCharge(rid, btn){
+  const r=qbRows[rid]; if(!r) return; if(!svcReady()) return toast("Set up the signing service first: More, Contracts, Signing service.");
+  if(btn){ btn.disabled=true; btn.textContent="Refunding…"; }
+  try{ await db.ref("sync/qb/"+rid+"/undoReq").set({ at:Date.now(), by:me.email }); }
+  catch(e){ if(btn) btn.disabled=false; return toast("Not started: "+(e.code||e.message)); }
+  const R=await svcCall("undo",{ k:rid });
+  if(!R) toast("No answer from the signing service. Check this list in a minute before trying again.");
+  else if(R.ok) toast(R.result==="voided" ? `Voided ${money(R.amount)}. It will not settle. The client was emailed.` : `Refunded ${money(R.amount)}. The client was emailed a receipt.`);
+  else toast("Not refunded: "+(R.error||""));
+  render();
 }
 async function moveCharge(rid, to){
   const r=qbRows[rid]; if(!r) return; const c=clients[r.clientId]||{}, now=Date.now(), name=c.name||"client"; let payOkKey=null;
