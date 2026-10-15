@@ -192,7 +192,7 @@ const INTUIT_TOKENS = { sandbox:"https://sandbox.api.intuit.com/quickbooks/v4/pa
 async function intuitToken(card, env){
   let r;
   try{ r = await fetch(INTUIT_TOKENS[env==="production"?"production":"sandbox"], { method:"POST", headers:{ "Content-Type":"application/json", "Accept":"application/json" }, body:JSON.stringify({ card }) }); }
-  catch(e){ throw new Error("We could not reach our payment processor. Check your connection and try again."); }
+  catch(e){ const x = new Error("Your browser could not reach our payment processor. A content blocker or privacy setting can cause this. You can turn it off for this page and try again, or tap \"Email me a secure QuickBooks page instead\" below."); x.netFail = true; throw x; }
   let j={}; try{ j = await r.json(); }catch(e){}
   if(!r.ok || !j.value){ const m = j.errors && j.errors[0] && (j.errors[0].message||j.errors[0].code); throw new Error("The card was not accepted"+(m?": "+m:"")+". Check the details and try again."); }
   return j.value;
@@ -217,6 +217,7 @@ function showPay(A){
           ${token?`<div class="field2"><label for="ccCvc">Security code</label><input id="ccCvc" name="cvc" autocomplete="cc-csc" inputmode="numeric" maxlength="4" placeholder="123"></div>`:""}
           <div class="field2"><label for="ccZip">Billing ZIP</label><input id="ccZip" name="postal" autocomplete="billing postal-code" inputmode="numeric" placeholder="48150" maxlength="10"></div></div>
         <button type="button" class="primary wide" id="cardGo">Save my card and finish</button>
+        <button type="button" class="more" id="cardLink" style="margin-top:8px">Having trouble? Email me a secure QuickBooks page instead</button>
         <p class="meta" style="margin:10px 0 0">${A.dueNow>0?`Today's ${esc(money(A.dueNow))} is charged when you save your card, and a receipt is emailed to you.`:"Nothing is charged today."} Later charges follow your agreement, with a receipt each time. There is no card fee.</p>
         <p class="meta" style="margin:6px 0 0">Payments are processed by QuickBooks Payments, provided by Intuit Payments Inc. Your card goes straight to them; we never receive or store your card number or security code.</p>
       </form>
@@ -250,6 +251,11 @@ function showPay(A){
     catch(e){ btn.disabled=false; btn.textContent=was; return err(e.message); }
     num.value=""; $("#ccCvc").value=""; btn.disabled=false; btn.textContent=was;
     submit(btn, { method:"card", cardToken });
+  };
+  $("#cardLink").onclick = async () => {
+    const el=$("#cardLink"); el.disabled=true;
+    try{ const R=await call("pay", { choice:"card", link:true }); if(!R.ok) throw new Error(R.error||"Not saved."); route({ ...A, ...R }); }
+    catch(e){ el.disabled=false; err(e.message+" Try again, or call "+PHONE+"."); }
   };
   document.querySelectorAll("[data-choice]").forEach(el => el.onclick = async () => {
     el.disabled=true;
@@ -288,7 +294,7 @@ function showPayLink(A){
 function showDone(A){
   dropBar();
   const ch = A.pay ? A.pay.choice : "", check = ch==="check";
-  const linkMode = (A.cardMode!=="token" || ch==="ach") && !A.payLabel;
+  const linkMode = (A.cardMode!=="token" || ch==="ach" || !!(A.pay && A.pay.link)) && !A.payLabel;
   const methodLine = check ? "Check, waiting for it to arrive" : A.payLabel ? A.payLabel : `${ch==="ach"?"Bank account":"Card"}. We are emailing your secure QuickBooks page shortly.`;
   const C = A.check||{};
   const r=(a,b)=>`<tr><td>${a}</td><td>${b}</td></tr>`;
@@ -315,7 +321,7 @@ function showDone(A){
 function route(A){
   if(A.status!=="signed") return showSign(A);
   if(!A.pay) return showPay(A);
-  if(A.cardMode==="token" && A.pay.choice==="card" && !A.pay.detailsAt) return showPay(A);
+  if(A.cardMode==="token" && A.pay.choice==="card" && !A.pay.detailsAt && !A.pay.link) return showPay(A);
   return showDone(A);
 }
 
