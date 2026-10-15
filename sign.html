@@ -47,6 +47,16 @@
   .quote td:first-child{padding-right:12px}
   .quote td:last-child{text-align:right;padding-left:0;overflow-wrap:anywhere}
   .quote tr.big td:last-child,.quote td.amt{white-space:nowrap}
+  .quote sup{font-size:.75em;line-height:0;color:var(--ink2)}
+  .totals{margin-top:12px;border-top:2px solid var(--ink)}
+  .totals td{border-bottom:0;padding:10px 0}
+  .totals tr.tot td{font-weight:700;font-size:17px}
+  .totals tr.today td{background:var(--brand-soft);color:var(--ink);font-weight:800;font-size:19px;padding:12px 14px}
+  .totals tr.today td:first-child{border-radius:8px 0 0 8px} .totals tr.today td:last-child{border-radius:0 8px 8px 0;white-space:nowrap}
+  .totals tr.later td{font-size:15px;color:var(--ink2);padding-top:8px}
+  .foot{font-size:13px;color:var(--ink2);margin:10px 0 0}
+  .totals.solo{border-top:0;margin-top:8px}
+  .three{align-items:end}
   .quote tr.big td{font-weight:700;font-size:17px}
   .doc{background:#fff;color:#16233a;border:1px solid #d3dae3;border-radius:8px;padding:24px 22px;margin:0 0 14px;font:16px/1.55 Georgia,"Times New Roman",serif}
   .doc h2{font:700 21px/1.25 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;margin:0 0 12px}
@@ -133,13 +143,18 @@ function renderDoc(text){
     return head+"<p>"+lines.map(inline).join("<br>")+"</p>";
   }).join("");
 }
-// The quote: one row per service, the total, then what is charged when.
+// The quote: one row per service, then the total and what is charged when, set apart under a rule. The snow price
+// past sixteen visits is a note under the quote, marked by an asterisk on the snow line.
+const isSnowLine = l => /^snow/i.test(String(l && l[0] || ""));
+function snowNote(A, starred){ return A.perVisit ? `<p class="foot">${starred?"* ":""}Snow visits after the sixteenth are ${esc(money(A.perVisit))} each, charged after the visit.</p>` : ""; }
 function quoteRows(A, withLines){
-  const r=(a,b,big)=>`<tr${big?' class="big"':""}><td>${a}</td><td>${b}</td></tr>`;
-  return `<table class="quote">${withLines?(A.lines||[]).map(l=>r(esc(l[0]),esc(money(l[1])))).join("")+r("Total",esc(money(A.total))):""}
-    ${r("Charged today",esc(money(A.dueNow)||"$0"),true)}
-    ${A.dueInstall>0?r("Charged when your lights are installed",esc(money(A.dueInstall))):""}
-    ${A.perVisit?r("Each snow visit after the sixteenth",esc(money(A.perVisit))):""}</table>`;
+  const r=(a,b,cls)=>`<tr${cls?` class="${cls}"`:""}><td>${a}</td><td>${b}</td></tr>`;
+  const lines = withLines ? (A.lines||[]) : [], starred = !!A.perVisit && lines.some(isSnowLine);
+  return `${lines.length?`<table class="quote">${lines.map(l=>r(esc(l[0])+(starred&&isSnowLine(l)?"<sup>*</sup>":""),esc(money(l[1])))).join("")}</table>`:""}
+    <table class="quote totals${lines.length?"":" solo"}">${lines.length?r("Total",esc(money(A.total)),"tot"):""}
+    ${r("Charged today",esc(money(A.dueNow)||"$0"),"today")}
+    ${A.dueInstall>0?r("Charged when your lights are installed",esc(money(A.dueInstall)),"later"):""}</table>
+    ${snowNote(A, starred)}`;
 }
 
 async function call(action, body){
@@ -373,8 +388,8 @@ function showDone(A){
       ${r("Signed copy sent to",esc((A.to||[]).join(" and ")))}
       ${r("Payment method",esc(methodLine))}
       ${check?"":r("Charged today",esc(linkMode ? (money(A.dueNow)||"$0") : todayCell))}
-      ${A.dueInstall>0&&!check?r("Charged when your lights are installed",esc(money(A.dueInstall))):""}
-      ${A.perVisit&&!check?r("Each snow visit after the sixteenth",esc(money(A.perVisit))):""}</table>
+      ${A.dueInstall>0&&!check?r("Charged when your lights are installed",esc(money(A.dueInstall))):""}</table>
+      ${check?"":snowNote(A, false)}
       ${check?"":`<p class="meta" style="margin:10px 0 0">A receipt is emailed for every charge.</p>`}
       ${A.cancelByLong?`<p class="meta" style="margin:8px 0 0">You may cancel without penalty until midnight of ${esc(A.cancelByLong)}. The Notice of Cancellation is at the end of your signed copy.</p>`:""}</div>
     <p class="meta">${contact}</p>`;
