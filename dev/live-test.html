@@ -57,6 +57,6 @@ $("#go").onclick = async () => {
     const captcha = await grecaptcha.execute(ping.captchaKey, { action: "card" });
     const res = await (await fetch(SVC, { method: "POST", redirect: "follow", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify({ action: "livecard", code, cardToken: j.value, captcha }) })).json();
     say((res.ok ? "PASS 4: " : "FAIL 4: ") + JSON.stringify(res, null, 2), res.ok ? "ok" : "bad");
-  } catch (e) { wipe(); say("FAIL: " + e.message, "bad"); }
+  } catch (e) { wipe(); say("FAIL: " + e.message + "\nThe service may still have finished. Do not run again. In Apps Script, run qbLiveTestLast and send the log.", "bad"); }
 };
 </script></body></html>
