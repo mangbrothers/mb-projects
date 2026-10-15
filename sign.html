@@ -186,7 +186,17 @@ function showSign(A){
 
 // ---------- step 2: payment method ----------
 // "off" (now): no card form. Add my card asks the office to email a secure QuickBooks page; nothing is typed here.
-// "token" (v2, after Intuit approval): the card form below, with the security code, sends the card straight to Intuit.
+// "token" (v2, after Intuit approval): the card form below, with the security code, sends the card straight to Intuit
+// from this browser for a one-time token. Only the token comes to us. Bank accounts get the emailed QuickBooks page.
+const INTUIT_TOKENS = { sandbox:"https://sandbox.api.intuit.com/quickbooks/v4/payments/tokens", production:"https://api.intuit.com/quickbooks/v4/payments/tokens" };
+async function intuitToken(card, env){
+  let r;
+  try{ r = await fetch(INTUIT_TOKENS[env==="production"?"production":"sandbox"], { method:"POST", headers:{ "Content-Type":"application/json", "Accept":"application/json" }, body:JSON.stringify({ card }) }); }
+  catch(e){ throw new Error("We could not reach our payment processor. Check your connection and try again."); }
+  let j={}; try{ j = await r.json(); }catch(e){}
+  if(!r.ok || !j.value){ const m = j.errors && j.errors[0] && (j.errors[0].message||j.errors[0].code); throw new Error("The card was not accepted"+(m?": "+m:"")+". Check the details and try again."); }
+  return j.value;
+}
 const digits = v => String(v||"").replace(/\D/g,"");
 function luhn(n){ let s=0, alt=false; for(let i=n.length-1;i>=0;i--){ let d=+n[i]; if(alt){ d*=2; if(d>9) d-=9; } s+=d; alt=!alt; } return s%10===0; }
 function brandOf(n){ return /^4/.test(n)?"Visa":/^(5[1-5]|2[2-7])/.test(n)?"Mastercard":/^3[47]/.test(n)?"Amex":/^(6011|65|64[4-9]|622)/.test(n)?"Discover":""; }
@@ -207,18 +217,12 @@ function showPay(A){
           ${token?`<div class="field2"><label for="ccCvc">Security code</label><input id="ccCvc" name="cvc" autocomplete="cc-csc" inputmode="numeric" maxlength="4" placeholder="123"></div>`:""}
           <div class="field2"><label for="ccZip">Billing ZIP</label><input id="ccZip" name="postal" autocomplete="billing postal-code" inputmode="numeric" placeholder="48150" maxlength="10"></div></div>
         <button type="button" class="primary wide" id="cardGo">Save my card and finish</button>
-        <p class="meta" style="margin:10px 0 0">${A.dueNow>0?`Today's ${esc(money(A.dueNow))} is charged later today. You should see a charge email and a confirmation from us come through at some point today.`:"Nothing is charged today."} Later charges follow your agreement, with a receipt each time. There is no card fee.</p>
+        <p class="meta" style="margin:10px 0 0">${A.dueNow>0?`Today's ${esc(money(A.dueNow))} is charged when you save your card, and a receipt is emailed to you.`:"Nothing is charged today."} Later charges follow your agreement, with a receipt each time. There is no card fee.</p>
         <p class="meta" style="margin:6px 0 0">Payments are processed by QuickBooks Payments, provided by Intuit Payments Inc. Your card goes straight to them; we never receive or store your card number or security code.</p>
       </form>
       <button type="button" class="more" id="moreBtn" aria-expanded="false">More options ▾</button>
       <div id="more" hidden>
-        <form class="opt" id="achForm" onsubmit="return false"><h3>Bank account (ACH)</h3><p>Use a checking or savings account instead of a card.</p>
-          <div class="field2"><label for="baName">Name on the account</label><input id="baName" autocomplete="name" value="${esc(A.signerName||"")}"></div>
-          <div class="two"><div class="field2"><label for="baType">Account type</label><select id="baType"><option value="checking">Checking</option><option value="savings">Savings</option></select></div>
-            <div class="field2"><label for="baRouting">Routing number</label><input id="baRouting" inputmode="numeric" maxlength="9" placeholder="9 digits" autocomplete="off"></div></div>
-          <div class="field2"><label for="baAcct">Account number</label><input id="baAcct" inputmode="numeric" maxlength="17" autocomplete="off"></div>
-          <div class="field2"><label for="baAcct2">Account number again</label><input id="baAcct2" inputmode="numeric" maxlength="17" autocomplete="off"></div>
-          <button type="button" class="wide" id="achGo">Save my bank account and finish</button></form>
+        <div class="opt"><h3>Bank account (ACH)</h3><p>Use a checking or savings account instead of a card. We email you a secure QuickBooks page to add it, so your bank details go straight to QuickBooks Payments.</p><button type="button" class="wide" data-choice="ach">Email me the bank account page</button></div>
         <div class="opt"><h3>Prepay by check</h3><p>Pay the full ${esc(money(A.total))} by check instead of keeping a payment method on file. Your spot is not confirmed until we receive the check.</p><button type="button" class="wide" data-choice="check">Pay by check</button></div>
       </div>
       <div class="err" id="err" hidden></div></div>
@@ -229,25 +233,23 @@ function showPay(A){
   num.oninput = () => { const d=digits(num.value).slice(0,19); num.value = d.replace(/(\d{4})(?=\d)/g,"$1 "); $("#ccBrand").textContent = brandOf(d); };
   exp.oninput = () => { let d=digits(exp.value).slice(0,4); if(d.length===1 && +d>1) d="0"+d; exp.value = d.length>2 ? d.slice(0,2)+"/"+d.slice(2) : d; };
   const submit = async (btn, body) => {
-    btn.disabled=true; const was=btn.textContent; btn.textContent="Saving…";
+    btn.disabled=true; const was=btn.textContent; btn.textContent="Saving your card and charging today's amount…";
     try{ const R=await call("paydetails", body); if(!R.ok) throw new Error(R.error||"Not saved."); route({ ...A, ...R }); }
     catch(e){ btn.disabled=false; btn.textContent=was; err(e.message); }
   };
-  $("#cardGo").onclick = () => {
-    const n=digits(num.value), m=/^(\d{2})\/(\d{2})$/.exec(exp.value), zip=$("#ccZip").value.trim(), name=$("#ccName").value.trim();
+  $("#cardGo").onclick = async () => {
+    const n=digits(num.value), m=/^(\d{2})\/(\d{2})$/.exec(exp.value), zip=$("#ccZip").value.trim(), name=$("#ccName").value.trim(), cvc=digits(($("#ccCvc")||{}).value);
     if(name.length<2) return err("Enter the name on the card.");
     if(n.length<13 || !luhn(n)) return err("That card number is not valid. Check it and try again.");
     if(!m || +m[1]<1 || +m[1]>12) return err("Enter the expiration as MM/YY.");
+    if(!/^\d{3,4}$/.test(cvc)) return err("Enter the security code from the card.");
     if(!/^\d{5}(-\d{4})?$/.test(zip)) return err("Enter the billing ZIP code.");
-    err(""); submit($("#cardGo"), { method:"card", card:{ number:n, exp:exp.value, name, zip } });
-  };
-  $("#achGo").onclick = () => {
-    const r=digits($("#baRouting").value), a=digits($("#baAcct").value), a2=digits($("#baAcct2").value), name=$("#baName").value.trim();
-    if(name.length<2) return err("Enter the name on the account.");
-    if(!abaOk(r)) return err("That routing number is not valid. It is the 9 digits at the bottom left of a check.");
-    if(a.length<4) return err("Enter the account number.");
-    if(a!==a2) return err("The two account numbers do not match.");
-    err(""); submit($("#achGo"), { method:"ach", ach:{ routing:r, account:a, account2:a2, name, type:$("#baType").value } });
+    err(""); const btn=$("#cardGo"); btn.disabled=true; const was=btn.textContent; btn.textContent="Checking your card…";
+    let cardToken;
+    try{ cardToken = await intuitToken({ number:n, expMonth:m[1], expYear:"20"+m[2], cvc, name, address:{ postalCode:zip } }, A.payEnv); }
+    catch(e){ btn.disabled=false; btn.textContent=was; return err(e.message); }
+    num.value=""; $("#ccCvc").value=""; btn.disabled=false; btn.textContent=was;
+    submit(btn, { method:"card", cardToken });
   };
   document.querySelectorAll("[data-choice]").forEach(el => el.onclick = async () => {
     el.disabled=true;
@@ -286,7 +288,7 @@ function showPayLink(A){
 function showDone(A){
   dropBar();
   const ch = A.pay ? A.pay.choice : "", check = ch==="check";
-  const linkMode = A.cardMode!=="token" && !A.payLabel;
+  const linkMode = (A.cardMode!=="token" || ch==="ach") && !A.payLabel;
   const methodLine = check ? "Check, waiting for it to arrive" : A.payLabel ? A.payLabel : `${ch==="ach"?"Bank account":"Card"}. We are emailing your secure QuickBooks page shortly.`;
   const C = A.check||{};
   const r=(a,b)=>`<tr><td>${a}</td><td>${b}</td></tr>`;
@@ -313,7 +315,7 @@ function showDone(A){
 function route(A){
   if(A.status!=="signed") return showSign(A);
   if(!A.pay) return showPay(A);
-  if(A.cardMode==="token" && A.pay.choice!=="check" && !A.pay.detailsAt) return showPay(A);
+  if(A.cardMode==="token" && A.pay.choice==="card" && !A.pay.detailsAt) return showPay(A);
   return showDone(A);
 }
 
