@@ -253,10 +253,33 @@ function showPay(A){
   const num=$("#ccNum"), exp=$("#ccExp");
   num.oninput = () => { const d=digits(num.value).slice(0,19); num.value = d.replace(/(\d{4})(?=\d)/g,"$1 "); $("#ccBrand").textContent = brandOf(d); };
   exp.oninput = () => { let d=digits(exp.value).slice(0,4); if(d.length===1 && +d>1) d="0"+d; exp.value = d.length>2 ? d.slice(0,2)+"/"+d.slice(2) : d; };
+  // Each card submit has its own attempt id. If the reply is lost (the card may already be charged), the page never shows
+  // a failure and never invites a second try: it reads the outcome back from the signing service by that id.
   const submit = async (btn, body) => {
     btn.disabled=true; const was=btn.textContent; btn.textContent="Saving your card and charging today's amount…";
-    try{ const R=await call("paydetails", body); if(!R.ok) throw new Error(R.error||"Not saved."); route({ ...A, ...R }); }
-    catch(e){ btn.disabled=false; btn.textContent=was; err(e.message); }
+    const attempt = "a-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2,10);
+    let R;
+    try{ R = await call("paydetails", { ...body, attempt }); }
+    catch(e){ return recheck(attempt, btn); }
+    if(!R || !R.ok){ btn.disabled=false; btn.textContent=was; return err((R && R.error) || "Not saved."); }
+    route({ ...A, ...R });
+  };
+  const recheck = async (attempt, btn) => {
+    btn.textContent="Confirming your payment…";
+    const why = { declined:"Your card was declined, so nothing was charged. Try a different card, or call "+PHONE+".",
+      locked:"For your security, card entry is closed for this link. Tap \"Email me a secure QuickBooks page instead\", or call "+PHONE+".",
+      captcha:"We could not confirm this request came from a person, so nothing was saved or charged. Try again, or call "+PHONE+".",
+      failed:"We could not save that card, and nothing was charged. Try again in a minute, or call "+PHONE+"." };
+    for(let i=0;i<15;i++){
+      await new Promise(r => setTimeout(r, 3000));
+      let V; try{ V = await call("get"); }catch(e){ continue; }
+      if(!V || !V.ok) continue;
+      const last = V.payLast && V.payLast.attempt===attempt ? V.payLast.result : "";
+      if(last==="saved" || (V.pay && V.pay.detailsAt && !V.payBusy)) return route({ ...A, ...V });
+      if(last){ route({ ...A, ...V }); const e=$("#err"); if(e){ e.hidden=false; e.textContent=why[last]||why.failed; e.scrollIntoView({block:"center"}); } return; }
+    }
+    dropBar();
+    message("We are still confirming your payment", "Please do not enter your card again. Your payment may already be complete. Reload this page in a minute to see the result. If it still shows the card form, call "+esc(PHONE)+" before trying again.");
   };
   $("#cardGo").onclick = async () => {
     const n=digits(num.value), m=/^(\d{2})\/(\d{2})$/.exec(exp.value), zip=$("#ccZip").value.trim(), name=$("#ccName").value.trim(), cvc=digits(($("#ccCvc")||{}).value);
@@ -344,6 +367,8 @@ function showDone(A){
 
 function route(A){
   if(A.status!=="signed") return showSign(A);
+  // A card is being saved and charged right now (another tab, or a reload mid-charge): wait for the result, never show "all set" early.
+  if(A.payBusy && A.payBusy.at && Date.now() - A.payBusy.at < 120000){ dropBar(); return message("We are confirming your payment", "Please do not enter your card again. Reload this page in a minute to see the result, or call "+esc(PHONE)+"."); }
   if(!A.pay) return showPay(A);
   if(A.cardMode==="token" && A.pay.choice==="card" && !A.pay.detailsAt && !A.pay.link) return showPay(A);
   return showDone(A);
