@@ -170,6 +170,14 @@
   .svc .hd{display:flex;align-items:center;gap:8px}
   .svc .hd .sum{flex:1;font-size:13px;color:var(--ink2)}
   .svc .fields{margin-top:4px}
+  .svcbill{margin-top:8px;padding-top:8px;border-top:1px dashed var(--line);font-size:13px;color:var(--ink2);display:flex;flex-direction:column;gap:4px}
+  .svcbill .bl{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .svcbill .bl b{color:var(--ink)}
+  #chargeDlg .kinds{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:6px 0 10px}
+  #chargeDlg .kinds label{display:flex;gap:8px;align-items:center;border:1px solid var(--line);border-radius:var(--r);padding:10px;cursor:pointer;color:var(--ink);font-size:14px;margin:0}
+  #chargeDlg .kinds input{width:18px;height:18px;margin:0}
+  #chargeDlg .rcpt{background:var(--bg);border:1px solid var(--line);border-radius:var(--r);padding:8px 10px;font-size:13px;margin-top:10px}
+  @media (max-width:520px){#chargeDlg .kinds{grid-template-columns:1fr}}
   .ctr{display:flex;gap:8px;align-items:center;border:1px solid var(--line);border-radius:var(--r);padding:8px 10px;margin-top:6px;background:var(--bg);flex-wrap:wrap}
   .ctr .t{flex:1;min-width:180px}
   .log{max-height:220px;overflow:auto;border:1px solid var(--line);border-radius:var(--r);padding:6px 10px;background:var(--bg)}
@@ -348,6 +356,7 @@ details.ssamore summary{cursor:pointer;font-weight:600}
     <div id="ctrList"></div>
 
     <div class="meta" id="billSummary" style="margin-top:10px"></div>
+    <div class="row" id="chargeBar" style="margin-top:8px"></div>
 
     <div class="sect">Contact log <span class="n" id="logCount"></span></div>
     <div class="log" id="logList"></div>
@@ -359,6 +368,27 @@ details.ssamore summary{cursor:pointer;font-weight:600}
       <button type="button" class="primary" id="clientSave">Save</button>
     </div>
   </form>
+</dialog>
+
+<!-- Add a charge: snow visits past 16, lights service calls, anything else -->
+<dialog id="chargeDlg" class="big">
+  <div class="body">
+    <h3 id="chgTitle">Add a charge</h3>
+    <div class="kinds" id="chgKinds"></div>
+    <div class="grid2">
+      <div id="chgQtyBox"><label>Visits</label><input id="chgQty" type="number" inputmode="numeric" min="1" step="1" value="1"></div>
+      <div><label>Date of the work</label><input id="chgDate" type="date"></div>
+      <div><label>Amount</label><input id="chgAmt" type="number" inputmode="decimal" step="0.01" min="0" placeholder="$"></div>
+      <div style="grid-column:1/-1"><label id="chgNoteL">Note on the receipt (optional)</label><input id="chgNote" maxlength="120" autocomplete="off"></div>
+    </div>
+    <div class="rcpt" id="chgPreview"></div>
+    <div class="meta" id="chgErr" style="color:var(--red);font-weight:600;margin-top:8px"></div>
+    <div class="actions">
+      <button type="button" id="chgCancel">Cancel</button>
+      <button type="button" id="chgAdd">Add to Charges to run</button>
+      <button type="button" class="primary" id="chgRun" hidden>Add and charge card</button>
+    </div>
+  </div>
 </dialog>
 
 <!-- Contract signing / viewing, full screen -->
@@ -467,11 +497,12 @@ const SERVICE_TYPES = {
     summary:s=>[s.desc, s.jobStatus, s.date?fmtDate(s.date):"", money(s.price)].filter(Boolean).join(" · ") },
   lights: { label:"Christmas Lights", fields:[
     {k:"install",l:"Install date",t:"date"},
+    {k:"installed",l:"Installed, all lit",t:"check"},
     {k:"takedown",l:"Takedown date",t:"date"},
     {k:"price",l:"Price",t:"money"},
     {k:"gutters",l:"Bundled with gutters",t:"check"},
     {k:"notes",l:"Notes",t:"text"} ],
-    summary:s=>[s.install?"install "+fmtDate(s.install):"", s.takedown?"down "+fmtDate(s.takedown):"", money(s.price), s.gutters?"w/ gutters":""].filter(Boolean).join(" · ") }
+    summary:s=>[s.install?"install "+fmtDate(s.install):"", s.installed?"installed ✓":"", s.takedown?"down "+fmtDate(s.takedown):"", money(s.price), s.gutters?"w/ gutters":""].filter(Boolean).join(" · ") }
 };
 // ================================================================
 
@@ -558,7 +589,7 @@ function attach(){
   refs.c.on("value", s => { clients = s.val()||{}; render(); if(openId) refreshDialogLive(); if(!backfilled){ backfilled=true; backfillPhones(); } driveNag(); });
   refs.l.on("value", s => { logs = s.val()||{}; render(); if(openId) renderLog(); });
   refs.t.on("value", s => { templates = s.val()||{}; render(); if(openId) renderContracts(); });
-  refs.q.on("value", s => { qbRows = s.val()||{}; if(view==="tools") render(); });
+  refs.q.on("value", s => { qbRows = s.val()||{}; if(view==="tools") render(); if(openId) { renderSvcBills(); renderStamps(); } });
   refs.c.once("value").then(autoPurge);
 }
 function detach(){ Object.values(refs).forEach(r => r && r.off()); }
@@ -902,7 +933,7 @@ function renderStamps(){
   if(!c){ $("#clientStamps").innerHTML=""; return; }
   $("#clientStamps").innerHTML = `<b>First contact</b><span>${fmtStamp(c.firstContactAt||c.createdAt)}</span><b>Last contact</b><span>${fmtStamp(lastContact(c))} <i class="meta">(${ago(lastContact(c))})</i></span>${c.wonAt?`<b>Won</b><span>${fmtStamp(c.wonAt)}</span>`:""}`;
 }
-function refreshDialogLive(){ if(openId && !clients[openId]) { $("#clientDlg").close(); return; } renderStamps(); renderContracts(); }
+function refreshDialogLive(){ if(openId && !clients[openId]) { $("#clientDlg").close(); return; } renderStamps(); renderContracts(); renderSvcBills(); }
 function fieldInput(sid, fld, val){
   const n=`svc/${sid}/${fld.k}`;
   if(fld.t==="select") return `<select name="${n}">${opts(fld.o, val ?? fld.o[0])}</select>`;
@@ -923,7 +954,9 @@ function renderSvcsInner(){
   $("#svcList").innerHTML = list.map(([sid,s])=>{ const T=SERVICE_TYPES[s.type]; if(!T) return ""; return `<div class="svc svcbar ${s.type}" data-sid="${sid}">
     <div class="hd"><span class="tag ${s.type}">${esc(T.label)}</span><span class="sum">${esc(T.summary(s))}</span><button type="button" class="small danger" data-rm="${sid}">Remove</button></div>
     <div class="fields grid3">${T.fields.map(fld=>`<div${fld.w?` style="grid-column:span ${fld.w}"`:""}><label>${esc(fld.l)}</label>${fieldInput(sid,fld,s[fld.k])}</div>`).join("")}</div>
+    <div class="svcbill" data-bill="${sid}" hidden></div>
   </div>`; }).join("") || `<div class="meta">No services yet.</div>`;
+  renderSvcBills();
   $("#svcList").querySelectorAll("[data-rm]").forEach(b=> b.onclick = () => { readSvcForm(); removedServices.add(b.dataset.rm); delete draftServices[b.dataset.rm]; renderSvcs(); renderContracts(); });
   $("#svcList").querySelectorAll("input,select").forEach(i=> i.onchange = () => { readSvcForm(); renderSvcs(); renderContracts(); });
 }
@@ -1003,6 +1036,11 @@ $("#clientSave").onclick = async () => {
   removedServices.forEach(sid=> upd[`clients/${id}/services/${sid}`]=null);
   if(data.status==="active" && (!prev || prev.status!=="active")) Object.assign(upd, qbCustomerRow(id, data));
   await commit(prev ? "Edited "+data.name : "Added "+data.name, upd);
+  // The gate: a lights service ticked Installed, or a landscaping job set to Done, makes its waiting balance due now.
+  // Kept out of Undo on purpose: an undo after the charge ran must never put a charged row back to waiting.
+  const g = prev ? gateUpdates(id, prev.services||{}, services) : null;
+  if(g && g.released.length){ await db.ref().update(g.upd);
+    toast(`${g.released.map(x=>x.what).join(" and ")}: ${money(g.released.reduce((a,x)=>a+x.amount,0))} is now due.${apiCard(clients[id])?" Charge it from Charges to run.":" Charge it in QuickBooks, then mark it in Charges to run."}`); }
   // Stay open when a contract is now waiting, so it can be signed right away.
   const saved = clients[id];
   if(saved && contractNeeds(saved).some(x=>!x.signed)){ openClient(id); toast("Saved. The contract is ready to sign below."); }
@@ -1938,14 +1976,15 @@ function ssaApply(c, id, S, k, agNo, now, cid){
   if(!payOnFileOk(c)) upd["clients/"+id+"/payOnFile"] = { status:"missing", since:now };
   const desc = `${SSA_NAME} ${agNo}`;
   if(k.dueNow>0) upd["sync/qb/"+db.ref("sync/qb").push().key] = { type:"charge", trigger:"signing", status:"pending", clientId:id, contractId:cid, amount:k.dueNow, date:today(), description:`${desc}: due at signing`, createdAt:now, createdBy:me.email };
-  if(S.lights.on && k.dueInstall>0) upd["sync/qb/"+db.ref("sync/qb").push().key] = { type:"charge", trigger:"install", status:"scheduled", clientId:id, contractId:cid, amount:k.dueInstall, description:`${desc}: Christmas Lights balance, install day`, createdAt:now, createdBy:me.email };
+  const lightsSid = (Object.entries(c.services||{}).find(([,x])=>x.type==="lights")||[])[0] || "s"+now.toString(36)+"lights";
+  if(S.lights.on && k.dueInstall>0) upd["sync/qb/"+db.ref("sync/qb").push().key] = { type:"charge", trigger:"install", status:"scheduled", clientId:id, contractId:cid, sid:lightsSid, amount:k.dueInstall, description:`${desc}: Christmas Lights balance, install day`, createdAt:now, createdBy:me.email };
   const put = (type, fields, fresh, note) => { const e=Object.entries(c.services||{}).find(([,s])=>s.type===type), sid = e ? e[0] : "s"+now.toString(36)+type;
     const all = { ...(e?{}:{ type, createdAt:now, ...fresh }), ...fields, notes: e&&e[1].notes && !String(e[1].notes).includes(note) ? e[1].notes+"; "+note : note };
     for(const [f,v] of Object.entries(all)) upd[`clients/${id}/services/${sid}/${f}`]=v; };
   const noteOf = lines => lines.map(r=>r[0]).join(", ")+` (${agNo})`;
   if(fallOn) put("fall", { package:"Two passes", price:k.fall }, { route:"Route 1", pass1:false, pass2:false }, noteOf(k.fl));
   else if(incFall) put("fall", { package:"Two passes" }, { route:"Route 1", price:0, pass1:false, pass2:false }, `Included in the Showcase lights package (${agNo})`);
-  if(S.lights.on) put("lights", { price:k.lights }, { install:"", takedown:"", gutters:false }, S.lights.color+": "+noteOf(k.ll));
+  if(S.lights.on) put("lights", { price:k.lights }, { install:"", installed:false, takedown:"", gutters:false }, S.lights.color+": "+noteOf(k.ll));
   if(S.snow.on) put("snow", { price:k.snow }, { crew:"", start:"2026-11-01", end:"2027-03-15" }, noteOf(k.sl));
   if(LEAD_STAGES.includes(c.status)){ upd["clients/"+id+"/status"]="active"; if(!c.wonAt) upd["clients/"+id+"/wonAt"]=now; }
   Object.assign(upd, qbCustomerRow(id));
@@ -2177,12 +2216,119 @@ async function doImport(){
 }
 
 // ---------- Charges to run: the payment schedule ----------
+// ---------- Gates, 50/50 landscaping, Add a charge ----------
+// Releases waiting balances whose work was just marked done. prevS and nextS are the services before and after the save.
+function gateUpdates(clientId, prevS, nextS){
+  const upd={}, released=[], now=Date.now(), d=today();
+  const waiting = (trigger, sid) => Object.entries(qbRows).filter(([,r])=>r.type==="charge" && r.status==="scheduled" && r.trigger===trigger && r.clientId===clientId && (!r.sid || r.sid===sid));
+  const open = (rows, what) => rows.forEach(([rid,r])=>{
+    Object.assign(upd, { [`sync/qb/${rid}/status`]:"pending", [`sync/qb/${rid}/date`]:d, [`sync/qb/${rid}/releasedAt`]:now, [`sync/qb/${rid}/releasedBy`]:me.email, [`sync/qb/${rid}/updatedAt`]:now });
+    upd[`clientLog/${clientId}/${db.ref("clientLog").push().key}`] = { text:`${what}. ${money(r.amount)} is now due: ${r.description||""}.`, at:now, by:me.email, source:"payment" };
+    released.push({ rid, amount:+r.amount||0, what }); });
+  for(const [sid,s] of Object.entries(nextS||{})){
+    const was=(prevS||{})[sid]||{};
+    if(s.type==="lights" && s.installed && !was.installed){ open(waiting("install", sid), "Lights marked installed");
+      if(!s.install) upd[`clients/${clientId}/services/${sid}/install`]=d; }
+    if(s.type==="landscaping" && s.jobStatus==="Done" && was.jobStatus!=="Done") open(waiting("completion", sid), `Landscaping job done${s.desc?" ("+s.desc+")":""}`);
+  }
+  return { upd, released };
+}
+const STATE_WORD = r => r.status==="done" ? '<span class="pill paid">charged</span>' : r.status==="voided" ? '<span class="pill voided">voided</span>' : r.status==="scheduled" ? '<span class="pill">waiting</span>' : r.status==="declined" ? '<span class="pill pastdue">declined</span>' : r.status==="held"||r.status==="error" ? '<span class="pill pastdue">needs attention</span>' : r.status==="awaiting-check" ? '<span class="pill open">waiting for check</span>' : '<span class="pill open">due now</span>';
+// The billing lines under a saved lights or landscaping service. Updated live without redrawing the form fields.
+function renderSvcBills(){
+  if(!openId){ const b=$("#chargeBar"); if(b) b.innerHTML=""; return; } const c=clients[openId]; if(!c) return; const dirty=dialogDirty();
+  document.querySelectorAll("#svcList [data-bill]").forEach(box=>{
+    const sid=box.dataset.bill, s=(c.services||{})[sid]; let h="";
+    if(s && (s.type==="lights" || s.type==="landscaping")){
+      const trig = s.type==="lights" ? ["install"] : ["deposit","completion"];
+      const rows = Object.entries(qbRows).filter(([,r])=>r.type==="charge" && r.clientId===openId && trig.includes(r.trigger) && (r.sid===sid || (!r.sid && s.type==="lights")));
+      h = rows.map(([,r])=>`<div class="bl"><b>${esc(CHARGE_LABEL[r.trigger])}</b> ${money(r.amount)} ${STATE_WORD(r)}${r.status==="scheduled"?`<span class="meta">${s.type==="lights"?"Tick Installed and save to make it due.":"Set Status to Done and save to make it due."}</span>`:""}</div>`).join("");
+      if(s.type==="landscaping" && !rows.length && +s.price>0)
+        h = `<div class="bl"><button type="button" class="small" data-fifty="${sid}" ${dirty?"disabled":""}>Bill 50/50: ${money(r2(+s.price/2))} now, ${money(r2(+s.price - r2(+s.price/2)))} when done</button>${dirty?'<span class="meta">Save first.</span>':""}</div>`;
+    }
+    box.innerHTML=h; box.hidden=!h;
+  });
+  document.querySelectorAll("#svcList [data-fifty]").forEach(b=>b.onclick=()=>{ if(armed(b,"Tap again to set up 50/50")) billFifty(openId, b.dataset.fifty); });
+  const bar=$("#chargeBar"); if(bar){ bar.innerHTML = `<button type="button" class="small" id="chgOpen">Add a charge</button><span class="meta">Snow visit past 16, lights service call, or anything else.</span>`; $("#chgOpen").onclick=()=>openChargeDlg(openId); }
+}
+// Landscaping 50/50: half due now, the balance waits until the job is set to Done. Not on the Undo list (money rows).
+async function billFifty(clientId, sid){
+  const c=clients[clientId]||{}, s=(c.services||{})[sid]; if(!s || !(+s.price>0)) return toast("Set a price on the job and save first.");
+  if(Object.values(qbRows).some(r=>r.type==="charge" && r.sid===sid && (r.trigger==="deposit"||r.trigger==="completion"))) return toast("This job already has its 50/50 charges.");
+  const now=Date.now(), half=r2(+s.price/2), bal=r2(+s.price-half), job=`Landscaping${s.desc?", "+s.desc:""}`, done=s.jobStatus==="Done";
+  const upd={
+    ["sync/qb/"+db.ref("sync/qb").push().key]: { type:"charge", trigger:"deposit", status:"pending", clientId, sid, amount:half, date:today(), description:`${job}: 50% deposit`, createdAt:now, createdBy:me.email },
+    ["sync/qb/"+db.ref("sync/qb").push().key]: { type:"charge", trigger:"completion", status:done?"pending":"scheduled", clientId, sid, amount:bal, ...(done?{date:today()}:{}), description:`${job}: balance, job complete`, createdAt:now, createdBy:me.email },
+    [`clientLog/${clientId}/${db.ref("clientLog").push().key}`]: { text:`${job}: billed 50/50. ${money(half)} deposit due now; ${money(bal)} ${done?"balance also due now (job already done)":"balance when the job is done"}.`, at:now, by:me.email, source:"payment" } };
+  if(!c.payOnFile) upd[`clients/${clientId}/payOnFile`] = { status:"missing", since:now };
+  await db.ref().update(upd);
+  toast(`${money(half)} deposit is in Charges to run. The ${money(bal)} balance waits for Done.`); renderSvcBills();
+}
+const CHG_KINDS = [
+  { k:"overage", t:"Snow visit past 16", trig:"overage" },
+  { k:"call", t:`Lights service call, no ladder ($${SSA_CALL.plain})`, trig:"call", amt:SSA_CALL.plain, word:"no ladder" },
+  { k:"callL", t:`Lights service call, ladder ($${SSA_CALL.ladder})`, trig:"call", amt:SSA_CALL.ladder, word:"ladder" },
+  { k:"other", t:"Something else", trig:"other" } ];
+const CHG_MAX = 3000; // the signing service holds anything over its per-charge cap too
+let chg = null;
+async function openChargeDlg(clientId){
+  const c=clients[clientId]; if(!c) return;
+  chg = { clientId, kind:"", perVisit:null };
+  const sg=ssaSigned(c);
+  if(sg){ try{ const rec=(await db.ref("contracts/"+clientId+"/"+sg[0]).once("value")).val(); chg.perVisit = +rec?.details?.snow?.perPushAfter || null; chg.cid=sg[0]; chg.agNo=rec?.details?.agreementNo||sg[1].agreementNo||""; }catch(e){} }
+  $("#chgTitle").textContent = `Add a charge: ${c.name||""}`;
+  $("#chgKinds").innerHTML = CHG_KINDS.map(x=>`<label><input type="radio" name="chgk" value="${x.k}">${esc(x.t)}</label>`).join("");
+  $("#chgQty").value="1"; $("#chgDate").value=today(); $("#chgAmt").value=""; $("#chgNote").value=""; $("#chgErr").textContent="";
+  $("#chgKinds").querySelectorAll("input").forEach(i=>i.onchange=()=>{ chg.kind=i.value; const K=CHG_KINDS.find(x=>x.k===i.value);
+    $("#chgAmt").value = K.amt!=null ? K.amt : K.k==="overage" && chg.perVisit ? r2(chg.perVisit*(+$("#chgQty").value||1)) : ""; chgPreview(); });
+  ["chgQty","chgDate","chgAmt","chgNote"].forEach(x=>$("#"+x).oninput=()=>{ if(x==="chgQty" && chg.kind==="overage" && chg.perVisit) $("#chgAmt").value=r2(chg.perVisit*(+$("#chgQty").value||0)); chgPreview(); });
+  const run=$("#chgRun"); run.hidden=!apiCard(c); run.textContent=`Add and charge ${payOnFileLabel(c)}`; run.dataset.armed=""; run.classList.add("primary"); run.classList.remove("danger");
+  chgPreview(); $("#chargeDlg").showModal();
+}
+function chgDesc(){
+  const K=CHG_KINDS.find(x=>x.k===chg.kind), n=Math.max(1,Math.floor(+$("#chgQty").value||1)), d=$("#chgDate").value, note=$("#chgNote").value.trim();
+  if(!K) return "";
+  const when = d ? fmtDate(d) : "";
+  const base = K.k==="overage" ? `${n>1?n+" snow visits":"Snow visit"} past the sixteenth${chg.perVisit?` (${n} × ${money(chg.perVisit)})`:""}, ${when}`
+    : K.trig==="call" ? `Lights service call (${K.word}), ${when}` : (note||"");
+  const tail = K.k!=="other" && note ? `. ${note}` : "";
+  return (chg.agNo && K.k!=="other" ? chg.agNo+": " : "") + base + tail;
+}
+function chgPreview(){
+  const k=chg.kind; $("#chgQtyBox").hidden = k!=="overage";
+  $("#chgNoteL").textContent = k==="other" ? "What it is for (shows on the receipt)" : "Note on the receipt (optional)";
+  const amt=+$("#chgAmt").value;
+  $("#chgPreview").innerHTML = !k ? `<span class="meta">Choose what you are charging for.</span>` :
+    `<b>Receipt reads:</b> ${esc(chgDesc()||"(add what it is for)")} <b>${money(amt)||""}</b>${k==="overage"&&!chg.perVisit?`<div class="meta">No signed snow price found for this client. Enter the amount.</div>`:""}<div class="meta">${apiCard(clients[chg.clientId])?`Card on file: ${payOnFileLabel(clients[chg.clientId])}.`:"No saved card: charge it in QuickBooks, then mark it in Charges to run."}</div>`;
+}
+function chgCheck(){
+  const amt=r2(+$("#chgAmt").value), err=$("#chgErr"); err.textContent="";
+  if(!chg.kind) return err.textContent="Choose what you are charging for.", null;
+  if(!(amt>0)) return err.textContent="Enter an amount above zero.", null;
+  if(amt>CHG_MAX) return err.textContent=`Over ${money(CHG_MAX)}. Charge it by hand in QuickBooks.`, null;
+  if(!$("#chgDate").value) return err.textContent="Enter the date of the work.", null;
+  if(chg.kind==="other" && !$("#chgNote").value.trim()) return err.textContent="Say what the charge is for. It shows on the receipt.", null;
+  const K=CHG_KINDS.find(x=>x.k===chg.kind), now=Date.now();
+  return { rid:db.ref("sync/qb").push().key, row:{ type:"charge", trigger:K.trig, status:"pending", clientId:chg.clientId, ...(chg.cid&&K.k!=="other"?{contractId:chg.cid}:{}), amount:amt, date:today(), workDate:$("#chgDate").value, ...(K.k==="overage"?{visits:Math.max(1,Math.floor(+$("#chgQty").value||1))}:{}), description:chgDesc(), createdAt:now, createdBy:me.email, manual:true } };
+}
+async function chgSave(){
+  const x=chgCheck(); if(!x) return null; const now=Date.now();
+  await db.ref().update({ ["sync/qb/"+x.rid]:x.row, [`clientLog/${chg.clientId}/${db.ref("clientLog").push().key}`]:{ text:`Added a charge: ${x.row.description}, ${money(x.row.amount)}.`, at:now, by:me.email, source:"payment" } });
+  qbRows[x.rid]=qbRows[x.rid]||x.row; return x;
+}
+$("#chgCancel").onclick=()=>$("#chargeDlg").close();
+$("#chgAdd").onclick=async()=>{ const x=await chgSave(); if(!x) return; $("#chargeDlg").close(); toast(`${money(x.row.amount)} added to Charges to run.`); };
+$("#chgRun").onclick=async()=>{ const b=$("#chgRun"); if(!chgCheck()) return; if(!armed(b,`Tap again: charge ${money(r2(+$("#chgAmt").value))}`)) return;
+  const x=await chgSave(); if(!x) return; $("#chargeDlg").close(); runCharge(x.rid, null); };
+
 // A card the customer saved on the signing page (QuickBooks Payments, qbCardId on payOnFile) is charged from here
 // through the signing service: Charge card on file. The CRM writes a one-time request on the row; the service charges
 // it once, emails the receipt and writes the result back. Cards taken in GoPayment are still charged by a person in
 // QuickBooks and marked here with Charged or Declined. Claude never charges a card. Declined means past due as of today
 // (no late fee; grace is a judgment call). Test charges (TEST agreements, $1) are shown with a TEST tag and never counted.
-const CHARGE_LABEL = { signing:"Due at signing", install:"Lights balance, install day", overage:"Snow visit past 16", call:"Lights service call", completion:"On completion", test:"Test charge, later" };
+const CHARGE_LABEL = { signing:"Due at signing", install:"Lights balance, install day", overage:"Snow visit past 16", call:"Lights service call", deposit:"Landscaping, 50% deposit", completion:"Landscaping balance, when the job is done", other:"Other charge", test:"Test charge, later" };
+// What opens each waiting charge. The employee portal will set the same fields when it is built.
+const GATE_TEXT = { install:"Opens when the lights are ticked Installed on the client", completion:"Opens when the landscaping job is set to Done on the client" };
 const apiCard = c => !!(c && c.payOnFile && c.payOnFile.status==="on-file" && c.payOnFile.qbCardId);
 const testPill = r => r && r.test ? ' <span class="pill sample">TEST</span>' : "";
 function chargesHtml(){
@@ -2198,11 +2344,11 @@ function chargesHtml(){
   const handBtns=rid=>`<button class="small primary" data-chg="${rid}" data-to="done">Charged</button> <button class="small danger" data-chg="${rid}" data-to="declined">Declined</button>`;
   const undoState=r=> r.status==="voided" ? '<span class="pill voided">voided</span>' : (+r.refunded||0) >= (+r.amount||0)-0.001 ? '<span class="pill voided">refunded</span>' : (+r.refunded||0)>0 ? `<span class="pill open">refunded ${money(r.refunded)}</span>` : "";
   return `<div class="card" id="chargesCard"><h2>Charges to run <span class="meta">${nReal(pend)} due now · ${sum(pend)}</span></h2>
-    <p class="meta"><b>Charge card on file</b> charges a card the customer saved on the signing page, once, and emails the receipt. A card taken in GoPayment is charged in QuickBooks (Customers, the client, Receive payment), then marked here with Charged or Declined. Declined makes the amount past due as of today.</p>
+    <p class="meta">To bill a snow visit past 16, a lights service call or anything else, open the client and tap <b>Add a charge</b>. <b>Charge card on file</b> charges a card the customer saved on the signing page, once, and emails the receipt. A card taken in GoPayment is charged in QuickBooks (Customers, the client, Receive payment), then marked here with Charged or Declined. Declined makes the amount past due as of today.</p>
     ${attn.length?`<div class="sect" style="color:var(--red)">Needs attention <span class="n">${attn.length}</span></div>${tbl(attn,(rid,r,c)=>r.status==="charging"?'<span class="meta">Running…</span>':apiCard(c)?runBtn(rid,r,"Try again"):handBtns(rid),r=>esc(r.error||"")+(r.status==="error"?" Trying again cannot charge twice.":""))}`:""}
     ${attn.length||pend.length?`<div class="sect">Due now <span class="n">${nReal(pend)} · ${sum(pend)}</span></div>`:""}
     ${pend.length?tbl(pend,(rid,r,c)=>apiCard(c)?runBtn(rid,r,"Charge card on file"):handBtns(rid)):`<div class="meta">Nothing to charge right now.</div>`}
-    ${sched.length?`<div class="sect">Waiting for install day or a later date <span class="n">${nReal(sched)} · ${sum(sched)}</span></div>${tbl(sched,(rid,r,c)=>apiCard(c)?runBtn(rid,r,r.trigger==="test"?"Charge the second $1 now":"Charge now"):`<button class="small" data-chg="${rid}" data-to="pending">Installed: ready to charge</button>`)}`:""}
+    ${sched.length?`<div class="sect">Waiting for the job to be done <span class="n">${nReal(sched)} · ${sum(sched)}</span></div>${tbl(sched,(rid,r,c)=>r.trigger==="test"&&apiCard(c)?runBtn(rid,r,"Charge the second $1 now"):`<button class="small" data-chg="${rid}" data-to="pending">Open now</button>`,r=>GATE_TEXT[r.trigger]?esc(GATE_TEXT[r.trigger])+". Open now only if the work is done and nobody marked it.":"")}`:""}
     ${chk.length?`<div class="sect">Waiting for a prepay check <span class="n">${chk.length}</span></div>${tbl(chk,rid=>`<button class="small" data-chg="${rid}" data-to="check">Check received</button>`)}`:""}
     ${recent.length?`<div class="sect">Charged through QuickBooks Payments, last 45 days <span class="n">${recent.length}</span></div>${tbl(recent,(rid,r)=>{ const st=undoState(r); return st || `<button class="small" data-undo="${rid}" data-amt="${esc(money((+r.amount||0)-(+r.refunded||0)))}">Refund</button>`; },r=>`Charged ${esc(fmtDate(new Date(r.doneAt).toLocaleDateString("en-CA",{timeZone:"America/Detroit"})))}${r.ranBy?` by ${esc(r.ranBy)}`:""} · transaction ${esc(r.chargeId)}`)}<p class="meta">Refund voids the charge if it has not settled yet (same day), so it never posts; after that it refunds what is left. The client gets an email either way. Partial refunds: do them in QuickBooks.</p>`:""}
   </div>`;
