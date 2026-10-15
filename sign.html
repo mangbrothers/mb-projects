@@ -48,14 +48,14 @@
   .quote td:last-child{text-align:right;padding-left:0;overflow-wrap:anywhere}
   .quote tr.big td:last-child,.quote td.amt{white-space:nowrap}
   .quote sup{font-size:.75em;line-height:0;color:var(--ink2)}
-  .totals{margin-top:12px;border-top:2px solid var(--ink)}
-  .totals td{border-bottom:0;padding:10px 0}
-  .totals tr.tot td{font-weight:700;font-size:17px}
-  .totals tr.today td{background:var(--brand-soft);color:var(--ink);font-weight:800;font-size:19px;padding:12px 14px}
-  .totals tr.today td:first-child{border-radius:8px 0 0 8px} .totals tr.today td:last-child{border-radius:0 8px 8px 0;white-space:nowrap}
-  .totals tr.later td{font-size:15px;color:var(--ink2);padding-top:8px}
+  .totals{margin-top:12px;border-top:2px solid var(--ink);padding-top:2px}
+  .totals.solo{border-top:0;margin-top:8px;padding-top:0}
+  .trow{display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding:10px 0}
+  .trow>span:last-child{white-space:nowrap;text-align:right}
+  .trow.tot{font-weight:700;font-size:17px}
+  .trow.today{background:var(--brand-soft);color:var(--ink);font-weight:800;font-size:19px;margin:2px -12px;padding:12px;border-radius:8px}
+  .trow.later{font-size:15px;color:var(--ink2);padding-top:8px}
   .foot{font-size:13px;color:var(--ink2);margin:10px 0 0}
-  .totals.solo{border-top:0;margin-top:8px}
   .three{align-items:end}
   .quote tr.big td{font-weight:700;font-size:17px}
   .doc{background:#fff;color:#16233a;border:1px solid #d3dae3;border-radius:8px;padding:24px 22px;margin:0 0 14px;font:16px/1.55 Georgia,"Times New Roman",serif}
@@ -148,12 +148,12 @@ function renderDoc(text){
 const isSnowLine = l => /^snow/i.test(String(l && l[0] || ""));
 function snowNote(A, starred){ return A.perVisit ? `<p class="foot">${starred?"* ":""}Snow visits after the sixteenth are ${esc(money(A.perVisit))} each, charged after the visit.</p>` : ""; }
 function quoteRows(A, withLines){
-  const r=(a,b,cls)=>`<tr${cls?` class="${cls}"`:""}><td>${a}</td><td>${b}</td></tr>`;
+  const r=(a,b)=>`<tr><td>${a}</td><td>${b}</td></tr>`, t=(a,b,cls)=>`<div class="trow ${cls}"><span>${a}</span><span>${b}</span></div>`;
   const lines = withLines ? (A.lines||[]) : [], starred = !!A.perVisit && lines.some(isSnowLine);
   return `${lines.length?`<table class="quote">${lines.map(l=>r(esc(l[0])+(starred&&isSnowLine(l)?"<sup>*</sup>":""),esc(money(l[1])))).join("")}</table>`:""}
-    <table class="quote totals${lines.length?"":" solo"}">${lines.length?r("Total",esc(money(A.total)),"tot"):""}
-    ${r("Charged today",esc(money(A.dueNow)||"$0"),"today")}
-    ${A.dueInstall>0?r("Charged when your lights are installed",esc(money(A.dueInstall)),"later"):""}</table>
+    <div class="totals${lines.length?"":" solo"}">${lines.length?t("Total",esc(money(A.total)),"tot"):""}
+    ${t("Charged today",esc(money(A.dueNow)||"$0"),"today")}
+    ${A.dueInstall>0?t("Charged when your lights are installed",esc(money(A.dueInstall)),"later"):""}</div>
     ${snowNote(A, starred)}`;
 }
 
