@@ -551,7 +551,7 @@ const emailKey = e => e.toLowerCase().replace(/\./g, ",");
 // The business runs on Michigan time, not UTC.
 const TZ = "America/Detroit";
 const today = () => new Intl.DateTimeFormat("en-CA",{timeZone:TZ,year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date());
-function toast(m){ const t=$("#toast"); t.textContent=m; t.style.pointerEvents="none"; t.classList.add("show"); clearTimeout(toast.t); toast.t=setTimeout(()=>t.classList.remove("show"),2600); }
+function toast(m){ const t=$("#toast"); const top=[...document.querySelectorAll("dialog[open]")].pop()||document.body; if(t.parentNode!==top) top.appendChild(t); t.textContent=m; t.style.pointerEvents="none"; t.classList.add("show"); clearTimeout(toast.t); toast.t=setTimeout(()=>t.classList.remove("show"),2600); }
 function fmtDate(d){ if(!d) return ""; const [y,m,dd]=d.split("-"); return `${+m}/${+dd}/${y.slice(2)}`; }
 const MONTHS=["January","February","March","April","May","June","July","August","September","October","November","December"];
 function fmtLong(d){ if(!d) return ""; const [y,m,dd]=d.split("-"); return `${MONTHS[+m-1]} ${+dd}, ${y}`; }
@@ -2082,11 +2082,11 @@ function randToken(){ const a=new Uint8Array(24); crypto.getRandomValues(a); ret
 async function ssaSend(){
   const X=signCtx; if(!X || X.busy) return;
   const c=clients[X.clientId], S=X.S, id=X.clientId;
-  if(!svcReady()) return toast("Set up the signing service first: More, Contracts, Signing service.");
+  if(!svcReady()){ const m="Not sent: the signing service is not set in the CRM. Close this, then More, Contracts, Signing service: paste the service URL and Save."; $("#ss-err").textContent=m; return toast(m); }
   const to=[S.email, S.email2].filter(Boolean);
   if(!to.length) { $("#ss-err").textContent="Still needed: the customer's email."; $("#ss-email").focus(); return; }
   const mySig = X.mySig!==undefined ? X.mySig : await loadMySig(); X.mySig=mySig;
-  if(!mySig?.data) return toast("Draw your countersignature once first: More, Contracts, Your countersignature.");
+  if(!mySig?.data){ const m="Not sent: draw your countersignature once first: More, Contracts, Your countersignature."; $("#ss-err").textContent=m; return toast(m); }
   X.busy=true; const btn=$("#ss-send"); if(btn){ btn.disabled=true; btn.textContent="Sending…"; }
   if(S.test){ try{ await ssaSendTest(c, S, id, to, mySig); } catch(e){ toast("Not sent: "+(e.code||e.message)); } finally{ X.busy=false; if(btn){ btn.disabled=false; btn.textContent="Email contract to sign"; } } return; }
   try{
