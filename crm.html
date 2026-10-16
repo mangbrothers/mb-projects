@@ -1040,7 +1040,7 @@ $("#clientSave").onclick = async () => {
   // Kept out of Undo on purpose: an undo after the charge ran must never put a charged row back to waiting.
   const g = prev ? gateUpdates(id, prev.services||{}, services) : null;
   if(g && g.released.length){ await db.ref().update(g.upd);
-    toast(`${g.released.map(x=>x.what).join(" and ")}: ${money(g.released.reduce((a,x)=>a+x.amount,0))} is now due.${apiCard(clients[id])?" Charge it from Charges to run.":" Charge it in QuickBooks, then mark it in Charges to run."}`); }
+    toast(`${g.released.map(x=>x.what).join(" and ")}: ${money(g.released.reduce((a,x)=>a+x.amount,0))} is now due.${apiCard(clients[id])?" The saved card is charged automatically within 5 minutes.":" Charge it in QuickBooks, then mark it in Charges to run."}`); }
   // Stay open when a contract is now waiting, so it can be signed right away.
   const saved = clients[id];
   if(saved && contractNeeds(saved).some(x=>!x.signed)){ openClient(id); toast("Saved. The contract is ready to sign below."); }
@@ -2242,7 +2242,7 @@ function renderSvcBills(){
     if(s && (s.type==="lights" || s.type==="landscaping")){
       const trig = s.type==="lights" ? ["install"] : ["deposit","completion"];
       const rows = Object.entries(qbRows).filter(([,r])=>r.type==="charge" && r.clientId===openId && trig.includes(r.trigger) && (r.sid===sid || (!r.sid && s.type==="lights")));
-      h = rows.map(([,r])=>`<div class="bl"><b>${esc(CHARGE_LABEL[r.trigger])}</b> ${money(r.amount)} ${STATE_WORD(r)}${r.status==="scheduled"?`<span class="meta">${s.type==="lights"?"Tick Installed and save to make it due.":"Set Status to Done and save to make it due."}</span>`:""}</div>`).join("");
+      h = rows.map(([,r])=>`<div class="bl"><b>${esc(CHARGE_LABEL[r.trigger])}</b> ${money(r.amount)} ${STATE_WORD(r)}${r.status==="scheduled"?`<span class="meta">${s.type==="lights"?"Tick Installed and save: it is charged to a saved card within 5 minutes.":"Set Status to Done and save: it is charged to a saved card within 5 minutes."}</span>`:""}</div>`).join("");
       if(s.type==="landscaping" && !rows.length && +s.price>0)
         h = `<div class="bl"><button type="button" class="small" data-fifty="${sid}" ${dirty?"disabled":""}>Bill 50/50: ${money(r2(+s.price/2))} now, ${money(r2(+s.price - r2(+s.price/2)))} when done</button>${dirty?'<span class="meta">Save first.</span>':""}</div>`;
     }
@@ -2328,7 +2328,9 @@ $("#chgRun").onclick=async()=>{ const b=$("#chgRun"); if(!chgCheck()) return; if
 // (no late fee; grace is a judgment call). Test charges (TEST agreements, $1) are shown with a TEST tag and never counted.
 const CHARGE_LABEL = { signing:"Due at signing", install:"Lights balance, install day", overage:"Snow visit past 16", call:"Lights service call", deposit:"Landscaping, 50% deposit", completion:"Landscaping balance, when the job is done", other:"Other charge", test:"Test charge, later" };
 // What opens each waiting charge. The employee portal will set the same fields when it is built.
-const GATE_TEXT = { install:"Opens when the lights are ticked Installed on the client", completion:"Opens when the landscaping job is set to Done on the client" };
+const GATE_TEXT = { install:"Opens when the lights are ticked Installed on the client, then a saved card is charged automatically", completion:"Opens when the landscaping job is set to Done on the client, then a saved card is charged automatically" };
+const AUTO_TRIG = ["install","completion"];
+const autoNote = (r,c) => AUTO_TRIG.includes(r.trigger) && !r.test && apiCard(c) && r.status==="pending" && r.releasedAt ? "Charging automatically within 5 minutes." : "";
 const apiCard = c => !!(c && c.payOnFile && c.payOnFile.status==="on-file" && c.payOnFile.qbCardId);
 const testPill = r => r && r.test ? ' <span class="pill sample">TEST</span>' : "";
 function chargesHtml(){
@@ -2344,10 +2346,10 @@ function chargesHtml(){
   const handBtns=rid=>`<button class="small primary" data-chg="${rid}" data-to="done">Charged</button> <button class="small danger" data-chg="${rid}" data-to="declined">Declined</button>`;
   const undoState=r=> r.status==="voided" ? '<span class="pill voided">voided</span>' : (+r.refunded||0) >= (+r.amount||0)-0.001 ? '<span class="pill voided">refunded</span>' : (+r.refunded||0)>0 ? `<span class="pill open">refunded ${money(r.refunded)}</span>` : "";
   return `<div class="card" id="chargesCard"><h2>Charges to run <span class="meta">${nReal(pend)} due now · ${sum(pend)}</span></h2>
-    <p class="meta">To bill a snow visit past 16, a lights service call or anything else, open the client and tap <b>Add a charge</b>. <b>Charge card on file</b> charges a card the customer saved on the signing page, once, and emails the receipt. A card taken in GoPayment is charged in QuickBooks (Customers, the client, Receive payment), then marked here with Charged or Declined. Declined makes the amount past due as of today.</p>
+    <p class="meta">Lights and landscaping balances charge a saved card by themselves within 5 minutes of the job being marked Installed or Done. To bill a snow visit past 16, a lights service call or anything else, open the client and tap <b>Add a charge</b>. <b>Charge card on file</b> charges a card the customer saved on the signing page, once, and emails the receipt. A card taken in GoPayment is charged in QuickBooks (Customers, the client, Receive payment), then marked here with Charged or Declined. Declined makes the amount past due as of today.</p>
     ${attn.length?`<div class="sect" style="color:var(--red)">Needs attention <span class="n">${attn.length}</span></div>${tbl(attn,(rid,r,c)=>r.status==="charging"?'<span class="meta">Running…</span>':apiCard(c)?runBtn(rid,r,"Try again"):handBtns(rid),r=>esc(r.error||"")+(r.status==="error"?" Trying again cannot charge twice.":""))}`:""}
     ${attn.length||pend.length?`<div class="sect">Due now <span class="n">${nReal(pend)} · ${sum(pend)}</span></div>`:""}
-    ${pend.length?tbl(pend,(rid,r,c)=>apiCard(c)?runBtn(rid,r,"Charge card on file"):handBtns(rid)):`<div class="meta">Nothing to charge right now.</div>`}
+    ${pend.length?tbl(pend,(rid,r,c)=>apiCard(c)?runBtn(rid,r,"Charge card on file"):handBtns(rid),r=>esc(autoNote(r,clients[r.clientId]||{}))):`<div class="meta">Nothing to charge right now.</div>`}
     ${sched.length?`<div class="sect">Waiting for the job to be done <span class="n">${nReal(sched)} · ${sum(sched)}</span></div>${tbl(sched,(rid,r,c)=>r.trigger==="test"&&apiCard(c)?runBtn(rid,r,"Charge the second $1 now"):`<button class="small" data-chg="${rid}" data-to="pending">Open now</button>`,r=>GATE_TEXT[r.trigger]?esc(GATE_TEXT[r.trigger])+". Open now only if the work is done and nobody marked it.":"")}`:""}
     ${chk.length?`<div class="sect">Waiting for a prepay check <span class="n">${chk.length}</span></div>${tbl(chk,rid=>`<button class="small" data-chg="${rid}" data-to="check">Check received</button>`)}`:""}
     ${recent.length?`<div class="sect">Charged through QuickBooks Payments, last 45 days <span class="n">${recent.length}</span></div>${tbl(recent,(rid,r)=>{ const st=undoState(r); return st || `<button class="small" data-undo="${rid}" data-amt="${esc(money((+r.amount||0)-(+r.refunded||0)))}">Refund</button>`; },r=>`Charged ${esc(fmtDate(new Date(r.doneAt).toLocaleDateString("en-CA",{timeZone:"America/Detroit"})))}${r.ranBy?` by ${esc(r.ranBy)}`:""} · transaction ${esc(r.chargeId)}`)}<p class="meta">Refund voids the charge if it has not settled yet (same day), so it never posts; after that it refunds what is left. The client gets an email either way. Partial refunds: do them in QuickBooks.</p>`:""}
@@ -2396,7 +2398,7 @@ async function moveCharge(rid, to){
       if(svcReady()){ payOkKey=db.ref("sync/mail").push().key; upd["sync/mail/"+payOkKey]={ kind:"payok", clientId:r.clientId, contractId:r.contractId||"", amount:r.amount, description:r.description||"", date:today(), to:[c.email,c.email2].filter(Boolean), status:"queued", createdAt:now, createdBy:me.email }; } } }
   else if(to==="declined"){ upd[`sync/qb/${rid}/declinedAt`]=now; upd[`clients/${r.clientId}/payStatus`]="pastdue";
     text=`Card declined for ${money(r.amount)} (${r.description||""}). Past due as of ${fmtLong(today())}. Contact the client for a working payment method.`; label=`${name}: declined, past due`; }
-  else if(to==="pending"){ upd[`sync/qb/${rid}/date`]=today(); text=`Ready to charge ${money(r.amount)}: ${r.description||""}.`; label=`${name}: ready to charge`; }
+  else if(to==="pending"){ upd[`sync/qb/${rid}/date`]=today(); if(AUTO_TRIG.includes(r.trigger)){ upd[`sync/qb/${rid}/releasedAt`]=now; upd[`sync/qb/${rid}/releasedBy`]=me.email; } text=`Ready to charge ${money(r.amount)}: ${r.description||""}.`; label=`${name}: ready to charge`; }
   if(clients[r.clientId]) upd[`clientLog/${r.clientId}/${db.ref("clientLog").push().key}`]={ text, at:now, by:me.email, source:"payment" };
   await commit(label, upd); if(payOkKey){ svcCall("mail",{ k:payOkKey }); toast("Payment confirmed email going to the client."); } render();
 }
