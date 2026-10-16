@@ -170,6 +170,16 @@
   .svc .hd{display:flex;align-items:center;gap:8px}
   .svc .hd .sum{flex:1;font-size:13px;color:var(--ink2)}
   .svc .fields{margin-top:4px}
+  details.kmenu{position:relative;display:inline-block;margin-left:auto}
+  details.kmenu>summary{list-style:none;cursor:pointer;padding:2px 10px;border-radius:6px;font-size:18px;line-height:1;color:var(--muted)}
+  details.kmenu>summary::-webkit-details-marker{display:none}
+  details.kmenu[open]>summary{background:var(--bg)}
+  details.kmenu .kpop{position:absolute;right:0;top:100%;z-index:6;background:var(--card);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow);padding:4px;min-width:140px}
+  details.kmenu .kpop button{width:100%;text-align:left;border:0;background:transparent;padding:8px 10px}
+  #refundDlg .body{position:relative}
+  #refundDlg .rfx{position:absolute;top:8px;right:10px;width:40px;height:40px;border-radius:50%;font-size:26px;line-height:1;padding:0;background:var(--bg);border:0;cursor:pointer}
+  #refundDlg .actions{justify-content:flex-end}
+  #refundDlg textarea{min-height:70px}
   .ribbon{position:sticky;bottom:0;z-index:5;margin:12px -4px 0;background:var(--amber-soft);border:1px solid var(--amber);border-radius:var(--r);padding:10px 12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
   .ribbon .t{flex:1;min-width:200px;font-size:14px;color:var(--ink)}
   .ribbon .t ul{margin:4px 0 0;padding-left:18px}
@@ -382,6 +392,17 @@ details.ssamore summary{cursor:pointer;font-weight:600}
       <button type="button" class="primary" id="clientSave">Save</button>
     </div>
   </form>
+</dialog>
+
+<!-- Refund? pop-up: a card charge refunded with a reason. The X closes it and saves nothing. -->
+<dialog id="refundDlg">
+  <div class="body">
+    <button type="button" class="rfx" id="rfX" aria-label="Close without refunding">&times;</button>
+    <h3 id="rfTitle">Refund</h3>
+    <div id="rfBody"></div>
+    <div class="meta" id="rfErr" style="color:var(--red);font-weight:600;margin-top:8px"></div>
+    <div class="actions"><button type="button" class="primary" id="rfGo" disabled>Refund</button></div>
+  </div>
 </dialog>
 
 <!-- Add a charge: snow visits past 16, lights service calls, anything else -->
@@ -2333,7 +2354,7 @@ function renderRecord(){
       <div class="k">Open or scheduled<b>${money(open)||"$0"}</b><span class="meta">due now or waiting for the job</span></div></div>
     ${rows.length?`<div style="overflow-x:auto"><table><thead><tr><th>Charge</th><th class="num">Amount</th><th>State</th><th>Transaction</th></tr></thead><tbody>${rows.map(([rid,r])=>`<tr><td>${esc(CHARGE_LABEL[r.trigger]||r.trigger||"")}${r.test?' <span class="pill sample">TEST</span>':""}<div class="meta">${esc(r.description||"")}</div></td><td class="num">${money(r.amount)}</td><td>${STATE_WORD(r)}${(+r.refunded||0)>0?` <span class="pill voided">refunded ${money(r.refunded)}</span>`:""}</td><td class="meta">${esc(r.chargeId||r.via||"")}${r.doneAt?"<br>"+fmtStamp(r.doneAt):""}</td></tr>`).join("")}</tbody></table></div>`:`<div class="meta">No charges yet.</div>`}
     <div class="meta" style="margin-top:8px"><b>Service log</b></div>
-    ${ent.length?ent.slice(-12).reverse().map(x=>`<div class="staged"><span>${fmtDate(x.date)}</span><b>${esc(LOG_KINDS[x.e.kind]||x.e.kind)}</b><span class="meta">${entryApproved(x.date,x.e)?esc(x.e.billed?.what||"approved"):"waiting for the day to be approved"}${x.e.note?" · "+esc(x.e.note):""}</span></div>`).join(""):`<div class="meta">Nothing logged yet.</div>`}
+    ${ent.length?ent.slice(-12).reverse().map(x=>`<div class="staged"><span>${fmtDate(x.date)}</span><b>${esc(LOG_KINDS[x.e.kind]||x.e.kind)}</b><span class="meta">${entryApproved(x.date,x.e)?esc(x.e.billed?.what||"approved"):"waiting for the day to be approved"}${x.e.note?" · "+esc(x.e.note):""}</span>${kmenu(openId, x.e.billed?.rowId)}</div>`).join(""):`<div class="meta">Nothing logged yet.</div>`}
     ${staged.length?`<div class="meta" style="margin-top:6px"><b>Not saved yet</b></div>${staged.map((e,i)=>`<div class="staged">${fmtDate(e.date)} <b>${esc(LOG_KINDS[e.kind])}</b>${e.note?" · "+esc(e.note):""} <button type="button" class="small" data-unstage="${i}">Remove</button></div>`).join("")}`:""}
     <div class="logform"><div><label>Log service by hand</label><select id="lgKind">${Object.entries(LOG_KINDS).map(([k,v])=>`<option value="${k}">${esc(v)}</option>`).join("")}</select></div>
       <div><label>Date</label><input id="lgDate" type="date" value="${today()}"></div>
@@ -2347,6 +2368,7 @@ function renderRecord(){
     else staged.push({ kind, date, ladder:kind==="call"?$("#lgLadder").checked:undefined, note:$("#lgNote").value.trim() });
     renderRecord(); };
   box.querySelectorAll("[data-unstage]").forEach(b=>b.onclick=()=>{ staged.splice(+b.dataset.unstage,1); renderRecord(); });
+  wireKmenus(box);
   renderRibbon();
 }
 // Service log view: one day at a time, with the manager's approval.
@@ -2361,7 +2383,7 @@ function renderServiceLog(m){
     <p class="meta">Every visit is logged here, by the crew report or by hand. Nothing a crew logs is billed until a manager approves the day. Approving bills snow visits past 16, opens lights and landscaping balances, and charges service calls. A saved card is then charged within 5 minutes.</p>
     <div class="row" style="margin:8px 0"><input type="date" id="slDate" value="${slDate}" style="width:auto">
       ${openDays.length?`<span class="meta">Days waiting for approval: ${openDays.map(d=>`<button class="link" data-day="${d}">${fmtDate(d)}</button>`).join(" ")}</span>`:""}</div>
-    ${entries.length?`<div style="overflow-x:auto"><table><thead><tr><th>Client</th><th>Service</th><th>From</th><th>Billing</th></tr></thead><tbody>${entries.map(([eid,e])=>`<tr><td>${esc(clients[e.clientId]?.name||"(deleted client)")}</td><td>${esc(LOG_KINDS[e.kind]||e.kind)}${e.ladder?" (ladder)":""}${e.note?`<div class="meta">${esc(e.note)}</div>`:""}</td><td class="meta">${esc(e.source==="crew"?(e.crew||"Crew"):"CRM, "+String(e.by||"").split("@")[0])}</td><td class="meta">${e.billed?esc(e.billed.what):e.approved?"approved":"waiting for approval"}</td></tr>`).join("")}</tbody></table></div>`:`<div class="meta">Nothing logged on this day.</div>`}
+    ${entries.length?`<div style="overflow-x:auto"><table><thead><tr><th>Client</th><th>Service</th><th>From</th><th>Billing</th><th></th></tr></thead><tbody>${entries.map(([eid,e])=>`<tr><td>${esc(clients[e.clientId]?.name||"(deleted client)")}</td><td>${esc(LOG_KINDS[e.kind]||e.kind)}${e.ladder?" (ladder)":""}${e.note?`<div class="meta">${esc(e.note)}</div>`:""}</td><td class="meta">${esc(e.source==="crew"?(e.crew||"Crew"):"CRM, "+String(e.by||"").split("@")[0])}</td><td class="meta">${e.billed?esc(e.billed.what):e.approved?"approved":"waiting for approval"}</td><td>${kmenu(e.clientId, e.billed?.rowId)}</td></tr>`).join("")}</tbody></table></div>`:`<div class="meta">Nothing logged on this day.</div>`}
     <div class="row" style="margin-top:10px">${st.status==="approved"?`<span class="pill paid">Approved by ${esc(String(st.approvedBy||"").split("@")[0])} ${fmtStamp(st.approvedAt)}</span>`:""}
       ${waiting.length?`<button class="primary" id="slApprove">Approve day and bill (${waiting.length})</button>`:""}</div>
   </div>
@@ -2373,6 +2395,7 @@ function renderServiceLog(m){
       <div style="flex:0 0 auto"><button class="small" id="slAdd">Add to the day</button></div></div>
     <p class="meta" style="margin:6px 0 0">Stands in for the crew report until the crew view is built. Entries added here wait for the day's approval like crew entries.</p></div>`;
   $("#slDate").onchange=e=>{ slDate=e.target.value||today(); render(); };
+  wireKmenus(m);
   m.querySelectorAll("[data-day]").forEach(b=>b.onclick=()=>{ slDate=b.dataset.day; render(); });
   $("#slKind").onchange=e=>{ $("#slLadderBox").hidden=e.target.value!=="call"; };
   $("#slAdd").onclick=async()=>{ const id=$("#slClient").value; if(!id) return toast("Choose a client.");
@@ -2386,6 +2409,48 @@ function renderServiceLog(m){
     await db.ref().update(B.upd);
     toast(B.lines.length?`Approved. Sent to billing: ${B.lines.map(l=>l.text).join("; ")}.`:"Approved. Nothing to charge for this day."); };
 }
+
+// ---------- Refund? (October 16, 2026) ----------
+// A hidden menu on each service log entry (and Refund? in Charges to run) opens one pop-up. A card charge made through
+// QuickBooks Payments is refunded by the signing service to the same card, once, with the reason on the client's receipt.
+// GoPayment, bank transfer and check payments are refunded in QuickBooks for now.
+const REFUND_REASONS = ["Service not performed", "Service redone or not up to standard", "Charged in error or twice", "Cancelled within 3 business days", "Customer cancelled", "Goodwill credit", "Other"];
+const kmenu = (clientId, rowId) => `<details class="kmenu"><summary aria-label="More">&#8943;</summary><div class="kpop"><button type="button" data-kref="${esc(clientId||"")}" data-krow="${esc(rowId||"")}">Refund?</button></div></details>`;
+function wireKmenus(root){ root.querySelectorAll("[data-kref]").forEach(b=>b.onclick=()=>{ b.closest("details").open=false; openRefund(b.dataset.kref, b.dataset.krow); }); }
+const leftOn = r => r2((+r.amount||0)-(+r.refunded||0));
+function openRefund(clientId, preferRow){
+  const c=clients[clientId]; if(!c) return toast("That client no longer exists.");
+  const card=Object.entries(qbRows).filter(([,r])=>r.type==="charge" && r.clientId===clientId && r.status==="done" && r.chargeId && leftOn(r)>0).sort((a,b)=>(b[1].doneAt||0)-(a[1].doneAt||0));
+  const other=Object.entries(qbRows).filter(([,r])=>r.type==="charge" && r.clientId===clientId && r.status==="done" && !r.chargeId);
+  const pick = card.find(([rid])=>rid===preferRow) ? preferRow : (card[0]||[])[0];
+  $("#rfTitle").textContent=`Refund: ${c.name||""}`; $("#rfErr").textContent="";
+  $("#rfBody").innerHTML = card.length ? `
+    <label>Charge to refund</label><select id="rfCharge">${card.map(([rid,r])=>`<option value="${rid}"${rid===pick?" selected":""}>${esc(CHARGE_LABEL[r.trigger]||r.trigger)}: ${money(leftOn(r))} left of ${money(r.amount)}, ${fmtDate(new Date(r.doneAt||0).toLocaleDateString("en-CA",{timeZone:TZ}))}${r.test?" (TEST)":""}</option>`).join("")}</select>
+    <div class="grid2" style="margin-top:8px"><div><label>Amount</label><input id="rfAmt" type="number" inputmode="decimal" step="0.01" min="0"></div>
+      <div><label>Reason</label><select id="rfReason"><option value="">Choose</option>${REFUND_REASONS.map(x=>`<option>${esc(x)}</option>`).join("")}</select></div></div>
+    <label style="margin-top:8px">Details</label><textarea id="rfDetails" maxlength="300" placeholder="What happened. Kept on the client's log; the client's receipt shows only the reason."></textarea>
+    <p class="meta" id="rfCard" style="margin:8px 0 0"></p>
+    ${other.length?`<p class="meta" style="margin:6px 0 0">${other.length} payment${other.length===1?"":"s"} by GoPayment, bank transfer or check: refund those in QuickBooks.</p>`:""}`
+    : `<p>No card charge to refund here.</p><p class="meta">${other.length?"This client paid by GoPayment, bank transfer or check. Refund it in QuickBooks for now.":"Nothing has been charged to this client through QuickBooks Payments."}</p>`;
+  const go=$("#rfGo"); go.disabled=true;
+  if(card.length){
+    const sel=$("#rfCharge"), amt=$("#rfAmt"), rs=$("#rfReason"), dt=$("#rfDetails");
+    const fill=()=>{ const r=qbRows[sel.value]||{}; amt.value=leftOn(r); amt.max=leftOn(r); $("#rfCard").textContent = `Goes back to ${payOnFileLabel(c)||"the card it was charged to"}. The client is emailed a refund receipt with the reason.`; check(); };
+    const check=()=>{ const r=qbRows[sel.value]||{}, a=+amt.value; go.disabled = !(sel.value && a>0 && a<=leftOn(r)+0.001 && rs.value && dt.value.trim()); };
+    sel.onchange=fill; [amt,rs,dt].forEach(x=>{ x.oninput=check; x.onchange=check; }); fill();
+    go.onclick=async()=>{ if(go.disabled) return; const rid=sel.value, a=r2(+amt.value);
+      if(!svcReady()) return $("#rfErr").textContent="Set up the signing service first: More, Contracts, Signing service.";
+      go.disabled=true; go.textContent="Refunding…";
+      try{ await db.ref("sync/qb/"+rid+"/refundReq").set({ at:Date.now(), by:me.email, amount:a, reason:rs.value, details:dt.value.trim() }); }
+      catch(e){ go.disabled=false; go.textContent="Refund"; return $("#rfErr").textContent="Not started: "+(e.code||e.message); }
+      const R=await svcCall("refund",{ k:rid }); go.textContent="Refund";
+      if(!R){ go.disabled=false; return $("#rfErr").textContent="No answer from the signing service. Check the client's charges in a minute before trying again."; }
+      if(!R.ok){ go.disabled=false; return $("#rfErr").textContent="Not refunded: "+(R.error||""); }
+      $("#refundDlg").close(); toast(R.result==="voided" ? `Cancelled the ${money(R.amount)} charge before it posted. The client was emailed.` : `Refunded ${money(R.amount)}. The client was emailed a receipt with the reason.`); render(); if(openId) renderRecord(); };
+  }
+  $("#refundDlg").showModal();
+}
+$("#rfX").onclick=()=>$("#refundDlg").close();
 
 // ---------- Gates, 50/50 landscaping, Add a charge ----------
 // Releases waiting balances whose work was just marked done. prevS and nextS are the services before and after the save.
@@ -2523,7 +2588,7 @@ function chargesHtml(){
     ${pend.length?tbl(pend,(rid,r,c)=>apiCard(c)?runBtn(rid,r,"Charge card on file"):handBtns(rid),r=>esc(autoNote(r,clients[r.clientId]||{}))):`<div class="meta">Nothing to charge right now.</div>`}
     ${sched.length?`<div class="sect">Waiting for the job to be done <span class="n">${nReal(sched)} · ${sum(sched)}</span></div>${tbl(sched,(rid,r,c)=>r.trigger==="test"&&apiCard(c)?runBtn(rid,r,"Charge the second $1 now"):`<button class="small" data-chg="${rid}" data-to="pending">Open now</button>`,r=>GATE_TEXT[r.trigger]?esc(GATE_TEXT[r.trigger])+". Open now only if the work is done and nobody marked it.":"")}`:""}
     ${chk.length?`<div class="sect">Waiting for a prepay check <span class="n">${chk.length}</span></div>${tbl(chk,rid=>`<button class="small" data-chg="${rid}" data-to="check">Check received</button>`)}`:""}
-    ${recent.length?`<div class="sect">Charged through QuickBooks Payments, last 45 days <span class="n">${recent.length}</span></div>${tbl(recent,(rid,r)=>{ const st=undoState(r); return st || `<button class="small" data-undo="${rid}" data-amt="${esc(money((+r.amount||0)-(+r.refunded||0)))}">Refund</button>`; },r=>`Charged ${esc(fmtDate(new Date(r.doneAt).toLocaleDateString("en-CA",{timeZone:"America/Detroit"})))}${r.ranBy?` by ${esc(r.ranBy)}`:""} · transaction ${esc(r.chargeId)}`)}<p class="meta">Refund voids the charge if it has not settled yet (same day), so it never posts; after that it refunds what is left. The client gets an email either way. Partial refunds: do them in QuickBooks.</p>`:""}
+    ${recent.length?`<div class="sect">Charged through QuickBooks Payments, last 45 days <span class="n">${recent.length}</span></div>${tbl(recent,(rid,r)=>{ const st=undoState(r); return st || `<button class="small" data-refund="${rid}" data-client="${r.clientId}">Refund?</button>`; },r=>`Charged ${esc(fmtDate(new Date(r.doneAt).toLocaleDateString("en-CA",{timeZone:"America/Detroit"})))}${r.ranBy?` by ${esc(r.ranBy)}`:""} · transaction ${esc(r.chargeId)}`)}<p class="meta">Refund? opens the refund form: any amount up to what is left, with a reason the client sees on the emailed receipt. The whole charge on the day it was made is cancelled before it posts.</p>`:""}
   </div>`;
 }
 // Two taps for anything that moves money: the first arms the button for 4 seconds, the second runs it.
@@ -2531,7 +2596,7 @@ function armed(b, label){ if(b.dataset.armed==="1") return true; const was=b.tex
 function wireCharges(m){
   m.querySelectorAll("[data-chg]").forEach(b=>b.onclick=()=>moveCharge(b.dataset.chg, b.dataset.to));
   m.querySelectorAll("[data-run]").forEach(b=>b.onclick=()=>{ if(armed(b,`Tap again: charge ${b.dataset.amt}`)) runCharge(b.dataset.run, b); });
-  m.querySelectorAll("[data-undo]").forEach(b=>b.onclick=()=>{ if(armed(b,`Tap again: refund ${b.dataset.amt}`)) undoCharge(b.dataset.undo, b); });
+  m.querySelectorAll("[data-refund]").forEach(b=>b.onclick=()=>openRefund(b.dataset.client, b.dataset.refund));
 }
 async function runCharge(rid, btn){
   const r=qbRows[rid]; if(!r) return; if(!svcReady()) return toast("Set up the signing service first: More, Contracts, Signing service.");
