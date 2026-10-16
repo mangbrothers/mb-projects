@@ -170,6 +170,15 @@
   .svc .hd{display:flex;align-items:center;gap:8px}
   .svc .hd .sum{flex:1;font-size:13px;color:var(--ink2)}
   .svc .fields{margin-top:4px}
+  .ribbon{position:sticky;bottom:0;z-index:5;margin:12px -4px 0;background:var(--amber-soft);border:1px solid var(--amber);border-radius:var(--r);padding:10px 12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  .ribbon .t{flex:1;min-width:200px;font-size:14px;color:var(--ink)}
+  .ribbon .t ul{margin:4px 0 0;padding-left:18px}
+  .recgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin:6px 0}
+  .recgrid .k{background:var(--bg);border:1px solid var(--line);border-radius:var(--r);padding:8px 10px}
+  .recgrid .k b{display:block;font-size:20px}
+  .logform{display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin-top:8px}
+  .logform>div{flex:1 1 140px}
+  .staged{display:flex;gap:8px;align-items:center;font-size:14px;padding:4px 0}
   .svcbill{margin-top:8px;padding-top:8px;border-top:1px dashed var(--line);font-size:13px;color:var(--ink2);display:flex;flex-direction:column;gap:4px}
   .svcbill .bl{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
   .svcbill .bl b{color:var(--ink)}
@@ -301,6 +310,7 @@ details.ssamore summary{cursor:pointer;font-weight:600}
     <button data-view="svc-lights"><span class="dot" style="background:var(--s-lights)"></span>Lights</button>
     <button data-view="svc-snow"><span class="dot" style="background:#9ec3f0"></span>Snow</button>
     <button data-view="svc-landscaping"><span class="dot" style="background:var(--s-landscaping)"></span>Landscaping</button>
+    <button data-view="servicelog">Service log</button>
     <div class="more" id="more">
       <button id="moreBtn" aria-haspopup="menu" aria-expanded="false">More <span class="caret">&#9662;</span></button>
       <div class="menu" id="moreMenu" role="menu">
@@ -355,6 +365,9 @@ details.ssamore summary{cursor:pointer;font-weight:600}
     <div class="sect">Contracts <span class="n" id="ctrCount"></span></div>
     <div id="ctrList"></div>
 
+    <div class="sect">Service and billing record</div>
+    <div id="svcRecord"></div>
+
     <div class="meta" id="billSummary" style="margin-top:10px"></div>
     <div class="row" id="chargeBar" style="margin-top:8px"></div>
 
@@ -362,6 +375,7 @@ details.ssamore summary{cursor:pointer;font-weight:600}
     <div class="log" id="logList"></div>
     <div class="addnote" id="addNote"><textarea id="noteText" placeholder="What happened on this call or visit. Saved with the time you press Add."></textarea><button type="button" class="primary" id="noteAdd">Add note</button></div>
 
+    <div class="ribbon" id="chgRibbon" hidden><div class="t" id="chgRibbonT"></div><button type="button" class="primary" id="chgRibbonGo">Save and charge</button></div>
     <div class="actions">
       <button type="button" class="danger left" id="clientTrash">Move to Trash</button>
       <button type="button" id="clientCancel">Cancel</button>
@@ -528,7 +542,7 @@ const tel = p => p ? `<a href="tel:${esc(p.replace(/[^\d+]/g,""))}" style="color
 function phoneKey(p){ const d=String(p||"").replace(/\D/g,""); if(d.length===10) return "+1"+d; if(d.length===11 && d[0]==="1") return "+"+d; return d.length>=10 ? "+"+d : ""; }
 
 let me=null, myTier="", isRussel=false, view="leads";
-let clients={}, logs={}, templates={}, qbRows={};
+let clients={}, logs={}, templates={}, qbRows={}, svcLog={}, dayLogs={}, staged=[];
 let filters = { q:"", region:"", svc:"", status:"" };
 let sort = { key:"name", dir:1 };
 try{ const sv=JSON.parse(localStorage.getItem("crmSort")||"null"); if(sv&&sv.key) sort=sv; }catch(e){}
@@ -589,7 +603,10 @@ function attach(){
   refs.c.on("value", s => { clients = s.val()||{}; render(); if(openId) refreshDialogLive(); if(!backfilled){ backfilled=true; backfillPhones(); } driveNag(); });
   refs.l.on("value", s => { logs = s.val()||{}; render(); if(openId) renderLog(); });
   refs.t.on("value", s => { templates = s.val()||{}; render(); if(openId) renderContracts(); });
-  refs.q.on("value", s => { qbRows = s.val()||{}; if(view==="tools") render(); if(openId) { renderSvcBills(); renderStamps(); } });
+  refs.q.on("value", s => { qbRows = s.val()||{}; if(view==="tools"||view==="servicelog") render(); if(openId) { renderSvcBills(); renderStamps(); renderRecord(); } });
+  refs.sl = db.ref("serviceLog"); refs.dl = db.ref("dayLogs");
+  refs.sl.on("value", s => { svcLog = s.val()||{}; if(view==="servicelog") render(); if(openId) renderRecord(); });
+  refs.dl.on("value", s => { dayLogs = s.val()||{}; if(view==="servicelog") render(); if(openId) renderRecord(); });
   refs.c.once("value").then(autoPurge);
 }
 function detach(){ Object.values(refs).forEach(r => r && r.off()); }
@@ -718,6 +735,7 @@ function render(){
   if(view==="tools") return renderTools(m);
   if(view==="trash") return renderTrash(m);
   if(view==="contracts") return renderContractsView(m);
+  if(view==="servicelog") return renderServiceLog(m);
 }
 
 // Leads board
@@ -920,7 +938,7 @@ function openClient(id, defaultStatus){
   f.name.value=c.name||""; f.phone.value=c.phone||""; f.email.value=c.email||""; f.email2.value=c.email2||""; f.address.value=c.address||""; f.region.value=c.region||""; f.status.value=c.status||"new"; f.source.value=c.source||""; f.interest.value=c.interest||"";
   $("#clientTitle").textContent = id ? c.name : "New client";
   draftServices = JSON.parse(JSON.stringify(c.services||{})); removedServices = new Set();
-  renderStamps(); renderSvcs(); renderLog(); renderContracts(); showDlgDup();
+  staged=[]; renderStamps(); renderSvcs(); renderLog(); renderContracts(); renderRecord(); showDlgDup();
   $("#clientTrash").hidden = !id; $("#addNote").style.display = id ? "" : "none";
   if(!$("#clientDlg").open) $("#clientDlg").showModal();
   f.name.focus();
@@ -958,7 +976,7 @@ function renderSvcsInner(){
   </div>`; }).join("") || `<div class="meta">No services yet.</div>`;
   renderSvcBills();
   $("#svcList").querySelectorAll("[data-rm]").forEach(b=> b.onclick = () => { readSvcForm(); removedServices.add(b.dataset.rm); delete draftServices[b.dataset.rm]; renderSvcs(); renderContracts(); });
-  $("#svcList").querySelectorAll("input,select").forEach(i=> i.onchange = () => { readSvcForm(); renderSvcs(); renderContracts(); });
+  $("#svcList").querySelectorAll("input,select").forEach(i=> i.onchange = () => { readSvcForm(); renderSvcs(); renderContracts(); renderRibbon(); });
 }
 function readSvcForm(){
   const f=$("#clientForm");
@@ -1036,11 +1054,13 @@ $("#clientSave").onclick = async () => {
   removedServices.forEach(sid=> upd[`clients/${id}/services/${sid}`]=null);
   if(data.status==="active" && (!prev || prev.status!=="active")) Object.assign(upd, qbCustomerRow(id, data));
   await commit(prev ? "Edited "+data.name : "Added "+data.name, upd);
-  // The gate: a lights service ticked Installed, or a landscaping job set to Done, makes its waiting balance due now.
+  // Charge-affecting changes (lights ticked Installed, a landscaping job set to Done, service logged by hand) are only
+  // reachable through the Save and charge ribbon. They are logged as approved service and billed in one step.
   // Kept out of Undo on purpose: an undo after the charge ran must never put a charged row back to waiting.
-  const g = prev ? gateUpdates(id, prev.services||{}, services) : null;
-  if(g && g.released.length){ await db.ref().update(g.upd);
-    toast(`${g.released.map(x=>x.what).join(" and ")}: ${money(g.released.reduce((a,x)=>a+x.amount,0))} is now due.${apiCard(clients[id])?" The saved card is charged automatically within 5 minutes.":" Charge it in QuickBooks, then mark it in Charges to run."}`); }
+  const pend = prev ? pendingService(id, prev.services||{}, services) : [];
+  if(pend.length){ const B = await billEntries(pend.map(x=>({ ...x, date:x.date||today() })), true);
+    await db.ref().update(B.upd); staged=[];
+    toast(B.lines.length ? `Saved and sent to billing: ${B.lines.map(l=>l.text).join("; ")}.${apiCard(clients[id])?" A saved card is charged within 5 minutes.":" Charge it in QuickBooks, then mark it in Charges to run."}` : "Saved. Service logged; nothing to charge."); }
   // Stay open when a contract is now waiting, so it can be signed right away.
   const saved = clients[id];
   if(saved && contractNeeds(saved).some(x=>!x.signed)){ openClient(id); toast("Saved. The contract is ready to sign below."); }
@@ -2216,6 +2236,157 @@ async function doImport(){
 }
 
 // ---------- Charges to run: the payment schedule ----------
+// ---------- Service log (October 16, 2026) ----------
+// Every service visit is a log entry: serviceLog/{date}/{entry}. Crew entries (the crew view, later) wait until a
+// manager approves that day (dayLogs/{date}); nothing bills before then. Entries an admin logs by hand on a client are
+// approved by the Save and charge button itself. Approving bills what the contract says:
+//   snow visit: counted for the season; each approved visit past 16 is charged at the per-visit price
+//   lights installed: opens the install-day balance; landscaping job done: opens the second half
+//   lights service call: $40, or $65 with a ladder; fall pass, lawn cut, other: recorded, nothing charged (prepaid or billed elsewhere)
+// The signing service charges rows marked auto on its next 5-minute run, to a saved card.
+const LOG_KINDS = { snow:"Snow visit", lights:"Lights installed", call:"Lights service call", landscaping:"Landscaping job done", fall:"Fall cleanup pass", lawn:"Lawn cut", other:"Other service" };
+const SNOW_INCLUDED = 16;
+const seasonOf = d => { const [y,m]=d.split("-").map(Number); return m>=7 ? y : y-1; };
+const dayApproved = d => (dayLogs[d]||{}).status==="approved";
+const entryApproved = (d,e) => e.approved===true || dayApproved(d);
+function allEntries(){ const out=[]; for(const [d,day] of Object.entries(svcLog||{})) for(const [eid,e] of Object.entries(day||{})) out.push({ date:d, eid, e }); return out.sort((a,b)=>a.date.localeCompare(b.date)||(a.e.at||0)-(b.e.at||0)); }
+const clientEntries = id => allEntries().filter(x=>x.e.clientId===id);
+// Snow visits approved this season for a client, in order, so each visit knows its number.
+function snowCount(id, season){ return clientEntries(id).filter(x=>x.e.kind==="snow" && seasonOf(x.date)===season && entryApproved(x.date,x.e)).length; }
+async function perVisitFor(id){
+  const sg=ssaSigned(clients[id]||{}); if(!sg) return null;
+  try{ const rec=(await db.ref("contracts/"+id+"/"+sg[0]).once("value")).val(); return { amt:+rec?.details?.snow?.perPushAfter||null, cid:sg[0], agNo:rec?.details?.agreementNo||sg[1].agreementNo||"" }; }catch(e){ return null; }
+}
+// Turns approved entries into charges. list = [{date, eid?, e}] ; manual = true when logged by hand through the ribbon.
+// Returns { upd, lines } for one multi-path update. Never charges itself: rows marked auto are charged by the service.
+async function billEntries(list, manual){
+  const upd={}, lines=[], now=Date.now(), counts={}, pv={};
+  const addRow=(row)=>{ const rid=db.ref("sync/qb").push().key; upd["sync/qb/"+rid]={ type:"charge", status:"pending", auto:true, releasedAt:now, releasedBy:me.email, date:today(), createdAt:now, createdBy:me.email, ...row }; return rid; };
+  for(const x of list){
+    const e=x.e, id=e.clientId, c=clients[id]; if(!c) continue;
+    const eid = x.eid || db.ref("serviceLog/"+x.date).push().key, base="serviceLog/"+x.date+"/"+eid;
+    if(!x.eid) upd[base] = { ...e, at:e.at||now, by:e.by||me.email, source:e.source||"crm", ...(manual?{ approved:true, approvedBy:me.email, approvedAt:now }:{}) };
+    let billed = { at:now, by:me.email, what:"recorded" };
+    if(e.kind==="snow"){
+      const season=seasonOf(x.date), key=id+"|"+season;
+      if(!(key in counts)) counts[key]=snowCount(id, season);
+      const n=++counts[key];
+      if(n>SNOW_INCLUDED){
+        if(!(id in pv)) pv[id]=await perVisitFor(id);
+        const P=pv[id];
+        if(P && P.amt){ const rid=addRow({ trigger:"overage", clientId:id, contractId:P.cid, amount:P.amt, visit:n, workDate:x.date, entryId:eid, description:`${P.agNo?P.agNo+": ":""}Snow visit ${n} (past the sixteenth), ${fmtDate(x.date)}` });
+          billed={ ...billed, what:`visit ${n}, charged`, rowId:rid }; lines.push({ text:`${c.name}: snow visit ${n}, ${money(P.amt)}`, amount:P.amt }); }
+        else { billed={ ...billed, what:`visit ${n}, no signed snow price found: add the charge by hand` }; lines.push({ text:`${c.name}: snow visit ${n} needs a charge added by hand (no signed price found)`, amount:0 }); }
+      } else billed={ ...billed, what:`visit ${n} of ${SNOW_INCLUDED} included` };
+    } else if(e.kind==="lights" || e.kind==="landscaping"){
+      const trig = e.kind==="lights" ? "install" : "completion";
+      const rows = Object.entries(qbRows).filter(([,r])=>r.type==="charge" && r.status==="scheduled" && r.trigger===trig && r.clientId===id && (!e.sid || !r.sid || r.sid===e.sid));
+      rows.forEach(([rid,r])=>{ Object.assign(upd, { [`sync/qb/${rid}/status`]:"pending", [`sync/qb/${rid}/date`]:today(), [`sync/qb/${rid}/releasedAt`]:now, [`sync/qb/${rid}/releasedBy`]:me.email, [`sync/qb/${rid}/auto`]:true, [`sync/qb/${rid}/entryId`]:eid });
+        lines.push({ text:`${c.name}: ${CHARGE_LABEL[trig].toLowerCase()} ${money(r.amount)}`, amount:+r.amount||0 }); billed={ ...billed, what:"balance released", rowId:rid }; });
+      const svc = Object.entries(c.services||{}).find(([sid,sv])=>sv.type===e.kind && (!e.sid || sid===e.sid));
+      if(svc){ if(e.kind==="lights"){ upd[`clients/${id}/services/${svc[0]}/installed`]=true; if(!svc[1].install) upd[`clients/${id}/services/${svc[0]}/install`]=x.date; }
+        else upd[`clients/${id}/services/${svc[0]}/jobStatus`]="Done"; }
+      if(!rows.length) billed={ ...billed, what:"no waiting balance" };
+    } else if(e.kind==="call"){
+      const amt = e.ladder ? SSA_CALL.ladder : SSA_CALL.plain, sg=ssaSigned(c);
+      const rid=addRow({ trigger:"call", clientId:id, ...(sg?{contractId:sg[0]}:{}), amount:amt, workDate:x.date, entryId:eid, description:`Lights service call (${e.ladder?"ladder":"no ladder"}), ${fmtDate(x.date)}${e.note?". "+e.note:""}` });
+      billed={ ...billed, what:"service call charged", rowId:rid }; lines.push({ text:`${c.name}: lights service call ${money(amt)}`, amount:amt });
+    } else if(e.kind==="fall"){
+      const f=Object.entries(c.services||{}).find(([,sv])=>sv.type==="fall");
+      if(f){ upd[`clients/${id}/services/${f[0]}/${f[1].pass1?"pass2":"pass1"}`]=true; billed={ ...billed, what:`pass ${f[1].pass1?2:1} recorded (prepaid)` }; }
+    }
+    upd[base+"/billed"]=billed;
+    upd[`clientLog/${id}/${db.ref("clientLog").push().key}`]={ text:`Service logged: ${LOG_KINDS[e.kind]||e.kind}, ${fmtDate(x.date)}${e.note?" ("+e.note+")":""}. ${billed.what}.`, at:now, by:me.email, source:"service" };
+  }
+  return { upd, lines };
+}
+// The charge-affecting changes waiting in the open client dialog: hand-logged entries plus gate ticks on the services.
+function pendingService(id, prevS, nextS){
+  const out = staged.map(e=>({ date:e.date, e:{ ...e, clientId:id } }));
+  for(const [sid,s] of Object.entries(nextS||{})){ const was=(prevS||{})[sid]||{};
+    if(s.type==="lights" && s.installed && !was.installed && !out.some(x=>x.e.kind==="lights")) out.push({ date:today(), e:{ clientId:id, kind:"lights", sid, note:"Ticked Installed in the CRM" } });
+    if(s.type==="landscaping" && s.jobStatus==="Done" && was.jobStatus!=="Done") out.push({ date:today(), e:{ clientId:id, kind:"landscaping", sid, note:s.desc||"" } }); }
+  return out;
+}
+function renderRibbon(){
+  const rb=$("#chgRibbon"); if(!rb) return;
+  if(!openId){ rb.hidden=true; $("#clientSave").hidden=false; return; }
+  readSvcForm();
+  const pend = pendingService(openId, clients[openId]?.services||{}, draftServices);
+  rb.hidden=!pend.length; $("#clientSave").hidden=!!pend.length;
+  if(pend.length) $("#chgRibbonT").innerHTML = `<b>This save logs service that can charge ${esc(clients[openId]?.name||"the client")}:</b><ul>${pend.map(x=>`<li>${esc(LOG_KINDS[x.e.kind])}, ${fmtDate(x.date)}${x.e.kind==="call"?` (${x.e.ladder?"ladder $"+SSA_CALL.ladder:"no ladder $"+SSA_CALL.plain})`:""}${x.e.note?": "+esc(x.e.note):""}</li>`).join("")}</ul><span class="meta">Nothing is saved or charged until you tap Save and charge.</span>`;
+  const go=$("#chgRibbonGo"); go.dataset.armed=""; go.textContent="Save and charge"; go.classList.remove("danger"); go.classList.add("primary");
+  go.onclick=()=>{ if(armed(go,"Tap again: save and charge")) $("#clientSave").onclick(); };
+}
+// The client's service and billing record: snow count, every charge with its transaction id, and the service log.
+function renderRecord(){
+  const box=$("#svcRecord"); if(!box) return;
+  if(!openId){ box.innerHTML=`<div class="meta">Save the client first.</div>`; renderRibbon(); return; }
+  const c=clients[openId]||{}, season=seasonOf(today()), ent=clientEntries(openId);
+  const snow=snowCount(openId, season), snowPend=ent.filter(x=>x.e.kind==="snow" && seasonOf(x.date)===season && !entryApproved(x.date,x.e)).length;
+  const rows=Object.entries(qbRows).filter(([,r])=>r.type==="charge" && r.clientId===openId).sort((a,b)=>(a[1].createdAt||0)-(b[1].createdAt||0));
+  const paid=rows.filter(([,r])=>r.status==="done" && !r.test).reduce((a,[,r])=>a+(+r.amount||0)-(+r.refunded||0),0);
+  const open=rows.filter(([,r])=>["pending","declined","scheduled","error","held","awaiting-check"].includes(r.status) && !r.test).reduce((a,[,r])=>a+(+r.amount||0),0);
+  box.innerHTML = `<div class="recgrid">
+      ${hasSvc(c,"snow")||snow?`<div class="k">Snow visits this season<b>${snow}</b><span class="meta">${SNOW_INCLUDED} included · ${snow>SNOW_INCLUDED?`${snow-SNOW_INCLUDED} past 16 billed`:`${SNOW_INCLUDED-snow} left`}${snowPend?` · ${snowPend} waiting for day approval`:""}</span></div>`:""}
+      <div class="k">Paid<b>${money(paid)||"$0"}</b><span class="meta">through QuickBooks, after refunds</span></div>
+      <div class="k">Open or scheduled<b>${money(open)||"$0"}</b><span class="meta">due now or waiting for the job</span></div></div>
+    ${rows.length?`<div style="overflow-x:auto"><table><thead><tr><th>Charge</th><th class="num">Amount</th><th>State</th><th>Transaction</th></tr></thead><tbody>${rows.map(([rid,r])=>`<tr><td>${esc(CHARGE_LABEL[r.trigger]||r.trigger||"")}${r.test?' <span class="pill sample">TEST</span>':""}<div class="meta">${esc(r.description||"")}</div></td><td class="num">${money(r.amount)}</td><td>${STATE_WORD(r)}${(+r.refunded||0)>0?` <span class="pill voided">refunded ${money(r.refunded)}</span>`:""}</td><td class="meta">${esc(r.chargeId||r.via||"")}${r.doneAt?"<br>"+fmtStamp(r.doneAt):""}</td></tr>`).join("")}</tbody></table></div>`:`<div class="meta">No charges yet.</div>`}
+    <div class="meta" style="margin-top:8px"><b>Service log</b></div>
+    ${ent.length?ent.slice(-12).reverse().map(x=>`<div class="staged"><span>${fmtDate(x.date)}</span><b>${esc(LOG_KINDS[x.e.kind]||x.e.kind)}</b><span class="meta">${entryApproved(x.date,x.e)?esc(x.e.billed?.what||"approved"):"waiting for the day to be approved"}${x.e.note?" · "+esc(x.e.note):""}</span></div>`).join(""):`<div class="meta">Nothing logged yet.</div>`}
+    ${staged.length?`<div class="meta" style="margin-top:6px"><b>Not saved yet</b></div>${staged.map((e,i)=>`<div class="staged">${fmtDate(e.date)} <b>${esc(LOG_KINDS[e.kind])}</b>${e.note?" · "+esc(e.note):""} <button type="button" class="small" data-unstage="${i}">Remove</button></div>`).join("")}`:""}
+    <div class="logform"><div><label>Log service by hand</label><select id="lgKind">${Object.entries(LOG_KINDS).map(([k,v])=>`<option value="${k}">${esc(v)}</option>`).join("")}</select></div>
+      <div><label>Date</label><input id="lgDate" type="date" value="${today()}"></div>
+      <div id="lgLadderBox" hidden><label class="row" style="margin:24px 0 0;color:var(--ink)"><input type="checkbox" id="lgLadder"> Needed a ladder</label></div>
+      <div style="flex:2 1 200px"><label>Note</label><input id="lgNote" maxlength="120" autocomplete="off"></div>
+      <div style="flex:0 0 auto"><button type="button" class="small" id="lgAdd">Add</button></div></div>
+    <p class="meta" style="margin:6px 0 0">Anything logged here is billed only when you tap Save and charge. Crew reports wait for the day to be approved in Service log.</p>`;
+  const k=$("#lgKind"); k.onchange=()=>{ $("#lgLadderBox").hidden=k.value!=="call"; };
+  $("#lgAdd").onclick=()=>{ const kind=k.value, date=$("#lgDate").value||today();
+    if(kind==="landscaping"){ const jobs=Object.entries(clients[openId]?.services||{}).filter(([,s])=>s.type==="landscaping"); if(jobs.length>1) return toast("Several landscaping jobs: set the right one's Status to Done instead."); if(jobs[0]) staged.push({ kind, date, sid:jobs[0][0], note:$("#lgNote").value.trim() }); else return toast("This client has no landscaping job."); }
+    else staged.push({ kind, date, ladder:kind==="call"?$("#lgLadder").checked:undefined, note:$("#lgNote").value.trim() });
+    renderRecord(); };
+  box.querySelectorAll("[data-unstage]").forEach(b=>b.onclick=()=>{ staged.splice(+b.dataset.unstage,1); renderRecord(); });
+  renderRibbon();
+}
+// Service log view: one day at a time, with the manager's approval.
+let slDate=null;
+function renderServiceLog(m){
+  slDate = slDate || today();
+  const day = svcLog[slDate]||{}, entries=Object.entries(day).sort((a,b)=>(a[1].at||0)-(b[1].at||0)), st=dayLogs[slDate]||{};
+  const waiting = entries.filter(([,e])=>!e.billed);
+  const openDays = Object.keys(svcLog).filter(d=>!dayApproved(d) && Object.values(svcLog[d]||{}).some(e=>!e.approved && !e.billed)).sort().reverse();
+  const opts = live().filter(([,c])=>c.status==="active").sort(byName).map(([id,c])=>`<option value="${id}">${esc(c.name)}</option>`).join("");
+  m.innerHTML = `<div class="card"><h2>Service log <span class="meta">${fmtLong(slDate)}</span></h2>
+    <p class="meta">Every visit is logged here, by the crew report or by hand. Nothing a crew logs is billed until a manager approves the day. Approving bills snow visits past 16, opens lights and landscaping balances, and charges service calls. A saved card is then charged within 5 minutes.</p>
+    <div class="row" style="margin:8px 0"><input type="date" id="slDate" value="${slDate}" style="width:auto">
+      ${openDays.length?`<span class="meta">Days waiting for approval: ${openDays.map(d=>`<button class="link" data-day="${d}">${fmtDate(d)}</button>`).join(" ")}</span>`:""}</div>
+    ${entries.length?`<div style="overflow-x:auto"><table><thead><tr><th>Client</th><th>Service</th><th>From</th><th>Billing</th></tr></thead><tbody>${entries.map(([eid,e])=>`<tr><td>${esc(clients[e.clientId]?.name||"(deleted client)")}</td><td>${esc(LOG_KINDS[e.kind]||e.kind)}${e.ladder?" (ladder)":""}${e.note?`<div class="meta">${esc(e.note)}</div>`:""}</td><td class="meta">${esc(e.source==="crew"?(e.crew||"Crew"):"CRM, "+String(e.by||"").split("@")[0])}</td><td class="meta">${e.billed?esc(e.billed.what):e.approved?"approved":"waiting for approval"}</td></tr>`).join("")}</tbody></table></div>`:`<div class="meta">Nothing logged on this day.</div>`}
+    <div class="row" style="margin-top:10px">${st.status==="approved"?`<span class="pill paid">Approved by ${esc(String(st.approvedBy||"").split("@")[0])} ${fmtStamp(st.approvedAt)}</span>`:""}
+      ${waiting.length?`<button class="primary" id="slApprove">Approve day and bill (${waiting.length})</button>`:""}</div>
+  </div>
+  <div class="card"><h2>Log a visit for this day</h2>
+    <div class="logform"><div><label>Client</label><select id="slClient">${opts}</select></div>
+      <div><label>Service</label><select id="slKind">${Object.entries(LOG_KINDS).map(([k,v])=>`<option value="${k}">${esc(v)}</option>`).join("")}</select></div>
+      <div id="slLadderBox" hidden><label class="row" style="margin:24px 0 0;color:var(--ink)"><input type="checkbox" id="slLadder"> Needed a ladder</label></div>
+      <div style="flex:2 1 200px"><label>Note</label><input id="slNote" maxlength="120" autocomplete="off"></div>
+      <div style="flex:0 0 auto"><button class="small" id="slAdd">Add to the day</button></div></div>
+    <p class="meta" style="margin:6px 0 0">Stands in for the crew report until the crew view is built. Entries added here wait for the day's approval like crew entries.</p></div>`;
+  $("#slDate").onchange=e=>{ slDate=e.target.value||today(); render(); };
+  m.querySelectorAll("[data-day]").forEach(b=>b.onclick=()=>{ slDate=b.dataset.day; render(); });
+  $("#slKind").onchange=e=>{ $("#slLadderBox").hidden=e.target.value!=="call"; };
+  $("#slAdd").onclick=async()=>{ const id=$("#slClient").value; if(!id) return toast("Choose a client.");
+    const kind=$("#slKind").value, c=clients[id]; let sid;
+    if(kind==="landscaping"){ const jobs=Object.entries(c.services||{}).filter(([,s])=>s.type==="landscaping"&&s.jobStatus!=="Done"); if(!jobs.length) return toast("That client has no open landscaping job."); sid=jobs[0][0]; }
+    const e={ clientId:id, kind, ...(sid?{sid}:{}), ...(kind==="call"?{ladder:$("#slLadder").checked}:{}), note:$("#slNote").value.trim(), at:Date.now(), by:me.email, source:"crm" };
+    await db.ref().update({ [`serviceLog/${slDate}/${db.ref("serviceLog/"+slDate).push().key}`]:e }); toast("Added. It bills when the day is approved."); };
+  const ap=$("#slApprove"); if(ap) ap.onclick=async()=>{ if(!armed(ap,"Tap again: approve and bill")) return;
+    ap.disabled=true; const B=await billEntries(waiting.map(([eid,e])=>({ date:slDate, eid, e })), false);
+    B.upd[`dayLogs/${slDate}`]={ status:"approved", approvedBy:me.email, approvedAt:Date.now(), entries:entries.length };
+    await db.ref().update(B.upd);
+    toast(B.lines.length?`Approved. Sent to billing: ${B.lines.map(l=>l.text).join("; ")}.`:"Approved. Nothing to charge for this day."); };
+}
+
 // ---------- Gates, 50/50 landscaping, Add a charge ----------
 // Releases waiting balances whose work was just marked done. prevS and nextS are the services before and after the save.
 function gateUpdates(clientId, prevS, nextS){
@@ -2242,7 +2413,7 @@ function renderSvcBills(){
     if(s && (s.type==="lights" || s.type==="landscaping")){
       const trig = s.type==="lights" ? ["install"] : ["deposit","completion"];
       const rows = Object.entries(qbRows).filter(([,r])=>r.type==="charge" && r.clientId===openId && trig.includes(r.trigger) && (r.sid===sid || (!r.sid && s.type==="lights")));
-      h = rows.map(([,r])=>`<div class="bl"><b>${esc(CHARGE_LABEL[r.trigger])}</b> ${money(r.amount)} ${STATE_WORD(r)}${r.status==="scheduled"?`<span class="meta">${s.type==="lights"?"Tick Installed and save: it is charged to a saved card within 5 minutes.":"Set Status to Done and save: it is charged to a saved card within 5 minutes."}</span>`:""}</div>`).join("");
+      h = rows.map(([,r])=>`<div class="bl"><b>${esc(CHARGE_LABEL[r.trigger])}</b> ${money(r.amount)} ${STATE_WORD(r)}${r.status==="scheduled"?`<span class="meta">${s.type==="lights"?"Tick Installed, then Save and charge (or approve the crew's day in Service log).":"Set Status to Done, then Save and charge (or approve the crew's day in Service log)."}</span>`:""}</div>`).join("");
       if(s.type==="landscaping" && !rows.length && +s.price>0)
         h = `<div class="bl"><button type="button" class="small" data-fifty="${sid}" ${dirty?"disabled":""}>Bill 50/50: ${money(r2(+s.price/2))} now, ${money(r2(+s.price - r2(+s.price/2)))} when done</button>${dirty?'<span class="meta">Save first.</span>':""}</div>`;
     }
@@ -2257,7 +2428,7 @@ async function billFifty(clientId, sid){
   if(Object.values(qbRows).some(r=>r.type==="charge" && r.sid===sid && (r.trigger==="deposit"||r.trigger==="completion"))) return toast("This job already has its 50/50 charges.");
   const now=Date.now(), half=r2(+s.price/2), bal=r2(+s.price-half), job=`Landscaping${s.desc?", "+s.desc:""}`, done=s.jobStatus==="Done";
   const upd={
-    ["sync/qb/"+db.ref("sync/qb").push().key]: { type:"charge", trigger:"deposit", status:"pending", clientId, sid, amount:half, date:today(), description:`${job}: 50% deposit`, createdAt:now, createdBy:me.email },
+    ["sync/qb/"+db.ref("sync/qb").push().key]: { type:"charge", trigger:"deposit", status:"pending", auto:true, releasedAt:now, releasedBy:me.email, clientId, sid, amount:half, date:today(), description:`${job}: 50% deposit`, createdAt:now, createdBy:me.email },
     ["sync/qb/"+db.ref("sync/qb").push().key]: { type:"charge", trigger:"completion", status:done?"pending":"scheduled", clientId, sid, amount:bal, ...(done?{date:today()}:{}), description:`${job}: balance, job complete`, createdAt:now, createdBy:me.email },
     [`clientLog/${clientId}/${db.ref("clientLog").push().key}`]: { text:`${job}: billed 50/50. ${money(half)} deposit due now; ${money(bal)} ${done?"balance also due now (job already done)":"balance when the job is done"}.`, at:now, by:me.email, source:"payment" } };
   if(!c.payOnFile) upd[`clients/${clientId}/payOnFile`] = { status:"missing", since:now };
@@ -2328,9 +2499,9 @@ $("#chgRun").onclick=async()=>{ const b=$("#chgRun"); if(!chgCheck()) return; if
 // (no late fee; grace is a judgment call). Test charges (TEST agreements, $1) are shown with a TEST tag and never counted.
 const CHARGE_LABEL = { signing:"Due at signing", install:"Lights balance, install day", overage:"Snow visit past 16", call:"Lights service call", deposit:"Landscaping, 50% deposit", completion:"Landscaping balance, when the job is done", other:"Other charge", test:"Test charge, later" };
 // What opens each waiting charge. The employee portal will set the same fields when it is built.
-const GATE_TEXT = { install:"Opens when the lights are ticked Installed on the client, then a saved card is charged automatically", completion:"Opens when the landscaping job is set to Done on the client, then a saved card is charged automatically" };
+const GATE_TEXT = { install:"Opens when the install is approved (crew day approved, or Installed with Save and charge); a saved card is then charged automatically", completion:"Opens when the job is approved (crew day approved, or Done with Save and charge); a saved card is then charged automatically" };
 const AUTO_TRIG = ["install","completion"];
-const autoNote = (r,c) => AUTO_TRIG.includes(r.trigger) && !r.test && apiCard(c) && r.status==="pending" && r.releasedAt ? "Charging automatically within 5 minutes." : "";
+const autoNote = (r,c) => (r.auto || AUTO_TRIG.includes(r.trigger)) && !r.test && apiCard(c) && r.status==="pending" && r.releasedAt && !r.autoTriedAt ? "Charging automatically within 5 minutes." : "";
 const apiCard = c => !!(c && c.payOnFile && c.payOnFile.status==="on-file" && c.payOnFile.qbCardId);
 const testPill = r => r && r.test ? ' <span class="pill sample">TEST</span>' : "";
 function chargesHtml(){
@@ -2346,7 +2517,7 @@ function chargesHtml(){
   const handBtns=rid=>`<button class="small primary" data-chg="${rid}" data-to="done">Charged</button> <button class="small danger" data-chg="${rid}" data-to="declined">Declined</button>`;
   const undoState=r=> r.status==="voided" ? '<span class="pill voided">voided</span>' : (+r.refunded||0) >= (+r.amount||0)-0.001 ? '<span class="pill voided">refunded</span>' : (+r.refunded||0)>0 ? `<span class="pill open">refunded ${money(r.refunded)}</span>` : "";
   return `<div class="card" id="chargesCard"><h2>Charges to run <span class="meta">${nReal(pend)} due now · ${sum(pend)}</span></h2>
-    <p class="meta">Lights and landscaping balances charge a saved card by themselves within 5 minutes of the job being marked Installed or Done. To bill a snow visit past 16, a lights service call or anything else, open the client and tap <b>Add a charge</b>. <b>Charge card on file</b> charges a card the customer saved on the signing page, once, and emails the receipt. A card taken in GoPayment is charged in QuickBooks (Customers, the client, Receive payment), then marked here with Charged or Declined. Declined makes the amount past due as of today.</p>
+    <p class="meta">Approved service bills itself: lights and landscaping balances, snow visits past 16 and service calls charge a saved card within 5 minutes of approval (Service log, or Save and charge on the client). To bill anything else, a lights service call or anything else, open the client and tap <b>Add a charge</b>. <b>Charge card on file</b> charges a card the customer saved on the signing page, once, and emails the receipt. A card taken in GoPayment is charged in QuickBooks (Customers, the client, Receive payment), then marked here with Charged or Declined. Declined makes the amount past due as of today.</p>
     ${attn.length?`<div class="sect" style="color:var(--red)">Needs attention <span class="n">${attn.length}</span></div>${tbl(attn,(rid,r,c)=>r.status==="charging"?'<span class="meta">Running…</span>':apiCard(c)?runBtn(rid,r,"Try again"):handBtns(rid),r=>esc(r.error||"")+(r.status==="error"?" Trying again cannot charge twice.":""))}`:""}
     ${attn.length||pend.length?`<div class="sect">Due now <span class="n">${nReal(pend)} · ${sum(pend)}</span></div>`:""}
     ${pend.length?tbl(pend,(rid,r,c)=>apiCard(c)?runBtn(rid,r,"Charge card on file"):handBtns(rid),r=>esc(autoNote(r,clients[r.clientId]||{}))):`<div class="meta">Nothing to charge right now.</div>`}
