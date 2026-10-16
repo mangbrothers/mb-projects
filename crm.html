@@ -2314,9 +2314,9 @@ function renderRibbon(){
   readSvcForm();
   const pend = pendingService(openId, clients[openId]?.services||{}, draftServices);
   rb.hidden=!pend.length; $("#clientSave").hidden=!!pend.length;
-  if(pend.length) $("#chgRibbonT").innerHTML = `<b>This save logs service that can charge ${esc(clients[openId]?.name||"the client")}:</b><ul>${pend.map(x=>`<li>${esc(LOG_KINDS[x.e.kind])}, ${fmtDate(x.date)}${x.e.kind==="call"?` (${x.e.ladder?"ladder $"+SSA_CALL.ladder:"no ladder $"+SSA_CALL.plain})`:""}${x.e.note?": "+esc(x.e.note):""}</li>`).join("")}</ul><span class="meta">Nothing is saved or charged until you tap Save and charge.</span>`;
+  if(pend.length) $("#chgRibbonT").innerHTML = `<b>This save logs service that can charge ${esc(clients[openId]?.name||"the client")}:</b><ul>${pend.map(x=>`<li>${esc(LOG_KINDS[x.e.kind])}, ${fmtDate(x.date)}${x.e.kind==="call"?` (${x.e.ladder?"ladder $"+SSA_CALL.ladder:"no ladder $"+SSA_CALL.plain})`:""}${x.e.note?": "+esc(x.e.note):""}</li>`).join("")}</ul><span class="meta">Saved and sent to billing when you tap Save and charge.</span>`;
   const go=$("#chgRibbonGo"); go.dataset.armed=""; go.textContent="Save and charge"; go.classList.remove("danger"); go.classList.add("primary");
-  go.onclick=()=>{ if(armed(go,"Tap again: save and charge")) $("#clientSave").onclick(); };
+  go.onclick=()=>{ go.disabled=true; Promise.resolve($("#clientSave").onclick()).finally(()=>{ go.disabled=false; }); };
 }
 // The client's service and billing record: snow count, every charge with its transaction id, and the service log.
 function renderRecord(){
@@ -2380,7 +2380,7 @@ function renderServiceLog(m){
     if(kind==="landscaping"){ const jobs=Object.entries(c.services||{}).filter(([,s])=>s.type==="landscaping"&&s.jobStatus!=="Done"); if(!jobs.length) return toast("That client has no open landscaping job."); sid=jobs[0][0]; }
     const e={ clientId:id, kind, ...(sid?{sid}:{}), ...(kind==="call"?{ladder:$("#slLadder").checked}:{}), note:$("#slNote").value.trim(), at:Date.now(), by:me.email, source:"crm" };
     await db.ref().update({ [`serviceLog/${slDate}/${db.ref("serviceLog/"+slDate).push().key}`]:e }); toast("Added. It bills when the day is approved."); };
-  const ap=$("#slApprove"); if(ap) ap.onclick=async()=>{ if(!armed(ap,"Tap again: approve and bill")) return;
+  const ap=$("#slApprove"); if(ap) ap.onclick=async()=>{
     ap.disabled=true; const B=await billEntries(waiting.map(([eid,e])=>({ date:slDate, eid, e })), false);
     B.upd[`dayLogs/${slDate}`]={ status:"approved", approvedBy:me.email, approvedAt:Date.now(), entries:entries.length };
     await db.ref().update(B.upd);
