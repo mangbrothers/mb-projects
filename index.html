@@ -319,7 +319,7 @@ Trash: deleting a project, task, or file moves it to Trash. Trash has Restore an
 
 Undo: after any action, an Undo appears in the header and in the pop-up notice for eight seconds. Ctrl+Z or Cmd+Z also works. Undo covers only your own actions in that browser tab. "Delete forever" on a file cannot be undone.
 
-The Team list is the one sign-in list for every page. Each person has an access level: admin (Projects and the CRM), crew (the Employee View), or walker (the door hanger Routes page). Only admins can change the list, and Russel's entry cannot be removed.
+The Team list is the one sign-in list for every page. Each person has an access level: admin (Projects and the CRM), crew (the Crew View; crew and manager are set on the Crews page), or walker (the door hanger Routes page). Only admins can change the list, and Russel's entry cannot be removed.
 
 ## Team conventions
 
@@ -409,8 +409,8 @@ const firebaseConfig = {
 };
 const ADMIN_EMAIL = "russel.mangiapaneiii@gmail.com";
 // Clearance tiers on the team list. Admin uses this page and the CRM; crew and walkers are sent to their own page.
-const TIERS = { admin:"Admin: Projects, CRM, all data", crew:"Crew: Employee View only", walker:"Walker: Routes only" };
-const TIER_HOME = { admin:"index.html", crew:"my.html", walker:"routes.html" };
+const TIERS = { admin:"Admin: Projects, CRM, all data", crew:"Crew: Crew View only", walker:"Walker: Routes only" };
+const TIER_HOME = { admin:"index.html", crew:"crews.html", walker:"routes.html" };
 // ================================================================
 
 firebase.initializeApp(firebaseConfig);
@@ -952,31 +952,28 @@ function renderImport(m){
 
 // Team list = the one sign-in list for every page. Each entry carries a clearance tier (admin, crew, walker).
 // Only admins can open this page, so only admins can change the list; the database rules enforce the same.
-const CREWS = ["Crew 1","Crew 2"];
 function renderTeam(m){
   const order={admin:0,crew:1,walker:2};
   const list=Object.entries(team).sort((a,b)=>(order[a[1].tier]??3)-(order[b[1].tier]??3) || (a[1].name||"").localeCompare(b[1].name||""));
   const isR = t => (t.email||"").toLowerCase()===ADMIN_EMAIL.toLowerCase();
   const rows=list.map(([k,t])=>`<tr><td><span data-namebox="${k}">${esc(t.name)} <button class="small" data-rename="${k}" title="Change the name">Edit</button></span></td><td>${esc(t.email)}</td>
     <td>${isR(t)?'<span class="meta">Admin (owner)</span>':`<select data-tier="${k}" style="width:auto">${!t.tier?'<option value="" selected>No access level</option>':""}${Object.entries(TIERS).map(([v,l])=>`<option value="${v}" ${t.tier===v?"selected":""}>${esc(l)}</option>`).join("")}</select>`}
-      ${t.tier==="crew"?` <select data-crew="${k}" style="width:auto"><option value="">No crew</option>${CREWS.map(c=>`<option ${t.crew===c?"selected":""}>${c}</option>`).join("")}</select>`:""}</td>
+      ${t.tier==="crew"?` <a href="./crews.html" class="meta">${t.crew?esc(t.crew)+(t.crewRole==="manager"?", manager":""):"No crew yet: set it on the Crews page"}</a>`:""}</td>
     <td>${isR(t)?"":`<button class="small danger" data-rm="${k}">Remove</button>`}</td></tr>`).join("");
-  m.innerHTML = `<div class="card"><h2>Team and access</h2><p class="meta">One sign-in list for every page. The access level decides where a person lands: <b>Admin</b> opens Projects and the CRM, including client prices. <b>Crew</b> sees only the Employee View (his jobs, schedule, hours). <b>Walker</b> sees only the door hanger Routes page. Only admins can change this list. Names of admins are what show up as owners and assignees.</p>
+  m.innerHTML = `<div class="card"><h2>Team and access</h2><p class="meta">One sign-in list for every page. The access level decides where a person lands: <b>Admin</b> opens Projects and the CRM, including client prices. <b>Crew</b> sees only the Crew View (his crew's routes, schedule, hours); put the person on a crew on the Crews page. <b>Walker</b> sees only the door hanger Routes page. Only admins can change this list. Names of admins are what show up as owners and assignees.</p>
     <div style="overflow-x:auto"><table><thead><tr><th>Name</th><th>Google email</th><th>Access</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>
     <div class="grid2" style="margin-top:12px"><div><label>Name</label><input id="tmName" placeholder="First name"></div><div><label>Google email</label><input id="tmEmail" type="email" placeholder="name@gmail.com"></div>
       <div><label>Access level</label><select id="tmTier"><option value="">Pick one</option>${Object.entries(TIERS).map(([v,l])=>`<option value="${v}">${esc(l)}</option>`).join("")}</select></div>
-      <div id="tmCrewBox" hidden><label>Crew</label><select id="tmCrew">${CREWS.map(c=>`<option>${c}</option>`).join("")}</select></div></div>
+</div>
     <div class="actions"><button class="primary" id="tmAdd">Add person</button></div></div>`;
-  $("#tmTier").onchange = () => { $("#tmCrewBox").hidden = $("#tmTier").value!=="crew"; };
   $("#tmAdd").onclick = async () => {
     const name=$("#tmName").value.trim(), email=$("#tmEmail").value.trim().toLowerCase(), tier=$("#tmTier").value;
     if(!name||!/@/.test(email)) return toast("Name and a valid email are required");
     if(!tier) return toast("Pick an access level");
-    const v={name,email,tier}; if(tier==="crew") v.crew=$("#tmCrew").value;
+    const v={name,email,tier};
     await commit("Added "+name+" as "+tier, { ["allowed/"+emailKey(email)]: v });
   };
   m.querySelectorAll("[data-tier]").forEach(sel=>sel.onchange=()=>{ const k=sel.dataset.tier; if(!sel.value) return; commit(`${team[k].name}: access set to ${sel.value}`, { ["allowed/"+k+"/tier"]: sel.value }); });
-  m.querySelectorAll("[data-crew]").forEach(sel=>sel.onchange=()=>{ const k=sel.dataset.crew; commit(`${team[k].name}: ${sel.value||"no crew"}`, { ["allowed/"+k+"/crew"]: sel.value||null }); });
   m.querySelectorAll("[data-rm]").forEach(b=>b.onclick=()=>commit("Removed "+team[b.dataset.rm].name+" from the list", { ["allowed/"+b.dataset.rm]: null }));
   m.querySelectorAll("[data-rename]").forEach(b=>b.onclick=()=>{
     const k=b.dataset.rename, box=m.querySelector(`[data-namebox="${k}"]`);
@@ -1131,7 +1128,7 @@ $("#taskForm").onsubmit=async e=>{ const f=e.target; const data={title:f.title.v
 <div class="pgdrawer-bg" id="pgDrawerBg"></div>
 <nav class="pgdrawer" id="pgDrawer" aria-label="Pages" aria-hidden="true">
   <div class="pdhead"><b>Mangiapane Brothers</b><button type="button" class="pdx" id="pgDrawerX" aria-label="Close page menu">&times;</button></div>
-  <a href="./index.html" class="here" aria-current="page">Projects<span>Admin task dashboard</span></a><a href="./crm.html">CRM<span>Leads, clients, contracts</span></a><a href="./routes.html">Routes<span>Door hanger routes</span></a>
+  <a href="./index.html" class="here" aria-current="page">Projects<span>Admin task dashboard</span></a><a href="./crm.html">CRM<span>Leads, clients, contracts</span></a><a href="./crews.html">Crews<span>Crew routes, day logs, approval</span></a><a href="./routes.html">Routes<span>Door hanger routes</span></a>
   <div class="pdfoot">Full-Service Property Maintenance for Those Who Take Pride in Their Home</div>
 </nav>
 <script>

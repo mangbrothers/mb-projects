@@ -164,8 +164,8 @@ const ADMIN_EMAIL = "russel.mangiapaneiii@gmail.com";
 const RATE = 0.22;            // dollars per hanger
 const PACE = 80;              // standard doors per hour
 const SEED_URL = "routes-seed.json";
-// Where each clearance tier lands. Walkers and admins use this page; crew go to the Employee View.
-const TIER_HOME = { admin:"index.html", crew:"my.html", walker:"routes.html" };
+// Where each clearance tier lands. Walkers and admins use this page; crew go to the Crew View (crews.html).
+const TIER_HOME = { admin:"index.html", crew:"crews.html", walker:"routes.html" };
 // ================================================================
 
 const $ = s => document.querySelector(s);
@@ -726,7 +726,7 @@ if(DEMO){
 <div class="pgdrawer-bg" id="pgDrawerBg"></div>
 <nav class="pgdrawer" id="pgDrawer" aria-label="Pages" aria-hidden="true">
   <div class="pdhead"><b>Mangiapane Brothers</b><button type="button" class="pdx" id="pgDrawerX" aria-label="Close page menu">&times;</button></div>
-  <a href="./index.html">Projects<span>Admin task dashboard</span></a><a href="./crm.html">CRM<span>Leads, clients, contracts</span></a><a href="./routes.html" class="here" aria-current="page">Routes<span>Door hanger routes</span></a>
+  <a href="./index.html">Projects<span>Admin task dashboard</span></a><a href="./crm.html">CRM<span>Leads, clients, contracts</span></a><a href="./crews.html">Crews<span>Crew routes, day logs, approval</span></a><a href="./routes.html" class="here" aria-current="page">Routes<span>Door hanger routes</span></a>
   <div class="pdfoot">Full-Service Property Maintenance for Those Who Take Pride in Their Home</div>
 </nav>
 <script>

@@ -1,0 +1,848 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Mangiapane Brothers Crews</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+  :root{color-scheme:light dark;
+    --bg:#f3f5f8;--card:#ffffff;--surface2:#e9edf2;--line:#d3dae3;
+    --ink:#16233a;--ink2:#4a5a72;--muted:#7a889c;
+    --accent:#1f4e8c;--accent-ink:#ffffff;--accent-soft:#e2ebf7;
+    --green:#1c7a4c;--green-soft:#e1f0e8;--amber:#b0741b;--amber-soft:#fbf1dc;--red:#a63b3b;--red-soft:#f6e3e3;
+    --header:#1f4e8c;--header-ink:#ffffff;--shadow:0 8px 28px rgba(22,35,58,.12);--r:6px}
+  @media (prefers-color-scheme:dark){:root{
+    --bg:#0f1521;--card:#171f2e;--surface2:#1f2a3b;--line:#2c394d;
+    --ink:#e8edf4;--ink2:#b3bfd0;--muted:#7f8ca0;
+    --accent:#6da3e6;--accent-ink:#0f1521;--accent-soft:#1d2d47;
+    --green:#4fbf85;--green-soft:#163326;--amber:#e0a94a;--amber-soft:#3a2d14;--red:#e07a7a;--red-soft:#3a1d1d;
+    --header:#171f2e;--header-ink:#e8edf4;--shadow:0 8px 28px rgba(0,0,0,.45)}}
+  *{box-sizing:border-box}
+  body{margin:0;font:16px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--ink)}
+  header{background:var(--header);color:var(--header-ink);padding:10px 14px;display:flex;align-items:center;gap:6px 14px;flex-wrap:wrap;position:sticky;top:0;z-index:1000}
+  header h1{font-size:17px;margin:0;font-weight:650}
+  header .who{font-size:12px;opacity:.85;margin-left:auto}
+  header .xlinks{display:flex;gap:12px}
+  [hidden]{display:none!important}
+  header a.xlink{color:var(--header-ink);opacity:.8;font-size:13px;text-decoration:none;white-space:nowrap}
+  header a.xlink.here{opacity:1;font-weight:650;text-decoration:underline}
+  nav{display:flex;gap:4px;overflow-x:auto;width:100%;scrollbar-width:none}
+  nav::-webkit-scrollbar{display:none}
+  nav button{background:transparent;border:0;color:var(--header-ink);opacity:.75;padding:6px 10px;border-radius:var(--r);white-space:nowrap}
+  nav button.on{opacity:1;background:rgba(255,255,255,.18);font-weight:600}
+  button{font:inherit;cursor:pointer;border:1px solid var(--line);background:var(--card);color:var(--ink);padding:9px 13px;border-radius:var(--r);font-weight:500}
+  button.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+  button.small{padding:5px 9px;font-size:14px}
+  button.ghost{background:transparent;border-color:var(--header-ink);color:var(--header-ink)}
+  button.danger{color:var(--red)}
+  main{max-width:900px;margin:0 auto;padding:12px 12px 60px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:14px;margin:0 0 12px}
+  .card h2{font-size:17px;margin:0 0 6px}
+  .card h3{font-size:15px;margin:0 0 4px}
+  .meta{color:var(--ink2);font-size:14px}
+  .muted{color:var(--muted);font-size:13px}
+  .bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:0 0 12px}
+  .bar .date{font-weight:650;font-size:17px;flex:1;min-width:150px}
+  .routecard{cursor:pointer}
+  .routecard .top{display:flex;justify-content:space-between;gap:10px;align-items:baseline}
+  .prog{height:8px;background:var(--surface2);border-radius:4px;overflow:hidden;margin:8px 0 4px}
+  .prog i{display:block;height:100%;background:var(--green)}
+  .chip{display:inline-block;font-size:12px;padding:2px 8px;border-radius:99px;background:var(--accent-soft);color:var(--accent);font-weight:600}
+  .chip.warn{background:var(--amber-soft);color:var(--amber)}
+  .chip.ok{background:var(--green-soft);color:var(--green)}
+  #mapSlot{height:46vh;min-height:260px;border:1px solid var(--line);border-radius:var(--r);overflow:hidden;margin:0 0 10px;position:relative}
+  #mapEl{height:100%;width:100%}
+  .streets{list-style:none;margin:0;padding:0}
+  .streets li{display:flex;align-items:center;gap:10px;padding:9px 4px;border-bottom:1px solid var(--line)}
+  .streets li .nm{flex:1;min-width:0}
+  .streets li.done .nm b{text-decoration:line-through;color:var(--muted)}
+  .tick{width:38px;height:38px;border-radius:8px;border:2px solid var(--line);background:var(--card);font-size:20px;line-height:1;padding:0;flex:none}
+  li.done .tick{background:var(--green);border-color:var(--green);color:#fff}
+  .iconbtn{padding:6px 9px;font-size:14px;flex:none}
+  label{display:block;font-size:13px;color:var(--ink2);margin:8px 0 3px}
+  input,select,textarea{font:inherit;width:100%;padding:9px;border:1px solid var(--line);border-radius:var(--r);background:var(--card);color:var(--ink)}
+  input[type=checkbox]{width:auto}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:0 12px}
+  table{width:100%;border-collapse:collapse;font-size:14px}
+  th,td{text-align:left;padding:7px 6px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{color:var(--ink2);font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.3px}
+  .scroll{overflow-x:auto}
+  dialog{border:1px solid var(--line);border-radius:var(--r);background:var(--card);color:var(--ink);padding:16px;width:min(560px,94vw);max-height:90vh;overflow:auto;box-shadow:var(--shadow)}
+  dialog::backdrop{background:rgba(0,0,0,.45)}
+  .actions{display:flex;gap:8px;justify-content:flex-end;margin-top:14px;flex-wrap:wrap}
+  #toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:9px 14px;border-radius:var(--r);opacity:0;transition:opacity .2s;pointer-events:none;z-index:3000;font-size:14px}
+  #toast.show{opacity:1}
+  .lanes{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-start;margin:0 0 12px}
+  .lane{flex:1 1 250px;min-width:0;background:var(--surface2);border:1px solid var(--line);border-radius:var(--r);padding:10px}
+  .lane.light{flex:.7 1 210px;background:transparent;border-style:dashed}
+  .lane>h3{margin:0;font-size:16px}
+  .lane .lanewho{color:var(--ink2);font-size:13px;margin:0 0 8px}
+  .lane .card{margin:0 0 8px}
+  .lane .card:last-child{margin-bottom:0}
+  .flyer{font-size:17px;font-weight:700;margin:0 0 2px}
+  .flyerlist{margin:0;padding:0;list-style:none}
+  .flyerlist li{padding:6px 0;border-bottom:1px dashed var(--line);display:flex;flex-wrap:wrap;gap:4px 10px;align-items:baseline}
+  .flyerlist li:last-child{border-bottom:0}
+  .wk{display:grid;gap:6px 10px;grid-template-columns:repeat(var(--n),minmax(0,1fr))}
+  .wk .cell{font-size:13px;min-width:0}
+  .wk .cell b{display:block;font-size:14px}
+  .wk .cell[data-open]{cursor:pointer}
+  .wkhead{font-size:12px;color:var(--muted);font-weight:650;text-transform:uppercase;letter-spacing:.04em}
+  .daycol h3.daylink{cursor:pointer;color:var(--accent)}
+  @media (max-width:560px){.wk{grid-template-columns:1fr}.wkhead{display:none}.wk .cell::before{content:attr(data-seat) ": ";color:var(--muted);font-weight:650}}
+  .daycol{border-left:3px solid var(--line);padding:2px 0 2px 10px;margin:0 0 12px}
+  .daycol.today{border-color:var(--accent)}
+  .daycol h3{margin:0 0 6px}
+  .rowlink{display:flex;justify-content:space-between;gap:8px;padding:7px 0;border-bottom:1px dashed var(--line);cursor:pointer}
+  img.photo{max-width:100%;border-radius:var(--r)}
+  .mapbtn{display:inline-block;padding:7px 12px;border-radius:var(--r);border:1px solid var(--line);background:var(--accent);color:var(--accent-ink) !important;font-weight:650;font-size:14px;text-decoration:none;cursor:pointer}
+  button.mapbtn{background:var(--card);color:var(--ink) !important}
+  .viewas{width:auto;margin-left:auto;font-size:13px;padding:5px 8px}
+  .demo button{margin-left:8px}
+  .demo{background:var(--amber-soft);color:var(--amber);padding:6px 12px;font-size:13px;text-align:center}
+  @media (max-width:520px){.grid2{grid-template-columns:1fr}}
+
+  /* page menu: three-line button left of the company name, drawer from the left edge */
+  .navbtn{flex:none;width:40px;height:40px;padding:0;border:1px solid transparent;border-radius:8px;background:transparent;color:var(--header-ink);display:inline-flex;align-items:center;justify-content:center;cursor:pointer}
+  .navbtn:hover{background:rgba(255,255,255,.14)}
+  .navbtn svg{width:24px;height:24px;display:block}
+  .pgdrawer-bg{position:fixed;inset:0;background:rgba(10,16,28,.45);z-index:2000;opacity:0;pointer-events:none;transition:opacity .2s}
+  .pgdrawer-bg.open{opacity:1;pointer-events:auto}
+  .pgdrawer{position:fixed;top:0;left:0;bottom:0;width:min(290px,84vw);background:var(--card);color:var(--ink);z-index:2001;box-shadow:var(--shadow);transform:translateX(-102%);transition:transform .22s;display:flex;flex-direction:column;padding:14px 12px;touch-action:pan-y}
+  .pgdrawer.open{transform:none}
+  .pgdrawer .pdhead{display:flex;align-items:center;gap:8px;padding:0 4px 12px;border-bottom:1px solid var(--line);margin-bottom:8px}
+  .pgdrawer .pdhead b{flex:1;font-size:15px}
+  .pgdrawer .pdx{width:36px;height:36px;border-radius:50%;border:0;background:var(--surface2);color:var(--ink);font-size:22px;line-height:1;padding:0;cursor:pointer}
+  .pgdrawer a{display:block;padding:11px 12px;border-radius:8px;color:var(--ink);text-decoration:none;margin:2px 0}
+  .pgdrawer a span{display:block;font-size:12px;color:var(--muted);margin-top:1px}
+  .pgdrawer a:hover{background:var(--surface2)}
+  .pgdrawer a.here{background:var(--accent-soft);color:var(--accent);font-weight:650}
+  .pgdrawer .pdfoot{margin-top:auto;font-size:12px;color:var(--muted);padding:8px 4px 0}
+</style>
+<style>
+  /* Crews additions: the same look as the routes page, plus what a job carries */
+  .chip.svc-snow{background:#e3eefb;color:#1f5aa6}.chip.svc-lights{background:#fbf1dc;color:#9a6512}.chip.svc-landscaping{background:#e1f0e8;color:#1c7a4c}
+  .chip.svc-fall{background:#f8e6d8;color:#a5501b}.chip.svc-lawn{background:#e6f2dc;color:#3f7a1c}.chip.svc-other{background:var(--surface2);color:var(--ink2)}
+  @media (prefers-color-scheme:dark){.chip.svc-snow{background:#1d2d47;color:#8db8ef}.chip.svc-lights{background:#3a2d14;color:#e0a94a}.chip.svc-landscaping{background:#163326;color:#4fbf85}
+    .chip.svc-fall{background:#3a2416;color:#e59a63}.chip.svc-lawn{background:#1f3317;color:#8fcf63}}
+  .chip.bad{background:var(--red-soft);color:var(--red)}
+  .stops{list-style:none;margin:0;padding:0}
+  .stops li{display:flex;align-items:flex-start;gap:10px;padding:10px 4px;border-bottom:1px solid var(--line)}
+  .stops li .nm{flex:1;min-width:0}
+  .stops li .nm .addr{font-size:14px;color:var(--ink2)}
+  .stops li .nm .cnote{font-size:14px;margin-top:3px;padding:4px 8px;border-left:3px solid var(--amber);background:var(--amber-soft);border-radius:4px;color:var(--ink)}
+  .stops li.done .nm b{text-decoration:line-through;color:var(--muted)}
+  .stops li.skip .nm b{color:var(--muted)}
+  .stops li .num{flex:none;width:24px;text-align:right;color:var(--muted);font-weight:650;padding-top:9px;font-size:14px}
+  .stops li .acts{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+  .stops li .acts:empty{display:none}
+  li.done .tick{background:var(--green);border-color:var(--green);color:#fff}
+  li.skip .tick{background:var(--amber-soft);border-color:var(--amber);color:var(--amber)}
+  .clock{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .clock .big{font-size:20px;font-weight:700}
+  .storm{background:#e3eefb;border:1px solid #9ec0ea;color:#173f73;border-radius:var(--r);padding:10px 12px;margin:0 0 12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  @media (prefers-color-scheme:dark){.storm{background:#1d2d47;border-color:#2f4f7f;color:#cfe0f7}}
+  .pin{width:26px;height:26px;border-radius:50%;color:#fff;font:700 12px/22px -apple-system,BlinkMacSystemFont,sans-serif;text-align:center;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4)}
+  .logrow{display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-bottom:1px dashed var(--line)}
+  .logrow .t{flex:none;width:68px;color:var(--muted);font-size:13px;padding-top:2px}
+  .logrow .w{flex:1;min-width:0}
+  .who-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:6px 0;border-bottom:1px dashed var(--line)}
+  .who-row input[type=time]{width:auto}
+  .editlist li{display:flex;gap:8px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line)}
+  .editlist li .nm{flex:1;min-width:0}
+  .editlist li input{font-size:16px}
+  .pick{max-height:300px;overflow:auto;border:1px solid var(--line);border-radius:var(--r);margin-top:6px}
+  .pick button{display:block;width:100%;text-align:left;border:0;border-bottom:1px solid var(--line);border-radius:0}
+  .ok-banner{background:var(--green-soft);color:var(--green);border-radius:var(--r);padding:10px 12px;font-weight:600;margin:10px 0}
+  input,select,textarea{font-size:16px}
+  header{z-index:1100}
+  .kindbtns{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+  .kindbtns button{padding:14px 10px;font-weight:650}
+</style>
+</head>
+<body>
+<div id="previewBar" class="demo" hidden></div>
+<div id="demoBanner" class="demo" hidden>Demo mode. Nothing here is saved.</div>
+<header>
+  <button type="button" class="navbtn" id="navBtn" hidden aria-label="Open page menu" aria-controls="pgDrawer" aria-expanded="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+  <h1 id="title">Mangiapane Brothers Crews</h1>
+  <span class="who" id="who"></span>
+  <button class="ghost small" id="signout" hidden>Sign out</button>
+  <nav id="nav" hidden></nav>
+</header>
+
+<main>
+  <div id="gate" class="card" hidden>
+    <h2>Sign in</h2>
+    <p class="meta">Use the Google account Russel added to the team list.</p>
+    <button class="primary" id="signin">Sign in with Google</button>
+    <p class="meta" id="gateMsg"></p>
+  </div>
+  <div id="app" hidden></div>
+</main>
+
+<dialog id="dlg"></dialog>
+<div id="toast"></div>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
+<script>
+// ===== CONFIG (same Firebase project as the Projects page) =====
+const firebaseConfig = {
+  apiKey: "AIzaSyDLndoLTcm8zKyN3WlVfYoGVQmVlbMlib4",
+  authDomain: "mb-projects-c4383.firebaseapp.com",
+  databaseURL: "https://mb-projects-c4383-default-rtdb.firebaseio.com",
+  projectId: "mb-projects-c4383",
+  storageBucket: "mb-projects-c4383.firebasestorage.app",
+  messagingSenderId: "246828597156",
+  appId: "1:246828597156:web:dfa85db16f51d85b5fcb31"
+};
+const ADMIN_EMAIL = "russel.mangiapaneiii@gmail.com";
+// Where each clearance tier lands. Admins and crews use this page; walkers use the door hanger Routes page.
+const TIER_HOME = { admin:"index.html", crew:"crews.html", walker:"routes.html" };
+const HOME = [42.3836,-83.3527];   // Livonia, for an empty map
+const KEEP_DAYS = 45;              // check-offs loaded: today back this many days
+// ================================================================
+// Crews and Crew View (October 16, 2026). Built on the door hanger routes page: the same map, check-off and day log,
+// with what a job carries. Each crew works its own routes. A snow route is standing: it shows on a day once a storm is
+// started (by an admin for every crew, or by a crew's manager for his own crew). Other routes run on dates.
+// Checking a stop off writes a service log entry. Each crew's manager approves his own crew's day in Crew log, which
+// locks it and approves the day's time; the signing service then bills the day (snow past 16, lights and landscaping
+// balances, service calls) and charges saved cards. Crews never see client records, prices or payment details:
+// a stop carries its own copy of the name, address, phone and the crew note.
+
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const emailKey = e => e.toLowerCase().replace(/\./g, ",");
+const TZ = "America/Detroit";
+const today = () => new Intl.DateTimeFormat("en-CA",{timeZone:TZ,year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date());
+const pd = d => { const [y,m,dd]=d.split("-").map(Number); return new Date(Date.UTC(y,m-1,dd,12)); };
+const iso = dt => dt.toISOString().slice(0,10);
+const addDays = (d,n) => { const x=pd(d); x.setUTCDate(x.getUTCDate()+n); return iso(x); };
+const mondayOf = d => { const x=pd(d); const w=(x.getUTCDay()+6)%7; return addDays(d,-w); };
+const DOW = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"], MON = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+const fmtDay = d => { if(!d) return ""; const x=pd(d); return `${DOW[x.getUTCDay()]} ${MON[x.getUTCMonth()]} ${x.getUTCDate()}`; };
+const fmtRange = (a,b) => !a ? "Not scheduled" : (a===b||!b ? fmtDay(a) : `${fmtDay(a)} to ${fmtDay(b)}`);
+const fmtTime = ms => ms ? new Intl.DateTimeFormat("en-US",{timeZone:TZ,hour:"numeric",minute:"2-digit"}).format(new Date(ms)) : "";
+const hhmm = ms => ms ? new Intl.DateTimeFormat("en-GB",{timeZone:TZ,hour:"2-digit",minute:"2-digit",hour12:false}).format(new Date(ms)) : "";
+const hrs = n => (Math.round(n*10)/10).toFixed(1).replace(/\.0$/,"");
+function toast(m){ const t=$("#toast"); t.textContent=m; t.classList.add("show"); clearTimeout(toast.t); toast.t=setTimeout(()=>t.classList.remove("show"),2600); }
+// A time typed for a day ("07:30") as a timestamp in Michigan time.
+function atTime(d, hm){ if(!hm) return null; const [h,m]=hm.split(":").map(Number); const guess=Date.UTC(...d.split("-").map((v,i)=>i===1?v-1:+v), h, m);
+  for(const off of [4,5]){ const ms=guess+off*3600e3; if(hhmm(ms)===hm && new Intl.DateTimeFormat("en-CA",{timeZone:TZ}).format(new Date(ms))===d) return ms; } return guess+5*3600e3; }
+
+// What a stop can log, per service. The kind goes on the service log entry; billing reads it.
+const SERVICES = { snow:"Snow", lights:"Christmas lights", landscaping:"Landscaping", fall:"Fall cleanup", lawn:"Lawn", other:"Other" };
+const KINDS = { snow:"Snow push", lights:"Lights installed", call:"Lights service call", landscaping:"Landscaping job done", fall:"Fall cleanup pass", lawn:"Lawn cut", other:"Other work" };
+const KINDS_FOR = { snow:["snow"], lights:["lights","call"], landscaping:["landscaping"], fall:["fall"], lawn:["lawn"], other:["other"] };
+const DONE_WORD = { snow:"Pushed", lights:"Installed", call:"Service call", landscaping:"Job done", fall:"Pass done", lawn:"Cut", other:"Done" };
+
+// ---------- data layer: Firebase, or an in-memory copy when the URL has ?demo ----------
+const DEMO = new URLSearchParams(location.search).get("demo");
+function fbStore(){
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.database();
+  return {
+    auth: firebase.auth(),
+    on(path, cb, err){ const r=db.ref(path); r.on("value", s=>cb(s.val()), err||(()=>{})); return ()=>r.off(); },
+    onFrom(path, startKey, cb){ const q=db.ref(path).orderByKey().startAt(startKey); q.on("value", s=>cb(s.val()), ()=>{}); return ()=>q.off(); },
+    get(path){ return db.ref(path).once("value").then(s=>s.val()); },
+    update(obj){ return db.ref().update(obj); },
+    key(){ return db.ref("crewRoutes").push().key; }
+  };
+}
+function demoStore(){
+  const tree = {}; const subs = [];
+  const read = p => p.split("/").reduce((o,k)=> (o && typeof o==="object") ? o[k] : undefined, tree);
+  const write = (p,v) => { const ks=p.split("/"); let o=tree; ks.slice(0,-1).forEach(k=>{ if(typeof o[k]!=="object"||o[k]===null) o[k]={}; o=o[k]; }); const last=ks[ks.length-1]; if(v===null||v===undefined) delete o[last]; else o[last]=JSON.parse(JSON.stringify(v)); };
+  const copy = v => v===undefined ? null : JSON.parse(JSON.stringify(v));
+  const fire = () => subs.forEach(s=>s.cb(s.from ? Object.fromEntries(Object.entries(read(s.path)||{}).filter(([k])=>k>=s.from)) : copy(read(s.path))));
+  let n=0;
+  return {
+    auth:null, _tree:tree,
+    on(path, cb){ const s={path,cb}; subs.push(s); cb(copy(read(path))); return ()=>subs.splice(subs.indexOf(s),1); },
+    onFrom(path, from, cb){ const s={path,cb,from}; subs.push(s); cb(Object.fromEntries(Object.entries(read(path)||{}).filter(([k])=>k>=from))); return ()=>subs.splice(subs.indexOf(s),1); },
+    get(path){ return Promise.resolve(copy(read(path))); },
+    update(obj){ Object.entries(obj).forEach(([p,v])=>write(p,v)); fire(); return Promise.resolve(); },
+    key(){ return "d"+Date.now().toString(36)+(n++); }
+  };
+}
+const store = DEMO ? demoStore() : fbStore();
+
+// ---------- state ----------
+let me=null, isAdmin=false, realAdmin=false, viewAs="", meReal=null;
+let role="", myCrew="";              // crew tier: role manager or member, and the crew's name
+let crews={}, routes={}, storms={}, checks={}, events={}, team={}, clients={}, svcLog={}, dayLogs={}, timeAll={}, myTime={}, crewTime={}, myDay={};
+let view="today", curDate=today(), openRoute=null, crewFilter="", editing=null;
+let unsub=[], dayUnsub=[];
+const isMgr = () => (isAdmin && !viewAs) || role==="manager";
+const previewOnly = () => { if(viewAs){ toast("Crew preview. Nothing is saved."); return true; } return false; };
+
+// ---------- auth ----------
+$("#signin").onclick = async () => {
+  const p = new firebase.auth.GoogleAuthProvider();
+  try { await store.auth.signInWithPopup(p); }
+  catch(e){ if(/popup/.test(e.code)) store.auth.signInWithRedirect(p); else $("#gateMsg").textContent = e.message; }
+};
+$("#signout").onclick = () => store.auth && store.auth.signOut();
+
+async function enter(user){
+  me = { email:user.email.toLowerCase(), name:user.displayName||user.email, key:emailKey(user.email) };
+  $("#who").textContent = me.email; $("#signout").hidden = !!DEMO;
+  const deny = m => { $("#gate").hidden=false; $("#app").hidden=true; $("#nav").hidden=true; $("#navBtn").hidden=true; $("#gateMsg").textContent = m; };
+  try {
+    const mine = await store.get("allowed/"+me.key).catch(()=>null);
+    const tier = mine?.tier || (me.email===ADMIN_EMAIL.toLowerCase() ? "admin" : "");
+    if(tier==="walker"){ location.replace(TIER_HOME.walker); return; }
+    if(tier!=="admin" && tier!=="crew") return deny(`${me.email} is not on the team list. Ask Russel to add it, then sign out and back in.`);
+    if(tier==="crew" && mine.active===false) return deny(`${me.email} is not active on the team list. Ask Russel.`);
+    if(tier==="crew" && !mine.crew) return deny(`${mine.name||me.email} is on the team list but not on a crew yet. Ask Russel to put you on a crew.`);
+    isAdmin = tier==="admin"; realAdmin=isAdmin; viewAs=""; meReal=null;
+    role = isAdmin ? "" : (mine.crewRole==="manager" ? "manager" : "member"); myCrew = isAdmin ? "" : mine.crew;
+    if(mine?.name) me.name = mine.name;
+    $("#title").textContent = isAdmin ? "Mangiapane Brothers Crews" : `${myCrew}`;
+    $("#gate").hidden=true; $("#app").hidden=false; $("#nav").hidden=false; $("#navBtn").hidden=!isAdmin; attach();
+  } catch(e){ deny(`${me.email} could not be checked against the team list. Ask Russel.`); }
+}
+function leave(){ me=null; isAdmin=false; unsub.forEach(f=>f()); unsub=[]; dayUnsub.forEach(f=>f()); dayUnsub=[]; $("#who").textContent=""; $("#signout").hidden=true; $("#nav").hidden=true; $("#navBtn").hidden=true; $("#gate").hidden=false; $("#app").hidden=true; }
+function attach(){
+  unsub.forEach(f=>f()); unsub=[];
+  const bind = (path, set) => unsub.push(store.on(path, v=>{ set(v||{}); render(); }));
+  const from = addDays(today(), -KEEP_DAYS);
+  bind("crews", v=>{ const had=JSON.stringify(crewMembers(myCrew)); crews=v; if(!isAdmin && JSON.stringify(crewMembers(myCrew))!==had) dayBind(); }); bind("crewRoutes", v=>routes=v); bind("events", v=>events=v);
+  unsub.push(store.onFrom("storms", from, v=>{ storms=v||{}; render(); }));
+  unsub.push(store.onFrom("crewChecks", from, v=>{ checks=v||{}; render(); }));
+  if(isAdmin){
+    bind("allowed", v=>team=v); bind("clients", v=>clients=v);
+    unsub.push(store.onFrom("serviceLog", from, v=>{ svcLog=v||{}; render(); }));
+    unsub.push(store.onFrom("dayLogs", from, v=>{ dayLogs=v||{}; render(); }));
+    bind("timeEntries", v=>timeAll=v);
+  } else {
+    bind("timeEntries/"+me.key, v=>myTime=v);
+  }
+  dayBind();
+}
+// What depends on the day on screen, for crew sign-ins: the crew's approval for that day and (managers) the crew's time.
+function dayBind(){
+  dayUnsub.forEach(f=>f()); dayUnsub=[];
+  const crew = viewCrew(); if(isAdmin && !viewAs) return; if(!crew) return;
+  if(viewAs) return; // the office already reads everything
+  dayUnsub.push(store.on(`dayLogs/${curDate}/crews/${crew}`, v=>{ myDay[curDate]=v||null; render(); }));
+  if(role==="manager") Object.keys(crewMembers(crew)).forEach(k=>{ if(k===me.key) return; dayUnsub.push(store.on("timeEntries/"+k+"/"+curDate, v=>{ (crewTime[k]=crewTime[k]||{})[curDate]=v||{}; render(); })); });
+}
+function setViewAs(c){
+  if(!realAdmin) return;
+  viewAs=c||""; isAdmin=!viewAs;
+  if(!meReal) meReal={...me};
+  if(viewAs){ const mk=(crews[viewAs]||{}).manager; role="manager"; myCrew=viewAs; me={...meReal, key:mk||"preview", name:mk?personName(mk):viewAs}; }
+  else { role=""; myCrew=""; if(meReal) me=meReal; }
+  view="today"; openRoute=null; editing=null; render(); window.scrollTo(0,0);
+}
+
+// ---------- helpers on the data ----------
+const crewList = () => Object.entries(crews).filter(([,c])=>c && c.active!==false).sort((a,b)=>(a[1].order??99)-(b[1].order??99)||a[0].localeCompare(b[0],undefined,{numeric:true})).map(([k])=>k);
+const crewMembers = c => (crews[c]||{}).members||{};
+const personName = k => !k ? "No one" : ((team[k]||{}).name || (Object.values(crews).map(c=>(c.members||{})[k]).find(Boolean)) || k.replace(/,/g,"."));
+const viewCrew = () => viewAs || myCrew;
+const routeName = r => r.name || SERVICES[r.service] || "Route";
+const stopsOf = r => Object.entries(r.stops||{}).map(([id,s])=>({id,...s})).sort((a,b)=>(a.order??999)-(b.order??999)||(a.name||"").localeCompare(b.name||""));
+const stormOn = (d,c) => !!((storms[d]||{})[c]);
+// Routes a crew works on a day: standing (snow) routes when a storm is on, dated routes inside their dates.
+const routesOn = (d, crew) => Object.entries(routes).filter(([,r])=>r && (!crew || r.crew===crew) && (r.standing ? stormOn(d,r.crew) : (r.start && r.start<=d && d<=(r.end||r.start))))
+  .sort((a,b)=>(a[1].service==="snow"?0:1)-(b[1].service==="snow"?0:1) || routeName(a[1]).localeCompare(routeName(b[1])));
+// Check-offs that count for a route on a day: that day only for standing routes, any day of the run for dated routes.
+function checksFor(rid, d){
+  const r=routes[rid]||{}; if(r.standing) return Object.fromEntries(Object.entries((checks[d]||{})[rid]||{}).map(([s,v])=>[s,{...v,date:d}]));
+  const out={}; Object.keys(checks).sort().forEach(x=>{ if(x<(r.start||x) || x>d) return; Object.entries((checks[x]||{})[rid]||{}).forEach(([s,v])=>{ out[s]={...v,date:x}; }); }); return out;
+}
+function progress(rid, d){ const r=routes[rid]; const st=stopsOf(r); const c=checksFor(rid,d); const done=st.filter(s=>c[s.id]&&!c[s.id].skipped).length, skip=st.filter(s=>c[s.id]&&c[s.id].skipped).length; return {done,skip,total:st.length,pct:st.length?Math.round((done+skip)/st.length*100):0}; }
+const dayApproved = (d,c) => isAdmin&&!viewAs ? ((((dayLogs[d]||{}).crews||{})[c]||{}).status==="approved") : viewAs ? ((((dayLogs[d]||{}).crews||{})[c]||{}).status==="approved") : (myDay[d]||{}).status==="approved";
+const approvalOf = (d,c) => isAdmin||viewAs ? (((dayLogs[d]||{}).crews||{})[c]||null) : (myDay[d]||null);
+const APPLE = /iPhone|iPad|iPod|Macintosh/.test(navigator.userAgent);
+const dirUrl = dest => APPLE ? "https://maps.apple.com/?dirflg=d&daddr="+encodeURIComponent(dest) : "https://www.google.com/maps/dir/?api=1&destination="+encodeURIComponent(dest);
+const stopDest = s => s.lat&&s.lon ? s.lat+","+s.lon : (s.address||s.name||"");
+const telLink = p => p ? `<a href="tel:${esc(String(p).replace(/[^\d+]/g,""))}">${esc(p)}</a>` : "";
+const svcChip = s => `<span class="chip svc-${esc(s)}">${esc(SERVICES[s]||s)}</span>`;
+// Hours from time entries (in and out stamps); an entry still open counts to now on today only.
+function entryHours(e, d){ if(!e||!e.in) return 0; const out=e.out || (d===today()?Date.now():e.in); return Math.max(0,(out-e.in)/3600e3); }
+const dayHours = (map, d) => Object.values((map||{})[d]||{}).reduce((n,e)=>n+entryHours(e,d),0);
+const myTimeMap = () => viewAs ? (timeAll[me.key]||{}) : myTime;
+
+// ---------- navigation ----------
+function tabs(){
+  const t = isAdmin ? [["today","Day"],["week","Week"],["routes","Routes"],["crews","Crews"],["log","Log"],["schedule","Schedule"]]
+    : [["today","Today"],["week","Week"],["mydays","My days"]].concat(role==="manager"?[["crewlog","Crew log"]]:[]);
+  $("#nav").innerHTML = t.map(([k,l])=>`<button data-v="${k}" class="${view===k&&!openRoute&&!editing?"on":""}">${l}</button>`).join("")
+    + (realAdmin && crewList().length ? `<select id="viewAs" class="viewas" aria-label="See the page as a crew"><option value="">Office view</option>${crewList().map(c=>`<option value="${esc(c)}" ${viewAs===c?"selected":""}>See as ${esc(c)} manager</option>`).join("")}</select>` : "");
+  const pb=$("#previewBar"); pb.hidden=!viewAs;
+  if(viewAs){ pb.innerHTML=`Crew preview: this is what the <b>${esc(viewAs)}</b> manager sees. Members see the same without Crew log. Nothing is saved. <button class="small" id="exitPreview">Back to office view</button>`; $("#exitPreview").onclick=()=>setViewAs(""); }
+  const va=$("#viewAs"); if(va) va.onchange=()=>setViewAs(va.value);
+  $("#nav").querySelectorAll("button[data-v]").forEach(b=>b.onclick=()=>{ view=b.dataset.v; openRoute=null; editing=null; render(); window.scrollTo(0,0); });
+}
+function dateBar(step){
+  const sel = isAdmin && ["today","week","log"].includes(view) ? `<select id="cf" style="width:auto"><option value="">All crews</option>${crewList().map(c=>`<option ${crewFilter===c?"selected":""}>${esc(c)}</option>`).join("")}</select>` : "";
+  return `<div class="bar"><button class="small" id="prevD" aria-label="Previous">&#8249;</button><span class="date">${step===7?"Week of "+fmtDay(mondayOf(curDate)):fmtDay(curDate)}${curDate===today()&&step!==7?' <span class="chip">Today</span>':""}</span><button class="small" id="nextD" aria-label="Next">&#8250;</button><button class="small" id="nowD">Today</button>${sel}</div>`;
+}
+function wireDateBar(step){
+  const go = d => { curDate=d; dayBind(); render(); };
+  $("#prevD").onclick=()=>go(addDays(curDate,-step)); $("#nextD").onclick=()=>go(addDays(curDate,step)); $("#nowD").onclick=()=>go(today());
+  if($("#cf")) $("#cf").onchange=e=>{ crewFilter=e.target.value; render(); };
+}
+function routeCard(id,r,d){
+  const p=progress(id,d), st=stopsOf(r);
+  return `<div class="card routecard" data-open="${esc(id)}"><div class="top"><p class="flyer">${esc(routeName(r))}</p><span class="chip ${p.pct===100?"ok":""}">${p.done}/${p.total} stops</span></div>
+    <div class="meta">${svcChip(r.service)} ${r.standing?"Standing route, runs each storm":fmtRange(r.start,r.end)}</div>
+    ${p.skip?`<div class="meta"><span class="chip warn">${p.skip} skipped</span></div>`:""}
+    ${st[0]?`<div class="meta">First stop: ${esc(st[0].name||"")}, ${esc(st[0].address||"")}</div>`:""}
+    <div class="prog"><i style="width:${p.pct}%"></i></div>${r.note?`<div class="muted">${esc(r.note)}</div>`:""}</div>`;
+}
+const wireCards = () => document.querySelectorAll("[data-open]").forEach(el=>el.onclick=e=>{ if(e.target.closest("[data-stop]")) return; openRoute=el.dataset.open; render(); window.scrollTo(0,0); });
+
+// ---------- views ----------
+function render(){
+  if(!me) return;
+  tabs();
+  const app=$("#app");
+  if(editing) return renderEditRoute(app);
+  if(openRoute && routes[openRoute]) return renderRoute(app);
+  openRoute=null;
+  ({today:renderToday, week:renderWeek, mydays:renderMyDays, crewlog:renderCrewLog, routes:renderRoutes, crews:renderCrews, log:renderLog, schedule:renderSchedule}[view]||renderToday)(app);
+}
+
+// Today: for a crew, the clock, the storm, the day's routes and meetings. For the office, one lane per crew.
+function renderToday(app){
+  let h = dateBar(1);
+  if(isAdmin){
+    const list = crewFilter ? [crewFilter] : crewList();
+    const snowCrews = crewList().filter(c=>Object.values(routes).some(r=>r&&r.standing&&r.crew===c));
+    const off = snowCrews.filter(c=>!stormOn(curDate,c));
+    if(snowCrews.length) h += `<div class="storm">${off.length?`<span>No storm on for ${esc(off.join(", "))} on ${fmtDay(curDate)}.</span><button class="primary small" id="stormAll">Start storm for every crew</button>`:`<span><b>Storm on</b> for ${esc(snowCrews.join(", "))} on ${fmtDay(curDate)}.</span>`}</div>`;
+    if(!crewList().length) h += `<div class="card"><p class="meta">No crews yet. Open the Crews tab to set them up, then build their routes under Routes.</p></div>`;
+    h += `<div class="lanes">${list.map(c=>{ const rs=routesOn(curDate,c); const a=approvalOf(curDate,c); const mk=(crews[c]||{}).manager;
+      return `<section class="lane"><h3>${esc(c)} ${stormOn(curDate,c)?'<span class="chip svc-snow">Storm</span>':""} ${a&&a.status==="approved"?'<span class="chip ok">Approved</span>':""}</h3><p class="lanewho">${mk?"Manager "+esc(personName(mk)):"No manager"} &middot; ${Object.keys(crewMembers(c)).length} on the crew</p>${rs.length?rs.map(([id,r])=>routeCard(id,r,curDate)).join(""):'<p class="muted">No route this day.</p>'}</section>`; }).join("")}</div>`;
+    h += eventsCard(curDate, "");
+    app.innerHTML=h; wireDateBar(1); wireCards();
+    const sa=$("#stormAll"); if(sa) sa.onclick=()=>startStorm(off);
+    return;
+  }
+  const crew=viewCrew(), rs=routesOn(curDate,crew), a=approvalOf(curDate,crew);
+  if(curDate===today()) h += clockCard();
+  const hasSnow = Object.values(routes).some(r=>r&&r.standing&&r.crew===crew);
+  if(hasSnow){
+    if(stormOn(curDate,crew)){ const s=storms[curDate][crew]; h += `<div class="storm"><b>Storm on</b><span>Started ${fmtTime(s.at)}${s.by?" by "+esc(personName(s.by)):""}. Your snow route is below.</span></div>`; }
+    else if(role==="manager" && curDate>=today() && !(a&&a.status==="approved")) h += `<div class="storm"><span>No storm on for ${esc(crew)} on ${fmtDay(curDate)}.</span><button class="primary small" id="stormMine">Start storm</button></div>`;
+  }
+  if(a && a.status==="approved") h += `<div class="ok-banner">This day is approved. Check-offs are locked.</div>`;
+  h += rs.length ? rs.map(([id,r])=>routeCard(id,r,curDate)).join("") : `<div class="card"><p class="meta">No route for ${esc(crew)} on ${fmtDay(curDate)}.${hasSnow&&!stormOn(curDate,crew)?" The snow route shows once a storm is started.":""}</p></div>`;
+  h += eventsCard(curDate, crew);
+  app.innerHTML=h; wireDateBar(1); wireCards(); wireClock();
+  const sm=$("#stormMine"); if(sm) sm.onclick=()=>startStorm([crew]);
+}
+function eventsCard(d, crew){
+  const ev=Object.entries(events).filter(([,e])=>e&&e.date===d && (!crew || !e.crew || e.crew==="all" || e.crew===crew)).sort((a,b)=>(a[1].start||"").localeCompare(b[1].start||""));
+  if(!ev.length) return "";
+  return `<div class="card"><h2>Trainings and meetings</h2>${ev.map(([,e])=>`<div class="rowlink" style="cursor:default"><span><b>${esc(e.title)}</b> <span class="meta">${esc(e.where||"")}</span></span><span class="meta">${esc(e.start||"")}${e.end?" to "+esc(e.end):""}${!crew&&e.crew&&e.crew!=="all"?" &middot; "+esc(e.crew):""}</span></div>`).join("")}</div>`;
+}
+async function startStorm(list){
+  if(previewOnly()) return;
+  const upd={}; list.forEach(c=>{ if(!stormOn(curDate,c)) upd[`storms/${curDate}/${c}`]={ at:Date.now(), by:me.key }; });
+  if(!Object.keys(upd).length) return;
+  try { await store.update(upd); toast(`Storm started for ${list.join(", ")}`); } catch(e){ toast("Could not start the storm: "+(e.message||e)); }
+}
+
+// Clock in and out: one entry per stretch of work, under the person's own key.
+function clockCard(){
+  const day=myTimeMap()[curDate]||{}, list=Object.entries(day).sort((a,b)=>(a[1].in||0)-(b[1].in||0)), open=list.find(([,e])=>e.in&&!e.out);
+  const total=dayHours(myTimeMap(), curDate), locked=list.some(([,e])=>e.status==="approved");
+  return `<div class="card"><div class="clock">${open?`<span class="big">On the clock</span><span class="meta">since ${fmtTime(open[1].in)}</span><button class="primary" id="clockOut" style="margin-left:auto">Clock out</button>`:`<span class="big">${total?hrs(total)+" hrs today":"Not clocked in"}</span><button class="primary" id="clockIn" style="margin-left:auto" ${locked?"disabled":""}>Clock in</button>`}</div>
+    ${list.length?`<div class="muted" style="margin-top:6px">${list.map(([,e])=>`${fmtTime(e.in)} to ${e.out?fmtTime(e.out):"now"}`).join(" &middot; ")}${locked?" &middot; approved":""}</div>`:""}</div>`;
+}
+function wireClock(){
+  const ci=$("#clockIn"), co=$("#clockOut");
+  if(ci) ci.onclick=async()=>{ if(previewOnly()) return; const id=store.key(); await store.update({[`timeEntries/${me.key}/${today()}/${id}`]:{ in:Date.now(), crew:viewCrew() }}); toast("Clocked in"); };
+  if(co) co.onclick=async()=>{ if(previewOnly()) return; const open=Object.entries(myTimeMap()[today()]||{}).find(([,e])=>e.in&&!e.out); if(!open) return; await store.update({[`timeEntries/${me.key}/${today()}/${open[0]}/out`]:Date.now()}); toast("Clocked out"); };
+}
+
+function renderWeek(app){
+  const mon=mondayOf(curDate); let h=dateBar(7);
+  const crew = isAdmin ? crewFilter : viewCrew();
+  for(let i=0;i<7;i++){ const d=addDays(mon,i); const rs=routesOn(d, crew||undefined);
+    const ev=Object.values(events).filter(e=>e&&e.date===d && (!crew || !e.crew || e.crew==="all" || e.crew===crew));
+    h+=`<div class="daycol ${d===today()?"today":""}"><h3 class="daylink" data-day="${d}">${fmtDay(d)} &rsaquo;</h3>${rs.length?rs.map(([id,r])=>{ const p=progress(id,d); return `<div class="rowlink" data-open="${esc(id)}" data-d="${d}"><span><b>${esc(routeName(r))}</b> <span class="meta">${isAdmin&&!crew?esc(r.crew)+" &middot; ":""}${p.total} stops${r.standing?", storm":""}</span></span><span class="chip ${p.pct===100?"ok":""}">${p.done}/${p.total}</span></div>`; }).join(""):`<div class="muted">No routes</div>`}
+      ${ev.map(e=>`<div class="rowlink" style="cursor:default"><span>${esc(e.title)}</span><span class="meta">${esc(e.start||"")}</span></div>`).join("")}</div>`; }
+  app.innerHTML=h; wireDateBar(7);
+  app.querySelectorAll("[data-open]").forEach(el=>el.onclick=()=>{ curDate=el.dataset.d; openRoute=el.dataset.open; dayBind(); render(); window.scrollTo(0,0); });
+  app.querySelectorAll("[data-day]").forEach(el=>el.onclick=()=>{ curDate=el.dataset.day; view="today"; dayBind(); render(); window.scrollTo(0,0); });
+}
+
+// My days: hours and stops by day, and whether the manager has approved the day.
+function renderMyDays(app){
+  const days=new Set(Object.keys(myTimeMap())); Object.entries(checks).forEach(([d,byR])=>Object.values(byR||{}).forEach(st=>Object.values(st||{}).forEach(c=>{ if(c&&c.by===me.key) days.add(d); })));
+  const list=[...days].sort().reverse().slice(0,40);
+  const kindsOn = d => { const n={}; Object.entries(checks[d]||{}).forEach(([rid,st])=>Object.values(st||{}).forEach(c=>{ if(c&&c.by===me.key&&!c.skipped) n[c.kind]=(n[c.kind]||0)+1; })); return Object.entries(n).map(([k,v])=>`${v} ${esc(DONE_WORD[k]||k).toLowerCase()}`).join(", "); };
+  const mon=mondayOf(today()); let wk=0, wkStops=0; for(let i=0;i<7;i++){ const d=addDays(mon,i); wk+=dayHours(myTimeMap(),d); Object.values(checks[d]||{}).forEach(st=>Object.values(st||{}).forEach(c=>{ if(c&&c.by===me.key&&!c.skipped) wkStops++; })); }
+  app.innerHTML=`<div class="card"><h2>This week</h2><table><tr><td>Hours on the clock</td><td><b>${hrs(wk)}</b></td></tr><tr><td>Stops you checked off</td><td><b>${wkStops}</b></td></tr></table><p class="muted">Pay is figured from approved stops and approved hours. Your manager approves each day.</p></div>
+    <div class="card"><h2>My days</h2><div class="scroll"><table><tr><th>Day</th><th>Hours</th><th>Stops</th><th>Day</th></tr>${list.map(d=>{ const t=(myTimeMap()[d]||{}); const ap=Object.values(t).some(e=>e.status==="approved"); return `<tr><td>${fmtDay(d)}</td><td>${hrs(dayHours(myTimeMap(),d))}</td><td>${kindsOn(d)||'<span class="muted">none</span>'}</td><td>${ap?'<span class="chip ok">Approved</span>':'<span class="chip warn">Waiting</span>'}</td></tr>`; }).join("")||'<tr><td colspan="4" class="meta">Nothing yet.</td></tr>'}</table></div></div>`;
+}
+
+// ---------- one route: map and stop list ----------
+let map=null, mapEl=null, layer=null, meMarker=null, fitFor=null;
+function canCheckOn(r, d){ if(isAdmin&&!viewAs) return true; return r.crew===viewCrew() && !dayApproved(d, r.crew); }
+function renderRoute(app){
+  const id=openRoute, r=routes[id], st=stopsOf(r), c=checksFor(id,curDate), p=progress(id,curDate), d=curDate;
+  const can=canCheckOn(r,d), locked=dayApproved(d,r.crew);
+  app.innerHTML=`<div class="bar"><button class="small" id="back">&#8249; Back</button><span class="date">${esc(routeName(r))}</span><span class="chip ${p.pct===100?"ok":""}">${p.done}/${p.total}</span></div>
+    <div class="meta" style="margin:-6px 0 10px">${svcChip(r.service)} ${esc(r.crew||"")} &middot; ${r.standing?"Storm of "+fmtDay(d):fmtRange(r.start,r.end)}${(crews[r.crew]||{}).start?`<br>Yard: <a href="${dirUrl(crews[r.crew].start)}" target="_blank" rel="noopener">${esc(crews[r.crew].start)}</a>`:""}${r.note?"<br>"+esc(r.note):""}</div>
+    ${locked?`<div class="ok-banner">${esc(r.crew)}'s day is approved. Check-offs are locked.</div>`:""}
+    <div id="mapSlot"></div>
+    <div class="bar"><button class="small" id="locate">Show where I am</button><span class="muted">Green is done. Tap the map for directions. Tap a stop to check it off.</span></div>
+    <ul class="stops">${st.map((s,i)=>{ const k=c[s.id];
+      return `<li class="${k?(k.skipped?"skip":"done"):""}"><span class="num">${i+1}</span><button class="tick" data-tick="${esc(s.id)}" aria-label="Check off ${esc(s.name)}" ${can?"":"disabled"}>${k?(k.skipped?"&ndash;":"&#10003;"):""}</button>
+        <span class="nm"><b>${esc(s.name)}</b> ${(KINDS_FOR[r.service]||[]).length>1||s.kind==="call"?`<span class="chip">${esc(KINDS[s.kind]||"")}</span>`:""}<div class="addr">${esc(s.address||"")}${s.phone?" &middot; "+telLink(s.phone):""}</div>
+          ${s.note?`<div class="cnote">${esc(s.note)}</div>`:""}
+          ${k?`<div class="muted">${k.skipped?"Skipped: "+esc(k.reason||""):esc(DONE_WORD[k.kind]||"Done")+(k.ladder?", ladder":"")} &middot; ${k.date!==d?fmtDay(k.date)+" ":""}${fmtTime(k.at)} &middot; ${esc(personName(k.by))}${k.note?" &middot; "+esc(k.note):""}</div>`:""}
+          ${s.lat?"":'<div class="muted">Not on the map</div>'}
+          <div class="acts">${k&&k.photo?`<button class="iconbtn small" data-view="${esc(s.id)}">Photo</button>`:""}
+          ${can&&k&&!k.skipped?`<label class="iconbtn small" style="margin:0;border:1px solid var(--line);border-radius:var(--r);cursor:pointer;color:var(--ink)">${k.photo?"Retake photo":"Add photo"}<input type="file" accept="image/*" capture="environment" data-photo="${esc(s.id)}" hidden></label>`:""}
+          ${can&&k?`<button class="iconbtn small" data-note="${esc(s.id)}">Note</button>`:""}
+          ${can&&!k?`<button class="iconbtn small" data-skip="${esc(s.id)}">Skip</button>`:""}</div></span>
+        <a class="mapbtn" target="_blank" rel="noopener" href="${dirUrl(stopDest(s))}" data-stop style="flex:none">Directions</a></li>`; }).join("")||'<li class="meta">No stops on this route yet.</li>'}</ul>`;
+  $("#back").onclick=()=>{ openRoute=null; render(); };
+  app.querySelectorAll("[data-tick]").forEach(b=>b.onclick=()=>tapStop(id,b.dataset.tick));
+  app.querySelectorAll("[data-photo]").forEach(i=>i.onchange=()=>i.files[0]&&addPhoto(id,i.dataset.photo,i.files[0]));
+  app.querySelectorAll("[data-view]").forEach(b=>b.onclick=()=>viewPhoto(id,b.dataset.view));
+  app.querySelectorAll("[data-note]").forEach(b=>b.onclick=()=>editNote(id,b.dataset.note));
+  app.querySelectorAll("[data-skip]").forEach(b=>b.onclick=()=>skipStop(id,b.dataset.skip));
+  drawMap(id, st, c, can);
+  $("#locate").onclick=locate;
+}
+// The walker page's map: the same tiles, colors, directions and check-off, with numbered stops in route order.
+function drawMap(id, st, c, can){
+  if(typeof L==="undefined"){ $("#mapSlot").innerHTML='<p class="meta" style="padding:12px">The map could not load. The stop list below still works.</p>'; return; }
+  if(!mapEl){ mapEl=document.createElement("div"); mapEl.id="mapEl"; }
+  $("#mapSlot").appendChild(mapEl);
+  if(!map){ map=L.map(mapEl,{zoomControl:true}); L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:19,attribution:"&copy; OpenStreetMap contributors"}).addTo(map); layer=L.layerGroup().addTo(map); }
+  layer.clearLayers(); const all=[]; map.closePopup();
+  map.off("click"); map.on("click",e=>mapPopup(e.latlng,"This spot",null));
+  const pts=st.filter(s=>s.lat&&s.lon);
+  if(pts.length>1) L.polyline(pts.map(s=>[s.lat,s.lon]),{color:"#1f4e8c",weight:3,opacity:.45,dashArray:"6 8"}).addTo(layer);
+  st.forEach((s,i)=>{ if(!s.lat||!s.lon) return; const k=c[s.id], col=k?(k.skipped?"#b0741b":"#1c7a4c"):"#c0392b";
+    const mk=L.marker([s.lat,s.lon],{icon:L.divIcon({className:"",html:`<div class="pin" style="background:${col}">${i+1}</div>`,iconSize:[26,26],iconAnchor:[13,13]})}).addTo(layer);
+    mk.bindTooltip(`${i+1}. ${s.name}`); mk.on("click",e=>{ L.DomEvent.stopPropagation(e); mapPopup(e.latlng, `${i+1}. ${s.name}`, can?{done:!!k, go:()=>tapStop(id,s.id)}:null, s); }); all.push([s.lat,s.lon]); });
+  map.invalidateSize();
+  if(fitFor!==id+curDate && all.length){ all.length===1?map.setView(all[0],16):map.fitBounds(L.latLngBounds(all),{padding:[24,24]}); fitFor=id+curDate; }
+  else if(!all.length && fitFor!==id+curDate){ map.setView(HOME,12); fitFor=id+curDate; }
+}
+function mapPopup(ll, title, check, s){
+  const el=document.createElement("div"); el.style.minWidth="160px";
+  el.innerHTML=`<b>${esc(title)}</b>${s&&s.address?`<div class="muted">${esc(s.address)}</div>`:""}<div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap"><a class="mapbtn" target="_blank" rel="noopener" href="${dirUrl(s?stopDest(s):ll.lat.toFixed(5)+","+ll.lng.toFixed(5))}">Directions</a>${check?`<button type="button" class="mapbtn" id="mapTick">${check.done?"Uncheck":"Check off"}</button>`:""}</div>`;
+  const pop=L.popup({closeButton:true}).setLatLng(ll).setContent(el).openOn(map);
+  const b=el.querySelector("#mapTick"); if(b) b.onclick=()=>{ map.closePopup(pop); check.go(); };
+}
+function locate(){
+  if(!navigator.geolocation||!map) return toast("Location is not available on this phone");
+  navigator.geolocation.getCurrentPosition(p=>{ const ll=[p.coords.latitude,p.coords.longitude]; if(meMarker) meMarker.remove(); meMarker=L.circleMarker(ll,{radius:8,color:"#1f4e8c",fillColor:"#1f4e8c",fillOpacity:.9}).addTo(map); map.setView(ll,Math.max(map.getZoom(),17)); }, ()=>toast("Could not get your location"), {enableHighAccuracy:true,timeout:10000});
+}
+// Tapping a stop: checks it off with one tap. A lights stop asks once what was done (installed, or a service call
+// with or without a ladder), because each bills differently. Tapping a checked stop takes the check back.
+function tapStop(rid, sid){
+  const r=routes[rid], s=(r.stops||{})[sid]; if(!s) return;
+  const k=checksFor(rid,curDate)[sid];
+  if(k) return uncheck(rid, sid, k);
+  if(r.service==="lights") return openDlg(`<h2>${esc(s.name)}</h2><p class="meta">What was done?</p><div class="kindbtns">
+      <button class="primary" data-k="lights">Lights installed</button><button data-k="call|0">Service call, no ladder</button><button data-k="call|1">Service call, ladder</button><button data-close>Cancel</button></div>`)
+    .querySelectorAll("[data-k]").forEach(b=>b.onclick=()=>{ $("#dlg").close(); const [kind,l]=b.dataset.k.split("|"); checkStop(rid,sid,{kind, ladder:l==="1"}); });
+  checkStop(rid, sid, { kind: s.kind || (KINDS_FOR[r.service]||["other"])[0] });
+}
+// One check-off = the check plus its service log entry, saved together. The entry waits for the manager's approval.
+async function checkStop(rid, sid, o){
+  if(previewOnly()) return;
+  const r=routes[rid], s=r.stops[sid], d=curDate, eid=store.key(), now=Date.now();
+  const chk={ by:me.key, at:now, kind:o.kind, eid, ...(o.ladder?{ladder:true}:{}), ...(o.note?{note:o.note}:{}) };
+  const entry={ clientId:s.clientId, kind:o.kind, ...(s.svcId?{sid:s.svcId}:{}), ...(o.kind==="call"?{ladder:!!o.ladder}:{}), note:o.note||"", at:now, by:me.key, source:"crew", crew:r.crew, route:rid, stop:sid };
+  try { await store.update({ [`crewChecks/${d}/${rid}/${sid}`]:chk, [`serviceLog/${d}/${eid}`]:entry }); toast(`${s.name}: ${DONE_WORD[o.kind]||"done"}`); }
+  catch(e){ toast("Not saved: "+(e.message||e)); }
+}
+async function uncheck(rid, sid, k){
+  if(previewOnly()) return;
+  const d=k.date||curDate, upd={ [`crewChecks/${d}/${rid}/${sid}`]:null, [`crewPhotos/${d}/${rid}/${sid}`]:null };
+  if(k.eid) upd[`serviceLog/${d}/${k.eid}`]=null;
+  try { await store.update(upd); toast("Taken back"); } catch(e){ toast("Not changed: "+(e.message||e)); }
+}
+function skipStop(rid, sid){
+  const s=routes[rid].stops[sid];
+  const dl=openDlg(`<h2>Skip ${esc(s.name)}</h2><label>Why was it skipped?</label><input id="skipWhy" maxlength="120" placeholder="Car in the driveway, gate locked, client asked" autocomplete="off"><div class="actions"><button data-close>Cancel</button><button class="primary" id="skipGo">Skip stop</button></div>`);
+  dl.querySelector("#skipGo").onclick=async()=>{ const why=$("#skipWhy").value.trim(); if(!why) return toast("Say why it was skipped");
+    if(previewOnly()) return dl.close();
+    await store.update({ [`crewChecks/${curDate}/${rid}/${sid}`]:{ by:me.key, at:Date.now(), skipped:true, reason:why } }); dl.close(); toast("Skipped. Nothing is billed."); };
+}
+// A note changes the check and replaces its service log entry (crews cannot edit an entry, only take it back).
+function editNote(rid, sid){
+  const k=checksFor(rid,curDate)[sid]; if(!k) return;
+  const dl=openDlg(`<h2>Note</h2><textarea id="noteTxt" rows="3" maxlength="200">${esc(k.note||k.reason||"")}</textarea><div class="actions"><button data-close>Cancel</button><button class="primary" id="noteGo">Save note</button></div>`);
+  dl.querySelector("#noteGo").onclick=async()=>{ if(previewOnly()) return dl.close(); const note=$("#noteTxt").value.trim(), d=k.date, r=routes[rid], s=r.stops[sid];
+    if(k.skipped){ await store.update({ [`crewChecks/${d}/${rid}/${sid}/reason`]:note||k.reason }); dl.close(); return; }
+    const eid=store.key(), upd={ [`crewChecks/${d}/${rid}/${sid}/note`]:note||null, [`crewChecks/${d}/${rid}/${sid}/eid`]:eid,
+      [`serviceLog/${d}/${eid}`]:{ clientId:s.clientId, kind:k.kind, ...(s.svcId?{sid:s.svcId}:{}), ...(k.kind==="call"?{ladder:!!k.ladder}:{}), note, at:k.at, by:k.by, source:"crew", crew:r.crew, route:rid, stop:sid } };
+    if(k.eid) upd[`serviceLog/${d}/${k.eid}`]=null;
+    try { await store.update(upd); dl.close(); toast("Note saved"); } catch(e){ toast("Not saved: "+(e.message||e)); } };
+}
+function shrinkImage(file){
+  return new Promise((res,rej)=>{ const img=new Image(), url=URL.createObjectURL(file);
+    img.onload=()=>{ const sc=Math.min(1,1280/Math.max(img.width,img.height)); const cv=document.createElement("canvas"); cv.width=Math.round(img.width*sc); cv.height=Math.round(img.height*sc); cv.getContext("2d").drawImage(img,0,0,cv.width,cv.height); URL.revokeObjectURL(url); res(cv.toDataURL("image/jpeg",.7)); };
+    img.onerror=()=>{ URL.revokeObjectURL(url); rej(new Error("That file is not a photo")); }; img.src=url; });
+}
+async function addPhoto(rid,sid,file){
+  if(previewOnly()) return;
+  const k=checksFor(rid,curDate)[sid]; if(!k) return;
+  try { toast("Uploading photo"); const data=await shrinkImage(file);
+    await store.update({ [`crewPhotos/${k.date}/${rid}/${sid}`]:{data, at:Date.now(), by:me.key}, [`crewChecks/${k.date}/${rid}/${sid}/photo`]:true }); toast("Photo saved"); }
+  catch(e){ toast(e.message||"Photo failed"); }
+}
+async function viewPhoto(rid,sid,date){
+  const k=checksFor(rid,curDate)[sid]||{}; const d=date||k.date||curDate;
+  const p=await store.get(`crewPhotos/${d}/${rid}/${sid}`); const s=(routes[rid]?.stops||{})[sid]||{};
+  openDlg(`<h2>${esc(s.name||"Photo")}</h2>${p?`<img class="photo" src="${p.data}" alt="Stop photo"><p class="muted">${fmtDay(d)} ${fmtTime(p.at)} &middot; ${esc(personName(p.by))}</p>`:'<p class="meta">No photo found.</p>'}<div class="actions"><button data-close>Close</button></div>`);
+}
+function openDlg(html){ const d=$("#dlg"); d.innerHTML=html; d.querySelectorAll("[data-close]").forEach(b=>b.onclick=()=>d.close()); if(!d.open) d.showModal(); return d; }
+
+// ---------- the crew's day log (manager) and approval ----------
+// Every check-off for the crew that day, who did it and when, photos, skips, stops not done, and the crew's clock.
+function dayReport(d, crew){
+  const rs=routesOn(d,crew), rows=[], skipped=[], open=[];
+  rs.forEach(([rid,r])=>{ const c=(checks[d]||{})[rid]||{}; const all=checksFor(rid,d);
+    stopsOf(r).forEach(s=>{ const k=c[s.id]; if(k){ (k.skipped?skipped:rows).push({rid,r,s,k}); } else if(!all[s.id]) open.push({rid,r,s}); }); });
+  // check-offs on routes no longer on the day (a dated route that ended) still belong to the day
+  Object.entries(checks[d]||{}).forEach(([rid,c])=>{ const r=routes[rid]; if(!r||r.crew!==crew||rs.some(([x])=>x===rid)) return; Object.entries(c||{}).forEach(([sid,k])=>{ const s={id:sid,...((r.stops||{})[sid]||{name:"(removed stop)"})}; (k.skipped?skipped:rows).push({rid,r,s,k}); }); });
+  rows.sort((a,b)=>a.k.at-b.k.at);
+  return {rows, skipped, open};
+}
+function timeOf(crew, d){
+  const out={}; Object.entries(crewMembers(crew)).forEach(([k])=>{ out[k] = isAdmin||viewAs ? ((timeAll[k]||{})[d]||{}) : k===me.key ? (myTime[d]||{}) : (((crewTime[k]||{})[d])||{}); }); return out;
+}
+function logHtml(d, crew){
+  const {rows, skipped, open}=dayReport(d,crew), a=approvalOf(d,crew), t=timeOf(crew,d), locked=a&&a.status==="approved";
+  const counts={}; rows.forEach(x=>{ counts[x.k.kind]=(counts[x.k.kind]||0)+1; });
+  return `<div class="card"><h2>${esc(crew)} &middot; ${fmtDay(d)}</h2>
+    ${locked?`<div class="ok-banner">Approved by ${esc(personName(String(a.approvedBy||"").includes("@")?emailKey(a.approvedBy):a.approvedBy))} at ${fmtTime(a.approvedAt)}. ${a.billedAt?"Billed.":"Billing runs within 5 minutes."}</div>`:""}
+    <p class="meta">${rows.length} stops done${Object.keys(counts).length?": "+Object.entries(counts).map(([k,v])=>`${v} ${esc(KINDS[k]||k).toLowerCase()}`).join(", "):""}${skipped.length?` &middot; ${skipped.length} skipped`:""}${open.length?` &middot; ${open.length} not done`:""}</p>
+    <h3>On the clock</h3>${Object.entries(t).map(([k,day])=>{ const list=Object.entries(day).sort((x,y)=>(x[1].in||0)-(y[1].in||0)); const h=list.reduce((n,[,e])=>n+entryHours(e,d),0);
+      return `<div class="who-row"><b style="min-width:110px">${esc(personName(k))}</b>${list.length?list.map(([id,e])=>locked?`<span class="meta">${fmtTime(e.in)} to ${e.out?fmtTime(e.out):"no clock-out"}</span>`:`<span><input type="time" data-tin="${esc(k)}|${esc(id)}" value="${hhmm(e.in)}" aria-label="In"> to <input type="time" data-tout="${esc(k)}|${esc(id)}" value="${hhmm(e.out)}" aria-label="Out">${e.out?"":' <span class="chip warn">no clock-out</span>'}</span>`).join(" "):'<span class="muted">Did not clock in</span>'}<span class="meta" style="margin-left:auto">${hrs(h)} hrs</span></div>`; }).join("")||'<p class="muted">No one is on this crew.</p>'}
+    <h3 style="margin-top:12px">Stops</h3>${rows.map(x=>`<div class="logrow"><span class="t">${fmtTime(x.k.at)}</span><span class="w"><b>${esc(x.s.name)}</b> <span class="meta">${esc(x.s.address||"")}</span><div class="meta">${esc(KINDS[x.k.kind]||x.k.kind)}${x.k.ladder?", ladder":""} &middot; ${esc(personName(x.k.by))} &middot; ${esc(routeName(x.r))}${x.k.note?" &middot; "+esc(x.k.note):""}</div></span>${x.k.photo?`<button class="small" data-lview="${esc(x.rid)}|${esc(x.s.id)}">Photo</button>`:""}</div>`).join("")||'<p class="muted">Nothing checked off.</p>'}
+    ${skipped.length?`<h3 style="margin-top:12px">Skipped</h3>${skipped.map(x=>`<div class="logrow"><span class="t">${fmtTime(x.k.at)}</span><span class="w"><b>${esc(x.s.name)}</b><div class="meta">${esc(x.k.reason||"")} &middot; ${esc(personName(x.k.by))}</div></span></div>`).join("")}`:""}
+    ${open.length?`<h3 style="margin-top:12px">Not done</h3><p class="meta">${open.map(x=>esc(x.s.name)).join(", ")}</p>`:""}
+    ${locked?"":`<div class="actions"><span class="muted" style="margin-right:auto">Approving locks the day, approves the hours above and sends the stops to billing.</span><button class="primary" id="approveDay" data-crew="${esc(crew)}">Approve ${esc(crew)} day</button></div>`}</div>`;
+}
+function wireLog(root, d){
+  root.querySelectorAll("[data-lview]").forEach(b=>b.onclick=()=>{ const [rid,sid]=b.dataset.lview.split("|"); viewPhoto(rid,sid,d); });
+  const setT = async (inp, field) => { if(previewOnly()) return; const [k,id]=inp.dataset[field==="in"?"tin":"tout"].split("|"); const ms=atTime(d, inp.value);
+    try { await store.update({ [`timeEntries/${k}/${d}/${id}/${field}`]: ms }); toast("Time changed"); } catch(e){ toast("Not saved: "+(e.message||e)); } };
+  root.querySelectorAll("[data-tin]").forEach(i=>i.onchange=()=>setT(i,"in"));
+  root.querySelectorAll("[data-tout]").forEach(i=>i.onchange=()=>setT(i,"out"));
+  root.querySelectorAll("#approveDay").forEach(b=>b.onclick=()=>approveDay(d, b.dataset.crew));
+}
+async function approveDay(d, crew){
+  if(previewOnly()) return;
+  const {rows}=dayReport(d,crew), t=timeOf(crew,d);
+  const openClock=Object.entries(t).filter(([,day])=>Object.values(day).some(e=>e.in&&!e.out)).map(([k])=>personName(k));
+  if(openClock.length) return toast(`Set a clock-out time for ${openClock.join(", ")} first`);
+  const upd={ [`dayLogs/${d}/crews/${crew}`]:{ status:"approved", approvedBy:isAdmin?me.email:me.key, approvedAt:Date.now(), entries:rows.length } };
+  Object.entries(t).forEach(([k,day])=>Object.keys(day).forEach(id=>{ upd[`timeEntries/${k}/${d}/${id}/status`]="approved"; }));
+  try { await store.update(upd); toast(`${crew} day approved. Billing runs within 5 minutes.`); } catch(e){ toast("Not approved: "+(e.message||e)); }
+}
+function renderCrewLog(app){
+  app.innerHTML = dateBar(1) + logHtml(curDate, viewCrew()); wireDateBar(1); wireLog(app, curDate);
+}
+
+// ---------- office: log, routes, crews, schedule ----------
+function renderLog(app){
+  const list = crewList().filter(c=>!crewFilter||c===crewFilter);
+  app.innerHTML = dateBar(1) + (list.map(c=>logHtml(curDate,c)).join("") || '<div class="card"><p class="meta">No crews yet.</p></div>')
+    + `<p class="muted">Visits logged by hand in the CRM's Service log tab are under Office there.</p>`;
+  wireDateBar(1); wireLog(app, curDate);
+}
+
+function renderRoutes(app){
+  const list=Object.entries(routes).filter(([,r])=>r).sort((a,b)=>(a[1].crew||"").localeCompare(b[1].crew||"",undefined,{numeric:true})||(a[1].standing?0:1)-(b[1].standing?0:1)||(a[1].start||"").localeCompare(b[1].start||""));
+  app.innerHTML=`<div class="bar"><span class="date">Routes</span><button class="primary small" id="addRoute">Add route</button></div>
+    <p class="meta">Each crew works its own routes. A snow route is standing: it runs every storm. Other routes run on their dates. Tap a route to change it or its stops.</p>
+    <div class="card scroll"><table><tr><th>Crew</th><th>Route</th><th>Service</th><th>When</th><th>Stops</th></tr>
+    ${list.map(([id,r])=>`<tr data-edit="${esc(id)}" style="cursor:pointer"><td>${esc(r.crew||"No crew")}</td><td><b>${esc(routeName(r))}</b>${r.note?`<div class="muted">${esc(r.note)}</div>`:""}</td><td>${svcChip(r.service)}</td><td>${r.standing?"Every storm":fmtRange(r.start,r.end)}</td><td>${stopsOf(r).length}${stopsOf(r).some(s=>!s.lat)?' <span class="chip warn">not all mapped</span>':""}</td></tr>`).join("")||'<tr><td colspan="5" class="meta">No routes yet. Set up crews first, then add a route.</td></tr>'}</table></div>`;
+  $("#addRoute").onclick=()=>routeDialog(null);
+  app.querySelectorAll("[data-edit]").forEach(tr=>tr.onclick=()=>{ editing=tr.dataset.edit; render(); window.scrollTo(0,0); });
+}
+function routeDialog(id){
+  const r=id?routes[id]:{ service:"snow", standing:true, crew:crewList()[0]||"" };
+  const dl=openDlg(`<h2>${id?"Change route":"Add route"}</h2>
+    <div class="grid2"><div><label>Crew</label><select id="rCrew">${crewList().map(c=>`<option ${r.crew===c?"selected":""}>${esc(c)}</option>`).join("")}</select></div>
+    <div><label>Service</label><select id="rSvc">${Object.entries(SERVICES).map(([k,v])=>`<option value="${k}" ${r.service===k?"selected":""}>${esc(v)}</option>`).join("")}</select></div></div>
+    <label>Name</label><input id="rName" value="${esc(r.name||"")}" placeholder="Snow route, Lights installs week 1" autocomplete="off">
+    <label class="row" style="color:var(--ink);display:flex;gap:8px;align-items:center;margin-top:10px"><input type="checkbox" id="rStand" ${r.standing?"checked":""}> Standing route: runs every storm (snow)</label>
+    <div class="grid2" id="rDates" ${r.standing?"hidden":""}><div><label>First day</label><input type="date" id="rStart" value="${esc(r.start||today())}"></div><div><label>Last day</label><input type="date" id="rEnd" value="${esc(r.end||r.start||today())}"></div></div>
+    <label>Note for the crew (optional)</label><input id="rNote" value="${esc(r.note||"")}" maxlength="160" autocomplete="off">
+    <div class="actions">${id?`<button class="danger" id="rDel" style="margin-right:auto">Delete route</button>`:""}<button data-close>Cancel</button><button class="primary" id="rSave">${id?"Save":"Add and choose stops"}</button></div>`);
+  dl.querySelector("#rStand").onchange=e=>{ dl.querySelector("#rDates").hidden=e.target.checked; };
+  dl.querySelector("#rSvc").onchange=e=>{ if(e.target.value==="snow"){ dl.querySelector("#rStand").checked=true; dl.querySelector("#rDates").hidden=true; } };
+  dl.querySelector("#rSave").onclick=async()=>{
+    const crew=$("#rCrew").value; if(!crew) return toast("Set up a crew first");
+    const standing=$("#rStand").checked, v={ crew, service:$("#rSvc").value, name:$("#rName").value.trim(), note:$("#rNote").value.trim()||null, standing:standing||null, start:standing?null:$("#rStart").value, end:standing?null:($("#rEnd").value||$("#rStart").value) };
+    if(!standing && (!v.start || v.end<v.start)) return toast("Check the dates");
+    const rid=id||store.key(), upd={}; Object.entries(v).forEach(([k,x])=>upd[`crewRoutes/${rid}/${k}`]=x===""?null:x);
+    await store.update(upd); dl.close(); editing=rid; render(); toast(id?"Route saved":"Route added. Now add its stops."); };
+  const del=dl.querySelector("#rDel"); if(del) del.onclick=async()=>{ await store.update({[`crewRoutes/${id}`]:null}); dl.close(); editing=null; render(); toast("Route deleted"); };
+}
+// Route editor: stops in order, with the client's address placed on the map and a note for the crew.
+let pinFor=null;
+function renderEditRoute(app){
+  const id=editing, r=routes[id]; if(!r){ editing=null; return render(); }
+  const st=stopsOf(r), kinds=KINDS_FOR[r.service]||["other"];
+  app.innerHTML=`<div class="bar"><button class="small" id="back">&#8249; Routes</button><span class="date">${esc(routeName(r))}</span><button class="small" id="rEdit">Name, crew, dates</button></div>
+    <div class="meta" style="margin:-6px 0 10px">${svcChip(r.service)} ${esc(r.crew)} &middot; ${r.standing?"Every storm":fmtRange(r.start,r.end)} &middot; ${st.length} stops</div>
+    <div id="mapSlot"></div>
+    ${pinFor?`<div class="storm"><span>Tap the map where <b>${esc((r.stops[pinFor]||{}).name||"")}</b> is.</span><button class="small" id="pinCancel">Cancel</button></div>`:""}
+    <div class="card"><h2>Add a stop</h2><input id="cSearch" placeholder="Search clients by name or address" autocomplete="off"><div class="pick" id="cPick" hidden></div>
+      <p class="muted">The stop keeps its own copy of the name, address and phone, so the crew never opens the client record. Prices and payment stay in the CRM.</p></div>
+    <div class="card"><h2>Stops in order</h2><ul class="editlist" style="list-style:none;margin:0;padding:0">${st.map((s,i)=>`<li><span class="num" style="width:22px;color:var(--muted);font-weight:650">${i+1}</span>
+      <span class="nm"><b>${esc(s.name)}</b> <span class="meta">${esc(s.address||"")}</span>${s.lat?"":' <span class="chip warn">not on the map</span>'}
+        <div style="display:flex;gap:6px;margin-top:4px;flex-wrap:wrap">${kinds.length>1?`<select data-kind="${esc(s.id)}" style="width:auto">${kinds.map(k=>`<option value="${k}" ${s.kind===k?"selected":""}>${esc(KINDS[k])}</option>`).join("")}</select>`:""}
+        <input data-snote="${esc(s.id)}" value="${esc(s.note||"")}" placeholder="Note for the crew: gate code, dog, where to pile snow" maxlength="160" style="flex:1;min-width:180px"></div></span>
+      <span style="display:flex;flex-direction:column;gap:4px"><button class="small" data-up="${esc(s.id)}" ${i?"":"disabled"} aria-label="Move up">&uarr;</button><button class="small" data-down="${esc(s.id)}" ${i<st.length-1?"":"disabled"} aria-label="Move down">&darr;</button></span>
+      <span style="display:flex;flex-direction:column;gap:4px"><button class="small" data-pin="${esc(s.id)}">Pin</button><button class="small danger" data-rm="${esc(s.id)}">Remove</button></span></li>`).join("")||'<li class="meta">No stops yet. Search for a client above.</li>'}</ul></div>`;
+  $("#back").onclick=()=>{ editing=null; pinFor=null; view="routes"; render(); };
+  $("#rEdit").onclick=()=>routeDialog(id);
+  const pc=$("#pinCancel"); if(pc) pc.onclick=()=>{ pinFor=null; render(); };
+  const box=$("#cSearch"), pick=$("#cPick");
+  box.oninput=()=>{ const q=box.value.trim().toLowerCase(); if(q.length<2){ pick.hidden=true; return; }
+    const hits=Object.entries(clients).filter(([,c])=>c&&c.status!=="lost"&&[c.name,c.address].join(" ").toLowerCase().includes(q)).slice(0,20);
+    pick.hidden=false; pick.innerHTML=hits.map(([cid,c])=>`<button data-cid="${esc(cid)}"><b>${esc(c.name)}</b> <span class="meta">${esc(c.address||"no address")}</span>${Object.values(r.stops||{}).some(s=>s.clientId===cid)?' <span class="chip">on this route</span>':""}</button>`).join("")||'<div class="meta" style="padding:8px">No client matches.</div>';
+    pick.querySelectorAll("[data-cid]").forEach(b=>b.onclick=()=>addStop(id, b.dataset.cid)); };
+  app.querySelectorAll("[data-up]").forEach(b=>b.onclick=()=>moveStop(id,b.dataset.up,-1));
+  app.querySelectorAll("[data-down]").forEach(b=>b.onclick=()=>moveStop(id,b.dataset.down,1));
+  app.querySelectorAll("[data-rm]").forEach(b=>b.onclick=()=>store.update({[`crewRoutes/${id}/stops/${b.dataset.rm}`]:null}));
+  app.querySelectorAll("[data-pin]").forEach(b=>b.onclick=()=>{ pinFor=b.dataset.pin; render(); });
+  app.querySelectorAll("[data-snote]").forEach(i=>i.onchange=()=>store.update({[`crewRoutes/${id}/stops/${i.dataset.snote}/note`]:i.value.trim()||null}).then(()=>toast("Note saved")));
+  app.querySelectorAll("[data-kind]").forEach(i=>i.onchange=()=>store.update({[`crewRoutes/${id}/stops/${i.dataset.kind}/kind`]:i.value}));
+  drawMap(id, st, {}, false);
+  if(map && pinFor){ map.off("click"); map.on("click",async e=>{ const sid=pinFor; pinFor=null; await store.update({[`crewRoutes/${id}/stops/${sid}/lat`]:+e.latlng.lat.toFixed(6), [`crewRoutes/${id}/stops/${sid}/lon`]:+e.latlng.lng.toFixed(6)}); toast("Pin placed"); }); }
+}
+// OpenStreetMap's free address search, biased to the service area. One lookup at a time.
+async function geocode(addr){
+  if(!addr || DEMO) return null;
+  try { const u="https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=us&viewbox=-83.75,42.55,-83.05,42.15&q="+encodeURIComponent(/\bMI\b|Michigan/i.test(addr)?addr:addr+", MI");
+    const j=await (await fetch(u,{headers:{"Accept":"application/json"}})).json(); return j[0]?{lat:+(+j[0].lat).toFixed(6), lon:+(+j[0].lon).toFixed(6)}:null; }
+  catch(e){ return null; }
+}
+async function addStop(rid, cid){
+  const r=routes[rid], c=clients[cid]||{}; if(!c.name) return;
+  const svc=Object.entries(c.services||{}).find(([,s])=>s&&s.type===r.service);
+  const order=Math.max(0,...stopsOf(r).map(s=>s.order||0))+1, sid=store.key();
+  const stop={ clientId:cid, name:c.name, address:c.address||"", phone:c.phone||null, order, kind:(KINDS_FOR[r.service]||["other"])[0], ...(svc?{svcId:svc[0]}:{}) };
+  toast("Placing "+c.name+" on the map");
+  const g=await geocode(c.address); if(g) Object.assign(stop,g);
+  await store.update({[`crewRoutes/${rid}/stops/${sid}`]:stop});
+  $("#cSearch") && ($("#cSearch").value=""); toast(g?`${c.name} added`:`${c.name} added. The address was not found: tap Pin and place it on the map.`);
+}
+async function moveStop(rid, sid, dir){
+  const st=stopsOf(routes[rid]); const i=st.findIndex(s=>s.id===sid), j=i+dir; if(j<0||j>=st.length) return;
+  [st[i],st[j]]=[st[j],st[i]]; const upd={}; st.forEach((s,n)=>upd[`crewRoutes/${rid}/stops/${s.id}/order`]=n+1); await store.update(upd);
+}
+
+// Crews: who manages, who is on each crew, and where the crew starts. Writes each person's team entry too.
+function renderCrews(app){
+  const people=Object.entries(team).filter(([,t])=>t&&t.tier==="crew").sort((a,b)=>(a[1].name||"").localeCompare(b[1].name||""));
+  const loose=people.filter(([,t])=>!t.crew || !crews[t.crew]);
+  app.innerHTML=`<div class="bar"><span class="date">Crews</span><button class="primary small" id="addCrew">Add crew</button></div>
+    <p class="meta">Each crew has one manager. The manager approves his crew's day in Crew log, which sends the stops to billing and approves the crew's hours. People reach this list by being added to the Team list in Projects with the Crew access level.</p>
+    ${crewList().map(c=>{ const cr=crews[c]||{}, mem=Object.keys(cr.members||{});
+      return `<div class="card"><div class="top" style="display:flex;justify-content:space-between;gap:10px"><h2>${esc(c)}</h2><button class="small" data-cedit="${esc(c)}">Yard and note</button></div>
+        <p class="meta">${cr.start?"Yard: "+esc(cr.start):"No yard address"}${cr.note?" &middot; "+esc(cr.note):""}</p>
+        <table>${mem.map(k=>`<tr><td><b>${esc(personName(k))}</b><div class="muted">${esc((team[k]||{}).email||"")}</div></td><td>${cr.manager===k?'<span class="chip ok">Manager</span>':`<button class="small" data-mgr="${esc(c)}|${esc(k)}">Make manager</button>`}</td><td><button class="small danger" data-off="${esc(c)}|${esc(k)}">Take off crew</button></td></tr>`).join("")||'<tr><td class="meta">No one on this crew.</td></tr>'}</table>
+        <div class="bar" style="margin-top:10px"><select data-addto="${esc(c)}" style="width:auto;flex:1"><option value="">Add a person to ${esc(c)}</option>${people.filter(([k,t])=>t.crew!==c).map(([k,t])=>`<option value="${esc(k)}">${esc(t.name)}${t.crew?" (now "+esc(t.crew)+")":""}</option>`).join("")}</select></div></div>`; }).join("")||'<div class="card"><p class="meta">No crews yet. Add one.</p></div>'}
+    ${loose.length?`<div class="card"><h2>Not on a crew</h2><p class="meta">${loose.map(([,t])=>esc(t.name)).join(", ")}. They cannot open the Crew View until they are on a crew.</p></div>`:""}`;
+  $("#addCrew").onclick=()=>{ const n=crewList().length+1; const dl=openDlg(`<h2>Add crew</h2><label>Name</label><input id="ncName" value="Crew ${n}" maxlength="30"><div class="actions"><button data-close>Cancel</button><button class="primary" id="ncGo">Add</button></div>`);
+    dl.querySelector("#ncGo").onclick=async()=>{ const name=$("#ncName").value.trim().replace(/[.#$\[\]\/]/g,""); if(!name) return; if(crews[name]) return toast(name+" already exists"); await store.update({[`crews/${name}`]:{ name, order:n }}); dl.close(); toast(name+" added"); }; };
+  app.querySelectorAll("[data-cedit]").forEach(b=>b.onclick=()=>{ const c=b.dataset.cedit, cr=crews[c]||{};
+    const dl=openDlg(`<h2>${esc(c)}</h2><label>Yard or start address</label><input id="ceStart" value="${esc(cr.start||"")}" autocomplete="off"><label>Note</label><input id="ceNote" value="${esc(cr.note||"")}" maxlength="120"><div class="actions"><button data-close>Cancel</button><button class="primary" id="ceGo">Save</button></div>`);
+    dl.querySelector("#ceGo").onclick=async()=>{ await store.update({[`crews/${c}/start`]:$("#ceStart").value.trim()||null,[`crews/${c}/note`]:$("#ceNote").value.trim()||null}); dl.close(); }; });
+  app.querySelectorAll("[data-addto]").forEach(s=>s.onchange=async()=>{ const c=s.dataset.addto, k=s.value; if(!k) return; const t=team[k]||{}, old=t.crew, upd={};
+    if(old && crews[old]){ upd[`crews/${old}/members/${k}`]=null; if(crews[old].manager===k) upd[`crews/${old}/manager`]=null; }
+    upd[`crews/${c}/members/${k}`]=t.name||k; upd[`allowed/${k}/crew`]=c; upd[`allowed/${k}/crewRole`]="member";
+    await store.update(upd); toast(`${t.name} is on ${c}`); });
+  app.querySelectorAll("[data-mgr]").forEach(b=>b.onclick=async()=>{ const [c,k]=b.dataset.mgr.split("|"), cr=crews[c]||{}, upd={ [`crews/${c}/manager`]:k, [`allowed/${k}/crewRole`]:"manager" };
+    if(cr.manager && cr.manager!==k && team[cr.manager]) upd[`allowed/${cr.manager}/crewRole`]="member";
+    await store.update(upd); toast(`${personName(k)} manages ${c}`); });
+  app.querySelectorAll("[data-off]").forEach(b=>b.onclick=async()=>{ const [c,k]=b.dataset.off.split("|"), upd={ [`crews/${c}/members/${k}`]:null, [`allowed/${k}/crew`]:null, [`allowed/${k}/crewRole`]:null };
+    if((crews[c]||{}).manager===k) upd[`crews/${c}/manager`]=null; await store.update(upd); toast(`${personName(k)} is off ${c}`); });
+}
+
+function renderSchedule(app){
+  const list=Object.entries(events).filter(([,e])=>e&&e.date>=addDays(today(),-7)).sort((a,b)=>(a[1].date+(a[1].start||"")).localeCompare(b[1].date+(b[1].start||"")));
+  app.innerHTML=`<div class="bar"><span class="date">Trainings and meetings</span></div>
+    <div class="card"><div class="grid2"><div><label>What</label><input id="evTitle" placeholder="Snow training, crew meeting" maxlength="80"></div><div><label>Where</label><input id="evWhere" maxlength="80"></div>
+      <div><label>Day</label><input type="date" id="evDate" value="${today()}"></div><div><label>Who</label><select id="evCrew"><option value="all">Every crew</option>${crewList().map(c=>`<option>${esc(c)}</option>`).join("")}</select></div>
+      <div><label>Starts</label><input type="time" id="evStart" value="08:00"></div><div><label>Ends</label><input type="time" id="evEnd" value="09:00"></div></div>
+      <div class="actions"><button class="primary" id="evAdd">Add to the schedule</button></div></div>
+    <div class="card scroll"><table><tr><th>Day</th><th>What</th><th>Who</th><th></th></tr>${list.map(([id,e])=>`<tr><td>${fmtDay(e.date)}<div class="muted">${esc(e.start||"")}${e.end?" to "+esc(e.end):""}</div></td><td><b>${esc(e.title)}</b><div class="muted">${esc(e.where||"")}</div></td><td>${esc(e.crew==="all"||!e.crew?"Every crew":e.crew)}</td><td><button class="small danger" data-evrm="${esc(id)}">Remove</button></td></tr>`).join("")||'<tr><td colspan="4" class="meta">Nothing scheduled.</td></tr>'}</table></div>`;
+  $("#evAdd").onclick=async()=>{ const title=$("#evTitle").value.trim(); if(!title) return toast("Say what it is");
+    await store.update({[`events/${store.key()}`]:{ title, where:$("#evWhere").value.trim(), date:$("#evDate").value||today(), start:$("#evStart").value, end:$("#evEnd").value, crew:$("#evCrew").value }}); toast("Added"); };
+  app.querySelectorAll("[data-evrm]").forEach(b=>b.onclick=()=>store.update({[`events/${b.dataset.evrm}`]:null}));
+}
+
+// ---------- start ----------
+function demoSeed(){
+  const K = e => emailKey(e), d=today(), mon=mondayOf(d);
+  const ppl = { boss:"marcus.reed@example.com", m1:"tyler.ng@example.com", m2:"sam.ortiz@example.com", boss2:"dave.kim@example.com", m3:"luis.park@example.com" };
+  const T = (k,name,crew,r) => ({ name, email:ppl[k], tier:"crew", crew, crewRole:r });
+  const cl = [["Helen Brooks","34521 Hees St, Livonia, MI",42.3956,-83.3633,"734-555-0101"],["Tom Walsh","33740 Lyndon St, Livonia, MI",42.4001,-83.3608,"734-555-0102"],["Grace Patel","15620 Ellen Dr, Livonia, MI",42.4006,-83.3554,"734-555-0103"],
+    ["Mark Ruiz","15900 Fairfield St, Livonia, MI",42.4039,-83.3519,""],["Anna Cole","34000 Munger St, Livonia, MI",42.3981,-83.3575,"734-555-0105"],["Joe Lin","9300 Hix Rd, Westland, MI",42.3592,-83.4128,"734-555-0106"],["Ruth Diaz","35400 Glenwood Rd, Westland, MI",42.3247,-83.3742,""]];
+  const clientsSeed={}; cl.forEach(([n,a,la,lo,p],i)=>clientsSeed["c"+i]={ name:n, address:a, phone:p, status:"active", services:{ s1:{type:i<5?"snow":"lights"} } });
+  const stop = (i,o,extra) => ({ clientId:"c"+i, name:cl[i][0], address:cl[i][1], lat:cl[i][2], lon:cl[i][3], phone:cl[i][4]||null, order:o, kind:"snow", svcId:"s1", ...(extra||{}) });
+  const upd = {
+    ["allowed/"+K(ADMIN_EMAIL)]:{name:"Russel",email:ADMIN_EMAIL,tier:"admin"},
+    ["allowed/"+K(ppl.boss)]:T("boss","Marcus Reed","Crew 1","manager"), ["allowed/"+K(ppl.m1)]:T("m1","Tyler Ng","Crew 1","member"), ["allowed/"+K(ppl.m2)]:T("m2","Sam Ortiz","Crew 1","member"),
+    ["allowed/"+K(ppl.boss2)]:T("boss2","Dave Kim","Crew 2","manager"), ["allowed/"+K(ppl.m3)]:T("m3","Luis Park","",""),
+    "crews/Crew 1":{ name:"Crew 1", order:1, manager:K(ppl.boss), start:"3540 Thorn Tree Ct, Ann Arbor, MI", members:{[K(ppl.boss)]:"Marcus Reed",[K(ppl.m1)]:"Tyler Ng",[K(ppl.m2)]:"Sam Ortiz"} },
+    "crews/Crew 2":{ name:"Crew 2", order:2, manager:K(ppl.boss2), members:{[K(ppl.boss2)]:"Dave Kim"} },
+    "crewRoutes/snow1":{ crew:"Crew 1", service:"snow", name:"Livonia snow route", standing:true, stops:{ a:stop(0,1,{note:"Pile snow on the north side. Dog in the back yard."}), b:stop(1,2), c:stop(2,3,{note:"Long driveway, salt the walk"}), d:stop(3,4), e:stop(4,5) } },
+    "crewRoutes/lights1":{ crew:"Crew 2", service:"lights", name:"Lights installs", start:d, end:addDays(d,2), stops:{ a:stop(5,1,{kind:"lights"}), b:stop(6,2,{kind:"call",note:"Two strands out over the garage"}) } },
+    [`storms/${d}/Crew 1`]:{ at:Date.now()-3*3600e3, by:K(ppl.boss) },
+    [`crewChecks/${d}/snow1/a`]:{ by:K(ppl.m1), at:Date.now()-2.5*3600e3, kind:"snow", eid:"x1", photo:true },
+    [`crewChecks/${d}/snow1/b`]:{ by:K(ppl.m2), at:Date.now()-2.2*3600e3, kind:"snow", eid:"x2" },
+    [`crewPhotos/${d}/snow1/a`]:{ data:"data:image/svg+xml;utf8,"+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="480" height="300"><rect width="480" height="300" fill="#dfe6ee"/><rect y="200" width="480" height="100" fill="#8a96a3"/><text x="240" y="150" font-size="22" text-anchor="middle" fill="#41505f" font-family="sans-serif">Sample photo: cleared driveway</text></svg>'), at:Date.now()-2.5*3600e3, by:K(ppl.m1) },
+    [`serviceLog/${d}/x1`]:{ clientId:"c0", kind:"snow", source:"crew", crew:"Crew 1", at:Date.now()-2.5*3600e3, by:K(ppl.m1) },
+    [`serviceLog/${d}/x2`]:{ clientId:"c1", kind:"snow", source:"crew", crew:"Crew 1", at:Date.now()-2.2*3600e3, by:K(ppl.m2) },
+    [`timeEntries/${K(ppl.boss)}/${d}/t1`]:{ in:Date.now()-3*3600e3, crew:"Crew 1" }, [`timeEntries/${K(ppl.m1)}/${d}/t1`]:{ in:Date.now()-3*3600e3, crew:"Crew 1" }, [`timeEntries/${K(ppl.m2)}/${d}/t1`]:{ in:Date.now()-2.8*3600e3, out:Date.now()-0.5*3600e3, crew:"Crew 1" },
+    [`events/ev1`]:{ title:"Snow training", where:"The yard", date:addDays(mon,5), start:"09:00", end:"11:00", crew:"all" },
+    clients: clientsSeed
+  };
+  for(let i=1;i<=3;i++){ const x=addDays(d,-i); upd[`timeEntries/${K(ppl.m1)}/${x}/t1`]={ in:atTime(x,"07:00"), out:atTime(x,"15:30"), crew:"Crew 1", status:i>1?"approved":undefined }; }
+  return { upd, who:{ admin:{email:ADMIN_EMAIL,displayName:"Russel"}, manager:{email:ppl.boss,displayName:"Marcus Reed"}, member:{email:ppl.m1,displayName:"Tyler Ng"}, crew2:{email:ppl.boss2,displayName:"Dave Kim"} } };
+}
+if(DEMO){
+  $("#demoBanner").hidden=false;
+  const s=demoSeed(); store.update(s.upd).then(()=>enter(s.who[DEMO]||s.who.admin));
+} else {
+  store.auth.onAuthStateChanged(u => u ? enter(u) : leave());
+}
+</script>
+<div class="pgdrawer-bg" id="pgDrawerBg"></div>
+<nav class="pgdrawer" id="pgDrawer" aria-label="Pages" aria-hidden="true">
+  <div class="pdhead"><b>Mangiapane Brothers</b><button type="button" class="pdx" id="pgDrawerX" aria-label="Close page menu">&times;</button></div>
+  <a href="./index.html">Projects<span>Admin task dashboard</span></a><a href="./crm.html">CRM<span>Leads, clients, contracts</span></a><a href="./crews.html" class="here" aria-current="page">Crews<span>Crew routes, day logs, approval</span></a><a href="./routes.html">Routes<span>Door hanger routes</span></a>
+  <div class="pdfoot">Full-Service Property Maintenance for Those Who Take Pride in Their Home</div>
+</nav>
+<script>
+// Page menu: opens from the three-line button, closes with the X, a tap outside, Escape, or a swipe left.
+(function(){
+  const btn=document.getElementById("navBtn"), d=document.getElementById("pgDrawer"), bg=document.getElementById("pgDrawerBg"), x=document.getElementById("pgDrawerX");
+  const set=open=>{ d.classList.toggle("open",open); bg.classList.toggle("open",open); d.setAttribute("aria-hidden",String(!open)); btn.setAttribute("aria-expanded",String(open)); if(open) x.focus(); };
+  btn.onclick=()=>set(!d.classList.contains("open")); x.onclick=()=>set(false); bg.onclick=()=>set(false);
+  document.addEventListener("keydown",e=>{ if(e.key==="Escape" && d.classList.contains("open")) set(false); });
+  let x0=null; d.addEventListener("pointerdown",e=>{ x0=e.clientX; }); d.addEventListener("pointerup",e=>{ if(x0!=null && x0-e.clientX>60) set(false); x0=null; });
+  window.__pageMenu={open:()=>set(true),close:()=>set(false)};
+})();
+</script>
+</body>
+</html>

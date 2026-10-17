@@ -321,7 +321,6 @@ details.ssamore summary{cursor:pointer;font-weight:600}
     <button data-view="svc-snow"><span class="dot" style="background:#9ec3f0"></span>Snow</button>
     <button data-view="svc-landscaping"><span class="dot" style="background:var(--s-landscaping)"></span>Landscaping</button>
     <button data-view="servicelog">Service log</button>
-    <button data-view="charges">Charges</button>
     <div class="more" id="more">
       <button id="moreBtn" aria-haspopup="menu" aria-expanded="false">More <span class="caret">&#9662;</span></button>
       <div class="menu" id="moreMenu" role="menu">
@@ -487,7 +486,7 @@ const firebaseConfig = {
 const ADMIN_EMAIL = "russel.mangiapaneiii@gmail.com";
 const COMPANY = "Mangiapane Brothers Lawn and Snow LLC";
 // Where each clearance tier lands. A person whose tier is not admin is sent to his page.
-const TIER_HOME = { admin:"index.html", crew:"my.html", walker:"routes.html" };
+const TIER_HOME = { admin:"index.html", crew:"crews.html", walker:"routes.html" };
 // ================================================================
 
 // ===== LISTS: edit these to add a region, source, or service type =====
@@ -625,7 +624,7 @@ function attach(){
   refs.c.on("value", s => { clients = s.val()||{}; render(); if(openId) refreshDialogLive(); if(!backfilled){ backfilled=true; backfillPhones(); } driveNag(); });
   refs.l.on("value", s => { logs = s.val()||{}; render(); if(openId) renderLog(); });
   refs.t.on("value", s => { templates = s.val()||{}; render(); if(openId) renderContracts(); });
-  refs.q.on("value", s => { qbRows = s.val()||{}; if(view==="tools"||view==="servicelog"||view==="charges") render(); if(openId) { renderSvcBills(); renderStamps(); renderRecord(); } });
+  refs.q.on("value", s => { qbRows = s.val()||{}; if(view==="tools"||view==="servicelog") render(); if(openId) { renderSvcBills(); renderStamps(); renderRecord(); } });
   refs.sl = db.ref("serviceLog"); refs.dl = db.ref("dayLogs");
   refs.sl.on("value", s => { svcLog = s.val()||{}; if(view==="servicelog") render(); if(openId) renderRecord(); });
   refs.dl.on("value", s => { dayLogs = s.val()||{}; if(view==="servicelog") render(); if(openId) renderRecord(); });
@@ -755,7 +754,6 @@ function render(){
   if(view.startsWith("svc-")) return renderService(m, view.slice(4));
   if(view==="import") return renderImport(m);
   if(view==="tools") return renderTools(m);
-  if(view==="charges"){ m.innerHTML = chargesHtml(); wireCharges(m); return; }
   if(view==="trash") return renderTrash(m);
   if(view==="contracts") return renderContractsView(m);
   if(view==="servicelog") return renderServiceLog(m);
@@ -1551,7 +1549,7 @@ function renderContractsView(m){
     </tbody></table></div>`:""}
     <div class="card"><h2>Google Drive copies</h2>${(()=>{ const n=driveMissing().length; return `<p class="meta">Every signed contract is also saved as a PDF and an exact record in your Google Drive folder "${esc(DRIVE_ROOT_NAME)}", one folder per client.</p>` +
       (n ? `<div class="warnline">${n} signed contract${n===1?" is":"s are"} not in Google Drive yet. <button class="small primary" id="driveAll">Save to Drive</button></div>` : `<p class="meta">All signed contracts are in Google Drive.</p>`); })()}</div>
-    <div class="card"><h2>Payment</h2><p class="meta">Every client keeps a card on file, taken right after signing, even when nothing is due that day. A bank account (ACH) is an approved exception, and prepaying everything by check is the only other choice. No card fee. Card and bank numbers are entered in QuickBooks only; this page keeps the brand and the last four digits. Charges waiting to be run are in the Charges tab.</p></div>
+    <div class="card"><h2>Payment</h2><p class="meta">Every client keeps a card on file, taken right after signing, even when nothing is due that day. A bank account (ACH) is an approved exception, and prepaying everything by check is the only other choice. No card fee. Card and bank numbers are entered in QuickBooks only; this page keeps the brand and the last four digits. Charges waiting to be run are in More, QuickBooks and export.</p></div>
     <div class="card"><h2>Signing service</h2><p class="meta">Runs in admin@mangbrothers.com. It emails the one-link contract, takes the typed signature, saves every signed PDF to admin@'s Google Drive and emails a copy, and sends the payment confirmed email.</p>
       <label>Web app address (from Apps Script: Deploy, Manage deployments)</label><input id="svcUrl" value="${esc(svcInfo()?.url||"")}" placeholder="https://script.google.com/macros/s/.../exec" autocomplete="off">
       <div class="row" style="margin-top:8px"><button class="small" id="svcTest">Test</button><button class="small primary" id="svcSave">Save</button><span class="meta" id="svcMsg">${svcReady()?"Set up.":"Not set up. Emailing contracts is off."}</span></div></div>
@@ -2270,12 +2268,20 @@ async function doImport(){
 const LOG_KINDS = { snow:"Snow visit", lights:"Lights installed", call:"Lights service call", landscaping:"Landscaping job done", fall:"Fall cleanup pass", lawn:"Lawn cut", other:"Other service" };
 const SNOW_INCLUDED = 16;
 const seasonOf = d => { const [y,m]=d.split("-").map(Number); return m>=7 ? y : y-1; };
+// Approval is per crew per day (dayLogs/{date}/crews/{crew}) since the crew view (October 16): each crew's manager
+// approves his own crew, and admins approve any crew plus "Office" (visits added on this tab). The signing service
+// bills an approved crew day on its next 5-minute pass. Whole-day approvals from before stay valid for their entries.
+const OFFICE = "Office";
+const groupOf = e => e.crew || OFFICE;
 const dayApproved = d => (dayLogs[d]||{}).status==="approved";
-const entryApproved = (d,e) => e.approved===true || dayApproved(d);
+const crewApproved = (d,g) => (((dayLogs[d]||{}).crews||{})[g]||{}).status==="approved";
+const entryApproved = (d,e) => e.approved===true || !!e.billed || dayApproved(d) || crewApproved(d, groupOf(e));
 function allEntries(){ const out=[]; for(const [d,day] of Object.entries(svcLog||{})) for(const [eid,e] of Object.entries(day||{})) out.push({ date:d, eid, e }); return out.sort((a,b)=>a.date.localeCompare(b.date)||(a.e.at||0)-(b.e.at||0)); }
 const clientEntries = id => allEntries().filter(x=>x.e.clientId===id);
 // Snow visits approved this season for a client, in order, so each visit knows its number.
 function snowCount(id, season){ return clientEntries(id).filter(x=>x.e.kind==="snow" && seasonOf(x.date)===season && entryApproved(x.date,x.e)).length; }
+// Numbering for billing counts only visits already billed, the same as the signing service, so the two never disagree.
+function snowBilled(id, season){ return clientEntries(id).filter(x=>x.e.kind==="snow" && seasonOf(x.date)===season && x.e.billed).length; }
 async function perVisitFor(id){
   const sg=ssaSigned(clients[id]||{}); if(!sg) return null;
   try{ const rec=(await db.ref("contracts/"+id+"/"+sg[0]).once("value")).val(); return { amt:+rec?.details?.snow?.perPushAfter||null, cid:sg[0], agNo:rec?.details?.agreementNo||sg[1].agreementNo||"" }; }catch(e){ return null; }
@@ -2292,7 +2298,7 @@ async function billEntries(list, manual){
     let billed = { at:now, by:me.email, what:"recorded" };
     if(e.kind==="snow"){
       const season=seasonOf(x.date), key=id+"|"+season;
-      if(!(key in counts)) counts[key]=snowCount(id, season);
+      if(!(key in counts)) counts[key]=snowBilled(id, season);
       const n=++counts[key];
       if(n>SNOW_INCLUDED){
         if(!(id in pv)) pv[id]=await perVisitFor(id);
@@ -2378,16 +2384,19 @@ let slDate=null;
 function renderServiceLog(m){
   slDate = slDate || today();
   const day = svcLog[slDate]||{}, entries=Object.entries(day).sort((a,b)=>(a[1].at||0)-(b[1].at||0)), st=dayLogs[slDate]||{};
-  const waiting = entries.filter(([,e])=>!e.billed);
-  const openDays = Object.keys(svcLog).filter(d=>!dayApproved(d) && Object.values(svcLog[d]||{}).some(e=>!e.approved && !e.billed)).sort().reverse();
+  const waiting = entries.filter(([,e])=>!e.billed && !entryApproved(slDate,e));
+  const groups = [...new Set(waiting.map(([,e])=>groupOf(e)))].sort((a,b)=>a===OFFICE?1:b===OFFICE?-1:a.localeCompare(b,undefined,{numeric:true}));
+  const approvedGroups = Object.entries((dayLogs[slDate]||{}).crews||{}).filter(([,v])=>v&&v.status==="approved");
+  const openDays = Object.keys(svcLog).filter(d=>Object.values(svcLog[d]||{}).some(e=>!entryApproved(d,e))).sort().reverse();
   const opts = live().filter(([,c])=>c.status==="active").sort(byName).map(([id,c])=>`<option value="${id}">${esc(c.name)}</option>`).join("");
   m.innerHTML = `<div class="card"><h2>Service log <span class="meta">${fmtLong(slDate)}</span></h2>
-    <p class="meta">Every visit is logged here, by the crew report or by hand. Nothing a crew logs is billed until a manager approves the day. Approving bills snow visits past 16, opens lights and landscaping balances, and charges service calls. A saved card is then charged within 5 minutes.</p>
+    <p class="meta">Every visit is logged here, by a crew in the Crew View or by hand. Nothing bills until that crew's day is approved: each crew manager approves his own crew, and an admin can approve any crew here. Visits added on this tab are under Office. Approval bills snow visits past 16, opens lights and landscaping balances, and charges service calls; the signing service does the billing and charges a saved card within 5 minutes.</p>
     <div class="row" style="margin:8px 0"><input type="date" id="slDate" value="${slDate}" style="width:auto">
       ${openDays.length?`<span class="meta">Days waiting for approval: ${openDays.map(d=>`<button class="link" data-day="${d}">${fmtDate(d)}</button>`).join(" ")}</span>`:""}</div>
-    ${entries.length?`<div style="overflow-x:auto"><table><thead><tr><th>Client</th><th>Service</th><th>From</th><th>Billing</th><th></th></tr></thead><tbody>${entries.map(([eid,e])=>`<tr><td>${esc(clients[e.clientId]?.name||"(deleted client)")}</td><td>${esc(LOG_KINDS[e.kind]||e.kind)}${e.ladder?" (ladder)":""}${e.note?`<div class="meta">${esc(e.note)}</div>`:""}</td><td class="meta">${esc(e.source==="crew"?(e.crew||"Crew"):"CRM, "+String(e.by||"").split("@")[0])}</td><td class="meta">${e.billed?esc(e.billed.what):e.approved?"approved":"waiting for approval"}</td><td>${kmenu(e.clientId, e.billed?.rowId)}</td></tr>`).join("")}</tbody></table></div>`:`<div class="meta">Nothing logged on this day.</div>`}
+    ${entries.length?`<div style="overflow-x:auto"><table><thead><tr><th>Client</th><th>Service</th><th>From</th><th>Billing</th><th></th></tr></thead><tbody>${entries.map(([eid,e])=>`<tr><td>${esc(clients[e.clientId]?.name||"(deleted client)")}</td><td>${esc(LOG_KINDS[e.kind]||e.kind)}${e.ladder?" (ladder)":""}${e.note?`<div class="meta">${esc(e.note)}</div>`:""}</td><td class="meta">${esc(e.source==="crew"?(e.crew||"Crew"):"CRM, "+String(e.by||"").split("@")[0])}</td><td class="meta">${e.billed?esc(e.billed.what):entryApproved(slDate,e)?"approved, billing within 5 minutes":"waiting for approval"}</td><td>${kmenu(e.clientId, e.billed?.rowId)}</td></tr>`).join("")}</tbody></table></div>`:`<div class="meta">Nothing logged on this day.</div>`}
     <div class="row" style="margin-top:10px">${st.status==="approved"?`<span class="pill paid">Approved by ${esc(String(st.approvedBy||"").split("@")[0])} ${fmtStamp(st.approvedAt)}</span>`:""}
-      ${waiting.length?`<button class="primary" id="slApprove">Approve day and bill (${waiting.length})</button>`:""}</div>
+      ${approvedGroups.map(([g,v])=>`<span class="pill paid">${esc(g)} approved by ${esc(String(v.approvedBy||"").replace(/,/g,".").split("@")[0])} ${fmtStamp(v.approvedAt)}${v.billedAt?" · billed":""}</span>`).join(" ")}
+      ${groups.map(g=>`<button class="primary" data-approve="${esc(g)}">Approve ${esc(g)} (${waiting.filter(([,e])=>groupOf(e)===g).length})</button>`).join(" ")}</div>
   </div>
   <div class="card"><h2>Log a visit for this day</h2>
     <div class="logform"><div><label>Client</label><select id="slClient">${opts}</select></div>
@@ -2395,7 +2404,7 @@ function renderServiceLog(m){
       <div id="slLadderBox" hidden><label class="row" style="margin:24px 0 0;color:var(--ink)"><input type="checkbox" id="slLadder"> Needed a ladder</label></div>
       <div style="flex:2 1 200px"><label>Note</label><input id="slNote" maxlength="120" autocomplete="off"></div>
       <div style="flex:0 0 auto"><button class="small" id="slAdd">Add to the day</button></div></div>
-    <p class="meta" style="margin:6px 0 0">Stands in for the crew report until the crew view is built. Entries added here wait for the day's approval like crew entries.</p></div>`;
+    <p class="meta" style="margin:6px 0 0">For visits a crew did not log in the Crew View. They go under Office and wait for an admin to approve Office for the day.</p></div>`;
   $("#slDate").onchange=e=>{ slDate=e.target.value||today(); render(); };
   wireKmenus(m);
   m.querySelectorAll("[data-day]").forEach(b=>b.onclick=()=>{ slDate=b.dataset.day; render(); });
@@ -2405,11 +2414,10 @@ function renderServiceLog(m){
     if(kind==="landscaping"){ const jobs=Object.entries(c.services||{}).filter(([,s])=>s.type==="landscaping"&&s.jobStatus!=="Done"); if(!jobs.length) return toast("That client has no open landscaping job."); sid=jobs[0][0]; }
     const e={ clientId:id, kind, ...(sid?{sid}:{}), ...(kind==="call"?{ladder:$("#slLadder").checked}:{}), note:$("#slNote").value.trim(), at:Date.now(), by:me.email, source:"crm" };
     await db.ref().update({ [`serviceLog/${slDate}/${db.ref("serviceLog/"+slDate).push().key}`]:e }); toast("Added. It bills when the day is approved."); };
-  const ap=$("#slApprove"); if(ap) ap.onclick=async()=>{
-    ap.disabled=true; const B=await billEntries(waiting.map(([eid,e])=>({ date:slDate, eid, e })), false);
-    B.upd[`dayLogs/${slDate}`]={ status:"approved", approvedBy:me.email, approvedAt:Date.now(), entries:entries.length };
-    await db.ref().update(B.upd);
-    toast(B.lines.length?`Approved. Sent to billing: ${B.lines.map(l=>l.text).join("; ")}.`:"Approved. Nothing to charge for this day."); };
+  m.querySelectorAll("[data-approve]").forEach(b=>b.onclick=async()=>{ const g=b.dataset.approve; b.disabled=true;
+    const n=waiting.filter(([,e])=>groupOf(e)===g).length;
+    await db.ref().update({ [`dayLogs/${slDate}/crews/${g}`]:{ status:"approved", approvedBy:me.email, approvedAt:Date.now(), entries:n } });
+    toast(`${g} approved. Billing runs within 5 minutes.`); });
 }
 
 // ---------- Refund? (October 16, 2026) ----------
@@ -2699,7 +2707,7 @@ function renderTools(m){
   const all=Object.entries(qbRows).sort((a,b)=>b[1].createdAt-a[1].createdAt);
   const pending=all.filter(([,r])=>r.status==="pending" && r.type!=="charge"), recent=all.filter(([,r])=>r.status!=="pending" && r.type!=="charge").slice(0,15);
   const rowHtml = ([rid,r]) => `<tr><td>${esc(QB_LABEL[r.type]||r.type)}</td><td>${esc(clients[r.clientId]?.name||"(deleted client)")}</td><td>${esc(r.description||"")}</td><td class="num">${money(r.amount)}</td><td>${r.status==="pending"?'<span class="pill open">waiting</span>':r.status==="done"?'<span class="pill paid">done</span>':'<span class="pill pastdue">error</span>'}${r.result?.note?`<div class="meta">${esc(r.result.note)}</div>`:""}</td><td class="meta">${fmtStamp(r.createdAt)}</td></tr>`;
-  m.innerHTML = `<div class="card">
+  m.innerHTML = chargesHtml() + `<div class="card">
     <h2>QuickBooks queue <span class="meta">${pending.length} waiting for Claude</span></h2>
     <p class="meta">The page adds work here when a client becomes active or a contract is signed. Sample contracts never add work. Copy the queue, paste it into Claude, and ask it to run it with the QuickBooks connector. Paste Claude's answer in the box below to write the QuickBooks numbers back onto the clients.</p>
     <div class="row" style="margin:8px 0"><button class="primary" id="qbCopy" ${pending.length?"":"disabled"}>Copy queue for Claude</button><button id="qbDl" ${pending.length?"":"disabled"}>Download</button></div>
@@ -2758,7 +2766,7 @@ document.addEventListener("keydown", e => { if(e.key==="Escape") closeMore(); })
 <div class="pgdrawer-bg" id="pgDrawerBg"></div>
 <nav class="pgdrawer" id="pgDrawer" aria-label="Pages" aria-hidden="true">
   <div class="pdhead"><b>Mangiapane Brothers</b><button type="button" class="pdx" id="pgDrawerX" aria-label="Close page menu">&times;</button></div>
-  <a href="./index.html">Projects<span>Admin task dashboard</span></a><a href="./crm.html" class="here" aria-current="page">CRM<span>Leads, clients, contracts</span></a><a href="./routes.html">Routes<span>Door hanger routes</span></a>
+  <a href="./index.html">Projects<span>Admin task dashboard</span></a><a href="./crm.html" class="here" aria-current="page">CRM<span>Leads, clients, contracts</span></a><a href="./crews.html">Crews<span>Crew routes, day logs, approval</span></a><a href="./routes.html">Routes<span>Door hanger routes</span></a>
   <div class="pdfoot">Full-Service Property Maintenance for Those Who Take Pride in Their Home</div>
 </nav>
 <script>
