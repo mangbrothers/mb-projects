@@ -2022,7 +2022,7 @@ function paperCard(k){
         if(f==="i9" && x.online) act += x.s2 ? ` <span class="chip ok">Section 2 done</span>` : ` <span class="chip warn">Section 2 needed</span>`;
         // Russel, October 17: the full I-9 online, plus a paper I-9 collected in person as a backup.
         if(f==="i9"){ const pc=((paperAll[k]||{}).forms||{}).i9||{}; act += pc.paperCopy ? ` <button class="small" data-paperi9="${esc(k)}" title="Tap to undo">Paper I-9 ✓ ${fmtShort(pc.paperCopy)}</button>` : ` <button class="small" data-paperi9="${esc(k)}">Paper I-9 collected</button>`; } }
-      else act=`<button class="small" data-psend1="${esc(k)}|${f}">Email</button>`;
+      else act=`<button class="small" data-psend1="${esc(k)}|${f}" title="Sends only this form">Email this one</button>`;
       return `<div class="logrow"><span class="w"><b>${esc(F.short)}</b> <span class="meta">${esc(F.title)}</span></span><span style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:flex-end">${chip}${act}</span></div>`; }).join("")}</div>`;
 }
 function renderPaper(app){
@@ -2032,11 +2032,16 @@ function renderPaper(app){
   const open=ppl.filter(([k])=>packetOf(k).some(f=>f!=="deposit" && !formState(k,f).done)).length;
   const gTitle=g=>{ const [pos,ty]=g.split("|"); return `${PAPER.POSITIONS[pos]||pos} <span class="chip">${ty==="1099"?"1099 contractor":"W-2 employee"}</span>`; };
   const gNeeds=g=>{ const [pos,ty]=g.split("|"); return PAPER.packet(pos,ty).map(f=>PAPER.FORMS[f].short+(PAPER.FORMS[f].optional?" (optional)":"")).join(", "); };
-  app.innerHTML=`<div class="bar"><span class="date">Paperwork</span><span class="chip ${open?"warn":"ok"}">${open?open+" with forms left":"Everyone is signed"}</span></div>
+  const sendable=ppl.filter(([k,t])=>t.email && packetOf(k).some(f=>!formState(k,f).done));
+  app.innerHTML=`<div class="bar"><span class="date">Paperwork</span><span class="chip ${open?"warn":"ok"}">${open?open+" with forms left":"Everyone is signed"}</span>${sendable.length?`<button class="small primary" id="pEmailAll">Email everyone their missing forms (${sendable.length})</button>`:""}</div>
     ${vaultBar()}
-    <p class="meta">Grouped by position and legal status. Set a person's position and W-2 or 1099 on his profile. Email sends him one private link to sign on his phone; the same link is on his Training tab. Signing his agreement is what opens his crew pages. There is no handbook yet, so none is asked for.</p>
+    <p class="meta">Grouped by position and legal status. Set a person's position and W-2 or 1099 on his profile. Every email is one message with one private link to all of his unsigned forms, never one email per form; the same link is on his Training tab. Signing his agreement is what opens his crew pages. There is no handbook yet, so none is asked for.</p>
     ${[...groups.entries()].filter(([,ks])=>ks.length).map(([g,ks])=>`<h2 style="margin:18px 0 4px">${gTitle(g)}</h2><p class="meta" style="margin:0 0 8px">Signs: ${esc(gNeeds(g))}</p>${ks.map(paperCard).join("")}`).join("")||'<div class="card"><p class="meta">No crew or door hangers on the team list yet.</p></div>'}`;
   wireVault(app); wirePaper(app);
+  const all=app.querySelector("#pEmailAll");
+  if(all) all.onclick=async()=>{ all.disabled=true; let n=0;
+    for(const [k] of sendable){ all.textContent=`Sending ${++n} of ${sendable.length}…`; await paperSend(k); }
+    toast(`Sent ${sendable.length} email${sendable.length===1?"":"s"}, one per person`); render(); };
 }
 function wirePaper(app){
   app.querySelectorAll(".pname[data-person]").forEach(b=>b.onclick=()=>{ view="people"; personOpen=b.dataset.person; render(); window.scrollTo(0,0); });
