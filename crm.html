@@ -488,7 +488,7 @@ const firebaseConfig = {
 const ADMIN_EMAIL = "russel.mangiapaneiii@gmail.com";
 const COMPANY = "Mangiapane Brothers Lawn and Snow LLC";
 // Where each clearance tier lands. A person whose tier is not admin is sent to his page.
-const TIER_HOME = { admin:"index.html", crew:"crews.html", walker:"routes.html" };
+const TIER_HOME = { admin:"projects.html", crew:"crews.html", walker:"routes.html" };
 // ================================================================
 
 // ===== LISTS: edit these to add a region, source, or service type =====
@@ -600,7 +600,8 @@ auth.onAuthStateChanged(async user => {
   me = user; isRussel = !!user && user.email.toLowerCase() === ADMIN_EMAIL.toLowerCase();
   $("#who").textContent = user ? user.email : "";
   $("#signout").hidden = !user;
-  if(!user){ $("#gate").hidden=false; $("#app").hidden=true; $("#nav").hidden=true; $("#gateMsg").textContent=""; detach(); return; }
+  // Signed out: the front page signs people in and sends them back here (October 17, 2026).
+  if(!user){ detach(); location.replace("./?to=crm.html"); return; }
   try {
     if(isRussel){
       await db.ref("allowed/"+emailKey(user.email)).update({ name: user.displayName || "Russel", email: user.email.toLowerCase(), tier:"admin" });
@@ -2798,7 +2799,7 @@ document.addEventListener("keydown", e => { if(e.key==="Escape") closeMore(); })
 <div class="pgdrawer-bg" id="pgDrawerBg"></div>
 <nav class="pgdrawer" id="pgDrawer" aria-label="Pages" aria-hidden="true">
   <div class="pdhead"><b>Mangiapane Brothers</b><button type="button" class="pdx" id="pgDrawerX" aria-label="Close page menu">&times;</button></div>
-  <a href="./index.html">Projects<span>Admin task dashboard</span></a><a href="./crm.html" class="here" aria-current="page">CRM<span>Leads, clients, contracts</span></a><a href="./crews.html">Crews<span>Crew routes, day logs, approval</span></a><a href="./routes.html">Routes<span>Door hanger routes</span></a>
+  <a href="./projects.html">Projects<span>Admin task dashboard</span></a><a href="./crm.html" class="here" aria-current="page">CRM<span>Leads, clients, contracts</span></a><a href="./crews.html">Crews<span>Crew routes, day logs, approval</span></a><a href="./routes.html">Routes<span>Door hanger routes</span></a>
   <div class="pdfoot">Full-Service Property Maintenance for Those Who Take Pride in Their Home</div>
 </nav>
 <script>
