@@ -156,7 +156,8 @@
   .col.shut h2 .fold{transform:rotate(90deg)}
   @media(max-width:700px){.board{grid-template-columns:1fr!important}.col.shut{min-height:0;padding:10px;align-items:stretch}.col.shut h2{writing-mode:horizontal-tb;transform:none;flex-direction:row}.col.shut h2 .fold{transform:none}.col.shut h2 .n{margin-left:auto}}
   .lead{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:8px 10px;cursor:grab;user-select:none}
-  .lead:active{cursor:grabbing} .lead.dragging{opacity:.4}
+  .lead:active{cursor:grabbing} .lead.dragging{opacity:.35}
+  .lead{-webkit-user-select:none;-webkit-touch-callout:none} .lead.ghost{box-shadow:0 8px 24px rgba(0,0,0,.25);transform:rotate(2deg);opacity:.95;cursor:grabbing}
   .lead .name{font-weight:600}
   .lead .meta{margin-top:2px}
   .lead .stale{color:var(--red);font-weight:600}
@@ -777,7 +778,7 @@ function renderLeads(m){
     {key:"lost",label:"Lost",items:lost,cls:"lost"} ];
   const card = ([id,c]) => {
     const lc = lastContact(c); const stale = LEAD_STAGES.includes(c.status) && Date.now()-lc > 5*864e5;
-    return `<div class="lead" draggable="true" data-id="${id}">
+    return `<div class="lead" data-card="${id}" data-id="${id}">
       <div class="name">${esc(c.name)}${unsignedPill(c)}</div>
       <div class="meta">${tel(c.phone)}${c.region?" · "+esc(c.region):""}</div>
       <div class="meta">${esc(c.source||"")}${c.interest?" · "+esc(c.interest):""}</div>
@@ -801,7 +802,7 @@ function renderLeads(m){
         <div class="quickbtns"><button type="button" id="quickGo">Add lead</button><button class="primary" type="button" id="quickQuote">Add and quote</button></div>
       </form>
       <div id="quickDup"></div>
-      <div class="meta" style="margin-top:6px">Type while on the call. A number already in the CRM is flagged as you type. First contact is stamped when you press Add. Open a card to log notes. Drag cards between columns, or use the dropdown on a phone.</div>
+      <div class="meta" style="margin-top:6px">Type while on the call. A number already in the CRM is flagged as you type. First contact is stamped when you press Add. Open a card to log notes. Drag cards between columns: on an iPad or iPhone, hold a card a moment, then drag. The dropdown on a phone works too.</div>
     </div>
     <div class="srcstrip">${SOURCES.map(s=>`<span class="pill">${esc(s)} <b>${(src[s]||[]).length}</b></span>`).join("")}</div>
     <div class="board" style="grid-template-columns:${cols.map(col=>collapsedCols.has(col.key)?"52px":"minmax(230px,1fr)").join(" ")}">${cols.map(col=>{ const shut=collapsedCols.has(col.key); return `
@@ -838,21 +839,50 @@ function renderLeads(m){
   $("#quickGo").onclick = () => quick(false); $("#quickQuote").onclick = () => quick(true);
   form.onkeydown = e => { if(e.key==="Enter" && e.target.tagName==="INPUT"){ e.preventDefault(); quick(false); } };
   m.querySelectorAll(".lead").forEach(el=>{
-    el.onclick = e => { if(!e.target.closest("select,a,button")) openClient(el.dataset.id); };
-    el.ondragstart = e => { e.dataTransfer.setData("text/plain", el.dataset.id); el.classList.add("dragging"); };
-    el.ondragend = () => el.classList.remove("dragging");
+    el.onclick = e => { if(!justDragged(m) && !e.target.closest("select,a,button")) openClient(el.dataset.id); };
   });
   m.querySelectorAll("select[data-stage]").forEach(s=> s.onchange = () => setStatus(s.dataset.stage, s.value));
   m.querySelectorAll("[data-lead-send]").forEach(b=> b.onclick = () => openSeasonal(b.dataset.leadSend));
   m.querySelectorAll("[data-lead-status]").forEach(b=> b.onclick = () => showSentFor(b.dataset.leadStatus));
   m.querySelectorAll("[data-lead-view]").forEach(b=> b.onclick = () => { const [cid2,ct]=b.dataset.leadView.split("|"); viewContract(cid2, ct); });
   m.querySelectorAll("[data-fold]").forEach(h=> h.onclick = () => toggleCol(h.dataset.fold));
-  m.querySelectorAll(".col").forEach(col=>{
-    col.ondragover = e => { e.preventDefault(); col.classList.add("drop"); };
-    col.ondragleave = () => col.classList.remove("drop");
-    col.ondrop = e => { e.preventDefault(); col.classList.remove("drop"); const id=e.dataTransfer.getData("text/plain"); if(id) setStatus(id, col.dataset.col); };
+  // Drag by mouse, or by finger on the iPad and iPhone (hold a card a moment, then drag). October 17, 2026.
+  boardDrag(m, (id, col) => setStatus(id, col));
+}
+// Drag a card to another column, by mouse or by finger: on an iPad or iPhone, hold the card a moment, then drag.
+// Shared with the CRM's Leads board. onDrop(id, column) decides what the move means.
+function boardDrag(root, onDrop){
+  let st=null, raf=0;
+  const SKIP="a,button,select,input,textarea,label";
+  const colAt=(x,y)=>{ const el=document.elementFromPoint(x,y); return el&&el.closest("[data-col]"); };
+  const mark=c=>{ root.querySelectorAll("[data-col].drop").forEach(x=>{ if(x!==c) x.classList.remove("drop"); }); if(c) c.classList.add("drop"); };
+  const begin=()=>{ const r=st.card.getBoundingClientRect(), g=st.card.cloneNode(true); g.classList.add("ghost");
+    Object.assign(g.style,{position:"fixed",left:r.left+"px",top:r.top+"px",width:r.width+"px",pointerEvents:"none",zIndex:3000,margin:0});
+    document.body.appendChild(g); st.g=g; st.dx=st.x0-r.left; st.dy=st.y0-r.top; st.on=true; st.card.classList.add("dragging"); try{ navigator.vibrate&&navigator.vibrate(10); }catch(e){}
+    const tick=()=>{ if(!st||!st.on) return; const m=60, sp=14; if(st.y<m) window.scrollBy(0,-sp); else if(st.y>innerHeight-m) window.scrollBy(0,sp);
+      const b=root.querySelector(".board"); if(b){ const br=b.getBoundingClientRect(); if(st.x<br.left+m) b.scrollLeft-=sp; else if(st.x>br.right-m) b.scrollLeft+=sp; }
+      mark(colAt(st.x,st.y)); raf=requestAnimationFrame(tick); }; raf=requestAnimationFrame(tick); };
+  const move=(x,y)=>{ st.x=x; st.y=y; if(st.on){ st.g.style.left=(x-st.dx)+"px"; st.g.style.top=(y-st.dy)+"px"; } };
+  const finish=()=>{ if(!st) return; clearTimeout(st.timer); cancelAnimationFrame(raf); document.removeEventListener("touchmove",tmove,{passive:false}); document.removeEventListener("touchend",tend); document.removeEventListener("touchcancel",tcancel);
+    document.removeEventListener("mousemove",mmove); document.removeEventListener("mouseup",mup);
+    if(st.on){ const c=colAt(st.x,st.y); st.g.remove(); st.card.classList.remove("dragging"); mark(null); root._dragEnd=Date.now(); const id=st.id; st=null; if(c&&c.dataset.col) onDrop(id,c.dataset.col); return; }
+    st=null; };
+  const tmove=e=>{ const p=e.touches[0]; if(!st||!p) return; if(!st.on){ if(Math.hypot(p.clientX-st.x0,p.clientY-st.y0)>10){ clearTimeout(st.timer); finish(); } return; } e.preventDefault(); move(p.clientX,p.clientY); };
+  const tend=()=>finish(), tcancel=()=>{ if(st&&st.on){ st.g.remove(); st.card.classList.remove("dragging"); mark(null); } st&&clearTimeout(st.timer); st=null; };
+  const mmove=e=>{ if(!st) return; if(!st.on && Math.hypot(e.clientX-st.x0,e.clientY-st.y0)>5) begin(); if(st.on){ e.preventDefault(); move(e.clientX,e.clientY); } };
+  const mup=()=>finish();
+  root.querySelectorAll("[data-card]").forEach(card=>{
+    card.addEventListener("touchstart",e=>{ if(e.touches.length!==1||e.target.closest(SKIP)) return; const p=e.touches[0];
+      st={card,id:card.dataset.card,x0:p.clientX,y0:p.clientY,x:p.clientX,y:p.clientY,on:false}; st.timer=setTimeout(()=>{ if(st) begin(); },280);
+      document.addEventListener("touchmove",tmove,{passive:false}); document.addEventListener("touchend",tend); document.addEventListener("touchcancel",tcancel); },{passive:true});
+    card.addEventListener("mousedown",e=>{ if(e.button!==0||e.target.closest(SKIP)) return; e.preventDefault();
+      st={card,id:card.dataset.card,x0:e.clientX,y0:e.clientY,x:e.clientX,y:e.clientY,on:false}; document.addEventListener("mousemove",mmove); document.addEventListener("mouseup",mup); });
+    card.addEventListener("contextmenu",e=>{ if(st) e.preventDefault(); });
   });
 }
+const justDragged = root => Date.now()-(root._dragEnd||0) < 400;
+
+
 function wireDup(root){ root.querySelectorAll("[data-open-dup]").forEach(b=>b.onclick=()=>{ const id=b.dataset.openDup; if($("#clientDlg").open) $("#clientDlg").close(); openClient(id); }); }
 
 // Clients list

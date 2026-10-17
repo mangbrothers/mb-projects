@@ -158,6 +158,7 @@
   textarea{min-height:80px;resize:vertical}
   label{display:block;font-size:12px;color:var(--muted);margin:8px 0 3px}
   .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .lg input{font-size:16px} .lg code{font-size:15px}
   @media(max-width:600px){.grid2{grid-template-columns:1fr}}
   dialog{border:1px solid var(--line);border-radius:10px;padding:0;width:min(560px,94vw);box-shadow:var(--shadow);background:var(--card);color:var(--ink)}
   dialog::backdrop{background:rgba(10,16,28,.45)}
@@ -203,6 +204,7 @@
     <button data-view="person">By person</button>
     <button data-view="deadlines">Deadlines</button>
     <button data-view="import">Import from Claude</button>
+    <button data-view="logins">Passwords</button>
     <div class="more" id="more">
       <button id="moreBtn" aria-haspopup="menu" aria-expanded="false">More <span class="caret">&#9662;</span></button>
       <div class="menu" id="moreMenu" role="menu">
@@ -477,11 +479,12 @@ auth.onAuthStateChanged(async user => {
 // ---------- realtime listeners ----------
 const refs = {};
 function attach(){
-  refs.p = db.ref("projects"); refs.t = db.ref("tasks"); refs.a = db.ref("allowed"); refs.f = db.ref("fileMeta");
+  refs.p = db.ref("projects"); refs.t = db.ref("tasks"); refs.a = db.ref("allowed"); refs.f = db.ref("fileMeta"); refs.l = db.ref("logins");
   refs.p.on("value", s => { projects = s.val()||{}; render(); });
   refs.t.on("value", s => { tasks = s.val()||{}; render(); });
   refs.a.on("value", s => { team = s.val()||{}; render(); });
   refs.f.on("value", s => { files = s.val()||{}; render(); if(filesDlgProject) renderFilesList(); });
+  refs.l.on("value", s => { logins = s.val()||{}; if(view==="logins") render(); }, () => {});
   Promise.all([refs.p.once("value"), refs.t.once("value"), refs.f.once("value")]).then(autoPurge);
 }
 function detach(){ Object.values(refs).forEach(r => r && r.off()); }
@@ -492,7 +495,7 @@ function detach(){ Object.values(refs).forEach(r => r && r.off()); }
 // second multi-path update that puts things back. The stack lives only in this
 // browser tab; it undoes your own actions, not a teammate's.
 const stamp = () => ({ updatedAt: Date.now(), updatedBy: me.email });
-const cache = { projects: () => projects, tasks: () => tasks, allowed: () => team, fileMeta: () => files };
+const cache = { projects: () => projects, tasks: () => tasks, allowed: () => team, fileMeta: () => files, logins: () => logins };
 function getAt(path){ const [root, ...rest] = path.split("/"); let v = cache[root] ? cache[root]() : undefined; for(const k of rest){ if(v==null) return null; v = v[k]; } return v === undefined ? null : JSON.parse(JSON.stringify(v)); }
 const undoStack = [];
 async function commit(label, updates){
@@ -738,6 +741,7 @@ function render(){
   else if(view==="archive") renderArchive(m);
   else if(view==="tools") renderTools(m);
   else if(view==="trash") renderTrash(m);
+  else if(view==="logins") renderLogins(m);
 }
 
 // ---------- essential timeline ----------
@@ -1056,6 +1060,45 @@ function snapshot(){
   return out.join("\n");
 }
 function backupJson(){ return JSON.stringify({ exportedAt:new Date().toISOString(), exportedBy:me.email, allowed:team, projects, tasks, fileMeta:files, note:"File contents (fileData) are not included; download files individually from the Files tab." }, null, 2); }
+// ---------- Passwords (October 17, 2026) ----------
+// The admin team's logins for the company's outside accounts (QuickBooks, Canva, Quo, GoDaddy...). Admins only: the
+// database rules keep crews and walkers out. Passwords stay hidden until Show, and Copy puts one on the clipboard.
+let logins = {}, loginEdit = null, loginQ = "", loginShown = new Set();
+function renderLogins(m){
+  const q=loginQ.toLowerCase(), list=Object.entries(logins).filter(([,l])=>l && (!q || [l.site,l.url,l.user,l.note].join(" ").toLowerCase().includes(q)))
+    .sort((a,b)=>(a[1].site||"").localeCompare(b[1].site||""));
+  const e=loginEdit ? (logins[loginEdit]||{}) : {};
+  const href=u=>!u?"":/^https?:\/\//i.test(u)?u:"https://"+u;
+  m.innerHTML=`<div class="lg"><div class="card"><h2>${loginEdit?"Change "+esc(e.site||"login"):"Add a login"}</h2>
+    <div class="grid2"><div><label for="lgSite">Site or service</label><input id="lgSite" value="${esc(e.site||"")}" placeholder="QuickBooks" autocomplete="off"></div>
+      <div><label for="lgUrl">Web address</label><input id="lgUrl" value="${esc(e.url||"")}" placeholder="quickbooks.intuit.com" autocomplete="off" autocapitalize="off"></div>
+      <div><label for="lgUser">Username or email</label><input id="lgUser" value="${esc(e.user||"")}" autocomplete="off" autocapitalize="off" spellcheck="false"></div>
+      <div><label for="lgPass">Password</label><input id="lgPass" value="${esc(e.pass||"")}" autocomplete="new-password" autocapitalize="off" spellcheck="false"></div></div>
+    <label for="lgNote">Notes (2-step code goes to, PIN, who set it up)</label><input id="lgNote" value="${esc(e.note||"")}" autocomplete="off">
+    <div class="actions" style="display:flex;gap:8px;justify-content:flex-end;margin-top:10px">${loginEdit?`<button id="lgCancel">Cancel</button>`:""}<button class="primary" id="lgSave">${loginEdit?"Save":"Add login"}</button></div></div>
+    <div class="card"><h2>Passwords <span class="meta">${Object.keys(logins).length} saved</span></h2>
+    <p class="meta" style="white-space:normal">Only admins can open this tab. Tap Show to see a password, Copy to put it on the clipboard.</p>
+    <input id="lgQ" value="${esc(loginQ)}" placeholder="Search" autocomplete="off" style="margin:8px 0">
+    ${list.map(([id,l])=>`<div class="lgrow" style="border-top:1px solid var(--line);padding:10px 0">
+      <div style="display:flex;gap:8px;align-items:baseline;flex-wrap:wrap"><b>${esc(l.site||"")}</b>${l.url?`<a href="${esc(href(l.url))}" target="_blank" rel="noopener" style="font-size:14px">${esc(l.url)}</a>`:""}
+        <span style="margin-left:auto;display:flex;gap:6px"><button class="small" data-lgedit="${id}">Edit</button><button class="small danger" data-lgdel="${id}">Delete</button></span></div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:6px"><span class="meta" style="width:74px">Username</span><code style="word-break:break-all">${esc(l.user||"")}</code>${l.user?`<button class="small" data-lgcopy="${id}|user">Copy</button>`:""}</div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:4px"><span class="meta" style="width:74px">Password</span><code style="word-break:break-all">${loginShown.has(id)?esc(l.pass||""):(l.pass?"&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;":"")}</code>${l.pass?`<button class="small" data-lgshow="${id}">${loginShown.has(id)?"Hide":"Show"}</button><button class="small" data-lgcopy="${id}|pass">Copy</button>`:""}</div>
+      ${l.note?`<div class="meta" style="white-space:normal;margin-top:4px">${esc(l.note)}</div>`:""}
+      <div class="meta" style="margin-top:2px">${l.updatedBy?"Changed by "+esc(l.updatedBy)+" ":""}${l.updatedAt?new Date(l.updatedAt).toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"}):""}</div></div>`).join("")||`<p class="meta">${q?"Nothing matches.":"No logins yet. Add the first one above."}</p>`}</div></div>`;
+  $("#lgSave").onclick=async()=>{ const site=$("#lgSite").value.trim(); if(!site) return toast("Name the site or service");
+    const id=loginEdit||db.ref("logins").push().key, v={ site, url:$("#lgUrl").value.trim()||null, user:$("#lgUser").value.trim()||null, pass:$("#lgPass").value||null, note:$("#lgNote").value.trim()||null, ...stamp() };
+    if(!loginEdit){ v.createdAt=Date.now(); v.createdBy=me.email; }
+    await commit((loginEdit?"Changed":"Added")+" the "+site+" login", fieldUpdates("logins/"+id, v)); loginEdit=null; render(); };
+  const c=$("#lgCancel"); if(c) c.onclick=()=>{ loginEdit=null; render(); };
+  const qb=$("#lgQ"); qb.oninput=()=>{ loginQ=qb.value; const pos=qb.selectionStart; render(); const n=$("#lgQ"); n.focus(); try{ n.setSelectionRange(pos,pos); }catch(e){} };
+  m.querySelectorAll("[data-lgedit]").forEach(b=>b.onclick=()=>{ loginEdit=b.dataset.lgedit; render(); window.scrollTo(0,0); });
+  m.querySelectorAll("[data-lgdel]").forEach(b=>b.onclick=()=>commit("Deleted the "+(logins[b.dataset.lgdel]||{}).site+" login", { ["logins/"+b.dataset.lgdel]: null }));
+  m.querySelectorAll("[data-lgshow]").forEach(b=>b.onclick=()=>{ const id=b.dataset.lgshow; loginShown.has(id)?loginShown.delete(id):loginShown.add(id); render(); });
+  m.querySelectorAll("[data-lgcopy]").forEach(b=>b.onclick=async()=>{ const [id,f]=b.dataset.lgcopy.split("|"), v=(logins[id]||{})[f]||"";
+    try{ await navigator.clipboard.writeText(v); toast((f==="pass"?"Password":"Username")+" copied"); }catch(e){ toast("Copy did not work here. Tap Show and copy it by hand."); } });
+}
+
 function renderTools(m){
   const stamp=today();
   m.innerHTML = `<div class="card"><h2>Tools</h2><p class="meta">Downloads built from the live data at the moment you click.</p>

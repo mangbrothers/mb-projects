@@ -160,6 +160,30 @@
   .viewas{font-size:16px}
   .kindbtns{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
   .kindbtns button{padding:14px 10px;font-weight:650}
+  /* Team Manager: the Onboarding board, built like the CRM's Leads board */
+  .quick{display:grid;grid-template-columns:repeat(6,1fr) auto;gap:8px;align-items:end}
+  .quick label{margin:0 0 3px} .quick .quickbtns{display:flex;gap:6px}
+  @media(max-width:1000px){.quick{grid-template-columns:1fr 1fr 1fr}} @media(max-width:600px){.quick{grid-template-columns:1fr}}
+  .board{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(158px,1fr);gap:8px;overflow-x:auto;padding-bottom:6px;align-items:stretch}
+  /* the board uses the whole screen width, not the page column */
+  @media(min-width:701px){.board.wide{width:calc(100vw - 32px);margin-left:calc(50% - 50vw + 16px)}}
+  .col{background:var(--surface2);border:1px solid var(--line);border-radius:var(--r);padding:10px;min-height:300px;display:flex;flex-direction:column;gap:8px}
+  .col h2{font-size:13px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink2);margin:0 0 2px;display:flex;align-items:center;gap:6px;cursor:pointer;user-select:none}
+  .col h2 .n{margin-left:auto;font-weight:500;color:var(--muted)} .col h2 .fold{font-size:11px;color:var(--muted);width:12px}
+  .col.drop{box-shadow:inset 0 0 0 2px var(--accent)} .col.won{background:var(--green-soft)} .col.lost{background:var(--red-soft)}
+  .col.shut{padding:10px 4px;align-items:center} .col.shut h2{writing-mode:vertical-rl;transform:rotate(180deg);flex-direction:row-reverse;margin:0;white-space:nowrap}
+  .col.shut h2 .n{margin-left:0;margin-top:auto} .col.shut h2 .fold{transform:rotate(90deg)}
+  .tcard{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:8px 10px;cursor:grab;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
+  .tcard .name{font-weight:600} .tcard .meta{margin-top:2px} .tcard.dragging{opacity:.35} .tcard.ghost{box-shadow:0 8px 24px rgba(0,0,0,.25);transform:rotate(2deg);opacity:.95;cursor:grabbing}
+  .tcard.past .name{color:var(--ink2)} .tcard select{margin-top:6px;width:100%}
+  @media(min-width:701px){.tcard select{display:none}}
+  @media(max-width:700px){.board{grid-auto-flow:row;grid-auto-columns:auto;grid-template-columns:1fr!important}.col{min-height:0}.col.shut{padding:10px;align-items:stretch}.col.shut h2{writing-mode:horizontal-tb;transform:none;flex-direction:row}.col.shut h2 .fold{transform:none}.col.shut h2 .n{margin-left:auto}}
+  .clip{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;margin-top:3px}
+  .srcstrip{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px} .srcstrip .pill{background:var(--card);border:1px solid var(--line);color:var(--ink2);border-radius:999px;padding:3px 10px;font-size:13px}
+  .pfe{border-top:1px solid var(--line);padding:10px 0} .pfe .h{display:flex;gap:6px;align-items:center;flex-wrap:wrap} .pfe .h .muted{margin-left:auto}
+  .pfe .t{white-space:pre-wrap;margin-top:4px;line-height:1.45}
+  .checkrow{display:flex;gap:8px;align-items:center;color:var(--ink);margin:6px 0} .checkrow .muted{margin-left:auto}
+  textarea{width:100%;box-sizing:border-box}
 </style>
 </head>
 <body>
@@ -338,10 +362,13 @@ function attach(){
     bind("timeEntries", v=>timeAll=v);
     bind("staff", v=>staffAll=v); bind("staffPrivate", v=>privAll=v); bind("staffDocs", v=>docsAll=v); bind("shifts", v=>shiftsAll=v);
     bind("payLog", v=>payLogAll=v); bind("staffVault", v=>vault=v); bind("contractTemplates/_signing", v=>svcCfg=v&&v.url?v:null);
+    bind("applicants", v=>applicants=v); bind("personFile", v=>personFile=v); bind("staffReports", v=>reportsAll=v); bind("staffArchive", v=>archive=v); bind("personFileDoc", v=>fileDocs=v);
   } else {
     // An employee's own record. The office preview reads the office's copy instead.
     const own = (path, map) => unsub.push(store.on(path+"/"+me.key, v=>{ map[me.key]=v||{}; render(); }));
     own("timeEntries", timeAll); own("staff", staffAll); own("staffPrivate", privAll); own("staffDocs", docsAll); own("shifts", shiftsAll); own("payLog", payLogAll);
+    // A manager reads the employee reports he and the office filed for his crew.
+    if(role==="manager" && myCrew) unsub.push(store.on("staffReports/"+myCrew, v=>{ reportsAll={ [myCrew]:v||{} }; render(); }));
   }
   dayBind(); memberBind();
 }
@@ -380,7 +407,7 @@ function setViewAs(c){
 // ---------- helpers on the data ----------
 const crewList = () => Object.entries(crews).filter(([,c])=>c && c.active!==false).sort((a,b)=>(a[1].order??99)-(b[1].order??99)||a[0].localeCompare(b[0],undefined,{numeric:true})).map(([k])=>k);
 const crewMembers = c => (crews[c]||{}).members||{};
-const personName = k => !k ? "No one" : ((team[k]||{}).name || (Object.values(crews).map(c=>(c.members||{})[k]).find(Boolean)) || k.replace(/,/g,"."));
+const personName = k => !k ? "No one" : ((team[k]||{}).name || (Object.values(crews).map(c=>(c.members||{})[k]).find(Boolean)) || (archive[k]||{}).name || k.replace(/,/g,"."));
 const viewCrew = () => viewAs || myCrew;
 const routeName = r => r.name || SERVICES[r.service] || "Route";
 const stopsOf = r => Object.entries(r.stops||{}).map(([id,s])=>({id,...s})).sort((a,b)=>(a.order??999)-(b.order??999)||(a.name||"").localeCompare(b.name||""));
@@ -408,7 +435,7 @@ const myTimeMap = () => timeAll[me.key]||{};
 
 // ---------- navigation ----------
 function tabs(){
-  const t = isAdmin ? [["today","Day"],["week","Week"],["routes","Routes"],["crews","Crews"],["people","People"],["log","Log"],["events","Meetings"],["paycfg","Pay"]]
+  const t = isAdmin ? [["today","Day"],["week","Week"],["routes","Routes"],["crews","Crews"],["onboard","Onboarding"],["people","Personnel"],["reports","Reports"],["log","Log"],["events","Meetings"],["paycfg","Pay"]]
     : role==="manager" ? [["today","Today"],["week","Week"],["crewlog","Crew log"],["crew","Crew"],["me","Me"]]
     : [["schedule","Schedule"],["hours","Hours"],["pay","Pay"],["files","Files"],["info","My info"]];
   $("#nav").innerHTML = t.map(([k,l])=>`<button data-v="${k}" class="${view===k&&!openRoute&&!editing?"on":""}">${l}</button>`).join("")
@@ -416,7 +443,7 @@ function tabs(){
   const pb=$("#previewBar"); pb.hidden=!viewAs;
   if(viewAs){ pb.innerHTML=`${isEmpPreview()?`Employee preview: this is what <b>${esc(me.name)}</b> sees.`:`Manager preview: this is what the <b>${esc(viewAs)}</b> manager sees.`} Nothing is saved. <button class="small" id="exitPreview">Back to office view</button>`; $("#exitPreview").onclick=()=>setViewAs(""); }
   const va=$("#viewAs"); if(va) va.onchange=()=>setViewAs(va.value);
-  $("#nav").querySelectorAll("button[data-v]").forEach(b=>b.onclick=()=>{ view=b.dataset.v; openRoute=null; editing=null; personOpen=null; render(); window.scrollTo(0,0); });
+  $("#nav").querySelectorAll("button[data-v]").forEach(b=>b.onclick=()=>{ view=b.dataset.v; openRoute=null; editing=null; personOpen=null; applicantOpen=null; archiveOpen=null; render(); window.scrollTo(0,0); });
 }
 function dateBar(step){
   const sel = isAdmin && ["today","week","log"].includes(view) ? `<select id="cf" style="width:auto"><option value="">All crews</option>${crewList().map(c=>`<option ${crewFilter===c?"selected":""}>${esc(c)}</option>`).join("")}</select>` : "";
@@ -447,7 +474,7 @@ function render(){
   openRoute=null;
   if(role==="member" && !["schedule","hours","pay","files","info"].includes(view)) view="schedule";
   ({today:renderToday, week:renderWeek, crewlog:renderCrewLog, crew:renderCrewTab, me:renderMe, schedule:renderMySchedule, hours:renderHours, pay:renderPay, files:renderFiles, info:renderInfo,
-    routes:renderRoutes, crews:renderCrews, people:renderPeople, log:renderLog, events:renderSchedule, paycfg:renderPayCfg}[view]||renderToday)(app);
+    routes:renderRoutes, crews:renderCrews, people:renderPeople, onboard:renderOnboard, reports:renderReports, log:renderLog, events:renderSchedule, paycfg:renderPayCfg}[view]||renderToday)(app);
 }
 
 // Today: for a crew, the clock, the storm, the day's routes and meetings. For the office, one lane per crew.
@@ -668,6 +695,7 @@ function logHtml(d, crew){
     <h3 style="margin-top:12px">Stops</h3>${rows.map(x=>`<div class="logrow"><span class="t">${fmtTime(x.k.at)}</span><span class="w"><b>${esc(x.s.name)}</b> <span class="meta">${esc(x.s.address||"")}</span><div class="meta">${esc(KINDS[x.k.kind]||x.k.kind)}${x.k.ladder?", ladder":""} &middot; ${esc(personName(x.k.by))} &middot; ${esc(routeName(x.r))}${x.k.note?" &middot; "+esc(x.k.note):""}</div></span>${(((payRates.callbacks||{})[d]||{})[x.rid]||{})[x.s.id]?' <span class="chip bad">Callback</span>':""}${x.k.photo?`<button class="small" data-lview="${esc(x.rid)}|${esc(x.s.id)}">Photo</button>`:'<span class="chip bad">No photo</span>'}${isAdmin&&!viewAs?`<button class="small" data-cb="${esc(x.rid)}|${esc(x.s.id)}">${(((payRates.callbacks||{})[d]||{})[x.rid]||{})[x.s.id]?"Undo callback":"Callback"}</button>`:""}</div>`).join("")||'<p class="muted">Nothing checked off.</p>'}
     ${skipped.length?`<h3 style="margin-top:12px">Skipped</h3>${skipped.map(x=>`<div class="logrow"><span class="t">${fmtTime(x.k.at)}</span><span class="w"><b>${esc(x.s.name)}</b><div class="meta">${esc(x.k.reason||"")} &middot; ${esc(personName(x.k.by))}</div></span></div>`).join("")}`:""}
     ${open.length?`<h3 style="margin-top:12px">Not done</h3><p class="meta">${open.map(x=>esc(x.s.name)).join(", ")}</p>`:""}
+    ${reportsHtml(d, crew)}
     ${locked?"":`<div class="actions"><span class="muted" style="margin-right:auto">Approving locks the day, approves the hours above and sends the stops to billing.</span><button class="primary" id="approveDay" data-crew="${esc(crew)}">Approve ${esc(crew)} day</button></div>`}</div>`;
 }
 function wireLog(root, d){
@@ -677,6 +705,7 @@ function wireLog(root, d){
   root.querySelectorAll("[data-tin]").forEach(i=>i.onchange=()=>setT(i,"in"));
   root.querySelectorAll("[data-tout]").forEach(i=>i.onchange=()=>setT(i,"out"));
   root.querySelectorAll("#approveDay").forEach(b=>b.onclick=()=>approveDay(d, b.dataset.crew));
+  root.querySelectorAll("[data-report]").forEach(b=>b.onclick=()=>reportDialog(b.dataset.report, d));
   const crewOfCard = el => { const c=el.closest(".card"); const b=c&&c.querySelector("#approveDay"); return b?b.dataset.crew:(c&&c.dataset.crew)||viewCrew(); };
   root.querySelectorAll("#stTier").forEach(sel=>sel.onchange=()=>{ if(previewOnly()) return; store.update({[`storms/${d}/${crewOfCard(sel)}/tier`]:sel.value}).then(()=>toast("Depth changed")); });
   root.querySelectorAll("#stTwo").forEach(cb=>cb.onchange=()=>{ if(previewOnly()) return; store.update({[`storms/${d}/${crewOfCard(cb)}/twoPass`]:cb.checked||null}).then(()=>toast(cb.checked?"Marked two-pass":"Not two-pass")); });
@@ -963,7 +992,7 @@ function renderCrewTab(app){
 function renderPeople(app){
   if(personOpen && team[personOpen]) return renderPerson(app, personOpen);
   const list=people();
-  app.innerHTML=`<div class="bar"><span class="date">People</span></div><p class="meta">Everyone with the Crew access level. Add people on the Team list in Projects; put them on a crew under Crews. Files go to the company Google Drive; tax and ID forms are never shown on an employee's page.</p>
+  app.innerHTML=`<div class="bar"><span class="date">Personnel</span></div><p class="meta">Every employee. People come here from Onboarding when you drag them to Hired, or from the Team list in Projects with the Crew access level; put them on a crew under Crews. Past employees are in the Past column on Onboarding. Files go to the company Google Drive; tax and ID forms are never shown on an employee's page.</p>
     <div class="card scroll"><table><tr><th>Name</th><th>Crew</th><th>Phone</th><th>Pay rate</th><th>Files</th></tr>
     ${list.map(([k,t])=>{ const st=docStatus(k); return `<tr data-person="${esc(k)}" style="cursor:pointer"><td><b>${esc(t.name)}</b><div class="muted">${esc(t.email)}</div></td><td>${esc(t.crew||"No crew")}${t.crewRole==="manager"?" (manager)":""}</td><td>${esc(staffOf(k).phone||"")}</td><td>${roleOf(k)==="manager"?"Manager":"Crew"}</td>
       <td>${st.missing.length?`<span class="chip warn">${st.missing.length} missing</span> `:""}${st.expired.length?`<span class="chip bad">${st.expired.length} expired</span> `:""}${st.soon.length?`<span class="chip warn">${st.soon.length} expiring</span>`:""}${!st.missing.length&&!st.expired.length&&!st.soon.length?'<span class="chip ok">Up to date</span>':""}</td></tr>`; }).join("")||'<tr><td colspan="5" class="meta">No crew people on the Team list yet.</td></tr>'}</table></div>`;
@@ -971,7 +1000,7 @@ function renderPeople(app){
 }
 function renderPerson(app, k){
   const t=team[k]||{}, s=staffOf(k), em=s.emergency||{}, pv=privAll[k]||{}, st=docStatus(k);
-  app.innerHTML=`<div class="bar"><button class="small" id="back">&#8249; People</button><span class="date">${esc(t.name)}</span><button class="small" id="seeAs">See as ${esc((t.name||"").split(" ")[0])}</button></div>
+  app.innerHTML=`<div class="bar"><button class="small" id="back">&#8249; Personnel</button><span class="date">${esc(t.name)}</span><button class="small" id="seeAs">See as ${esc((t.name||"").split(" ")[0])}</button></div>
     <form class="card" id="pfForm"><h2>Profile</h2><div class="grid2">
       <div><label for="pfPhone">Phone</label><input id="pfPhone" type="tel" value="${esc(s.phone||"")}"></div><div><label for="pfAddr">Home address</label><input id="pfAddr" value="${esc(s.address||"")}"></div>
       <div><label for="pfEmName">Emergency contact</label><input id="pfEmName" value="${esc(em.name||"")}"></div><div><label for="pfEmPhone">Their phone</label><input id="pfEmPhone" type="tel" value="${esc(em.phone||"")}"></div>
@@ -986,8 +1015,12 @@ function renderPerson(app, k){
         <label for="upFile">File (PDF or photo, up to 7 MB)</label><input id="upFile" type="file" accept="application/pdf,image/*,.doc,.docx">
         <div class="actions"><button class="primary" id="upGo">Upload to Drive</button></div><p class="muted">Ordinary files are shared view-only with ${esc(t.email||"the employee")} so they can open them. Tax and ID forms stay in the office's Drive and show only as on file.</p></div>
     <div class="card"><div class="top" style="display:flex;justify-content:space-between;gap:10px;align-items:baseline"><h2>Shifts, next month</h2><button class="small primary" data-shadd="${esc(k)}">Add shifts</button></div>${shiftList(k, today(), SCHEDULE_DAYS)}</div>
-    <h2 style="margin:14px 0 8px">Pay log</h2>${payRowsHtml(k)}`;
+    <h2 style="margin:14px 0 8px">Pay log</h2>${payRowsHtml(k)}
+    ${s.applicantId||s.indeedUrl?`<div class="card"><h2>Hiring</h2><p class="meta">${s.hiredAt?"Hired "+fmtDay(iso(new Date(s.hiredAt)))+" from Onboarding":"Hired"}${s.appliedFor?", applied for "+esc(APPLIED_FOR[s.appliedFor]||s.appliedFor):""}${s.source?" through "+esc(s.source):""}.</p>${s.indeedUrl?`<a class="mapbtn" href="${esc(s.indeedUrl)}" target="_blank" rel="noopener">Indeed profile</a>`:""}</div>`:""}
+    ${pfileHtml(k)}
+    <div class="card"><h2>Leaving</h2><p class="meta">Moves ${esc(firstName(t.name))}'s whole record to the archive and takes him off the Team list. It asks first.</p><div class="actions"><button class="danger" id="toPast">Move to Past</button></div></div>`;
   $("#back").onclick=()=>{ personOpen=null; render(); };
+  $("#toPast").onclick=()=>archiveDialog(k); wirePfile(app, k);
   $("#seeAs").onclick=()=>setViewAs("emp:"+k);
   $("#pfForm").onsubmit=async e=>{ e.preventDefault();
     try { await store.update({ [`staff/${k}/phone`]:$("#pfPhone").value.trim()||null, [`staff/${k}/address`]:$("#pfAddr").value.trim()||null,
@@ -1005,8 +1038,8 @@ async function uploadDoc(k){
   if(f.size>7*1024*1024) return toast("That file is over 7 MB");
   const kind=$("#upKind").value, label=$("#upLabel").value.trim()||DOC_KINDS[kind], id=store.key(), btn=$("#upGo"); btn.disabled=true;
   try { toast("Uploading");
-    const up={ k, personName:(team[k]||{}).name||"", fileName:f.name, mime:f.type||"application/octet-stream", data:await readB64(f), kind, sensitive:SENSITIVE.includes(kind), label,
-      signedAt:$("#upSigned").value||null, expires:$("#upExp").value||null, at:Date.now(), by:me.email };
+    const up={ k, personName:(team[k]||{}).name||(applicants[k]||{}).name||"", fileName:f.name, mime:f.type||"application/octet-stream", data:await readB64(f), kind, sensitive:SENSITIVE.includes(kind), label,
+      signedAt:($("#upSigned")||{}).value||null, expires:($("#upExp")||{}).value||null, at:Date.now(), by:me.email };
     if(DEMO){ await store.update({ [`staffDocs/${k}/${id}`]:{ name:label, fileName:f.name, kind, sensitive:up.sensitive, at:Date.now(), by:me.email, signedAt:up.signedAt, expires:up.expires, ...(up.sensitive?{}:{url:"https://drive.google.com/", shared:true}) } }); toast("Saved (demo)"); return; }
     await store.update({ [`sync/staffUpload/${id}`]:up });
     if(!svcCfg) { toast("Queued. The signing service is not set here, so it uploads on its next 5-minute run."); return; }
@@ -1166,6 +1199,310 @@ function renderPayCfg(app){
     await store.update(upd); toast("Rates saved"); };
 }
 
+
+// ---------- Team Manager (October 17, 2026): Onboarding, Personnel, Reports ----------
+// Onboarding is the hiring board, built like the CRM's Leads board. Applicants (Indeed imports or added by hand) stay on
+// the board with their own profile, and their files sit in Drive under Potential Hires. Nobody gets an employee profile
+// until he is dragged to Hired: that asks first, then makes his Personnel profile and Team entry and carries his notes,
+// Indeed profile, interviews and files into his employee file. Dragging an employee to Past also asks first, then moves
+// his whole record (profile, files, shifts, hours, pay log) into the archive. Bringing him back restores it.
+// Every person has one personnel file: the Indeed profile, calls, interviews, reference checks, notes, stage changes
+// and employee reports. The signing service keeps it as a PDF in his Drive folder.
+const HIRE_STAGES = { applied:"Applied", screen:"Phone screen", interview:"Interview", offer:"Offer", hired:"Hired", backup:"Backup", nothired:"Not hired", past:"Past" };
+const BOARD_STAGES = ["applied","screen","interview","offer","hired","backup","nothired","past"];
+const APPLIED_FOR = { crew:"Crew member", manager:"Crew manager", walker:"Door hanger", office:"Office" };
+const HIRE_SOURCES = ["Indeed","Referral","Facebook","Walk-in","Returning","Other"];
+const HIRE_CHECKS = { screen:"Phone screen done", refs:"References called", driving:"Driving record pulled", consent:"Background check consent", offer:"Offer and contract sent", training:"Training date set" };
+const FILE_TYPES = { indeed:"Indeed profile", call:"Phone call", interview:"Interview", reference:"Reference check", note:"Note", report:"Employee report", stage:"Stage change", hired:"Hired", past:"Moved to Past" };
+const NOTE_TYPES = ["call","interview","reference","note"];
+const REPORT_KINDS = { good:"Commendation", concern:"Performance concern", attendance:"Attendance", safety:"Safety", incident:"Incident", general:"General" };
+const PAST_REASONS = ["Quit","Let go","Season ended","No call, no show","Other"];
+let applicants={}, personFile={}, reportsAll={}, archive={}, fileDocs={}, applicantOpen=null, archiveOpen=null, reportQ="";
+let tmFolded = new Set(); try { tmFolded = new Set(JSON.parse(localStorage.getItem("tmFoldedCols")||"[]")); } catch(e){}
+const pingTeam = () => { if(svcCfg && !DEMO) fetch(svcCfg.url+"?action=team").catch(()=>{}); };
+const daysSince = ms => ms ? Math.max(0, Math.floor((Date.now()-ms)/864e5)) : 0;
+const firstName = n => String(n||"").split(" ")[0];
+const fileEntries = pid => Object.entries(personFile[pid]||{}).filter(([,e])=>e).sort((a,b)=>(b[1].at||0)-(a[1].at||0));
+const fileDirty = pid => ({ [`sync/personFileDirty/${pid}`]:true });
+
+// Drag a card to another column, by mouse or by finger: on an iPad or iPhone, hold the card a moment, then drag.
+// Shared with the CRM's Leads board. onDrop(id, column) decides what the move means.
+function boardDrag(root, onDrop){
+  let st=null, raf=0;
+  const SKIP="a,button,select,input,textarea,label";
+  const colAt=(x,y)=>{ const el=document.elementFromPoint(x,y); return el&&el.closest("[data-col]"); };
+  const mark=c=>{ root.querySelectorAll("[data-col].drop").forEach(x=>{ if(x!==c) x.classList.remove("drop"); }); if(c) c.classList.add("drop"); };
+  const begin=()=>{ const r=st.card.getBoundingClientRect(), g=st.card.cloneNode(true); g.classList.add("ghost");
+    Object.assign(g.style,{position:"fixed",left:r.left+"px",top:r.top+"px",width:r.width+"px",pointerEvents:"none",zIndex:3000,margin:0});
+    document.body.appendChild(g); st.g=g; st.dx=st.x0-r.left; st.dy=st.y0-r.top; st.on=true; st.card.classList.add("dragging"); try{ navigator.vibrate&&navigator.vibrate(10); }catch(e){}
+    const tick=()=>{ if(!st||!st.on) return; const m=60, sp=14; if(st.y<m) window.scrollBy(0,-sp); else if(st.y>innerHeight-m) window.scrollBy(0,sp);
+      const b=root.querySelector(".board"); if(b){ const br=b.getBoundingClientRect(); if(st.x<br.left+m) b.scrollLeft-=sp; else if(st.x>br.right-m) b.scrollLeft+=sp; }
+      mark(colAt(st.x,st.y)); raf=requestAnimationFrame(tick); }; raf=requestAnimationFrame(tick); };
+  const move=(x,y)=>{ st.x=x; st.y=y; if(st.on){ st.g.style.left=(x-st.dx)+"px"; st.g.style.top=(y-st.dy)+"px"; } };
+  const finish=()=>{ if(!st) return; clearTimeout(st.timer); cancelAnimationFrame(raf); document.removeEventListener("touchmove",tmove,{passive:false}); document.removeEventListener("touchend",tend); document.removeEventListener("touchcancel",tcancel);
+    document.removeEventListener("mousemove",mmove); document.removeEventListener("mouseup",mup);
+    if(st.on){ const c=colAt(st.x,st.y); st.g.remove(); st.card.classList.remove("dragging"); mark(null); root._dragEnd=Date.now(); const id=st.id; st=null; if(c&&c.dataset.col) onDrop(id,c.dataset.col); return; }
+    st=null; };
+  const tmove=e=>{ const p=e.touches[0]; if(!st||!p) return; if(!st.on){ if(Math.hypot(p.clientX-st.x0,p.clientY-st.y0)>10){ clearTimeout(st.timer); finish(); } return; } e.preventDefault(); move(p.clientX,p.clientY); };
+  const tend=()=>finish(), tcancel=()=>{ if(st&&st.on){ st.g.remove(); st.card.classList.remove("dragging"); mark(null); } st&&clearTimeout(st.timer); st=null; };
+  const mmove=e=>{ if(!st) return; if(!st.on && Math.hypot(e.clientX-st.x0,e.clientY-st.y0)>5) begin(); if(st.on){ e.preventDefault(); move(e.clientX,e.clientY); } };
+  const mup=()=>finish();
+  root.querySelectorAll("[data-card]").forEach(card=>{
+    card.addEventListener("touchstart",e=>{ if(e.touches.length!==1||e.target.closest(SKIP)) return; const p=e.touches[0];
+      st={card,id:card.dataset.card,x0:p.clientX,y0:p.clientY,x:p.clientX,y:p.clientY,on:false}; st.timer=setTimeout(()=>{ if(st) begin(); },280);
+      document.addEventListener("touchmove",tmove,{passive:false}); document.addEventListener("touchend",tend); document.addEventListener("touchcancel",tcancel); },{passive:true});
+    card.addEventListener("mousedown",e=>{ if(e.button!==0||e.target.closest(SKIP)) return; e.preventDefault();
+      st={card,id:card.dataset.card,x0:e.clientX,y0:e.clientY,x:e.clientX,y:e.clientY,on:false}; document.addEventListener("mousemove",mmove); document.addEventListener("mouseup",mup); });
+    card.addEventListener("contextmenu",e=>{ if(st) e.preventDefault(); });
+  });
+}
+const justDragged = root => Date.now()-(root._dragEnd||0) < 400;
+
+// ----- the personnel file: one timeline per person, on the applicant profile and the Personnel page -----
+function pfileHtml(pid, title){
+  const doc=fileDocs[pid], list=fileEntries(pid);
+  return `<div class="card" id="pfile"><div class="top" style="display:flex;justify-content:space-between;gap:10px;align-items:baseline"><h2>${esc(title||"Personnel file")}</h2>${doc&&doc.url?`<a class="mapbtn" href="${esc(doc.url)}" target="_blank" rel="noopener">File PDF in Drive</a>`:'<span class="muted">The Drive copy is made within 5 minutes</span>'}</div>
+    <div class="grid2"><div><label for="pfType">Add</label><select id="pfType">${NOTE_TYPES.map(x=>`<option value="${x}">${esc(FILE_TYPES[x])}</option>`).join("")}</select></div><div></div></div>
+    <label for="pfText">Notes</label><textarea id="pfText" rows="4" maxlength="6000" placeholder="What was said, how he came across, what to check next"></textarea>
+    <div class="actions"><button class="primary" id="pfAdd">Add to file</button></div>
+    ${list.map(([id,e])=>`<div class="pfe"><div class="h"><b>${esc(FILE_TYPES[e.type]||e.type)}</b>${e.ref?` <span class="chip">${esc(e.ref)}</span>`:""}${e.kind?` <span class="chip ${e.kind==="good"?"ok":e.kind==="general"?"":"warn"}">${esc(REPORT_KINDS[e.kind]||e.kind)}</span>`:""}<span class="muted">${fmtDay(iso(new Date(e.at||0)))} ${fmtTime(e.at)}${e.byName||e.by?" &middot; "+esc(e.byName||String(e.by).replace(/,/g,".")):""}</span></div>
+      <div class="t">${esc(e.text||"")}</div>${e.url?`<a class="small" href="${esc(e.url)}" target="_blank" rel="noopener">${e.type==="report"?"Report PDF":"Open link"}</a>`:""}</div>`).join("")||'<p class="meta">Nothing in the file yet.</p>'}</div>`;
+}
+function wirePfile(root, pid){
+  const b=root.querySelector("#pfAdd"); if(!b) return;
+  b.onclick=async()=>{ const text=$("#pfText").value.trim(); if(!text) return toast("Write the notes first"); if(previewOnly()) return;
+    try { await store.update({ [`personFile/${pid}/${store.key()}`]:{ type:$("#pfType").value, text, at:Date.now(), by:me.email, byName:me.name }, ...fileDirty(pid) }); $("#pfText").value=""; toast("Added to the file"); pingTeam(); }
+    catch(e){ toast("Not saved: "+(e.message||e)); } };
+}
+
+// ----- Onboarding board -----
+function boardCols(){
+  const live=Object.entries(applicants).filter(([,a])=>a);
+  const cols=BOARD_STAGES.map(s=>({ key:s, label:HIRE_STAGES[s], items:[] }));
+  const col=k=>cols.find(c=>c.key===k);
+  live.forEach(([id,a])=>{ const s=a.stage||"applied";
+    if(s==="hired"){ if(Date.now()-(a.hiredAt||0) < 30*864e5) col("hired").items.push({id:"a:"+id,a}); return; }
+    if(s==="past") return; (col(s)||col("applied")).items.push({id:"a:"+id,a}); });
+  Object.entries(archive).filter(([,x])=>x).forEach(([k,x])=>col("past").items.push({id:"x:"+k,x,k}));
+  col("hired").label="Hired";
+  return cols;
+}
+function applicantCard(it){
+  if(it.x){ const x=it.x; return `<div class="tcard past" data-card="${esc(it.id)}"><div class="name">${esc(x.name||it.k)}</div><div class="meta">${esc(x.reason||"")}${x.lastDay?" &middot; last day "+fmtShort(x.lastDay):""}</div><div class="meta">${esc(x.crew||"")}${x.crewRole==="manager"?" (manager)":""}</div></div>`; }
+  const a=it.a, done=Object.keys(a.checks||{}).filter(c=>HIRE_CHECKS[c]&&a.checks[c]).length, last=fileEntries(it.id.slice(2)).find(([,e])=>NOTE_TYPES.includes(e.type));
+  return `<div class="tcard" data-card="${esc(it.id)}"><div class="name">${esc(a.name)}</div>
+    <div class="meta">${esc(APPLIED_FOR[a.role]||"Applicant")}${a.city?" &middot; "+esc(a.city):""}</div>
+    <div class="meta">${a.phone?telLink(a.phone):""}${a.phone&&a.source?" &middot; ":""}${a.source?`<span class="chip ${a.source==="Indeed"?"svc-snow":""}">${esc(a.source)}</span>`:""}</div>
+    <div class="meta">${a.stage==="hired"?`Hired ${fmtShort(iso(new Date(a.hiredAt)))}`:`${(n=>n===0?"New today":n===1?"1 day here":n+" days here")(daysSince(a.stageAt||a.createdAt))}`}${done?` &middot; ${done}/${Object.keys(HIRE_CHECKS).length} steps`:""}</div>
+    ${last?`<div class="muted clip">${esc(last[1].text)}</div>`:""}
+    <select data-stage="${esc(it.id)}" aria-label="Move to">${BOARD_STAGES.map(s=>`<option value="${s}" ${(a.stage||"applied")===s?"selected":""}>${esc(HIRE_STAGES[s])}</option>`).join("")}</select></div>`;
+}
+function renderOnboard(app){
+  if(applicantOpen && applicants[applicantOpen]) return renderApplicant(app, applicantOpen);
+  if(archiveOpen && archive[archiveOpen]) return renderArchived(app, archiveOpen);
+  applicantOpen=null; archiveOpen=null;
+  const cols=boardCols(), open=Object.values(applicants).filter(a=>a&&!["hired","past","nothired"].includes(a.stage)), src={};
+  open.forEach(a=>{ src[a.source||"Other"]=(src[a.source||"Other"]||0)+1; });
+  const prev=$("#apForm") ? Object.fromEntries(new FormData($("#apForm")).entries()) : null;
+  app.innerHTML=`<div class="bar"><span class="date">Onboarding</span></div>
+    <form class="card quick" id="apForm" onsubmit="return false">
+      <div><label for="apName">Name</label><input id="apName" name="name" autocomplete="off"></div><div><label for="apPhone">Phone</label><input id="apPhone" name="phone" type="tel"></div>
+      <div><label for="apEmail">Email</label><input id="apEmail" name="email" type="email" autocapitalize="off" autocomplete="off"></div><div><label for="apCity">Lives in</label><input id="apCity" name="city" placeholder="Westland" autocomplete="off"></div>
+      <div><label for="apRole">Applied for</label><select id="apRole" name="role">${Object.entries(APPLIED_FOR).map(([v,l])=>`<option value="${v}">${esc(l)}</option>`).join("")}</select></div>
+      <div><label for="apSrc">Source</label><select id="apSrc" name="source">${HIRE_SOURCES.map(s=>`<option>${esc(s)}</option>`).join("")}</select></div>
+      <div class="quickbtns"><button class="primary" type="button" id="apAdd">Add applicant</button></div></form>
+    <p class="meta">New Indeed applications land in Applied on their own within 5 minutes. Drag a card to move it: on an iPad or iPhone, hold it a moment, then drag. Hired makes the employee profile. Past moves an employee's record to the archive. Both ask first.</p>
+    <div class="srcstrip">${Object.entries(src).map(([s,n])=>`<span class="pill">${esc(s)} <b>${n}</b></span>`).join("")}</div>
+    <div class="board wide" style="grid-template-columns:${cols.map(c=>tmFolded.has(c.key)?"52px":"minmax(158px,1fr)").join(" ")}">${cols.map(c=>{ const shut=tmFolded.has(c.key); return `
+      <div class="col ${c.key==="hired"?"won":c.key==="past"||c.key==="nothired"?"lost":""}${shut?" shut":""}" data-col="${c.key}"><h2 data-fold="${c.key}"><span class="fold">${shut?"▸":"▾"}</span><span class="lbl">${esc(c.label)}</span><span class="n">${c.items.length}</span></h2>
+        ${shut?"":(c.items.sort((x,y)=>((y.a||y.x).stageAt||(y.x||{}).archivedAt||0)-((x.a||x.x).stageAt||(x.x||{}).archivedAt||0)).map(applicantCard).join("")||'<div class="muted" style="padding:10px">None</div>')}</div>`; }).join("")}</div>`;
+  if(prev) Object.entries(prev).forEach(([k,v])=>{ const el=$("#apForm").elements[k]; if(el) el.value=v; });
+  $("#apAdd").onclick=async()=>{ const f=$("#apForm"), name=f.name.value.trim(); if(!name) return toast("Name is required");
+    if(f.email.value.trim() && !/^\S+@\S+\.\S+$/.test(f.email.value.trim())) return toast("That email does not look right");
+    if(previewOnly()) return; const id="a_"+store.key(), now=Date.now();
+    await store.update({ [`applicants/${id}`]:{ name, phone:f.phone.value.trim()||null, email:f.email.value.trim().toLowerCase()||null, city:f.city.value.trim()||null, role:f.role.value, source:f.source.value, stage:"applied", stageAt:now, createdAt:now, by:me.email } });
+    f.reset(); toast(name+" added to Applied"); };
+  app.querySelectorAll("[data-fold]").forEach(h=>h.onclick=()=>{ const k=h.dataset.fold; tmFolded.has(k)?tmFolded.delete(k):tmFolded.add(k); try{ localStorage.setItem("tmFoldedCols",JSON.stringify([...tmFolded])); }catch(e){} render(); });
+  app.querySelectorAll("[data-card]").forEach(c=>c.onclick=e=>{ if(justDragged(app)||e.target.closest("a,select")) return; openBoardCard(c.dataset.card); });
+  app.querySelectorAll("select[data-stage]").forEach(s=>s.onchange=()=>moveCard(s.dataset.stage, s.value));
+  boardDrag(app, moveCard);
+}
+function openBoardCard(id){
+  const [t,k]=[id.slice(0,1),id.slice(2)];
+  if(t==="x"){ archiveOpen=k; render(); }
+  else { const a=applicants[k]; if(a&&a.stage==="hired"&&a.hiredKey&&team[a.hiredKey]){ view="people"; personOpen=a.hiredKey; } else applicantOpen=k; render(); }
+  window.scrollTo(0,0);
+}
+// What a move on the board means.
+function moveCard(id, to){
+  const t=id.slice(0,1), k=id.slice(2);
+  if(t==="x"){ if(to==="hired") return restoreDialog(k); if(to!=="past") toast("Drag a past employee to Hired to bring him back."); return render(); }
+  const a=applicants[k]; if(!a) return; const from=a.stage||"applied"; if(from===to) return;
+  const emp=a.hiredKey&&team[a.hiredKey];
+  if(to==="hired") return emp ? toast(`${a.name} is already an employee.`) : hireDialog(k);
+  if(to==="past"){ if(emp) return archiveDialog(a.hiredKey); toast("Past is for people who worked here. Drag to Not hired instead."); return render(); }
+  if(from==="hired" && emp){ toast(`${a.name} is an employee. Drag him to Past to take him off.`); return render(); }
+  if(previewOnly()) return render();
+  store.update({ [`applicants/${k}/stage`]:to, [`applicants/${k}/stageAt`]:Date.now(),
+    [`personFile/${k}/${store.key()}`]:{ type:"stage", text:`${HIRE_STAGES[from]} to ${HIRE_STAGES[to]}`, at:Date.now(), by:me.email, byName:me.name }, ...fileDirty(k) })
+    .then(()=>toast(`${a.name}: ${HIRE_STAGES[to]}`)).catch(e=>toast("Not moved: "+(e.message||e)));
+}
+
+// ----- hire: the applicant becomes an employee -----
+function hireDialog(aid){
+  const a=applicants[aid]; if(!a) return;
+  const dl=openDlg(`<h2>Hire ${esc(a.name)}?</h2>
+    <p class="meta">This makes ${esc(firstName(a.name))}'s employee profile under Personnel and puts him on the Team list with Crew access so he can sign in. His applicant file, notes, Indeed profile and files move into his employee file, and his Drive folder moves from Potential Hires to Staff.</p>
+    <label for="hEmail">His Google account (the email he signs in with)</label><input id="hEmail" type="email" autocapitalize="off" value="${esc(/@indeedemail\.com$/i.test(a.email||"")?"":(a.email||""))}" placeholder="name@gmail.com">
+    <div class="grid2"><div><label for="hRole">Position</label><select id="hRole"><option value="member" ${a.role!=="manager"?"selected":""}>Crew member</option><option value="manager" ${a.role==="manager"?"selected":""}>Crew manager</option></select></div>
+      <div><label for="hCrew">Crew</label><select id="hCrew"><option value="">Not on a crew yet</option>${crewList().map(c=>`<option>${esc(c)}</option>`).join("")}</select></div>
+      <div><label for="hType">Paid as</label><select id="hType"><option value="W-2">Employee (W-2)</option><option value="1099">Contractor (1099)</option></select></div>
+      <div><label for="hStart">Start date</label><input id="hStart" type="date" value="${esc(today())}"></div></div>
+    <p class="muted">He cannot open his schedule until he is on a crew. You can put him on one later under Crews.</p>
+    <div class="actions"><button data-close>Cancel</button><button class="primary" id="hGo">Yes, hire ${esc(firstName(a.name))}</button></div>`);
+  dl.querySelector("#hGo").onclick=async()=>{
+    const email=$("#hEmail").value.trim().toLowerCase(); if(!/^\S+@\S+\.\S+$/.test(email)) return toast("Enter his Google account email");
+    const k=emailKey(email); if(archive[k]) return toast("That person is in Past. Drag his Past card to Hired to bring him back.");
+    if(team[k] && team[k].tier==="admin") return toast("That email is an admin.");
+    if(previewOnly()) return dl.close();
+    const role=$("#hRole").value, crew=$("#hCrew").value, now=Date.now(), upd={};
+    upd[`allowed/${k}`]={ ...(team[k]||{}), name:a.name, email, tier:"crew", crewRole:role, ...(crew?{crew}:{}) };
+    if(crew){ upd[`crews/${crew}/members/${k}`]=a.name; const cr=crews[crew]||{};
+      if(role==="manager"){ upd[`crews/${crew}/manager`]=k; if(cr.manager&&cr.manager!==k&&team[cr.manager]) upd[`allowed/${cr.manager}/crewRole`]="member"; } }
+    upd[`staff/${k}`]={ ...(staffAll[k]||{}), name:a.name, email, phone:a.phone||null, address:a.address||null, city:a.city||null, startDate:$("#hStart").value||today(), type:$("#hType").value,
+      applicantId:aid, appliedFor:a.role||null, job:a.job||null, source:a.source||null, indeedUrl:a.indeedUrl||null, hiredAt:now, hiredBy:me.email };
+    Object.entries(personFile[aid]||{}).forEach(([id,e])=>{ upd[`personFile/${k}/${id}`]=e; }); upd[`personFile/${aid}`]=null;
+    upd[`personFile/${k}/${store.key()}`]={ type:"hired", text:`Hired as ${role==="manager"?"crew manager":"crew member"}${crew?" on "+crew:""}, starting ${fmtDay($("#hStart").value||today())}. Paid as ${$("#hType").value}.`, at:now, by:me.email, byName:me.name };
+    const docs=docsAll[aid]||{}, vlt=vault[aid]||{}; Object.entries(docs).forEach(([id,d])=>{ upd[`staffDocs/${k}/${id}`]=d; }); Object.entries(vlt).forEach(([id,v])=>{ upd[`staffVault/${k}/${id}`]=v; });
+    if(Object.keys(docs).length) upd[`staffDocs/${aid}`]=null; if(Object.keys(vlt).length) upd[`staffVault/${aid}`]=null;
+    if(fileDocs[aid]){ upd[`personFileDoc/${k}`]=fileDocs[aid]; upd[`personFileDoc/${aid}`]=null; }
+    Object.assign(upd, { [`applicants/${aid}/stage`]:"hired", [`applicants/${aid}/stageAt`]:now, [`applicants/${aid}/hiredAt`]:now, [`applicants/${aid}/hiredKey`]:k,
+      [`sync/staffMove/${store.key()}`]:{ action:"hire", from:aid, to:k, name:a.name, email, at:now }, [`sync/personFileDirty/${aid}`]:null, ...fileDirty(k) });
+    try { await store.update(upd); dl.close(); toast(`${a.name} is hired. His profile is under Personnel.`); pingTeam(); }
+    catch(e){ toast("Not hired: "+(e.message||e)); }
+  };
+}
+// ----- Past: the employee's whole record moves to the archive -----
+function archiveDialog(k){
+  const t=team[k]||{}, s=staffAll[k]||{}, name=t.name||s.name||personName(k); if(t.tier!=="crew") return toast("Only crew people can be moved to Past here.");
+  const cur=periodOf(today()), prev=addDays(cur,-PERIOD_DAYS), owed=[prev,cur].map(p=>({p,e:earnings(k,p)})).filter(x=>x.e.earned>0.005 && !(x.e.paid&&x.e.paid.paidAmount!=null));
+  const dl=openDlg(`<h2>Move ${esc(name)} to Past?</h2>
+    <p class="meta">This takes ${esc(firstName(name))} off the Team list so he can no longer sign in${t.crew?`, takes him off ${esc(t.crew)}`:""}, and moves his profile, files, shifts, hours and pay log into the archive. His personnel file stays, and his Drive folder moves to Archive. Nothing is deleted: drag his card from Past to Hired to bring him back.</p>
+    ${owed.length?`<div class="storm"><span><b>Not paid yet:</b> ${owed.map(x=>`${money(x.e.earned)} for ${fmtShort(x.p)} to ${fmtShort(periodEnd(x.p))}`).join("; ")}. His final pay is due by the next regular payday.</span></div>`:""}
+    <div class="grid2"><div><label for="xWhy">Reason</label><select id="xWhy">${PAST_REASONS.map(r=>`<option>${esc(r)}</option>`).join("")}</select></div><div><label for="xLast">Last day worked</label><input id="xLast" type="date" value="${esc(today())}"></div></div>
+    <label for="xNote">Note for his file (optional)</label><textarea id="xNote" rows="3" maxlength="2000"></textarea>
+    <div class="actions"><button data-close>Cancel</button><button class="danger" id="xGo">Yes, move to Past</button></div>`);
+  dl.querySelector("#xGo").onclick=async()=>{ if(previewOnly()) return dl.close();
+    const now=Date.now(), why=$("#xWhy").value, note=$("#xNote").value.trim(), crew=t.crew||"";
+    const copy=v=>v==null?null:JSON.parse(JSON.stringify(v));
+    const rec={ name, email:t.email||s.email||null, crew:crew||null, crewRole:t.crewRole||null, archivedAt:now, by:me.email, reason:why, note:note||null, lastDay:$("#xLast").value||null,
+      allowed:copy(t), staff:copy(staffAll[k]), staffPrivate:copy(privAll[k]), staffDocs:copy(docsAll[k]), payLog:copy(payLogAll[k]), timeEntries:copy(timeAll[k]), shifts:copy(shiftsAll[k]) };
+    const upd={ [`staffArchive/${k}`]:JSON.parse(JSON.stringify(rec)), [`allowed/${k}`]:null, [`staff/${k}`]:null, [`staffPrivate/${k}`]:null, [`staffDocs/${k}`]:null, [`payLog/${k}`]:null, [`timeEntries/${k}`]:null, [`shifts/${k}`]:null,
+      [`personFile/${k}/${store.key()}`]:{ type:"past", text:`Moved to Past: ${why}.${note?" "+note:""}`, at:now, by:me.email, byName:me.name },
+      [`sync/staffMove/${store.key()}`]:{ action:"archive", k, name, at:now }, ...fileDirty(k) };
+    Object.entries(crews).forEach(([c,cr])=>{ if((cr.members||{})[k]) upd[`crews/${c}/members/${k}`]=null; if(cr.manager===k) upd[`crews/${c}/manager`]=null; });
+    Object.entries(applicants).forEach(([aid,a])=>{ if(a&&a.hiredKey===k){ upd[`applicants/${aid}/stage`]="past"; upd[`applicants/${aid}/stageAt`]=now; } });
+    try { await store.update(upd); dl.close(); personOpen=null; toast(`${name} moved to Past`); pingTeam(); render(); }
+    catch(e){ toast("Not moved: "+(e.message||e)); } };
+}
+function restoreDialog(k){
+  const x=archive[k]; if(!x) return;
+  const crewOk=x.crew&&crews[x.crew];
+  const dl=openDlg(`<h2>Bring ${esc(x.name)} back?</h2><p class="meta">This puts ${esc(firstName(x.name))} back on the Team list${crewOk?` and on ${esc(x.crew)}`:""} and restores his profile, files, shifts, hours and pay log from the archive.</p>
+    <div class="actions"><button data-close>Cancel</button><button class="primary" id="rGo">Yes, bring him back</button></div>`);
+  dl.querySelector("#rGo").onclick=async()=>{ if(previewOnly()) return dl.close(); const now=Date.now();
+    const al={ ...(x.allowed||{}), name:x.name, email:x.email, tier:"crew", crewRole:x.crewRole==="manager"&&crewOk&&!(crews[x.crew]||{}).manager?"manager":"member" }; if(crewOk) al.crew=x.crew; else delete al.crew;
+    const upd={ [`allowed/${k}`]:al, [`staffArchive/${k}`]:null, [`personFile/${k}/${store.key()}`]:{ type:"hired", text:"Brought back from Past.", at:now, by:me.email, byName:me.name },
+      [`sync/staffMove/${store.key()}`]:{ action:"restore", k, name:x.name, at:now }, ...fileDirty(k) };
+    [["staff","staff"],["staffPrivate","staffPrivate"],["staffDocs","staffDocs"],["payLog","payLog"],["timeEntries","timeEntries"],["shifts","shifts"]].forEach(([node,f])=>{ if(x[f]) upd[`${node}/${k}`]=x[f]; });
+    if(crewOk){ upd[`crews/${x.crew}/members/${k}`]=x.name; if(al.crewRole==="manager") upd[`crews/${x.crew}/manager`]=k; }
+    Object.entries(applicants).forEach(([aid,a])=>{ if(a&&a.hiredKey===k){ upd[`applicants/${aid}/stage`]="hired"; upd[`applicants/${aid}/stageAt`]=now; upd[`applicants/${aid}/hiredAt`]=now; } });
+    try { await store.update(upd); dl.close(); archiveOpen=null; toast(`${x.name} is back`); pingTeam(); render(); } catch(e){ toast("Not restored: "+(e.message||e)); } };
+}
+
+// ----- applicant profile -----
+function renderApplicant(app, aid){
+  const a=applicants[aid], ch=a.checks||{}, indeed=fileEntries(aid).filter(([,e])=>e.type==="indeed"), docs=Object.entries(docsAll[aid]||{});
+  app.innerHTML=`<div class="bar"><button class="small" id="back">&#8249; Onboarding</button><span class="date">${esc(a.name)}</span><span class="chip">${esc(HIRE_STAGES[a.stage||"applied"])}</span></div>
+    <form class="card" id="apfForm"><h2>Applicant</h2><div class="grid2">
+      <div><label for="afName">Name</label><input id="afName" value="${esc(a.name||"")}"></div><div><label for="afPhone">Phone</label><input id="afPhone" type="tel" value="${esc(a.phone||"")}"></div>
+      <div><label for="afEmail">Email</label><input id="afEmail" type="email" autocapitalize="off" value="${esc(a.email||"")}"></div><div><label for="afCity">Lives in</label><input id="afCity" value="${esc(a.city||"")}"></div>
+      <div><label for="afRole">Applied for</label><select id="afRole">${Object.entries(APPLIED_FOR).map(([v,l])=>`<option value="${v}" ${a.role===v?"selected":""}>${esc(l)}</option>`).join("")}</select></div>
+      <div><label for="afSrc">Source</label><select id="afSrc">${HIRE_SOURCES.map(s=>`<option ${a.source===s?"selected":""}>${esc(s)}</option>`).join("")}</select></div>
+      <div><label for="afJob">Listing</label><input id="afJob" value="${esc(a.job||"")}" placeholder="Landscape Laborer, Year Round"></div><div><label for="afIndeed">Indeed profile link</label><input id="afIndeed" value="${esc(a.indeedUrl||"")}" placeholder="https://employers.indeed.com/candidates/view?id=..." autocapitalize="off"></div>
+      <div><label for="afStage">Stage</label><select id="afStage">${BOARD_STAGES.map(s=>`<option value="${s}" ${(a.stage||"applied")===s?"selected":""}>${esc(HIRE_STAGES[s])}</option>`).join("")}</select></div>
+      <div><label>Applied</label><input disabled value="${a.appliedAt||a.createdAt?esc(fmtDay(iso(new Date(a.appliedAt||a.createdAt)))):""}"></div></div>
+      <div class="actions">${a.indeedUrl?`<a class="mapbtn" href="${esc(a.indeedUrl)}" target="_blank" rel="noopener" style="margin-right:auto">Open on Indeed</a>`:""}${a.mailUrl?`<a class="mapbtn" href="${esc(a.mailUrl)}" target="_blank" rel="noopener">Indeed email</a>`:""}<button class="primary">Save</button></div></form>
+    <div class="card"><h2>Hiring steps</h2>${Object.entries(HIRE_CHECKS).map(([c,l])=>`<label class="checkrow"><input type="checkbox" data-hc="${c}" ${ch[c]?"checked":""}> <span>${esc(l)}</span>${ch[c]?`<span class="muted">${fmtShort(iso(new Date(ch[c])))}</span>`:""}</label>`).join("")}
+      <p class="muted">References and the driving record before the in-person meeting; the full background check after hire. Hired asks first and then makes his employee profile.</p></div>
+    ${indeed.length?`<div class="card"><h2>Indeed profile</h2>${indeed.map(([,e])=>`<div class="t" style="white-space:pre-wrap">${esc(e.text)}</div>`).join("<hr>")}</div>`:""}
+    ${pfileHtml(aid,"Applicant file")}
+    <div class="card"><h2>Files</h2><p class="meta">Résumé, consent forms, driving record. Kept in Drive under Potential Hires; they move with him if he is hired.</p>
+      ${docs.map(([id,d])=>docRow(aid,id,d,true)).join("")||'<p class="meta">No files yet.</p>'}
+      <div class="grid2"><div><label for="upKind">What it is</label><select id="upKind"><option value="other">Résumé or other file</option>${Object.entries(DOC_KINDS).filter(([x])=>x!=="other").map(([x,l])=>`<option value="${x}">${esc(l)}${SENSITIVE.includes(x)?" (kept in Drive only)":""}</option>`).join("")}</select></div>
+        <div><label for="upLabel">Name on the record</label><input id="upLabel" placeholder="Résumé"></div></div>
+      <label for="upFile">File (PDF or photo, up to 7 MB)</label><input id="upFile" type="file" accept="application/pdf,image/*,.doc,.docx">
+      <div class="actions"><button class="primary" id="upGo">Upload to Drive</button></div></div>`;
+  $("#back").onclick=()=>{ applicantOpen=null; render(); };
+  $("#apfForm").onsubmit=async e=>{ e.preventDefault(); if(previewOnly()) return; const name=$("#afName").value.trim(); if(!name) return toast("Name is required");
+    await store.update({ [`applicants/${aid}/name`]:name, [`applicants/${aid}/phone`]:$("#afPhone").value.trim()||null, [`applicants/${aid}/email`]:$("#afEmail").value.trim().toLowerCase()||null,
+      [`applicants/${aid}/city`]:$("#afCity").value.trim()||null, [`applicants/${aid}/role`]:$("#afRole").value, [`applicants/${aid}/source`]:$("#afSrc").value,
+      [`applicants/${aid}/job`]:$("#afJob").value.trim()||null, [`applicants/${aid}/indeedUrl`]:$("#afIndeed").value.trim()||null, ...fileDirty(aid) }); toast("Saved"); };
+  $("#afStage").onchange=e=>moveCard("a:"+aid, e.target.value);
+  app.querySelectorAll("[data-hc]").forEach(b=>b.onchange=()=>{ if(previewOnly()) return; store.update({ [`applicants/${aid}/checks/${b.dataset.hc}`]: b.checked?Date.now():null }); });
+  wirePfile(app, aid);
+  $("#upGo").onclick=()=>uploadDoc(aid);
+  app.querySelectorAll("[data-docrm]").forEach(b=>b.onclick=async()=>{ await store.update({[`staffDocs/${aid}/${b.dataset.docrm}`]:null}); toast("Record removed. The file stays in Drive."); });
+}
+function renderArchived(app, k){
+  const x=archive[k], th=Object.values(x.timeEntries||{}).reduce((n,day)=>n+Object.values(day||{}).reduce((m,e)=>m+(e&&e.in&&e.out?(e.out-e.in)/3600e3:0),0),0);
+  const paid=Object.values(x.payLog||{}).reduce((n,p)=>n+(+((p||{}).paidAmount)||0),0), s=x.staff||{};
+  app.innerHTML=`<div class="bar"><button class="small" id="back">&#8249; Onboarding</button><span class="date">${esc(x.name)}</span><span class="chip bad">Past</span><button class="small primary" id="bring">Bring back</button></div>
+    <div class="card"><h2>Archived record</h2><table><tr><td>Moved to Past</td><td>${fmtDay(iso(new Date(x.archivedAt)))}: ${esc(x.reason||"")}${x.note?" &middot; "+esc(x.note):""}</td></tr>
+      <tr><td>Last day</td><td>${x.lastDay?fmtDay(x.lastDay):""}</td></tr><tr><td>Crew</td><td>${esc(x.crew||"")}${x.crewRole==="manager"?" (manager)":""}</td></tr>
+      <tr><td>Started</td><td>${s.startDate?fmtDay(s.startDate):""}</td></tr><tr><td>Phone</td><td>${telLink(s.phone)}</td></tr><tr><td>Email</td><td>${esc(x.email||"")}</td></tr>
+      <tr><td>Hours on record</td><td>${hrs(th)}</td></tr><tr><td>Paid on record</td><td>${money(paid)}</td></tr><tr><td>Files</td><td>${Object.values(x.staffDocs||{}).map(d=>esc(d.name)).join(", ")||"none"}</td></tr></table></div>
+    ${pfileHtml(k)}`;
+  $("#back").onclick=()=>{ archiveOpen=null; render(); }; $("#bring").onclick=()=>restoreDialog(k); wirePfile(app,k);
+}
+
+// ----- employee reports: optional, from the manager's crew log -----
+const reportsFor = (crew, d) => Object.entries(reportsAll[crew]||{}).filter(([,r])=>r&&(!d||r.date===d)).sort((a,b)=>(a[1].at||0)-(b[1].at||0));
+function reportsHtml(d, crew){
+  if(!(isAdmin || role==="manager")) return "";
+  const list=reportsFor(crew,d);
+  return `<div class="reports"><h3 style="margin-top:12px">Employee reports <span class="muted" style="font-weight:400">(optional)</span></h3>
+    ${list.map(([,r])=>`<div class="logrow"><span class="t">${r.ref?esc(r.ref.slice(-3)):"..."}</span><span class="w"><b>${esc(r.name||personName(r.k))}</b> <span class="chip ${r.kind==="good"?"ok":r.kind==="general"?"":"warn"}">${esc(REPORT_KINDS[r.kind]||r.kind)}</span>
+      <div class="meta">${r.ref?esc(r.ref):"Reference number within 5 minutes"} &middot; ${esc(r.byName||personName(r.by))}</div><div class="muted clip">${esc(r.text)}</div></span></div>`).join("")||'<p class="muted">None today. Write one when someone did something worth the record, good or bad. It goes to the office and into his personnel file; he does not see it.</p>'}
+    <div class="actions"><button class="small" data-report="${esc(crew)}">Write an employee report</button></div></div>`;
+}
+function reportDialog(crew, d){
+  const mem=Object.keys(crewMembers(crew)).filter(k=>k!==me.key);
+  if(!mem.length) return toast("No one else is on "+crew);
+  const dl=openDlg(`<h2>Employee report</h2><p class="meta">${esc(crew)} &middot; ${fmtDay(d)}. It gets a reference number, is saved to his Drive folder and goes into his personnel file. He does not see it.</p>
+    <div class="grid2"><div><label for="erWho">About</label><select id="erWho">${mem.map(k=>`<option value="${esc(k)}">${esc(personName(k))}</option>`).join("")}</select></div>
+      <div><label for="erKind">Kind</label><select id="erKind">${Object.entries(REPORT_KINDS).map(([v,l])=>`<option value="${v}">${esc(l)}</option>`).join("")}</select></div></div>
+    <label for="erText">What happened</label><textarea id="erText" rows="6" maxlength="4000" placeholder="What he did, where and when, and what you told him"></textarea>
+    <div class="actions"><button data-close>Cancel</button><button class="primary" id="erGo">Send report</button></div>`);
+  dl.querySelector("#erGo").onclick=async()=>{ const text=$("#erText").value.trim(); if(!text) return toast("Write what happened"); if(previewOnly()) return dl.close();
+    const k=$("#erWho").value, id=store.key();
+    try { await store.update({ [`staffReports/${crew}/${id}`]:{ k, name:personName(k), crew, date:d, kind:$("#erKind").value, text, by:me.key, byName:me.name, at:Date.now() } });
+      dl.close(); toast("Report sent. Its reference number comes within 5 minutes."); pingTeam(); } catch(e){ toast("Not sent: "+(e.message||e)); } };
+}
+function renderReports(app){
+  const q=reportQ.toLowerCase(), all=[]; Object.entries(reportsAll).forEach(([c,list])=>Object.entries(list||{}).forEach(([id,r])=>{ if(r) all.push({c,id,...r}); }));
+  const rows=all.filter(r=>!q||[r.ref,r.name,personName(r.k),r.crew,r.text,REPORT_KINDS[r.kind]].join(" ").toLowerCase().includes(q)).sort((a,b)=>(b.at||0)-(a.at||0));
+  app.innerHTML=`<div class="bar"><span class="date">Employee reports</span><input id="rq" value="${esc(reportQ)}" placeholder="Search by number, name or word" style="flex:1;min-width:160px" autocomplete="off"></div>
+    <p class="meta">Filed by crew managers from their crew log. Each has a reference number (ER-date-number), a PDF in the person's Drive folder, and a line in his personnel file.</p>
+    <div class="card scroll"><table><tr><th>Number</th><th>Date</th><th>About</th><th>Crew</th><th>Kind</th><th>Filed by</th><th></th></tr>
+    ${rows.map(r=>`<tr data-rep="${esc(r.c)}|${esc(r.id)}" style="cursor:pointer"><td><b>${esc(r.ref||"pending")}</b></td><td>${fmtShort(r.date)}</td><td>${esc(r.name||personName(r.k))}</td><td>${esc(r.crew||r.c)}</td><td><span class="chip ${r.kind==="good"?"ok":r.kind==="general"?"":"warn"}">${esc(REPORT_KINDS[r.kind]||r.kind)}</span></td><td>${esc(r.byName||personName(r.by))}</td><td>${r.url?`<a href="${esc(r.url)}" target="_blank" rel="noopener">PDF</a>`:""}</td></tr>`).join("")||'<tr><td colspan="7" class="meta">No reports yet.</td></tr>'}</table></div>`;
+  const rq=$("#rq"); rq.oninput=()=>{ reportQ=rq.value; const pos=rq.selectionStart; render(); const n=$("#rq"); n.focus(); try{ n.setSelectionRange(pos,pos); }catch(e){} };
+  app.querySelectorAll("[data-rep]").forEach(tr=>tr.onclick=e=>{ if(e.target.closest("a")) return; const [c,id]=tr.dataset.rep.split("|"), r=(reportsAll[c]||{})[id]; if(!r) return;
+    openDlg(`<h2>${esc(r.ref||"Report")}</h2><p class="meta">${esc(r.name||personName(r.k))} &middot; ${esc(r.crew||c)} &middot; ${fmtDay(r.date)} &middot; ${esc(REPORT_KINDS[r.kind]||r.kind)} &middot; filed by ${esc(r.byName||personName(r.by))}</p><div style="white-space:pre-wrap">${esc(r.text)}</div>
+      <div class="actions">${r.url?`<a class="mapbtn" href="${esc(r.url)}" target="_blank" rel="noopener">Open PDF</a>`:""}<button data-person-go="${esc(r.k)}">Open his file</button><button data-close>Close</button></div>`);
+    const go=document.querySelector("[data-person-go]"); if(go) go.onclick=()=>{ $("#dlg").close(); if(team[r.k]){ view="people"; personOpen=r.k; } else if(archive[r.k]){ view="onboard"; archiveOpen=r.k; } render(); window.scrollTo(0,0); }; });
+}
+
 // ---------- start ----------
 function demoSeed(){
   const K = e => emailKey(e), d=today(), mon=mondayOf(d);
@@ -1210,6 +1547,28 @@ function demoSeed(){
     [`staffDocs/${S("m1")}/f4`]:{ name:"Chauffeur license", kind:"cert", at:Date.now()-18*864e5, expires:addDays(d,20), url:"https://drive.google.com/", shared:true },
     [`staffVault/${S("m1")}/f3`]:{ fileId:"demo", url:"https://drive.google.com/" },
     [`payLog/${S("m1")}/2026-09-21`]:{ paidAmount:612.4, paidDate:"2026-10-09", ref:"Payroll check 1042" }
+  });
+  // Hiring board: applicants at each stage, their files, an employee report and one past employee.
+  const ago=n=>Date.now()-n*864e5, A=(name,role,stage,extra)=>({ name, role, stage, source:"Indeed", stageAt:ago(extra&&extra.days||2), createdAt:ago(9), appliedAt:ago(9), by:"Indeed import", ...(extra||{}) });
+  Object.assign(upd, {
+    "applicants/a_1":A("Jordan Hale","crew","applied",{ city:"Westland, MI", phone:"734-555-0201", job:"Landscape Laborer, Year Round (Lawn, Leaf, Snow)", indeedUrl:"https://employers.indeed.com/candidates/view?id=1a2b3c4d5e6f", days:1 }),
+    "applicants/a_2":A("Chris Moreno","manager","applied",{ city:"Livonia, MI", phone:"734-555-0202", job:"Landscape Crew Leader, Year Round (Lawn, Leaf, Snow)", days:0 }),
+    "applicants/a_3":A("Devon Price","crew","screen",{ city:"Redford, MI", phone:"313-555-0203", checks:{ screen:ago(1) }, days:1 }),
+    "applicants/a_4":A("Alex Turner","manager","interview",{ city:"Plymouth, MI", phone:"313-555-0204", email:"alex.turner@example.com", checks:{ screen:ago(4), refs:ago(2), driving:ago(2) }, days:2 }),
+    "applicants/a_5":A("Sam Brooks","crew","offer",{ city:"Garden City, MI", phone:"734-555-0205", email:"sam.brooks@example.com", source:"Referral", checks:{ screen:ago(6), refs:ago(4), driving:ago(4), consent:ago(4), offer:ago(1) }, days:1 }),
+    "applicants/a_6":A("Riley Shaw","crew","backup",{ city:"Canton, MI", phone:"734-555-0206", days:5 }),
+    "applicants/a_7":A("Pat Quinn","walker","nothired",{ city:"Detroit, MI", days:6 }),
+    "applicants/a_8":A("Tyler Ng","crew","hired",{ hiredAt:ago(19), hiredKey:S("m1"), days:19 }),
+    [`personFile/a_1/i1`]:{ type:"indeed", text:"Applied for Landscape Laborer, Year Round (Lawn, Leaf, Snow).\n\nJordan Hale\nWestland, MI 48185\nExperience: two seasons on a residential mowing crew; push blowers and string trimmers.\nScreener: weekday snow dispatch, yes. Valid license, yes.", at:ago(9), by:"Indeed import" },
+    [`personFile/a_4/c1`]:{ type:"call", text:"Ten minutes. Ran a three-man crew at his last company for two seasons. First question was where the yard is. Wants steady winter work.", at:ago(4), by:ADMIN_EMAIL, byName:"Russel" },
+    [`personFile/a_4/r1`]:{ type:"reference", text:"Former supervisor: on time, ran the truck alone the last season, would hire him back.", at:ago(2), by:ADMIN_EMAIL, byName:"Russel" },
+    [`personFile/${S("m1")}/h1`]:{ type:"interview", text:"In person. Showed up ten minutes early. Clear answers on how he handles a missed house.", at:ago(22), by:ADMIN_EMAIL, byName:"Russel" },
+    [`personFile/${S("m1")}/h2`]:{ type:"hired", text:"Hired as crew member on Crew 1. Paid as W-2.", at:ago(19), by:ADMIN_EMAIL, byName:"Russel" },
+    [`personFile/${S("m1")}/rp1`]:{ type:"report", ref:"ER-"+addDays(d,-2).replace(/-/g,"")+"-001", kind:"good", text:"Finished the north half of the route alone when the blower went down.", at:ago(2), by:S("boss"), byName:"Marcus Reed", url:"https://drive.google.com/" },
+    [`staffReports/Crew 1/rp1`]:{ k:S("m1"), name:"Tyler Ng", crew:"Crew 1", date:addDays(d,-2), kind:"good", text:"Finished the north half of the route alone when the blower went down.", by:S("boss"), byName:"Marcus Reed", at:ago(2), ref:"ER-"+addDays(d,-2).replace(/-/g,"")+"-001", url:"https://drive.google.com/" },
+    [`personFileDoc/${S("m1")}`]:{ url:"https://drive.google.com/", at:ago(2), entries:3 },
+    "staffArchive/kevin,ward@example,com":{ name:"Kevin Ward", email:"kevin.ward@example.com", crew:"Crew 2", crewRole:"member", archivedAt:ago(12), by:ADMIN_EMAIL, reason:"Season ended", lastDay:addDays(d,-12),
+      staff:{ phone:"734-555-0299", startDate:"2026-04-06", type:"W-2" }, timeEntries:{ [addDays(d,-13)]:{ t1:{ in:ago(13), out:ago(13)+8*3600e3 } } }, payLog:{ "2026-09-21":{ paidAmount:845.5 } } }
   });
   for(let i=0;i<20;i++){ const x=addDays(d,i), w=pd(x).getUTCDay(); if(w===0||w===6) continue; ["m1","m2","boss"].forEach(k=>{ upd[`shifts/${S(k)}/${x}`]={ start:k==="boss"?"06:30":"07:00", end:"15:30", crew:"Crew 1", note:i%5===2?"Lights installs, meet at the yard":null }; }); }
   return { upd, who:{ admin:{email:ADMIN_EMAIL,displayName:"Russel"}, manager:{email:ppl.boss,displayName:"Marcus Reed"}, member:{email:ppl.m1,displayName:"Tyler Ng"}, crew2:{email:ppl.boss2,displayName:"Dave Kim"} } };
