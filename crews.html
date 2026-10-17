@@ -157,6 +157,7 @@
   .ok-banner{background:var(--green-soft);color:var(--green);border-radius:var(--r);padding:10px 12px;font-weight:600;margin:10px 0}
   input,select,textarea{font-size:16px}
   header{z-index:1100}
+  .viewas{font-size:16px}
   .kindbtns{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
   .kindbtns button{padding:14px 10px;font-weight:650}
 </style>
@@ -204,7 +205,18 @@ const ADMIN_EMAIL = "russel.mangiapaneiii@gmail.com";
 const TIER_HOME = { admin:"index.html", crew:"crews.html", walker:"routes.html" };
 const HOME = [42.3836,-83.3527];   // Livonia, for an empty map
 const KEEP_DAYS = 45;              // check-offs loaded: today back this many days
+const SCHEDULE_DAYS = 31;          // an employee sees his schedule this far ahead
+const PERIOD_DAYS = 14;            // pay period: every two weeks (Russel, Oct 17)
+const MIN_WAGE_DEFAULT = 13.73;    // Michigan, 2026; $15.00 from January 1, 2027. Set on the Pay tab.
+// Files kept on an employee's record. Sensitive ones (tax and ID forms) stay in Drive only: the record shows they are
+// on file and when, with no link. Everything else opens and downloads from the employee's Files tab.
+const DOC_KINDS = { agreement:"Employment or contractor agreement", payterms:"Pay terms", handbook:"Handbook or policy acknowledgment", equipment:"Equipment sign-out", cert:"License or certification", other:"Other file",
+  w4:"W-4 tax withholding", i9:"I-9 work eligibility", w9:"W-9 (contractor)", deposit:"Direct deposit form", id:"ID copy" };
+const SENSITIVE = ["w4","i9","w9","deposit","id"];
 // ================================================================
+// Three views (October 17, 2026): the office; crew managers, who run the routes (the full mirror of the door hanger
+// Routes page: map, check-off, crew log and approval, plus their crew's contact info and shifts); and employees, who
+// see their schedule for the next month, past hours, pay log, their files with the company and their own info.
 // Crews and Crew View (October 16, 2026). Built on the door hanger routes page: the same map, check-off and day log,
 // with what a job carries. Each crew works its own routes. A snow route is standing: it shows on a day once a storm is
 // started (by an admin for every crew, or by a crew's manager for his own crew). Other routes run on dates.
@@ -274,11 +286,14 @@ const store = DEMO ? demoStore() : fbStore();
 // ---------- state ----------
 let me=null, isAdmin=false, realAdmin=false, viewAs="", meReal=null;
 let role="", myCrew="";              // crew tier: role manager or member, and the crew's name
-let crews={}, routes={}, storms={}, checks={}, events={}, team={}, clients={}, svcLog={}, dayLogs={}, timeAll={}, myTime={}, crewTime={}, myDay={};
-let view="today", curDate=today(), openRoute=null, crewFilter="", editing=null;
-let unsub=[], dayUnsub=[];
+let crews={}, routes={}, storms={}, checks={}, events={}, team={}, clients={}, svcLog={}, dayLogs={}, timeAll={};
+// People data, keyed by person (emailKey). The office reads all of it; an employee binds his own; a manager also his crew's contact info and shifts.
+let staffAll={}, privAll={}, docsAll={}, shiftsAll={}, payLogAll={}, vault={}, payRates={}, svcCfg=null;
+let view="today", curDate=today(), openRoute=null, crewFilter="", editing=null, meTab="schedule", personOpen=null, payPeriod=null;
+let unsub=[], dayUnsub=[], memUnsub=[];
 const isMgr = () => (isAdmin && !viewAs) || role==="manager";
-const previewOnly = () => { if(viewAs){ toast("Crew preview. Nothing is saved."); return true; } return false; };
+const previewOnly = () => { if(viewAs){ toast("Preview. Nothing is saved."); return true; } return false; };
+const isEmpPreview = () => viewAs.startsWith("emp:");
 
 // ---------- auth ----------
 $("#signin").onclick = async () => {
@@ -302,16 +317,18 @@ async function enter(user){
     isAdmin = tier==="admin"; realAdmin=isAdmin; viewAs=""; meReal=null;
     role = isAdmin ? "" : (mine.crewRole==="manager" ? "manager" : "member"); myCrew = isAdmin ? "" : mine.crew;
     if(mine?.name) me.name = mine.name;
+    view = role==="member" ? "schedule" : "today";
     $("#title").textContent = isAdmin ? "Mangiapane Brothers Crews" : `${myCrew}`;
     $("#gate").hidden=true; $("#app").hidden=false; $("#nav").hidden=false; $("#navBtn").hidden=!isAdmin; attach();
   } catch(e){ deny(`${me.email} could not be checked against the team list. Ask Russel.`); }
 }
-function leave(){ me=null; isAdmin=false; unsub.forEach(f=>f()); unsub=[]; dayUnsub.forEach(f=>f()); dayUnsub=[]; $("#who").textContent=""; $("#signout").hidden=true; $("#nav").hidden=true; $("#navBtn").hidden=true; $("#gate").hidden=false; $("#app").hidden=true; }
+function leave(){ me=null; isAdmin=false; unsub.forEach(f=>f()); unsub=[]; dayUnsub.forEach(f=>f()); dayUnsub=[]; memUnsub.forEach(f=>f()); memUnsub=[]; $("#who").textContent=""; $("#signout").hidden=true; $("#nav").hidden=true; $("#navBtn").hidden=true; $("#gate").hidden=false; $("#app").hidden=true; }
 function attach(){
   unsub.forEach(f=>f()); unsub=[];
   const bind = (path, set) => unsub.push(store.on(path, v=>{ set(v||{}); render(); }));
   const from = addDays(today(), -KEEP_DAYS);
-  bind("crews", v=>{ const had=JSON.stringify(crewMembers(myCrew)); crews=v; if(!isAdmin && JSON.stringify(crewMembers(myCrew))!==had) dayBind(); }); bind("crewRoutes", v=>routes=v); bind("events", v=>events=v);
+  bind("crews", v=>{ const had=JSON.stringify(crewMembers(myCrew)); crews=v; if(!isAdmin && JSON.stringify(crewMembers(myCrew))!==had) memberBind(); }); bind("crewRoutes", v=>routes=v); bind("events", v=>events=v);
+  bind("payRates", v=>payRates=v);
   unsub.push(store.onFrom("storms", from, v=>{ storms=v||{}; render(); }));
   unsub.push(store.onFrom("crewChecks", from, v=>{ checks=v||{}; render(); }));
   if(isAdmin){
@@ -319,26 +336,45 @@ function attach(){
     unsub.push(store.onFrom("serviceLog", from, v=>{ svcLog=v||{}; render(); }));
     unsub.push(store.onFrom("dayLogs", from, v=>{ dayLogs=v||{}; render(); }));
     bind("timeEntries", v=>timeAll=v);
+    bind("staff", v=>staffAll=v); bind("staffPrivate", v=>privAll=v); bind("staffDocs", v=>docsAll=v); bind("shifts", v=>shiftsAll=v);
+    bind("payLog", v=>payLogAll=v); bind("staffVault", v=>vault=v); bind("contractTemplates/_signing", v=>svcCfg=v&&v.url?v:null);
   } else {
-    bind("timeEntries/"+me.key, v=>myTime=v);
+    // An employee's own record. The office preview reads the office's copy instead.
+    const own = (path, map) => unsub.push(store.on(path+"/"+me.key, v=>{ map[me.key]=v||{}; render(); }));
+    own("timeEntries", timeAll); own("staff", staffAll); own("staffPrivate", privAll); own("staffDocs", docsAll); own("shifts", shiftsAll); own("payLog", payLogAll);
   }
-  dayBind();
+  dayBind(); memberBind();
+}
+// A manager reads his crew's contact info, shifts and clock times (the rules allow nothing more).
+function memberBind(){
+  memUnsub.forEach(f=>f()); memUnsub=[];
+  if(isAdmin || viewAs || role!=="manager") return;
+  Object.keys(crewMembers(myCrew)).forEach(k=>{ if(k===me.key) return;
+    [["staff",staffAll],["shifts",shiftsAll],["timeEntries",timeAll]].forEach(([p,map])=>memUnsub.push(store.on(p+"/"+k, v=>{ map[k]=v||{}; render(); }))); });
 }
 // What depends on the day on screen, for crew sign-ins: the crew's approval for that day and (managers) the crew's time.
 function dayBind(){
   dayUnsub.forEach(f=>f()); dayUnsub=[];
   const crew = viewCrew(); if(isAdmin && !viewAs) return; if(!crew) return;
   if(viewAs) return; // the office already reads everything
-  dayUnsub.push(store.on(`dayLogs/${curDate}/crews/${crew}`, v=>{ myDay[curDate]=v||null; render(); }));
-  if(role==="manager") Object.keys(crewMembers(crew)).forEach(k=>{ if(k===me.key) return; dayUnsub.push(store.on("timeEntries/"+k+"/"+curDate, v=>{ (crewTime[k]=crewTime[k]||{})[curDate]=v||{}; render(); })); });
+  dayUnsub.push(store.on(`dayLogs/${curDate}/crews/${crew}`, v=>{ setApproval(curDate, crew, v); render(); }));
+}
+function setApproval(d, crew, v){ const day=dayLogs[d]=dayLogs[d]||{}; day.crews=day.crews||{}; if(v) day.crews[crew]=v; else delete day.crews[crew]; }
+// Approvals for days off screen (pay periods), read once each for a crew sign-in.
+const fetched={};
+function fetchApprovals(dates, crew){
+  if(isAdmin || viewAs || !crew) return;
+  const need=dates.filter(d=>!fetched[d+"|"+crew]); if(!need.length) return;
+  need.forEach(d=>{ fetched[d+"|"+crew]=1; store.get(`dayLogs/${d}/crews/${crew}`).then(v=>{ if(v){ setApproval(d,crew,v); render(); } }).catch(()=>{}); });
 }
 function setViewAs(c){
   if(!realAdmin) return;
   viewAs=c||""; isAdmin=!viewAs;
   if(!meReal) meReal={...me};
-  if(viewAs){ const mk=(crews[viewAs]||{}).manager; role="manager"; myCrew=viewAs; me={...meReal, key:mk||"preview", name:mk?personName(mk):viewAs}; }
-  else { role=""; myCrew=""; if(meReal) me=meReal; }
-  view="today"; openRoute=null; editing=null; render(); window.scrollTo(0,0);
+  if(viewAs.startsWith("emp:")){ const k=viewAs.slice(4), t=team[k]||{}; role="member"; myCrew=t.crew||""; me={...meReal, key:k, name:t.name||k}; view="schedule"; }
+  else if(viewAs){ const mk=(crews[viewAs]||{}).manager; role="manager"; myCrew=viewAs; me={...meReal, key:mk||"preview", name:mk?personName(mk):viewAs}; view="today"; }
+  else { role=""; myCrew=""; if(meReal) me=meReal; view="today"; }
+  openRoute=null; editing=null; personOpen=null; render(); window.scrollTo(0,0);
 }
 
 // ---------- helpers on the data ----------
@@ -358,8 +394,8 @@ function checksFor(rid, d){
   const out={}; Object.keys(checks).sort().forEach(x=>{ if(x<(r.start||x) || x>d) return; Object.entries((checks[x]||{})[rid]||{}).forEach(([s,v])=>{ out[s]={...v,date:x}; }); }); return out;
 }
 function progress(rid, d){ const r=routes[rid]; const st=stopsOf(r); const c=checksFor(rid,d); const done=st.filter(s=>c[s.id]&&!c[s.id].skipped).length, skip=st.filter(s=>c[s.id]&&c[s.id].skipped).length; return {done,skip,total:st.length,pct:st.length?Math.round((done+skip)/st.length*100):0}; }
-const dayApproved = (d,c) => isAdmin&&!viewAs ? ((((dayLogs[d]||{}).crews||{})[c]||{}).status==="approved") : viewAs ? ((((dayLogs[d]||{}).crews||{})[c]||{}).status==="approved") : (myDay[d]||{}).status==="approved";
-const approvalOf = (d,c) => isAdmin||viewAs ? (((dayLogs[d]||{}).crews||{})[c]||null) : (myDay[d]||null);
+const approvalOf = (d,c) => (((dayLogs[d]||{}).crews||{})[c]||null);
+const dayApproved = (d,c) => (approvalOf(d,c)||{}).status==="approved";
 const APPLE = /iPhone|iPad|iPod|Macintosh/.test(navigator.userAgent);
 const dirUrl = dest => APPLE ? "https://maps.apple.com/?dirflg=d&daddr="+encodeURIComponent(dest) : "https://www.google.com/maps/dir/?api=1&destination="+encodeURIComponent(dest);
 const stopDest = s => s.lat&&s.lon ? s.lat+","+s.lon : (s.address||s.name||"");
@@ -368,18 +404,19 @@ const svcChip = s => `<span class="chip svc-${esc(s)}">${esc(SERVICES[s]||s)}</s
 // Hours from time entries (in and out stamps); an entry still open counts to now on today only.
 function entryHours(e, d){ if(!e||!e.in) return 0; const out=e.out || (d===today()?Date.now():e.in); return Math.max(0,(out-e.in)/3600e3); }
 const dayHours = (map, d) => Object.values((map||{})[d]||{}).reduce((n,e)=>n+entryHours(e,d),0);
-const myTimeMap = () => viewAs ? (timeAll[me.key]||{}) : myTime;
+const myTimeMap = () => timeAll[me.key]||{};
 
 // ---------- navigation ----------
 function tabs(){
-  const t = isAdmin ? [["today","Day"],["week","Week"],["routes","Routes"],["crews","Crews"],["log","Log"],["schedule","Schedule"]]
-    : [["today","Today"],["week","Week"],["mydays","My days"]].concat(role==="manager"?[["crewlog","Crew log"]]:[]);
+  const t = isAdmin ? [["today","Day"],["week","Week"],["routes","Routes"],["crews","Crews"],["people","People"],["log","Log"],["events","Meetings"],["paycfg","Pay"]]
+    : role==="manager" ? [["today","Today"],["week","Week"],["crewlog","Crew log"],["crew","Crew"],["me","Me"]]
+    : [["schedule","Schedule"],["hours","Hours"],["pay","Pay"],["files","Files"],["info","My info"]];
   $("#nav").innerHTML = t.map(([k,l])=>`<button data-v="${k}" class="${view===k&&!openRoute&&!editing?"on":""}">${l}</button>`).join("")
-    + (realAdmin && crewList().length ? `<select id="viewAs" class="viewas" aria-label="See the page as a crew"><option value="">Office view</option>${crewList().map(c=>`<option value="${esc(c)}" ${viewAs===c?"selected":""}>See as ${esc(c)} manager</option>`).join("")}</select>` : "");
+    + (realAdmin && (crewList().length || people().length) ? `<select id="viewAs" class="viewas" aria-label="See the page as someone else"><option value="">Office view</option>${crewList().map(c=>`<option value="${esc(c)}" ${viewAs===c?"selected":""}>See as ${esc(c)} manager</option>`).join("")}${people().map(([k,t])=>`<option value="emp:${esc(k)}" ${viewAs==="emp:"+k?"selected":""}>See as ${esc(t.name)}</option>`).join("")}</select>` : "");
   const pb=$("#previewBar"); pb.hidden=!viewAs;
-  if(viewAs){ pb.innerHTML=`Crew preview: this is what the <b>${esc(viewAs)}</b> manager sees. Members see the same without Crew log. Nothing is saved. <button class="small" id="exitPreview">Back to office view</button>`; $("#exitPreview").onclick=()=>setViewAs(""); }
+  if(viewAs){ pb.innerHTML=`${isEmpPreview()?`Employee preview: this is what <b>${esc(me.name)}</b> sees.`:`Manager preview: this is what the <b>${esc(viewAs)}</b> manager sees.`} Nothing is saved. <button class="small" id="exitPreview">Back to office view</button>`; $("#exitPreview").onclick=()=>setViewAs(""); }
   const va=$("#viewAs"); if(va) va.onchange=()=>setViewAs(va.value);
-  $("#nav").querySelectorAll("button[data-v]").forEach(b=>b.onclick=()=>{ view=b.dataset.v; openRoute=null; editing=null; render(); window.scrollTo(0,0); });
+  $("#nav").querySelectorAll("button[data-v]").forEach(b=>b.onclick=()=>{ view=b.dataset.v; openRoute=null; editing=null; personOpen=null; render(); window.scrollTo(0,0); });
 }
 function dateBar(step){
   const sel = isAdmin && ["today","week","log"].includes(view) ? `<select id="cf" style="width:auto"><option value="">All crews</option>${crewList().map(c=>`<option ${crewFilter===c?"selected":""}>${esc(c)}</option>`).join("")}</select>` : "";
@@ -408,7 +445,9 @@ function render(){
   if(editing) return renderEditRoute(app);
   if(openRoute && routes[openRoute]) return renderRoute(app);
   openRoute=null;
-  ({today:renderToday, week:renderWeek, mydays:renderMyDays, crewlog:renderCrewLog, routes:renderRoutes, crews:renderCrews, log:renderLog, schedule:renderSchedule}[view]||renderToday)(app);
+  if(role==="member" && !["schedule","hours","pay","files","info"].includes(view)) view="schedule";
+  ({today:renderToday, week:renderWeek, crewlog:renderCrewLog, crew:renderCrewTab, me:renderMe, schedule:renderMySchedule, hours:renderHours, pay:renderPay, files:renderFiles, info:renderInfo,
+    routes:renderRoutes, crews:renderCrews, people:renderPeople, log:renderLog, events:renderSchedule, paycfg:renderPayCfg}[view]||renderToday)(app);
 }
 
 // Today: for a crew, the clock, the storm, the day's routes and meetings. For the office, one lane per crew.
@@ -477,19 +516,9 @@ function renderWeek(app){
   app.querySelectorAll("[data-day]").forEach(el=>el.onclick=()=>{ curDate=el.dataset.day; view="today"; dayBind(); render(); window.scrollTo(0,0); });
 }
 
-// My days: hours and stops by day, and whether the manager has approved the day.
-function renderMyDays(app){
-  const days=new Set(Object.keys(myTimeMap())); Object.entries(checks).forEach(([d,byR])=>Object.values(byR||{}).forEach(st=>Object.values(st||{}).forEach(c=>{ if(c&&c.by===me.key) days.add(d); })));
-  const list=[...days].sort().reverse().slice(0,40);
-  const kindsOn = d => { const n={}; Object.entries(checks[d]||{}).forEach(([rid,st])=>Object.values(st||{}).forEach(c=>{ if(c&&c.by===me.key&&!c.skipped) n[c.kind]=(n[c.kind]||0)+1; })); return Object.entries(n).map(([k,v])=>`${v} ${esc(DONE_WORD[k]||k).toLowerCase()}`).join(", "); };
-  const mon=mondayOf(today()); let wk=0, wkStops=0; for(let i=0;i<7;i++){ const d=addDays(mon,i); wk+=dayHours(myTimeMap(),d); Object.values(checks[d]||{}).forEach(st=>Object.values(st||{}).forEach(c=>{ if(c&&c.by===me.key&&!c.skipped) wkStops++; })); }
-  app.innerHTML=`<div class="card"><h2>This week</h2><table><tr><td>Hours on the clock</td><td><b>${hrs(wk)}</b></td></tr><tr><td>Stops you checked off</td><td><b>${wkStops}</b></td></tr></table><p class="muted">Pay is figured from approved stops and approved hours. Your manager approves each day.</p></div>
-    <div class="card"><h2>My days</h2><div class="scroll"><table><tr><th>Day</th><th>Hours</th><th>Stops</th><th>Day</th></tr>${list.map(d=>{ const t=(myTimeMap()[d]||{}); const ap=Object.values(t).some(e=>e.status==="approved"); return `<tr><td>${fmtDay(d)}</td><td>${hrs(dayHours(myTimeMap(),d))}</td><td>${kindsOn(d)||'<span class="muted">none</span>'}</td><td>${ap?'<span class="chip ok">Approved</span>':'<span class="chip warn">Waiting</span>'}</td></tr>`; }).join("")||'<tr><td colspan="4" class="meta">Nothing yet.</td></tr>'}</table></div></div>`;
-}
-
 // ---------- one route: map and stop list ----------
 let map=null, mapEl=null, layer=null, meMarker=null, fitFor=null;
-function canCheckOn(r, d){ if(isAdmin&&!viewAs) return true; return r.crew===viewCrew() && !dayApproved(d, r.crew); }
+function canCheckOn(r, d){ if(isAdmin&&!viewAs) return true; return role==="manager" && r.crew===viewCrew() && !dayApproved(d, r.crew); }
 function renderRoute(app){
   const id=openRoute, r=routes[id], st=stopsOf(r), c=checksFor(id,curDate), p=progress(id,curDate), d=curDate;
   const can=canCheckOn(r,d), locked=dayApproved(d,r.crew);
@@ -620,7 +649,7 @@ function dayReport(d, crew){
   return {rows, skipped, open};
 }
 function timeOf(crew, d){
-  const out={}; Object.entries(crewMembers(crew)).forEach(([k])=>{ out[k] = isAdmin||viewAs ? ((timeAll[k]||{})[d]||{}) : k===me.key ? (myTime[d]||{}) : (((crewTime[k]||{})[d])||{}); }); return out;
+  const out={}; Object.keys(crewMembers(crew)).forEach(k=>{ out[k]=(timeAll[k]||{})[d]||{}; }); return out;
 }
 function logHtml(d, crew){
   const {rows, skipped, open}=dayReport(d,crew), a=approvalOf(d,crew), t=timeOf(crew,d), locked=a&&a.status==="approved";
@@ -754,7 +783,7 @@ function renderCrews(app){
   const people=Object.entries(team).filter(([,t])=>t&&t.tier==="crew").sort((a,b)=>(a[1].name||"").localeCompare(b[1].name||""));
   const loose=people.filter(([,t])=>!t.crew || !crews[t.crew]);
   app.innerHTML=`<div class="bar"><span class="date">Crews</span><button class="primary small" id="addCrew">Add crew</button></div>
-    <p class="meta">Each crew has one manager. The manager approves his crew's day in Crew log, which sends the stops to billing and approves the crew's hours. People reach this list by being added to the Team list in Projects with the Crew access level.</p>
+    <p class="meta">Each crew has one manager. Managers run the routes: the map, check-offs and the crew log, and they approve their crew's day, which sends the stops to billing and approves the crew's hours. Everyone else on a crew sees a simpler page: their schedule, hours, pay and files. People reach this list by being added to the Team list in Projects with the Crew access level.</p>
     ${crewList().map(c=>{ const cr=crews[c]||{}, mem=Object.keys(cr.members||{});
       return `<div class="card"><div class="top" style="display:flex;justify-content:space-between;gap:10px"><h2>${esc(c)}</h2><button class="small" data-cedit="${esc(c)}">Yard and note</button></div>
         <p class="meta">${cr.start?"Yard: "+esc(cr.start):"No yard address"}${cr.note?" &middot; "+esc(cr.note):""}</p>
@@ -768,7 +797,7 @@ function renderCrews(app){
     dl.querySelector("#ceGo").onclick=async()=>{ await store.update({[`crews/${c}/start`]:$("#ceStart").value.trim()||null,[`crews/${c}/note`]:$("#ceNote").value.trim()||null}); dl.close(); }; });
   app.querySelectorAll("[data-addto]").forEach(s=>s.onchange=async()=>{ const c=s.dataset.addto, k=s.value; if(!k) return; const t=team[k]||{}, old=t.crew, upd={};
     if(old && crews[old]){ upd[`crews/${old}/members/${k}`]=null; if(crews[old].manager===k) upd[`crews/${old}/manager`]=null; }
-    upd[`crews/${c}/members/${k}`]=t.name||k; upd[`allowed/${k}/crew`]=c; upd[`allowed/${k}/crewRole`]="member";
+    upd[`crews/${c}/members/${k}`]=t.name||k; upd[`allowed/${k}/crew`]=c; upd[`allowed/${k}/crewRole`]="member"; if(t.email) upd[`staff/${k}/email`]=t.email;
     await store.update(upd); toast(`${t.name} is on ${c}`); });
   app.querySelectorAll("[data-mgr]").forEach(b=>b.onclick=async()=>{ const [c,k]=b.dataset.mgr.split("|"), cr=crews[c]||{}, upd={ [`crews/${c}/manager`]:k, [`allowed/${k}/crewRole`]:"manager" };
     if(cr.manager && cr.manager!==k && team[cr.manager]) upd[`allowed/${cr.manager}/crewRole`]="member";
@@ -788,6 +817,248 @@ function renderSchedule(app){
   $("#evAdd").onclick=async()=>{ const title=$("#evTitle").value.trim(); if(!title) return toast("Say what it is");
     await store.update({[`events/${store.key()}`]:{ title, where:$("#evWhere").value.trim(), date:$("#evDate").value||today(), start:$("#evStart").value, end:$("#evEnd").value, crew:$("#evCrew").value }}); toast("Added"); };
   app.querySelectorAll("[data-evrm]").forEach(b=>b.onclick=()=>store.update({[`events/${b.dataset.evrm}`]:null}));
+}
+
+// ---------- people: schedule, hours, pay, files, info (October 17, 2026) ----------
+const people = () => Object.entries(team).filter(([,t])=>t && t.tier==="crew").sort((a,b)=>(a[1].name||"").localeCompare(b[1].name||""));
+const money = n => "$"+(Math.round((+n||0)*100)/100).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2});
+const fmtShort = d => { if(!d) return ""; const x=pd(d); return `${MON[x.getUTCMonth()]} ${x.getUTCDate()}`; };
+const crewOfPerson = k => (team[k]||{}).crew || (k===me.key ? myCrew : Object.keys(crews).find(c=>(crewMembers(c)||{})[k]) || "");
+const staffOf = k => staffAll[k]||{};
+const minWage = () => +payRates.minWage || MIN_WAGE_DEFAULT;
+const rateOf = (k, kind) => { const o=(privAll[k]||{}).rates||{}; return o[kind]!=null&&o[kind]!=="" ? +o[kind] : +((payRates.kinds||{})[kind]||0); };
+const shareOf = k => { const s=(privAll[k]||{}).share; return s!=null&&s!=="" ? +s : +(payRates.defaultShare||0); };
+// Pay periods run every two weeks from the start date set on the Pay tab.
+const periodAnchor = () => payRates.periodStart || "2026-10-05";
+function periodOf(d){ const a=pd(periodAnchor()), x=pd(d); const n=Math.floor((x-a)/864e5/PERIOD_DAYS); return addDays(periodAnchor(), n*PERIOD_DAYS); }
+const periodEnd = p => addDays(p, PERIOD_DAYS-1);
+const datesIn = (a,b) => { const out=[]; for(let x=a; x<=b; x=addDays(x,1)) out.push(x); return out; };
+// What a person earned in a period. Piece pay: every approved stop on a day he worked for that crew, at the service's
+// rate times his share. Hours are kept for the record and for the minimum wage: if piece pay falls below approved
+// hours times the minimum, the difference is made up. Russel's full pay sheet will refine this.
+function earnings(k, p){
+  const from=p, to=periodEnd(p), tm=timeAll[k]||{}, out={ hours:0, hoursOpen:0, piece:0, pending:0, stops:{}, pendingStops:0, days:0 };
+  const crewDays=[];
+  datesIn(from,to).forEach(d=>{ const day=tm[d]||{}; const es=Object.values(day); if(!es.length) return; out.days++;
+    es.forEach(e=>{ const h=entryHours(e,d); if(e.status==="approved") out.hours+=h; else out.hoursOpen+=h; });
+    [...new Set(es.map(e=>e.crew||crewOfPerson(k)).filter(Boolean))].forEach(c=>crewDays.push([d,c])); });
+  [...new Set(crewDays.map(([,c])=>c))].forEach(c=>fetchApprovals(crewDays.filter(([,x])=>x===c).map(([d])=>d), c));
+  crewDays.forEach(([d,c])=>{ const ok=dayApproved(d,c);
+    Object.entries(checks[d]||{}).forEach(([rid,st])=>{ if((routes[rid]||{}).crew!==c) return; Object.values(st||{}).forEach(x=>{ if(!x||x.skipped) return;
+      const amt=rateOf(k,x.kind)*shareOf(k)/100; if(ok){ out.piece+=amt; out.stops[x.kind]=(out.stops[x.kind]||0)+1; } else { out.pending+=amt; out.pendingStops++; } }); }); });
+  out.floor=out.hours*minWage(); out.makeup=Math.max(0,out.floor-out.piece); out.earned=out.piece+out.makeup;
+  out.paid=(payLogAll[k]||{})[p]||null;
+  return out;
+}
+
+// Employee: the next month. Shifts set by the office or the crew manager, storm call-outs and meetings.
+function renderMySchedule(app){
+  const k=me.key, crew=crewOfPerson(k), sh=shiftsAll[k]||{}, t=today(); let h="";
+  if(crew) h += clockCard();
+  const days=datesIn(t, addDays(t, SCHEDULE_DAYS-1)).map(d=>{ const items=[];
+    const s=sh[d]; if(s) items.push(`<div class="rowlink" style="cursor:default"><span><b>Work${s.crew&&s.crew!==crew?" with "+esc(s.crew):""}</b>${s.note?` <span class="meta">${esc(s.note)}</span>`:""}</span><span class="meta">${esc(s.start||"")}${s.end?" to "+esc(s.end):""}</span></div>`);
+    if(crew && stormOn(d,crew)) items.push(`<div class="rowlink" style="cursor:default"><span><span class="chip svc-snow">Storm</span> <b>Snow call-out</b></span><span class="meta">Started ${fmtTime(storms[d][crew].at)}</span></div>`);
+    Object.values(events).filter(e=>e&&e.date===d&&(!e.crew||e.crew==="all"||e.crew===crew)).forEach(e=>items.push(`<div class="rowlink" style="cursor:default"><span><b>${esc(e.title)}</b> <span class="meta">${esc(e.where||"")}</span></span><span class="meta">${esc(e.start||"")}${e.end?" to "+esc(e.end):""}</span></div>`));
+    return items.length ? `<div class="daycol ${d===t?"today":""}"><h3>${fmtDay(d)}</h3>${items.join("")}</div>` : ""; }).join("");
+  h += `<div class="card"><h2>Your schedule</h2><p class="meta">The next ${SCHEDULE_DAYS} days. Your manager or the office sets your shifts. Storm call-outs show the moment a storm is started.</p>${days||'<p class="meta">Nothing scheduled in the next month yet.</p>'}</div>`;
+  app.innerHTML=h; wireClock();
+}
+
+// Employee: past hours by pay period, with the manager's approval.
+function renderHours(app){
+  const k=me.key, tm=timeAll[k]||{}, cur=periodOf(today()); let h="";
+  for(let i=0;i<6;i++){ const p=addDays(cur,-PERIOD_DAYS*i), rows=datesIn(p,periodEnd(p)).reverse().filter(d=>tm[d]&&Object.keys(tm[d]).length);
+    if(!rows.length && i>0) continue;
+    const tot=rows.reduce((n,d)=>n+dayHours(tm,d),0);
+    h+=`<div class="card"><h2>${fmtShort(p)} to ${fmtShort(periodEnd(p))} <span class="meta">${hrs(tot)} hrs</span></h2>${rows.length?`<div class="scroll"><table><tr><th>Day</th><th>Clock</th><th>Hours</th><th></th></tr>${rows.map(d=>{ const es=Object.values(tm[d]).sort((a,b)=>(a.in||0)-(b.in||0)), ap=es.every(e=>e.status==="approved");
+      return `<tr><td>${fmtDay(d)}</td><td>${es.map(e=>`${fmtTime(e.in)} to ${e.out?fmtTime(e.out):"now"}`).join("<br>")}</td><td style="font-variant-numeric:tabular-nums">${hrs(dayHours(tm,d))}</td><td>${ap?'<span class="chip ok">Approved</span>':'<span class="chip warn">Waiting</span>'}</td></tr>`; }).join("")}</table></div>`:'<p class="meta">No hours yet this period.</p>'}</div>`; }
+  app.innerHTML=h||'<div class="card"><p class="meta">No hours yet.</p></div>';
+}
+
+// Employee: pay log. Earned on this page from approved stops and hours; paid amounts come from QuickBooks Payroll.
+function payRowsHtml(k){
+  const cur=periodOf(today()); let h="";
+  for(let i=0;i<6;i++){ const p=addDays(cur,-PERIOD_DAYS*i), e=earnings(k,p);
+    if(!e.days && !e.paid && i>0) continue;
+    const kinds=Object.entries(e.stops).map(([x,n])=>`${n} ${esc(KINDS[x]||x).toLowerCase()}`).join(", ");
+    h+=`<div class="card"><h2>${fmtShort(p)} to ${fmtShort(periodEnd(p))}${i===0?' <span class="chip">This period</span>':""}</h2><table>
+      <tr><td>Stops (approved)</td><td>${kinds||"none"}</td></tr>
+      <tr><td>Piece pay at your share (${hrs(shareOf(k))}%)</td><td style="font-variant-numeric:tabular-nums"><b>${money(e.piece)}</b></td></tr>
+      <tr><td>Hours approved</td><td style="font-variant-numeric:tabular-nums">${hrs(e.hours)}${e.hoursOpen?` <span class="muted">(+${hrs(e.hoursOpen)} waiting)</span>`:""}</td></tr>
+      ${e.makeup>0.005?`<tr><td>Minimum wage make-up (${money(minWage())} an hour)</td><td style="font-variant-numeric:tabular-nums">${money(e.makeup)}</td></tr>`:""}
+      <tr><td><b>Earned</b></td><td style="font-variant-numeric:tabular-nums"><b>${money(e.earned)}</b>${e.pending>0.005?` <span class="muted">+ about ${money(e.pending)} waiting for approval</span>`:""}</td></tr>
+      <tr><td>Paid</td><td>${e.paid&&e.paid.paidAmount!=null?`<b>${money(e.paid.paidAmount)}</b> on ${fmtDay(e.paid.paidDate)}${e.paid.ref?` <span class="muted">${esc(e.paid.ref)}</span>`:""}`:'<span class="chip warn">Not paid yet</span>'}</td></tr></table></div>`; }
+  return h;
+}
+function renderPay(app){
+  app.innerHTML = `<p class="meta">Pay periods run every two weeks. Earned pay comes from approved stops at your share, with the minimum wage made up if piece pay falls short of your approved hours. Paid amounts come from payroll. Before taxes and deductions.</p>` + payRowsHtml(me.key);
+}
+
+// Files: everything on file with the company. Sensitive forms show only that they are on file.
+const requiredFor = k => (staffOf(k).type==="1099" ? ["agreement","payterms","handbook","w9"] : ["agreement","payterms","handbook","w4","i9","deposit"]);
+function docStatus(k){
+  const docs=Object.entries(docsAll[k]||{}).filter(([,d])=>d); const have=new Set(docs.map(([,d])=>d.kind)); const t=today(), soon=addDays(t,30);
+  return { docs:docs.sort((a,b)=>(b[1].at||0)-(a[1].at||0)), missing:requiredFor(k).filter(x=>!have.has(x)),
+    expired:docs.filter(([,d])=>d.expires&&d.expires<t), soon:docs.filter(([,d])=>d.expires&&d.expires>=t&&d.expires<=soon) };
+}
+function docRow(k, id, d, office){
+  const t=today(), chip = d.expires ? (d.expires<t?'<span class="chip bad">Expired</span>':d.expires<=addDays(t,30)?'<span class="chip warn">Expires soon</span>':"") : "";
+  const link = d.sensitive ? (office && (vault[k]||{})[id] ? `<a class="mapbtn" href="${esc(vault[k][id].url)}" target="_blank" rel="noopener">Open in Drive</a>` : '<span class="chip">On file, kept in Drive</span>')
+    : d.url ? `<a class="mapbtn" href="${esc(d.url)}" target="_blank" rel="noopener">Open</a>` : "";
+  return `<div class="logrow"><span class="w"><b>${esc(d.name)}</b> ${chip}<div class="meta">${esc(DOC_KINDS[d.kind]||d.kind)}${d.signedAt?" &middot; signed "+fmtShort(d.signedAt):""}${d.expires?" &middot; expires "+fmtShort(d.expires):""} &middot; added ${fmtShort(iso(new Date(d.at||Date.now())))}${d.shareError?` &middot; <span style="color:var(--red)">not shared: ${esc(d.shareError)}</span>`:""}</div>${d.note?`<div class="muted">${esc(d.note)}</div>`:""}</span>
+    <span style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end">${link}${office?`<button class="small danger" data-docrm="${esc(id)}">Remove record</button>`:""}</span></div>`;
+}
+function renderFiles(app){
+  const k=me.key, st=docStatus(k);
+  app.innerHTML=`<div class="card"><h2>Your files with Mangiapane Brothers</h2><p class="meta">Agreements and papers on file. Tap Open to view or download. Tax and ID forms are kept in the company's Google Drive and only show here as on file.</p>
+    ${st.missing.length?`<p><span class="chip warn">Still needed</span> ${st.missing.map(x=>esc(DOC_KINDS[x])).join(", ")}. Talk to the office.</p>`:""}
+    ${st.docs.map(([id,d])=>docRow(k,id,d,false)).join("")||'<p class="meta">No files yet.</p>'}</div>`;
+}
+
+// My info: the employee keeps his phone, address and emergency contact current.
+function renderInfo(app){
+  const k=me.key, s=staffOf(k), em=s.emergency||{}, crew=crewOfPerson(k), mk=(crews[crew]||{}).manager;
+  app.innerHTML=`<div class="card"><h2>${esc(me.name)}</h2><table>
+      <tr><td>Email</td><td>${esc((team[k]||{}).email||me.email)}</td></tr><tr><td>Crew</td><td>${esc(crew||"Not on a crew")}${role==="manager"?" (manager)":""}</td></tr>
+      ${mk&&mk!==k?`<tr><td>Manager</td><td>${esc(personName(mk))}</td></tr>`:""}${s.startDate?`<tr><td>Started</td><td>${fmtDay(s.startDate)}</td></tr>`:""}</table></div>
+    <form class="card" id="infoForm"><h2>Keep this current</h2><div class="grid2">
+      <div><label for="inPhone">Phone</label><input id="inPhone" type="tel" value="${esc(s.phone||"")}" autocomplete="tel"></div>
+      <div><label for="inAddr">Home address</label><input id="inAddr" value="${esc(s.address||"")}" autocomplete="street-address"></div>
+      <div><label for="inEmName">Emergency contact</label><input id="inEmName" value="${esc(em.name||"")}"></div>
+      <div><label for="inEmPhone">Their phone</label><input id="inEmPhone" type="tel" value="${esc(em.phone||"")}"></div>
+      <div><label for="inEmRel">Relationship</label><input id="inEmRel" value="${esc(em.relation||"")}" placeholder="Mother, spouse"></div></div>
+      <div class="actions"><button class="primary">Save</button></div></form>`;
+  $("#infoForm").onsubmit=async e=>{ e.preventDefault(); if(previewOnly()) return;
+    try { await store.update({ [`staff/${k}/phone`]:$("#inPhone").value.trim()||null, [`staff/${k}/address`]:$("#inAddr").value.trim()||null,
+      [`staff/${k}/emergency`]:{ name:$("#inEmName").value.trim(), phone:$("#inEmPhone").value.trim(), relation:$("#inEmRel").value.trim() } }); toast("Saved"); }
+    catch(err){ toast("Not saved: "+(err.message||err)); } };
+}
+
+// Manager: his own employee pages under one tab.
+function renderMe(app){
+  const subs=[["schedule","Schedule"],["hours","Hours"],["pay","Pay"],["files","Files"],["info","My info"]];
+  app.innerHTML=`<div class="bar">${subs.map(([v,l])=>`<button class="small ${meTab===v?"primary":""}" data-me="${v}">${l}</button>`).join("")}</div><div id="meBody"></div>`;
+  app.querySelectorAll("[data-me]").forEach(b=>b.onclick=()=>{ meTab=b.dataset.me; render(); });
+  ({schedule:renderMySchedule, hours:renderHours, pay:renderPay, files:renderFiles, info:renderInfo}[meTab]||renderMySchedule)($("#meBody"));
+}
+
+// Shifts: set by the office or the person's crew manager.
+function shiftList(k, from, days){
+  const sh=shiftsAll[k]||{}; const to=addDays(from,days-1);
+  return Object.keys(sh).filter(d=>d>=from&&d<=to).sort().map(d=>`<div class="who-row"><span style="min-width:96px">${fmtDay(d)}</span><span class="meta">${esc(sh[d].start||"")}${sh[d].end?" to "+esc(sh[d].end):""}${sh[d].note?" &middot; "+esc(sh[d].note):""}</span><button class="small danger" style="margin-left:auto" data-shrm="${esc(k)}|${d}">Remove</button></div>`).join("") || '<p class="muted">No shifts set.</p>';
+}
+function shiftDialog(k){
+  const t=today(), crew=crewOfPerson(k);
+  const dl=openDlg(`<h2>Shifts for ${esc(personName(k))}</h2><div class="grid2"><div><label for="shFrom">From</label><input type="date" id="shFrom" value="${t}"></div><div><label for="shTo">To</label><input type="date" id="shTo" value="${addDays(t,13)}"></div>
+    <div><label for="shStart">Start</label><input type="time" id="shStart" value="07:00"></div><div><label for="shEnd">End (optional)</label><input type="time" id="shEnd"></div></div>
+    <label>Days</label><div style="display:flex;gap:10px;flex-wrap:wrap">${[1,2,3,4,5,6,0].map(w=>`<label style="display:flex;gap:4px;align-items:center;margin:0;color:var(--ink)"><input type="checkbox" data-wd="${w}" ${w>=1&&w<=5?"checked":""}> ${DOW[w]}</label>`).join("")}</div>
+    <label for="shNote">Note (optional)</label><input id="shNote" maxlength="80" placeholder="Meet at the yard">
+    <div class="actions"><button data-close>Cancel</button><button class="primary" id="shGo">Add shifts</button></div>`);
+  dl.querySelector("#shGo").onclick=async()=>{ const a=$("#shFrom").value, b=$("#shTo").value, st=$("#shStart").value; if(!a||!b||b<a) return toast("Check the dates"); if(!st) return toast("Set a start time");
+    const wds=[...dl.querySelectorAll("[data-wd]:checked")].map(x=>+x.dataset.wd); const upd={};
+    datesIn(a,b).forEach(d=>{ if(wds.includes(pd(d).getUTCDay())) upd[`shifts/${k}/${d}`]={ start:st, end:$("#shEnd").value||null, note:$("#shNote").value.trim()||null, crew:crew||null, by:me.key, at:Date.now() }; });
+    if(!Object.keys(upd).length) return toast("No days match"); if(previewOnly()) return dl.close();
+    try { await store.update(upd); dl.close(); toast(`${Object.keys(upd).length} shifts added`); } catch(e){ toast("Not saved: "+(e.message||e)); } };
+}
+function wireShifts(root){
+  root.querySelectorAll("[data-shadd]").forEach(b=>b.onclick=()=>shiftDialog(b.dataset.shadd));
+  root.querySelectorAll("[data-shrm]").forEach(b=>b.onclick=async()=>{ if(previewOnly()) return; const [k,d]=b.dataset.shrm.split("|"); await store.update({[`shifts/${k}/${d}`]:null}); toast("Shift removed"); });
+}
+const contactHtml = k => { const s=staffOf(k), em=s.emergency||{}, t=team[k]||{};
+  return `<table><tr><td>Phone</td><td>${s.phone?telLink(s.phone):'<span class="muted">not given</span>'}</td></tr><tr><td>Email</td><td>${esc(s.email||t.email||"")}</td></tr>
+    <tr><td>Address</td><td>${s.address?esc(s.address):'<span class="muted">not given</span>'}</td></tr>
+    <tr><td>Emergency</td><td>${em.name?`${esc(em.name)}${em.relation?" ("+esc(em.relation)+")":""} ${telLink(em.phone)}`:'<span class="chip warn">none on file</span>'}</td></tr></table>`; };
+
+// Manager: his crew's contact and emergency info, and their shifts.
+function renderCrewTab(app){
+  const crew=viewCrew(), mem=Object.keys(crewMembers(crew));
+  app.innerHTML=`<p class="meta">${esc(crew)}: contact and emergency info for your crew, and their shifts for the next two weeks. Pay and files are kept by the office.</p>`
+    + mem.map(k=>`<div class="card"><div class="top" style="display:flex;justify-content:space-between;gap:10px;align-items:baseline"><h2>${esc(personName(k))}${(crews[crew]||{}).manager===k?' <span class="chip ok">Manager</span>':""}</h2><button class="small primary" data-shadd="${esc(k)}">Add shifts</button></div>
+      ${contactHtml(k)}<h3 style="margin-top:10px">Shifts, next two weeks</h3>${shiftList(k, today(), 14)}</div>`).join("") || '<div class="card"><p class="meta">No one is on your crew.</p></div>';
+  wireShifts(app);
+}
+
+// Office: the people database. Profiles, pay share, files and shifts.
+function renderPeople(app){
+  if(personOpen && team[personOpen]) return renderPerson(app, personOpen);
+  const list=people();
+  app.innerHTML=`<div class="bar"><span class="date">People</span></div><p class="meta">Everyone with the Crew access level. Add people on the Team list in Projects; put them on a crew under Crews. Files go to the company Google Drive; tax and ID forms are never shown on an employee's page.</p>
+    <div class="card scroll"><table><tr><th>Name</th><th>Crew</th><th>Phone</th><th>Share</th><th>Files</th></tr>
+    ${list.map(([k,t])=>{ const st=docStatus(k); return `<tr data-person="${esc(k)}" style="cursor:pointer"><td><b>${esc(t.name)}</b><div class="muted">${esc(t.email)}</div></td><td>${esc(t.crew||"No crew")}${t.crewRole==="manager"?" (manager)":""}</td><td>${esc(staffOf(k).phone||"")}</td><td>${hrs(shareOf(k))}%</td>
+      <td>${st.missing.length?`<span class="chip warn">${st.missing.length} missing</span> `:""}${st.expired.length?`<span class="chip bad">${st.expired.length} expired</span> `:""}${st.soon.length?`<span class="chip warn">${st.soon.length} expiring</span>`:""}${!st.missing.length&&!st.expired.length&&!st.soon.length?'<span class="chip ok">Up to date</span>':""}</td></tr>`; }).join("")||'<tr><td colspan="5" class="meta">No crew people on the Team list yet.</td></tr>'}</table></div>`;
+  app.querySelectorAll("[data-person]").forEach(tr=>tr.onclick=()=>{ personOpen=tr.dataset.person; render(); window.scrollTo(0,0); });
+}
+function renderPerson(app, k){
+  const t=team[k]||{}, s=staffOf(k), em=s.emergency||{}, pv=privAll[k]||{}, st=docStatus(k);
+  app.innerHTML=`<div class="bar"><button class="small" id="back">&#8249; People</button><span class="date">${esc(t.name)}</span><button class="small" id="seeAs">See as ${esc((t.name||"").split(" ")[0])}</button></div>
+    <form class="card" id="pfForm"><h2>Profile</h2><div class="grid2">
+      <div><label for="pfPhone">Phone</label><input id="pfPhone" type="tel" value="${esc(s.phone||"")}"></div><div><label for="pfAddr">Home address</label><input id="pfAddr" value="${esc(s.address||"")}"></div>
+      <div><label for="pfEmName">Emergency contact</label><input id="pfEmName" value="${esc(em.name||"")}"></div><div><label for="pfEmPhone">Their phone</label><input id="pfEmPhone" type="tel" value="${esc(em.phone||"")}"></div>
+      <div><label for="pfEmRel">Relationship</label><input id="pfEmRel" value="${esc(em.relation||"")}"></div><div><label for="pfStart">Start date</label><input id="pfStart" type="date" value="${esc(s.startDate||"")}"></div>
+      <div><label for="pfType">Paid as</label><select id="pfType"><option value="W-2" ${s.type!=="1099"?"selected":""}>Employee (W-2)</option><option value="1099" ${s.type==="1099"?"selected":""}>Contractor (1099)</option></select></div>
+      <div><label for="pfShare">Piece pay share (%)</label><input id="pfShare" type="number" inputmode="decimal" min="0" max="100" step="0.5" value="${esc(pv.share??"")}" placeholder="${hrs(+(payRates.defaultShare||0))} (default)"></div></div>
+      <details style="margin-top:8px"><summary>Rate overrides for ${esc((t.name||"").split(" ")[0])}</summary><div class="grid2">${Object.entries(KINDS).map(([x,l])=>`<div><label for="pfR_${x}">${esc(l)}</label><input id="pfR_${x}" data-rate="${x}" type="number" inputmode="decimal" step="0.01" value="${esc((pv.rates||{})[x]??"")}" placeholder="${money((payRates.kinds||{})[x]||0)} (table)"></div>`).join("")}</div></details>
+      <div class="actions"><button class="primary">Save profile</button></div></form>
+    <div class="card"><h2>Files</h2>${st.missing.length?`<p><span class="chip warn">Missing</span> ${st.missing.map(x=>esc(DOC_KINDS[x])).join(", ")}</p>`:'<p><span class="chip ok">All required files on file</span></p>'}
+      ${st.docs.map(([id,d])=>docRow(k,id,d,true)).join("")||'<p class="meta">No files yet.</p>'}
+      <h3 style="margin-top:12px">Add a file</h3><div class="grid2"><div><label for="upKind">What it is</label><select id="upKind">${Object.entries(DOC_KINDS).map(([x,l])=>`<option value="${x}">${esc(l)}${SENSITIVE.includes(x)?" (kept in Drive only)":""}</option>`).join("")}</select></div>
+        <div><label for="upLabel">Name on the record</label><input id="upLabel" placeholder="2026 employment agreement"></div><div><label for="upSigned">Signed</label><input id="upSigned" type="date"></div><div><label for="upExp">Expires (optional)</label><input id="upExp" type="date"></div></div>
+        <label for="upFile">File (PDF or photo, up to 7 MB)</label><input id="upFile" type="file" accept="application/pdf,image/*,.doc,.docx">
+        <div class="actions"><button class="primary" id="upGo">Upload to Drive</button></div><p class="muted">Ordinary files are shared view-only with ${esc(t.email||"the employee")} so they can open them. Tax and ID forms stay in the office's Drive and show only as on file.</p></div>
+    <div class="card"><div class="top" style="display:flex;justify-content:space-between;gap:10px;align-items:baseline"><h2>Shifts, next month</h2><button class="small primary" data-shadd="${esc(k)}">Add shifts</button></div>${shiftList(k, today(), SCHEDULE_DAYS)}</div>
+    <h2 style="margin:14px 0 8px">Pay log</h2>${payRowsHtml(k)}`;
+  $("#back").onclick=()=>{ personOpen=null; render(); };
+  $("#seeAs").onclick=()=>setViewAs("emp:"+k);
+  $("#pfForm").onsubmit=async e=>{ e.preventDefault(); const rates={}; app.querySelectorAll("[data-rate]").forEach(i=>{ if(i.value!=="") rates[i.dataset.rate]=+i.value; });
+    const sh=$("#pfShare").value;
+    try { await store.update({ [`staff/${k}/phone`]:$("#pfPhone").value.trim()||null, [`staff/${k}/address`]:$("#pfAddr").value.trim()||null,
+      [`staff/${k}/emergency`]:{ name:$("#pfEmName").value.trim(), phone:$("#pfEmPhone").value.trim(), relation:$("#pfEmRel").value.trim() },
+      [`staff/${k}/startDate`]:$("#pfStart").value||null, [`staff/${k}/type`]:$("#pfType").value, [`staffPrivate/${k}/share`]:sh===""?null:+sh, [`staffPrivate/${k}/rates`]:Object.keys(rates).length?rates:null }); toast("Profile saved"); }
+    catch(err){ toast("Not saved: "+(err.message||err)); } };
+  $("#upKind").onchange=()=>{ if(!$("#upLabel").value) $("#upLabel").placeholder=DOC_KINDS[$("#upKind").value]; };
+  $("#upGo").onclick=()=>uploadDoc(k);
+  app.querySelectorAll("[data-docrm]").forEach(b=>b.onclick=async()=>{ await store.update({[`staffDocs/${k}/${b.dataset.docrm}`]:null}); toast("Record removed. The file stays in Drive."); });
+  wireShifts(app);
+}
+const readB64 = f => new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>res(String(r.result).split(",")[1]||""); r.onerror=()=>rej(new Error("Could not read the file")); r.readAsDataURL(f); });
+async function uploadDoc(k){
+  const f=$("#upFile").files[0]; if(!f) return toast("Choose a file");
+  if(f.size>7*1024*1024) return toast("That file is over 7 MB");
+  const kind=$("#upKind").value, label=$("#upLabel").value.trim()||DOC_KINDS[kind], id=store.key(), btn=$("#upGo"); btn.disabled=true;
+  try { toast("Uploading");
+    const up={ k, personName:(team[k]||{}).name||"", fileName:f.name, mime:f.type||"application/octet-stream", data:await readB64(f), kind, sensitive:SENSITIVE.includes(kind), label,
+      signedAt:$("#upSigned").value||null, expires:$("#upExp").value||null, at:Date.now(), by:me.email };
+    if(DEMO){ await store.update({ [`staffDocs/${k}/${id}`]:{ name:label, fileName:f.name, kind, sensitive:up.sensitive, at:Date.now(), by:me.email, signedAt:up.signedAt, expires:up.expires, ...(up.sensitive?{}:{url:"https://drive.google.com/", shared:true}) } }); toast("Saved (demo)"); return; }
+    await store.update({ [`sync/staffUpload/${id}`]:up });
+    if(!svcCfg) { toast("Queued. The signing service is not set here, so it uploads on its next 5-minute run."); return; }
+    const r=await (await fetch(svcCfg.url+"?action=staffdoc&k="+encodeURIComponent(id))).json().catch(()=>null);
+    if(r&&r.ok) toast(r.sensitive?"Saved to Drive. Shown to the employee as on file only.":r.shared?"Saved to Drive and shared with the employee.":"Saved to Drive. Not shared: "+(r.shareError||"check Drive sharing"));
+    else toast((r&&r.error)||"The upload is queued and finishes on the next 5-minute run.");
+  } catch(e){ toast("Not uploaded: "+(e.message||e)); }
+  finally { btn.disabled=false; }
+}
+
+// Office: pay settings and each period's pay, with what payroll paid.
+function renderPayCfg(app){
+  const kinds=payRates.kinds||{}, p=payPeriod||periodOf(today()), list=people();
+  app.innerHTML=`<div class="bar"><span class="date">Pay</span></div>
+    <form class="card" id="prForm"><h2>Rates</h2><p class="meta">One piece rate per service. Each person earns his share of every approved stop on days he worked; a share or rate on a person's profile overrides these. Hours are paid up to the minimum wage when piece pay falls short. Russel's pay sheet will refine this.</p>
+      <div class="grid2">${Object.entries(KINDS).map(([x,l])=>`<div><label for="pr_${x}">${esc(l)}, per stop</label><input id="pr_${x}" data-kind="${x}" type="number" inputmode="decimal" step="0.01" value="${esc(kinds[x]??"")}"></div>`).join("")}
+      <div><label for="prShare">Default share (%)</label><input id="prShare" type="number" inputmode="decimal" step="0.5" value="${esc(payRates.defaultShare??"")}"></div>
+      <div><label for="prMin">Minimum wage ($ an hour)</label><input id="prMin" type="number" inputmode="decimal" step="0.01" value="${esc(payRates.minWage??MIN_WAGE_DEFAULT)}"></div>
+      <div><label for="prStart">A pay period starts on</label><input id="prStart" type="date" value="${esc(periodAnchor())}"></div></div>
+      <div class="actions"><button class="primary">Save rates</button></div></form>
+    <div class="card"><div class="bar"><button class="small" id="ppPrev">&#8249;</button><span class="date">${fmtShort(p)} to ${fmtShort(periodEnd(p))}</span><button class="small" id="ppNext">&#8250;</button></div>
+      <div class="scroll"><table><tr><th>Person</th><th>Hours</th><th>Piece</th><th>Make-up</th><th>Earned</th><th>Paid</th></tr>
+      ${list.map(([k,t])=>{ const e=earnings(k,p), pd0=e.paid||{}; return `<tr><td><b>${esc(t.name)}</b></td><td style="font-variant-numeric:tabular-nums">${hrs(e.hours)}${e.hoursOpen?`<div class="muted">+${hrs(e.hoursOpen)} waiting</div>`:""}</td><td style="font-variant-numeric:tabular-nums">${money(e.piece)}</td><td style="font-variant-numeric:tabular-nums">${e.makeup>0.005?money(e.makeup):""}</td><td style="font-variant-numeric:tabular-nums"><b>${money(e.earned)}</b></td>
+        <td><div style="display:flex;gap:4px;flex-wrap:wrap"><input type="number" step="0.01" inputmode="decimal" data-paid="${esc(k)}" value="${esc(pd0.paidAmount??"")}" placeholder="Amount" style="width:100px"><input type="date" data-paiddate="${esc(k)}" value="${esc(pd0.paidDate||"")}" style="width:auto"></div></td></tr>`; }).join("")||'<tr><td colspan="6" class="meta">No people yet.</td></tr>'}</table></div>
+      <p class="muted">Paid amounts are copied in from QuickBooks Payroll (Claude does this once payroll is connected). Typing one here saves it on the employee's pay log.</p></div>`;
+  $("#prForm").onsubmit=async e=>{ e.preventDefault(); const k={}; app.querySelectorAll("[data-kind]").forEach(i=>{ if(i.value!=="") k[i.dataset.kind]=+i.value; });
+    await store.update({ "payRates/kinds":k, "payRates/defaultShare":$("#prShare").value===""?null:+$("#prShare").value, "payRates/minWage":+$("#prMin").value||MIN_WAGE_DEFAULT, "payRates/periodStart":$("#prStart").value||periodAnchor() }); toast("Rates saved"); };
+  $("#ppPrev").onclick=()=>{ payPeriod=addDays(p,-PERIOD_DAYS); render(); }; $("#ppNext").onclick=()=>{ payPeriod=addDays(p,PERIOD_DAYS); render(); };
+  const savePaid = k => store.update({ [`payLog/${k}/${p}`]:{ paidAmount:+(app.querySelector(`[data-paid="${k}"]`).value)||0, paidDate:app.querySelector(`[data-paiddate="${k}"]`).value||today(), by:me.email, at:Date.now() } }).then(()=>toast("Paid amount saved"));
+  app.querySelectorAll("[data-paid]").forEach(i=>i.onchange=()=>{ if(i.value!=="") savePaid(i.dataset.paid); });
+  app.querySelectorAll("[data-paiddate]").forEach(i=>i.onchange=()=>{ const a=app.querySelector(`[data-paid="${i.dataset.paiddate}"]`); if(a.value!=="") savePaid(i.dataset.paiddate); });
 }
 
 // ---------- start ----------
@@ -817,7 +1088,26 @@ function demoSeed(){
     [`events/ev1`]:{ title:"Snow training", where:"The yard", date:addDays(mon,5), start:"09:00", end:"11:00", crew:"all" },
     clients: clientsSeed
   };
-  for(let i=1;i<=3;i++){ const x=addDays(d,-i); upd[`timeEntries/${K(ppl.m1)}/${x}/t1`]={ in:atTime(x,"07:00"), out:atTime(x,"15:30"), crew:"Crew 1", status:i>1?"approved":undefined }; }
+  // Past days: Tyler worked, the crew logged stops, and the manager approved two of the three days.
+  for(let i=1;i<=3;i++){ const x=addDays(d,-i); upd[`timeEntries/${K(ppl.m1)}/${x}/t1`]={ in:atTime(x,"07:00"), out:atTime(x,"15:30"), crew:"Crew 1", status:i>1?"approved":undefined };
+    upd[`storms/${x}/Crew 1`]={ at:atTime(x,"05:00"), by:K(ppl.boss) }; ["a","b","c","d","e"].forEach((sid,j)=>{ upd[`crewChecks/${x}/snow1/${sid}`]={ by:K(ppl.boss), at:atTime(x,"07:30")+j*1800e3, kind:"snow", eid:"p"+i+sid }; });
+    if(i>1) upd[`dayLogs/${x}/crews/Crew 1`]={ status:"approved", approvedBy:K(ppl.boss), approvedAt:atTime(x,"16:00"), entries:5 }; }
+  // People records: contact, pay share, files and shifts
+  const S = k => K(ppl[k]);
+  Object.assign(upd, {
+    "payRates":{ kinds:{ snow:45, lights:60, call:20, landscaping:80, fall:40, lawn:12, other:0 }, defaultShare:25, minWage:13.73, periodStart:"2026-10-05" },
+    [`staff/${S("m1")}`]:{ email:ppl.m1, phone:"734-555-0141", address:"29500 Six Mile Rd, Livonia, MI", emergency:{ name:"Linda Ng", phone:"734-555-0142", relation:"Mother" }, startDate:"2026-09-28", type:"W-2" },
+    [`staff/${S("m2")}`]:{ email:ppl.m2, phone:"734-555-0151", startDate:"2026-10-01", type:"W-2" },
+    [`staff/${S("boss")}`]:{ email:ppl.boss, phone:"734-555-0161", address:"15100 Farmington Rd, Livonia, MI", emergency:{ name:"Jen Reed", phone:"734-555-0162", relation:"Spouse" }, startDate:"2026-09-15", type:"W-2" },
+    [`staffPrivate/${S("m1")}`]:{ share:30 }, [`staffPrivate/${S("boss")}`]:{ share:40 },
+    [`staffDocs/${S("m1")}/f1`]:{ name:"2026 employment agreement", kind:"agreement", at:Date.now()-18*864e5, signedAt:addDays(d,-18), url:"https://drive.google.com/", shared:true },
+    [`staffDocs/${S("m1")}/f2`]:{ name:"Pay terms, snow season", kind:"payterms", at:Date.now()-18*864e5, signedAt:addDays(d,-18), url:"https://drive.google.com/", shared:true },
+    [`staffDocs/${S("m1")}/f3`]:{ name:"W-4", kind:"w4", sensitive:true, at:Date.now()-18*864e5, signedAt:addDays(d,-18) },
+    [`staffDocs/${S("m1")}/f4`]:{ name:"Chauffeur license", kind:"cert", at:Date.now()-18*864e5, expires:addDays(d,20), url:"https://drive.google.com/", shared:true },
+    [`staffVault/${S("m1")}/f3`]:{ fileId:"demo", url:"https://drive.google.com/" },
+    [`payLog/${S("m1")}/2026-09-21`]:{ paidAmount:612.4, paidDate:"2026-10-09", ref:"Payroll check 1042" }
+  });
+  for(let i=0;i<20;i++){ const x=addDays(d,i), w=pd(x).getUTCDay(); if(w===0||w===6) continue; ["m1","m2","boss"].forEach(k=>{ upd[`shifts/${S(k)}/${x}`]={ start:k==="boss"?"06:30":"07:00", end:"15:30", crew:"Crew 1", note:i%5===2?"Lights installs, meet at the yard":null }; }); }
   return { upd, who:{ admin:{email:ADMIN_EMAIL,displayName:"Russel"}, manager:{email:ppl.boss,displayName:"Marcus Reed"}, member:{email:ppl.m1,displayName:"Tyler Ng"}, crew2:{email:ppl.boss2,displayName:"Dave Kim"} } };
 }
 if(DEMO){
