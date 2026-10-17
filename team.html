@@ -496,7 +496,7 @@ function renderToday(app){
     const snowCrews = crewList().filter(c=>Object.values(routes).some(r=>r&&r.standing&&r.crew===c));
     const off = snowCrews.filter(c=>!stormOn(curDate,c));
     if(snowCrews.length) h += `<div class="storm">${off.length?`<span>No storm on for ${esc(off.join(", "))} on ${fmtDay(curDate)}.</span><button class="primary small" id="stormAll">Start storm for every crew</button>`:`<span><b>Storm on</b> for ${esc(snowCrews.join(", "))} on ${fmtDay(curDate)}.</span>`}</div>`;
-    if(!crewList().length) h += `<div class="card"><p class="meta">No crews yet. Open the Crews tab to set them up, then build their routes under Routes.</p></div>`;
+    if(!crewList().length) h += `<div class="card"><p class="meta">No crews yet. Set them up on Team Manager, under Crews, then build their routes under Routes.</p></div>`;
     h += `<div class="lanes">${list.map(c=>{ const rs=routesOn(curDate,c); const a=approvalOf(curDate,c); const mk=(crews[c]||{}).manager;
       return `<section class="lane"><h3>${esc(c)} ${stormOn(curDate,c)?'<span class="chip svc-snow">Storm</span>':""} ${a&&a.status==="approved"?'<span class="chip ok">Approved</span>':""}</h3><p class="lanewho">${mk?"Manager "+esc(personName(mk)):"No manager"} &middot; ${Object.keys(crewMembers(c)).length} on the crew</p>${rs.length?rs.map(([id,r])=>routeCard(id,r,curDate)).join(""):'<p class="muted">No route this day.</p>'}</section>`; }).join("")}</div>`;
     h += eventsCard(curDate, "");
@@ -966,7 +966,7 @@ function renderMe(app){
 // Shifts: set by the office or the person's crew manager.
 function shiftList(k, from, days){
   const sh=shiftsAll[k]||{}; const to=addDays(from,days-1);
-  return Object.keys(sh).filter(d=>d>=from&&d<=to).sort().map(d=>`<div class="who-row"><span style="min-width:96px">${fmtDay(d)}</span><span class="meta">${esc(sh[d].start||"")}${sh[d].end?" to "+esc(sh[d].end):""}${sh[d].note?" &middot; "+esc(sh[d].note):""}</span><button class="small danger" style="margin-left:auto" data-shrm="${esc(k)}|${d}">Remove</button></div>`).join("") || '<p class="muted">No shifts set.</p>';
+  return Object.keys(sh).filter(d=>d>=from&&d<=to).sort().map(d=>`<div class="who-row"><span style="min-width:96px">${fmtDay(d)}</span><span class="meta">${esc(sh[d].start||"")}${sh[d].end?" to "+esc(sh[d].end):""}${sh[d].note?" &middot; "+esc(sh[d].note):""}</span>${isAdmin&&!viewAs?`<button class="small danger" style="margin-left:auto" data-shrm="${esc(k)}|${d}">Remove</button>`:""}</div>`).join("") || '<p class="muted">No shifts set.</p>';
 }
 function shiftDialog(k){
   const t=today(), crew=crewOfPerson(k);
@@ -993,8 +993,8 @@ const contactHtml = k => { const s=staffOf(k), em=s.emergency||{}, t=team[k]||{}
 // Manager: his crew's contact and emergency info, and their shifts.
 function renderCrewTab(app){
   const crew=viewCrew(), mem=Object.keys(crewMembers(crew));
-  app.innerHTML=`<p class="meta">${esc(crew)}: contact and emergency info for your crew, and their shifts for the next two weeks. Pay and files are kept by the office.</p>`
-    + mem.map(k=>`<div class="card"><div class="top" style="display:flex;justify-content:space-between;gap:10px;align-items:baseline"><h2>${esc(personName(k))}${(crews[crew]||{}).manager===k?' <span class="chip ok">Manager</span>':""}</h2><button class="small primary" data-shadd="${esc(k)}">Add shifts</button></div>
+  app.innerHTML=`<p class="meta">${esc(crew)}: contact and emergency info for your crew, and their shifts for the next two weeks. The office sets the shifts and keeps pay and files.</p>`
+    + mem.map(k=>`<div class="card"><div class="top" style="display:flex;justify-content:space-between;gap:10px;align-items:baseline"><h2>${esc(personName(k))}${(crews[crew]||{}).manager===k?' <span class="chip ok">Manager</span>':""}</h2></div>
       ${contactHtml(k)}<h3 style="margin-top:10px">Shifts, next two weeks</h3>${shiftList(k, today(), 14)}</div>`).join("") || '<div class="card"><p class="meta">No one is on your crew.</p></div>';
   wireShifts(app);
 }
@@ -1482,7 +1482,7 @@ function renderSched(app){
   const days=14, from=curDate<today()?today():curDate, list=people().filter(([k,t])=>!crewFilter||t.crew===crewFilter);
   const byCrew={}; list.forEach(([k,t])=>{ (byCrew[t.crew||"No crew"]=byCrew[t.crew||"No crew"]||[]).push([k,t]); });
   app.innerHTML=`<div class="bar"><span class="date">Schedules</span><select id="cf" style="width:auto"><option value="">All crews</option>${crewList().map(c=>`<option ${crewFilter===c?"selected":""}>${esc(c)}</option>`).join("")}</select></div>
-    <p class="meta">Shifts for the next two weeks, by crew. Crew managers set their own crew's shifts too. Storm call-outs and meetings show on each person's schedule on their own.</p>
+    <p class="meta">Shifts for the next two weeks, by crew. Storm call-outs and meetings show on each person's schedule on their own.</p>
     ${Object.entries(byCrew).sort((a,b)=>a[0].localeCompare(b[0],undefined,{numeric:true})).map(([c,ps])=>`<h2 style="margin:14px 0 8px">${esc(c)}</h2>`+ps.map(([k,t])=>`<div class="card"><div class="top" style="display:flex;justify-content:space-between;gap:10px;align-items:baseline"><h2>${esc(t.name)}${t.crewRole==="manager"?' <span class="chip ok">Manager</span>':""}</h2><button class="small primary" data-shadd="${esc(k)}">Add shifts</button></div>${shiftList(k, from, days)||'<p class="muted">No shifts in the next two weeks.</p>'}</div>`).join("")).join("")||'<div class="card"><p class="meta">No crew people yet. Hire them on Team Manager.</p></div>'}`;
   $("#cf").onchange=e=>{ crewFilter=e.target.value; render(); };
   wireShifts(app);
