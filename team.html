@@ -235,8 +235,14 @@ const PAPER = (() => {
     miw4:      { title:"Form MI-W4, Michigan tax withholding", short:"MI-W4", file:"forms/mi-w4.pdf", gov:true },
     i9:        { title:"Form I-9, employment eligibility", short:"I-9", file:"forms/i-9.pdf", gov:true },
     w9:        { title:"Form W-9, taxpayer ID for contractors", short:"W-9", file:"forms/fw9.pdf", gov:true },
-    deposit:   { title:"Direct deposit authorization", short:"Direct deposit", gov:false, optional:true }
+    deposit:   { title:"Direct deposit authorization", short:"Direct deposit", gov:false, optional:true },
+    privacy:   { title:"Employee information privacy policy", short:"Privacy policy", gov:false }
   };
+  // Forms sealed with the vault before they leave the employee's phone. The agreement and the privacy policy
+  // acknowledgment carry no tax or bank numbers and are stored as plain PDFs he can open.
+  const SEALED = ["w4","miw4","i9","w9","deposit"];
+  // The Michigan Social Security Number Privacy Act requires a written policy; this one covers all worker information.
+  const PRIVACY_POLICY = "Employee Information Privacy Policy\nMangiapane Brothers Lawn and Snow LLC \u00b7 Effective October 17, 2026\n\n1. Why this policy exists\nThe Company collects personal information from the people who work for it, as employees or as contractors, so it can hire them, pay them, meet tax and immigration law, and keep them safe. This policy says what the Company collects, who may see it, how it is protected, how long it is kept, and how it is destroyed. It is also the Company's privacy policy under the Michigan Social Security Number Privacy Act (MCL 445.81 to 445.87).\n\n2. What this policy covers\nEvery piece of personal information the Company holds about a worker, applicant or former worker, on paper or in any computer system, including:\na. Social Security numbers and taxpayer identification numbers.\nb. Tax forms (W-4, MI-W4, W-9), the I-9 and the identity and work-authorization documents shown for it.\nc. Bank routing and account numbers for direct deposit.\nd. Date of birth, driver's license or state ID number, home address, phone, personal email and emergency contacts.\ne. Pay rates, pay records, hours, time clock records and payroll records.\nf. Hiring records: applications, r\u00e9sum\u00e9s, interview and reference notes, background or driving record checks.\ng. Personnel records: agreements, employee reports, discipline, training records and certifications.\nh. Work records made by the Company's systems: route check-offs, job photos, clock-in and clock-out times and the location data that comes with them.\ni. Medical or injury information given for a workplace injury or a leave request.\n\n3. How the information is used\nThe Company uses this information only to hire, onboard, schedule, train, supervise and pay workers; to withhold and report taxes; to verify work eligibility; to report new hires as Michigan requires; to handle workers' compensation, unemployment and insurance; to contact a worker or his emergency contact; and to meet any other legal requirement. The Company does not sell worker information and does not use it for marketing.\n\n4. Social Security numbers\na. The Company collects a Social Security number only when the law or a legitimate business need requires it: tax forms, the I-9, payroll, new-hire reporting, and background or driving record checks the worker has authorized.\nb. The Company will not put more than four sequential digits of a Social Security number on anything that is publicly displayed, on an ID card or badge, on a time card or schedule, or on anything mailed or emailed where the number can be seen without opening it.\nc. The Company will not use a Social Security number as an employee number, a user name or a password, and will not send a full number by unencrypted email or text.\nd. A full Social Security number is shown only to the people listed in section 6, and only when the task in front of them needs it. Everywhere else the Company's systems show it masked, with no more than the last four digits.\n\n5. How the information is protected\na. Tax, I-9, W-9 and direct deposit forms completed online are locked (encrypted) on the worker's own device before they are sent, and are stored only in that locked form. Opening one takes the paperwork password, and the Company's access rules let only the owner and the administrators the owner names in writing open them.\nb. All other worker records are kept in the Company's internal system, which requires a Google sign-in on the Company's access list. Each person sees only what his role needs: a crew member sees his own records; a crew manager sees his own crew's contact and emergency information and shifts, not their pay rates, tax forms or bank details.\nc. Paper records with sensitive information (for example a paper I-9 or a signed W-4) are kept in a locked cabinet or locked container, never in a vehicle, and never left on a desk unattended.\nd. I-9 forms and copies of identity documents are kept apart from the general personnel file.\ne. Company accounts that can reach worker records use strong passwords and two-step verification.\nf. Workers' records are not taken off Company systems, printed or copied except for a business purpose.\n\n6. Who may see sensitive information\nSensitive information (sections 2a to 2c and 2i) may be seen only by: the owner; administrators the owner has named in writing for that purpose; the Company's payroll provider, accountant and attorney, as their work requires; and government agencies when the law requires. Crew managers and other workers may not see it.\n\n7. Sharing outside the Company\nThe Company shares worker information only: with its payroll, accounting, insurance and software providers, as their service needs and under their own confidentiality duties; with government agencies as the law requires (for example the IRS, the Michigan Department of Treasury, Michigan New Hire Reporting, the Unemployment Insurance Agency, and immigration authorities for the I-9); to answer a subpoena, court order or other legal process; and with the worker's own written permission. The Company confirms employment and dates of employment to outside callers only with the worker's permission.\n\n8. How long records are kept\na. I-9 forms: three years after the date of hire, or one year after employment ends, whichever is later.\nb. Payroll, tax and time records: at least four years after the tax is due or paid, whichever is later.\nc. Personnel and hiring records: at least three years after employment ends, or longer while a claim or lawsuit is open.\nd. Applicants who are not hired: at least one year after the hiring decision.\n\n9. How records are destroyed\nWhen a record is past its keeping period, it is destroyed so it cannot be read or put back together: paper is shredded (cross-cut) or given to a document destruction service; electronic records are deleted from the Company's systems and from any backups the Company controls; devices are wiped before they are sold, given away or thrown out.\n\n10. If something goes wrong\nAnyone who learns that worker information was lost, stolen, sent to the wrong person or seen by someone who should not have seen it must tell the owner the same day. The Company will look into it, limit the harm, and notify the affected people and any agency as Michigan's Identity Theft Protection Act and other laws require.\n\n11. Your rights\nA worker may ask to see the personnel record the Company keeps on him, as Michigan's Bullard-Plawecki Employee Right to Know Act allows, and may submit a written statement disagreeing with something in it. Ask the owner in writing.\n\n12. Breaking this policy\nAnyone who looks at, uses or shares worker information in a way this policy does not allow, or who knowingly breaks section 4, is subject to discipline up to and including termination, or ending a contractor's agreement, and may be reported to the authorities when the law has been broken.\n\n13. Questions and changes\nQuestions go to the owner, Russel Mangiapane III, at 734-450-2400 or admin@mangbrothers.com. The Company may update this policy and will give workers the new version.";
   const POSITIONS = { manager:"Crew manager", member:"Crew member", walker:"Door hanger distributor", walkerpt:"Door hanger (part-time)", office:"Office" };
   // Legal status that goes with each position by default (the office can change it per person).
   const STATUS_FOR = { manager:"w2", member:"w2", walker:"1099", walkerpt:"1099", office:"w2" };
@@ -246,6 +252,7 @@ const PAPER = (() => {
   function packet(position, type){
     const f = [];
     if(AGREEMENT_FOR[position]) f.push("agreement");
+    f.push("privacy");
     if(type === "1099") f.push("w9"); else f.push("w4","miw4","i9");
     f.push("deposit");
     return f;
@@ -436,6 +443,31 @@ const PAPER = (() => {
     await audit(doc, 0, a);
     return await doc.save();
   }
+  // The privacy policy, then his acknowledgment and signature.
+  async function buildPrivacy(f, a){
+    const { PDFDocument, StandardFonts, rgb } = L();
+    const doc=await PDFDocument.create(), font=await doc.embedFont(StandardFonts.Helvetica), bold=await doc.embedFont(StandardFonts.HelveticaBold);
+    let page=doc.addPage([612,792]), y=744; const W=504, X=54;
+    const np=()=>{ page=doc.addPage([612,792]); y=744; };
+    const para=(t, o)=>{ o=o||{}; const fnt=o.bold?bold:font, size=o.size||9.6, lh=size*1.38; let ln="";
+      const flush=()=>{ if(y<60) np(); page.drawText(ln,{ x:X+(o.indent||0), y, size, font:fnt, color:rgb(0.08,0.12,0.2) }); y-=lh; ln=""; };
+      String(t).split(" ").forEach(w=>{ const tt=ln?ln+" "+w:w; if(fnt.widthOfTextAtSize(tt,size)>W-(o.indent||0)){ flush(); ln=w; } else ln=tt; }); if(ln) flush(); y-=o.after||3; };
+    PRIVACY_POLICY.split("\n").forEach((line,i)=>{ if(!line.trim()){ y-=4; return; }
+      if(i===0) return para(line,{ bold:true, size:16, after:2 });
+      if(i===1) return para(line,{ size:9, after:8 });
+      if(/^\d+\. /.test(line)) return para(line,{ bold:true, size:11, after:2 });
+      para(line,{ indent:/^[a-z]\. /.test(line)?12:0 }); });
+    if(y<200) np();
+    y-=10; para("Acknowledgment",{ bold:true, size:12, after:4 });
+    para(`I have received and read the ${COMPANY.name} Employee Information Privacy Policy. I understand how the Company collects, uses, protects and destroys my information, and I agree to follow this policy for any worker or customer information I see in my job.`,{ after:30 });
+    const name=[f.first, f.mi, f.last].filter(Boolean).join(" ");
+    page.drawLine({ start:{x:X,y}, end:{x:X+280,y}, thickness:0.8 }); page.drawLine({ start:{x:X+330,y}, end:{x:X+W,y}, thickness:0.8 });
+    if(f.sig){ const png=await doc.embedPng(f.sig), h=28, w=Math.min(260, png.width*(h/png.height)); page.drawImage(png,{ x:X+4, y:y+2, width:w, height:h }); }
+    page.drawText(mdY(a.date||todayIso()),{ x:X+334, y:y+5, size:11, font });
+    page.drawText(`Signature: ${name}`,{ x:X, y:y-12, size:9, font }); page.drawText("Date",{ x:X+330, y:y-12, size:9, font });
+    await audit(doc, doc.getPageCount()-1, a);
+    return await doc.save();
+  }
   // The company's agreement for the position, from the signing service, with the employee's signature and the owner's.
   async function buildAgreement(bytes, f, a, companySig){
     const doc=await loadForm(bytes), form=doc.getForm(), names=form.getFields().map(x=>x.getName()), has=n=>names.includes(n);
@@ -459,6 +491,7 @@ const PAPER = (() => {
     if(form==="i9") return buildI9(bytes, f, a, extra && extra.s2);
     if(form==="w9") return buildW9(bytes, f, a);
     if(form==="deposit") return buildDeposit(f, a);
+    if(form==="privacy") return buildPrivacy(f, a);
     if(form==="agreement") return buildAgreement(bytes, f, a, extra && extra.companySig);
     throw new Error("Unknown form "+form);
   }
@@ -466,13 +499,15 @@ const PAPER = (() => {
   const KEEP = {
     w4:["first","mi","last","street","apt","city","state","zip","ssn","filing","twoJobs","kids","otherDeps","otherCredits","otherIncome","deductions","extra","exempt","startDate","sig"],
     miw4:["first","mi","last","street","apt","city","state","zip","ssn","dob","dl","newEmployee","startDate","exemptions","miExtra","exempt8","exemptWhy","zone","sig"],
-    i9:["first","mi","last","otherLast","street","apt","city","state","zip","dob","ssn","email","phone","status","aNumber","workUntil","i94","passport","passportCountry","sig"],
+    i9:["first","mi","last","otherLast","street","apt","city","state","zip","dob","ssn","email","phone","status","aNumber","workUntil","i94","passport","passportCountry","sig",
+        "docWhich","aTitle","aAuth","aNum","aExp","bTitle","bAuth","bNum","bExp","cTitle","cAuth","cNum","cExp"],
     w9:["legalName","business","taxClass","llcCode","otherClass","first","mi","last","street","apt","city","state","zip","tinType","ssn","ein","sig"],
     deposit:["first","mi","last","street","apt","city","state","zip","bankName","routing","account","acctType","sig"],
-    agreement:["first","mi","last","phone","email","startDate","strava","sig"]
+    agreement:["first","mi","last","phone","email","startDate","strava","sig"],
+    privacy:["first","mi","last","sig"]
   };
   const keep = (form, f) => { const o={}; (KEEP[form]||[]).forEach(k=>{ if(f[k]!==undefined && f[k]!=="") o[k]=f[k]; }); return o; };
-  return { FORMS, POSITIONS, STATUS_FOR, AGREEMENT_FOR, packet, COMPANY, b64, unb64, create, unlock, rewrap, sealFor, openFor, build, keep,
+  return { FORMS, SEALED, PRIVACY_POLICY, POSITIONS, STATUS_FOR, AGREEMENT_FOR, packet, COMPANY, b64, unb64, create, unlock, rewrap, sealFor, openFor, build, keep,
     digits, fmtSSN, validSSN, validRouting, mdY, todayIso, nowStamp };
 })();
 if(typeof module!=="undefined") module.exports = PAPER;
@@ -506,7 +541,7 @@ const MIN_WAGE_DEFAULT = 13.73;    // Michigan, 2026; $15.00 from January 1, 202
 // Files kept on an employee's record. Sensitive ones (tax and ID forms) stay in Drive only: the record shows they are
 // on file and when, with no link. Everything else opens and downloads from the employee's Files tab.
 const DOC_KINDS = { agreement:"Employment or contractor agreement", payterms:"Pay terms", handbook:"Handbook or policy acknowledgment", equipment:"Equipment sign-out", cert:"License or certification", other:"Other file",
-  w4:"W-4 tax withholding", miw4:"MI-W4 Michigan withholding", i9:"I-9 work eligibility", w9:"W-9 (contractor)", deposit:"Direct deposit form", id:"ID copy" };
+  w4:"W-4 tax withholding", miw4:"MI-W4 Michigan withholding", i9:"I-9 work eligibility", w9:"W-9 (contractor)", deposit:"Direct deposit form", id:"ID copy", privacy:"Privacy policy acknowledgment" };
 const SENSITIVE = ["w4","miw4","i9","w9","deposit","id"];
 // ================================================================
 // Three views (October 17, 2026): the office; crew managers, who run the routes (the full mirror of the door hanger
@@ -1907,12 +1942,15 @@ async function openSealed(k, id){
 }
 // I-9 Section 2: the office looks at his original documents in person, then fills this in and signs.
 function section2Dialog(k, id, env, f){
-  const s=staffOf(k), doc=p=>`<div class="grid2"><div><label>Document title</label><input data-s2="${p}.title"></div><div><label>Issuing authority</label><input data-s2="${p}.authority"></div><div><label>Document number</label><input data-s2="${p}.number"></div><div><label>Expires (blank if none)</label><input type="date" data-s2="${p}.expires"></div></div>`;
+  const s=staffOf(k), pre={ listA:{ title:f.aTitle, number:f.aNum, expires:f.aExp }, listB:{ title:f.bTitle, number:f.bNum, expires:f.bExp }, listC:{ title:f.cTitle, number:f.cNum, expires:f.cExp } };
+  const doc=p=>{ const v=pre[p]||{}; return `<div class="grid2"><div><label>Document title</label><input data-s2="${p}.title" value="${esc(v.title||"")}"></div><div><label>Issuing authority</label><input data-s2="${p}.authority" placeholder="${p==="listB"?"Michigan Secretary of State":p==="listC"?"Social Security Administration":"U.S. Department of State"}"></div><div><label>Document number</label><input data-s2="${p}.number" value="${esc(v.number||"")}"></div><div><label>Expires (blank if none)</label><input type="date" data-s2="${p}.expires" value="${esc(v.expires||"")}"></div></div>`; };
   const d=openDlg(`<h2>I-9 Section 2: ${esc(personName(k))}</h2>
     <p class="meta">Look at his original, unexpired documents in person, by his third day of work: one from List A (for example a U.S. passport), or one from List B (for example a driver's license) and one from List C (for example a Social Security card or birth certificate). No copies or photos.</p>
-    <label class="ck" style="display:flex;gap:10px;align-items:center"><input type="radio" name="s2w" value="A" style="width:22px;height:22px"> List A</label>
-    <label class="ck" style="display:flex;gap:10px;align-items:center"><input type="radio" name="s2w" value="BC" checked style="width:22px;height:22px"> List B and List C</label>
-    <div id="s2A" hidden><h3>List A</h3>${doc("listA")}</div><div id="s2BC"><h3>List B</h3>${doc("listB")}<h3>List C</h3>${doc("listC")}</div>
+    ${f.docWhich?`<p class="meta">He said he would bring: ${esc(f.docWhich==="A"?f.aTitle||"a List A document":[f.bTitle,f.cTitle].filter(Boolean).join(" and "))}. Check every detail against the originals.</p>`:""}
+    <p class="meta"><b>Paper copy:</b> also have him fill out a paper I-9 (<a href="forms/i-9.pdf" target="_blank" rel="noopener">print a blank</a>), then mark it collected on the Paperwork tab.</p>
+    <label class="ck" style="display:flex;gap:10px;align-items:center"><input type="radio" name="s2w" value="A" ${f.docWhich==="A"?"checked":""} style="width:22px;height:22px"> List A</label>
+    <label class="ck" style="display:flex;gap:10px;align-items:center"><input type="radio" name="s2w" value="BC" ${f.docWhich!=="A"?"checked":""} style="width:22px;height:22px"> List B and List C</label>
+    <div id="s2A" ${f.docWhich==="A"?"":"hidden"}><h3>List A</h3>${doc("listA")}</div><div id="s2BC" ${f.docWhich==="A"?"hidden":""}><h3>List B</h3>${doc("listB")}<h3>List C</h3>${doc("listC")}</div>
     <div class="grid2"><div><label for="s2First">First day of work</label><input id="s2First" type="date" value="${esc(s.startDate||"")}"></div><div><label for="s2Rep">Your name and title</label><input id="s2Rep" value="${esc((me.name||"")+", Owner")}"></div></div>
     <label>Your signature</label><div style="border:1px solid var(--line);border-radius:8px;background:#fff;touch-action:none"><canvas id="s2Sig" style="display:block;width:100%;height:120px;touch-action:none"></canvas></div>
     <p><button class="small" id="s2Clear" type="button">Clear</button></p><p class="err" id="s2Err"></p>
@@ -1947,7 +1985,7 @@ function miniPad(cv){ const ctx=cv.getContext("2d"); let on=false, last=null, n=
 async function paperSend(k, only){
   const t=team[k]||{}, s=staffOf(k);
   if(!t.email) return toast("Add an email address for "+(t.name||"him")+" first");
-  const forms=packetOf(k), sealedLeft=forms.filter(f=>f!=="agreement" && !formState(k,f).done && (!only || f===only));
+  const forms=packetOf(k), sealedLeft=forms.filter(f=>PAPER.SEALED.includes(f) && !formState(k,f).done && (!only || f===only));
   if(sealedLeft.length && !vaultPub){ if(!forms.includes("agreement") || only) return toast(isRussel()?"Set the paperwork password first":"Russel has to set the paperwork password first"); toast("Sending the agreement only. Tax and bank forms wait for the paperwork password."); only="agreement"; }
   const tok=(paperAll[k]||{}).token || newToken(), now=Date.now();
   const req={ k, name:t.name||"", email:t.email, phone:s.phone||"", position:positionOf(k), type:legalOf(k), forms, startDate:s.startDate||"", s:deployId(), by:me.email, at:now };
@@ -1970,13 +2008,15 @@ function paperCard(k){
       <div><b class="pname" data-person="${esc(k)}" style="cursor:pointer;font-size:17px">${esc(t.name||k)}</b> <span class="chip ${doneN===req.length?"ok":"warn"}">${doneN} of ${req.length} signed</span>
         <div class="meta">${esc(t.crew||(t.tier==="walker"?"Door hangers":"No crew"))}${t.email?" &middot; "+esc(t.email):' &middot; <span style="color:var(--red)">no email</span>'}${p.sentAt?" &middot; last emailed "+fmtShort(iso(new Date(p.sentAt))):""}</div></div>
       ${left.length?`<button class="small primary" data-psend="${esc(k)}">Email all missing</button>`:""}</div>
-    ${states.map(([f,x])=>{ const F=PAPER.FORMS[f], sealed=f!=="agreement", d=x.doc?(docsAll[k]||{})[x.doc]||{}:{};
+    ${states.map(([f,x])=>{ const F=PAPER.FORMS[f], sealed=PAPER.SEALED.includes(f), d=x.doc?(docsAll[k]||{})[x.doc]||{}:{};
       const chip = x.done ? `<span class="chip ok">Signed ${x.at?fmtShort(iso(new Date(x.at))):""}</span>` : x.sentAt ? `<span class="chip warn">Sent ${fmtShort(iso(new Date(x.sentAt)))}</span>` : `<span class="chip">${F.optional?"Optional":"Not sent"}</span>`;
       let act="";
       if(x.done){ if(sealed && (x.online || x.encrypted)) act = hasVault() ? `<button class="small" data-vopen="${esc(k)}|${esc(x.doc)}">${unlocked?"Open":"🔒 Open"}</button>` : `<span class="chip">🔒 Sealed</span>`;
         else if(d.url) act=`<a class="mapbtn" href="${esc(d.url)}" target="_blank" rel="noopener">Open</a>`;
         else if(sealed) act=`<span class="chip">On file in Drive</span>`;
-        if(f==="i9" && x.online) act += x.s2 ? ` <span class="chip ok">Section 2 done</span>` : ` <span class="chip warn">Section 2 needed</span>`; }
+        if(f==="i9" && x.online) act += x.s2 ? ` <span class="chip ok">Section 2 done</span>` : ` <span class="chip warn">Section 2 needed</span>`;
+        // Russel, October 17: the full I-9 online, plus a paper I-9 collected in person as a backup.
+        if(f==="i9"){ const pc=((paperAll[k]||{}).forms||{}).i9||{}; act += pc.paperCopy ? ` <button class="small" data-paperi9="${esc(k)}" title="Tap to undo">Paper I-9 ✓ ${fmtShort(pc.paperCopy)}</button>` : ` <button class="small" data-paperi9="${esc(k)}">Paper I-9 collected</button>`; } }
       else act=`<button class="small" data-psend1="${esc(k)}|${f}">Email</button>`;
       return `<div class="logrow"><span class="w"><b>${esc(F.short)}</b> <span class="meta">${esc(F.title)}</span></span><span style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:flex-end">${chip}${act}</span></div>`; }).join("")}</div>`;
 }
@@ -1998,6 +2038,8 @@ function wirePaper(app){
   app.querySelectorAll("[data-psend]").forEach(b=>b.onclick=()=>{ b.disabled=true; paperSend(b.dataset.psend).finally(()=>{ b.disabled=false; }); });
   app.querySelectorAll("[data-psend1]").forEach(b=>b.onclick=()=>{ const [k,f]=b.dataset.psend1.split("|"); b.disabled=true; paperSend(k,f).finally(()=>{ b.disabled=false; }); });
   app.querySelectorAll("[data-vopen]").forEach(b=>b.onclick=()=>{ const [k,id]=b.dataset.vopen.split("|"); openSealed(k,id); });
+  app.querySelectorAll("[data-paperi9]").forEach(b=>b.onclick=async()=>{ const k=b.dataset.paperi9, cur=((((paperAll[k]||{}).forms||{}).i9)||{}).paperCopy;
+    try { await store.update({ [`paper/${k}/forms/i9/paperCopy`]: cur ? null : today() }); toast(cur ? "Paper I-9 unmarked" : "Paper I-9 marked collected. Keep it with the I-9s, apart from his personnel file."); } catch(e){ toast("Not saved: "+(e.message||e)); } });
 }
 
 // ----- Training (October 17, 2026) -----
@@ -2240,7 +2282,7 @@ function demoSeed(){
     [`staffDocs/${S("m1")}/p3`]:{ name:"Form I-9 (Section 1)", kind:"i9", sensitive:true, encrypted:true, at:Date.now()-18*864e5, signedAt:addDays(d,-18) },
     [`paper/${S("m2")}`]:{ token:"p_demo2", position:"member", type:"w2", sentAt:Date.now()-2*864e5, forms:{ agreement:{ sentAt:Date.now()-2*864e5 }, w4:{ sentAt:Date.now()-2*864e5 } } },
     ["paper/jake,hill@example,com"]:{ token:"p_demo3", position:"walker", type:"1099", forms:{ agreement:{ status:"done", at:Date.now()-12*864e5, doc:"j1" } } },
-    [`paper/${S("m3")}`]:{ token:"p_demo4", s:"DEMO", position:"member", type:"w2", list:["agreement","w4","miw4","i9","deposit"], sentAt:Date.now()-3600e3, forms:{ agreement:{ sentAt:Date.now()-3600e3 } } },
+    [`paper/${S("m3")}`]:{ token:"p_demo4", s:"DEMO", position:"member", type:"w2", list:["agreement","privacy","w4","miw4","i9","deposit"], sentAt:Date.now()-3600e3, forms:{ agreement:{ sentAt:Date.now()-3600e3 } } },
     "trainingLib/t1":{ title:"Snow route: start to finish", category:"Snow", kind:"deck", description:"Twelve slides. Storm call-out, loading the truck, route order, photos, and closing out the day.", url:"https://docs.google.com/presentation/", createdAt:Date.now()-5*864e5 },
     "trainingLib/t2":{ title:"Blower start-up and safety check", category:"Equipment", kind:"sop", description:"Before every storm.", body:"Check the oil and fuel.\nCheck the shear pins and the chute.\nPrime three times, choke on, pull start.\nLet it warm up two minutes before you load it." , createdAt:Date.now()-5*864e5 },
     "trainingLib/t3":{ title:"Leading a crew: the manager's day", category:"Company policy", kind:"doc", description:"Approving the day, the crew log, and employee reports.", url:"https://drive.google.com/", fileId:"demo", createdAt:Date.now()-4*864e5 },

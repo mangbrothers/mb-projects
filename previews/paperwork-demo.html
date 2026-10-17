@@ -67,6 +67,7 @@
   .tick{display:inline-flex;width:34px;height:34px;border-radius:50%;background:var(--brand);color:var(--brand-ink);align-items:center;justify-content:center;font-weight:700;margin-right:8px;vertical-align:-6px}
   .hide{display:none!important}
   .sec{border-top:1px solid var(--line);margin-top:14px;padding-top:4px}
+  .policy{white-space:pre-wrap;max-height:46vh;overflow:auto;border:1px solid var(--line);border-radius:8px;padding:12px;font-size:14px;line-height:1.5;margin:0 0 14px;background:var(--bg)}
   @media(max-width:520px){header .tag{display:none}.g3{grid-template-columns:1fr 1fr}.g3>:first-child{grid-column:1/-1}}
 </style>
 </head>
@@ -89,8 +90,14 @@ const PAPER = (() => {
     miw4:      { title:"Form MI-W4, Michigan tax withholding", short:"MI-W4", file:"forms/mi-w4.pdf", gov:true },
     i9:        { title:"Form I-9, employment eligibility", short:"I-9", file:"forms/i-9.pdf", gov:true },
     w9:        { title:"Form W-9, taxpayer ID for contractors", short:"W-9", file:"forms/fw9.pdf", gov:true },
-    deposit:   { title:"Direct deposit authorization", short:"Direct deposit", gov:false, optional:true }
+    deposit:   { title:"Direct deposit authorization", short:"Direct deposit", gov:false, optional:true },
+    privacy:   { title:"Employee information privacy policy", short:"Privacy policy", gov:false }
   };
+  // Forms sealed with the vault before they leave the employee's phone. The agreement and the privacy policy
+  // acknowledgment carry no tax or bank numbers and are stored as plain PDFs he can open.
+  const SEALED = ["w4","miw4","i9","w9","deposit"];
+  // The Michigan Social Security Number Privacy Act requires a written policy; this one covers all worker information.
+  const PRIVACY_POLICY = "Employee Information Privacy Policy\nMangiapane Brothers Lawn and Snow LLC \u00b7 Effective October 17, 2026\n\n1. Why this policy exists\nThe Company collects personal information from the people who work for it, as employees or as contractors, so it can hire them, pay them, meet tax and immigration law, and keep them safe. This policy says what the Company collects, who may see it, how it is protected, how long it is kept, and how it is destroyed. It is also the Company's privacy policy under the Michigan Social Security Number Privacy Act (MCL 445.81 to 445.87).\n\n2. What this policy covers\nEvery piece of personal information the Company holds about a worker, applicant or former worker, on paper or in any computer system, including:\na. Social Security numbers and taxpayer identification numbers.\nb. Tax forms (W-4, MI-W4, W-9), the I-9 and the identity and work-authorization documents shown for it.\nc. Bank routing and account numbers for direct deposit.\nd. Date of birth, driver's license or state ID number, home address, phone, personal email and emergency contacts.\ne. Pay rates, pay records, hours, time clock records and payroll records.\nf. Hiring records: applications, r\u00e9sum\u00e9s, interview and reference notes, background or driving record checks.\ng. Personnel records: agreements, employee reports, discipline, training records and certifications.\nh. Work records made by the Company's systems: route check-offs, job photos, clock-in and clock-out times and the location data that comes with them.\ni. Medical or injury information given for a workplace injury or a leave request.\n\n3. How the information is used\nThe Company uses this information only to hire, onboard, schedule, train, supervise and pay workers; to withhold and report taxes; to verify work eligibility; to report new hires as Michigan requires; to handle workers' compensation, unemployment and insurance; to contact a worker or his emergency contact; and to meet any other legal requirement. The Company does not sell worker information and does not use it for marketing.\n\n4. Social Security numbers\na. The Company collects a Social Security number only when the law or a legitimate business need requires it: tax forms, the I-9, payroll, new-hire reporting, and background or driving record checks the worker has authorized.\nb. The Company will not put more than four sequential digits of a Social Security number on anything that is publicly displayed, on an ID card or badge, on a time card or schedule, or on anything mailed or emailed where the number can be seen without opening it.\nc. The Company will not use a Social Security number as an employee number, a user name or a password, and will not send a full number by unencrypted email or text.\nd. A full Social Security number is shown only to the people listed in section 6, and only when the task in front of them needs it. Everywhere else the Company's systems show it masked, with no more than the last four digits.\n\n5. How the information is protected\na. Tax, I-9, W-9 and direct deposit forms completed online are locked (encrypted) on the worker's own device before they are sent, and are stored only in that locked form. Opening one takes the paperwork password, and the Company's access rules let only the owner and the administrators the owner names in writing open them.\nb. All other worker records are kept in the Company's internal system, which requires a Google sign-in on the Company's access list. Each person sees only what his role needs: a crew member sees his own records; a crew manager sees his own crew's contact and emergency information and shifts, not their pay rates, tax forms or bank details.\nc. Paper records with sensitive information (for example a paper I-9 or a signed W-4) are kept in a locked cabinet or locked container, never in a vehicle, and never left on a desk unattended.\nd. I-9 forms and copies of identity documents are kept apart from the general personnel file.\ne. Company accounts that can reach worker records use strong passwords and two-step verification.\nf. Workers' records are not taken off Company systems, printed or copied except for a business purpose.\n\n6. Who may see sensitive information\nSensitive information (sections 2a to 2c and 2i) may be seen only by: the owner; administrators the owner has named in writing for that purpose; the Company's payroll provider, accountant and attorney, as their work requires; and government agencies when the law requires. Crew managers and other workers may not see it.\n\n7. Sharing outside the Company\nThe Company shares worker information only: with its payroll, accounting, insurance and software providers, as their service needs and under their own confidentiality duties; with government agencies as the law requires (for example the IRS, the Michigan Department of Treasury, Michigan New Hire Reporting, the Unemployment Insurance Agency, and immigration authorities for the I-9); to answer a subpoena, court order or other legal process; and with the worker's own written permission. The Company confirms employment and dates of employment to outside callers only with the worker's permission.\n\n8. How long records are kept\na. I-9 forms: three years after the date of hire, or one year after employment ends, whichever is later.\nb. Payroll, tax and time records: at least four years after the tax is due or paid, whichever is later.\nc. Personnel and hiring records: at least three years after employment ends, or longer while a claim or lawsuit is open.\nd. Applicants who are not hired: at least one year after the hiring decision.\n\n9. How records are destroyed\nWhen a record is past its keeping period, it is destroyed so it cannot be read or put back together: paper is shredded (cross-cut) or given to a document destruction service; electronic records are deleted from the Company's systems and from any backups the Company controls; devices are wiped before they are sold, given away or thrown out.\n\n10. If something goes wrong\nAnyone who learns that worker information was lost, stolen, sent to the wrong person or seen by someone who should not have seen it must tell the owner the same day. The Company will look into it, limit the harm, and notify the affected people and any agency as Michigan's Identity Theft Protection Act and other laws require.\n\n11. Your rights\nA worker may ask to see the personnel record the Company keeps on him, as Michigan's Bullard-Plawecki Employee Right to Know Act allows, and may submit a written statement disagreeing with something in it. Ask the owner in writing.\n\n12. Breaking this policy\nAnyone who looks at, uses or shares worker information in a way this policy does not allow, or who knowingly breaks section 4, is subject to discipline up to and including termination, or ending a contractor's agreement, and may be reported to the authorities when the law has been broken.\n\n13. Questions and changes\nQuestions go to the owner, Russel Mangiapane III, at 734-450-2400 or admin@mangbrothers.com. The Company may update this policy and will give workers the new version.";
   const POSITIONS = { manager:"Crew manager", member:"Crew member", walker:"Door hanger distributor", walkerpt:"Door hanger (part-time)", office:"Office" };
   // Legal status that goes with each position by default (the office can change it per person).
   const STATUS_FOR = { manager:"w2", member:"w2", walker:"1099", walkerpt:"1099", office:"w2" };
@@ -100,6 +107,7 @@ const PAPER = (() => {
   function packet(position, type){
     const f = [];
     if(AGREEMENT_FOR[position]) f.push("agreement");
+    f.push("privacy");
     if(type === "1099") f.push("w9"); else f.push("w4","miw4","i9");
     f.push("deposit");
     return f;
@@ -290,6 +298,31 @@ const PAPER = (() => {
     await audit(doc, 0, a);
     return await doc.save();
   }
+  // The privacy policy, then his acknowledgment and signature.
+  async function buildPrivacy(f, a){
+    const { PDFDocument, StandardFonts, rgb } = L();
+    const doc=await PDFDocument.create(), font=await doc.embedFont(StandardFonts.Helvetica), bold=await doc.embedFont(StandardFonts.HelveticaBold);
+    let page=doc.addPage([612,792]), y=744; const W=504, X=54;
+    const np=()=>{ page=doc.addPage([612,792]); y=744; };
+    const para=(t, o)=>{ o=o||{}; const fnt=o.bold?bold:font, size=o.size||9.6, lh=size*1.38; let ln="";
+      const flush=()=>{ if(y<60) np(); page.drawText(ln,{ x:X+(o.indent||0), y, size, font:fnt, color:rgb(0.08,0.12,0.2) }); y-=lh; ln=""; };
+      String(t).split(" ").forEach(w=>{ const tt=ln?ln+" "+w:w; if(fnt.widthOfTextAtSize(tt,size)>W-(o.indent||0)){ flush(); ln=w; } else ln=tt; }); if(ln) flush(); y-=o.after||3; };
+    PRIVACY_POLICY.split("\n").forEach((line,i)=>{ if(!line.trim()){ y-=4; return; }
+      if(i===0) return para(line,{ bold:true, size:16, after:2 });
+      if(i===1) return para(line,{ size:9, after:8 });
+      if(/^\d+\. /.test(line)) return para(line,{ bold:true, size:11, after:2 });
+      para(line,{ indent:/^[a-z]\. /.test(line)?12:0 }); });
+    if(y<200) np();
+    y-=10; para("Acknowledgment",{ bold:true, size:12, after:4 });
+    para(`I have received and read the ${COMPANY.name} Employee Information Privacy Policy. I understand how the Company collects, uses, protects and destroys my information, and I agree to follow this policy for any worker or customer information I see in my job.`,{ after:30 });
+    const name=[f.first, f.mi, f.last].filter(Boolean).join(" ");
+    page.drawLine({ start:{x:X,y}, end:{x:X+280,y}, thickness:0.8 }); page.drawLine({ start:{x:X+330,y}, end:{x:X+W,y}, thickness:0.8 });
+    if(f.sig){ const png=await doc.embedPng(f.sig), h=28, w=Math.min(260, png.width*(h/png.height)); page.drawImage(png,{ x:X+4, y:y+2, width:w, height:h }); }
+    page.drawText(mdY(a.date||todayIso()),{ x:X+334, y:y+5, size:11, font });
+    page.drawText(`Signature: ${name}`,{ x:X, y:y-12, size:9, font }); page.drawText("Date",{ x:X+330, y:y-12, size:9, font });
+    await audit(doc, doc.getPageCount()-1, a);
+    return await doc.save();
+  }
   // The company's agreement for the position, from the signing service, with the employee's signature and the owner's.
   async function buildAgreement(bytes, f, a, companySig){
     const doc=await loadForm(bytes), form=doc.getForm(), names=form.getFields().map(x=>x.getName()), has=n=>names.includes(n);
@@ -313,6 +346,7 @@ const PAPER = (() => {
     if(form==="i9") return buildI9(bytes, f, a, extra && extra.s2);
     if(form==="w9") return buildW9(bytes, f, a);
     if(form==="deposit") return buildDeposit(f, a);
+    if(form==="privacy") return buildPrivacy(f, a);
     if(form==="agreement") return buildAgreement(bytes, f, a, extra && extra.companySig);
     throw new Error("Unknown form "+form);
   }
@@ -320,13 +354,15 @@ const PAPER = (() => {
   const KEEP = {
     w4:["first","mi","last","street","apt","city","state","zip","ssn","filing","twoJobs","kids","otherDeps","otherCredits","otherIncome","deductions","extra","exempt","startDate","sig"],
     miw4:["first","mi","last","street","apt","city","state","zip","ssn","dob","dl","newEmployee","startDate","exemptions","miExtra","exempt8","exemptWhy","zone","sig"],
-    i9:["first","mi","last","otherLast","street","apt","city","state","zip","dob","ssn","email","phone","status","aNumber","workUntil","i94","passport","passportCountry","sig"],
+    i9:["first","mi","last","otherLast","street","apt","city","state","zip","dob","ssn","email","phone","status","aNumber","workUntil","i94","passport","passportCountry","sig",
+        "docWhich","aTitle","aAuth","aNum","aExp","bTitle","bAuth","bNum","bExp","cTitle","cAuth","cNum","cExp"],
     w9:["legalName","business","taxClass","llcCode","otherClass","first","mi","last","street","apt","city","state","zip","tinType","ssn","ein","sig"],
     deposit:["first","mi","last","street","apt","city","state","zip","bankName","routing","account","acctType","sig"],
-    agreement:["first","mi","last","phone","email","startDate","strava","sig"]
+    agreement:["first","mi","last","phone","email","startDate","strava","sig"],
+    privacy:["first","mi","last","sig"]
   };
   const keep = (form, f) => { const o={}; (KEEP[form]||[]).forEach(k=>{ if(f[k]!==undefined && f[k]!=="") o[k]=f[k]; }); return o; };
-  return { FORMS, POSITIONS, STATUS_FOR, AGREEMENT_FOR, packet, COMPANY, b64, unb64, create, unlock, rewrap, sealFor, openFor, build, keep,
+  return { FORMS, SEALED, PRIVACY_POLICY, POSITIONS, STATUS_FOR, AGREEMENT_FOR, packet, COMPANY, b64, unb64, create, unlock, rewrap, sealFor, openFor, build, keep,
     digits, fmtSSN, validSSN, validRouting, mdY, todayIso, nowStamp };
 })();
 if(typeof module!=="undefined") module.exports = PAPER;
@@ -348,7 +384,7 @@ window.__paperTest = (() => { let vault=null, agr=null; const done={};
   return async (action, body) => {
     if(!vault){ vault=await PAPER.create("preview-only"); Object.values(PAPER.FORMS).forEach(F=>{ if(F.file && !F.file.startsWith("../")) F.file="../"+F.file; }); agr=await sampleAgreement(); }
     if(action==="paperget") return { ok:true, name:"Jordan Hale", email:"jordan.hale@example.com", phone:"734-555-0201", position:"member", type:"w2", startDate:"2026-10-20",
-      forms:["agreement","w4","miw4","i9","deposit"].map(id=>({ id, done:!!done[id], at:done[id]||null })), pub:vault.pub, agreement:agr, companySig:null };
+      forms:["agreement","privacy","w4","miw4","i9","deposit"].map(id=>({ id, done:!!done[id], at:done[id]||null })), pub:vault.pub, agreement:agr, companySig:null };
     if(action==="papersubmit"){ await new Promise(r=>setTimeout(r,600)); done[body.form]=Date.now(); return { ok:true, status:"done" }; }
     return { ok:false, error:"Preview" }; }; })();
 </script>
@@ -371,7 +407,7 @@ async function call(action, body){
 // What he types, kept only in this page's memory and shared across forms so he types his name and address once.
 const me = {}; let pkt = null, copies = {};
 const STATES = "AL AK AZ AR CA CO CT DE DC FL GA HI ID IL IN IA KS KY LA ME MD MA MI MN MS MO MT NE NV NH NJ NM NY NC ND OH OK OR PA RI SC SD TN TX UT VT VA WA WV WI WY".split(" ");
-const isSealed = id => id !== "agreement";
+const isSealed = id => PAPER.SEALED.includes(id);
 
 async function load(){
   try { pkt = await call("paperget"); } catch(e){ pkt = { ok:false, error:e.message }; }
@@ -419,6 +455,11 @@ const SPEC = {
     ${nameBlock()}<div class="g2">${inp("phone","Phone",{type:"tel",ac:"tel"})}${inp("email","Email",{type:"email",ac:"email"})}</div>
     ${["walker","walkerpt"].includes(pkt.position) ? inp("strava","Strava username",{help:"You add the company as a follower so finished routes show up."}) : inp("startDate","Start date",{type:"date"})}
     ${cbox("read","I have read the whole agreement, including Schedule A, and agree to it.")}`,
+  privacy: () => `
+    <p class="meta">How the company collects, uses, protects and destroys your information, and the rules you follow for anyone else's. Read it, then sign that you received it.</p>
+    <div class="policy" tabindex="0">${esc(PAPER.PRIVACY_POLICY)}</div>
+    ${nameBlock()}
+    ${cbox("readPrivacy","I have received and read this policy, and I agree to follow it.")}`,
   w4: () => `
     <p class="meta">Federal income tax withholding. If you are unsure, the IRS estimator at <a href="https://www.irs.gov/w4app" target="_blank" rel="noopener">irs.gov/w4app</a> helps. Most people with one job and no kids pick their filing status and stop there.</p>
     <h3>Step 1: You</h3>${nameBlock()}${addrBlock()}${ssnInp()}
@@ -449,6 +490,15 @@ const SPEC = {
     <div id="st4" class="${me.status==="4"?"":"hide"}">${inp("workUntil","Authorized to work until (blank if no end date)",{type:"date",req:false})}
       <p class="help">Give one of: the A-Number above, a Form I-94 admission number, or a foreign passport number and country.</p>
       ${inp("i94","Form I-94 admission number",{req:false})}<div class="g2">${inp("passport","Foreign passport number",{req:false})}${inp("passportCountry","Country of issuance",{req:false})}</div></div>
+    <div class="sec"><h3>Documents you will show</h3>
+    <p class="help">Bring the originals (no copies or photos) on your first day. The office looks at them in person and fills in Section 2. You will also fill out a paper I-9 at the office. Numbers are optional here.</p>
+    ${radios("docWhich",[["A","One document from List A (for example a U.S. passport)"],["BC","One from List B and one from List C (for example a driver's license and a Social Security card)"]])}
+    <div id="docA" class="${me.docWhich==="A"?"":"hide"}">${sel("aTitle","List A document",[["","Pick one"],["U.S. passport","U.S. passport"],["U.S. passport card","U.S. passport card"],["Permanent resident card (I-551)","Permanent resident card (I-551)"],["Employment authorization document (I-766)","Employment authorization document (I-766)"],["Foreign passport with I-551 stamp or I-94","Foreign passport with I-551 stamp or I-94"]])}
+      <div class="g2">${inp("aNum","Document number",{req:false})}${inp("aExp","Expires",{type:"date",req:false})}</div></div>
+    <div id="docBC" class="${me.docWhich==="BC"?"":"hide"}">${sel("bTitle","List B document (identity)",[["","Pick one"],["Driver's license","Driver's license"],["State ID card","State ID card"],["School ID card with photo","School ID card with photo"],["Voter registration card","Voter registration card"],["U.S. military card","U.S. military card"]])}
+      <div class="g2">${inp("bNum","Document number",{req:false})}${inp("bExp","Expires",{type:"date",req:false})}</div>
+      ${sel("cTitle","List C document (work authorization)",[["","Pick one"],["Social Security card (unrestricted)","Social Security card (unrestricted)"],["Birth certificate","Birth certificate"],["Certification of report of birth abroad","Certification of report of birth abroad"],["Native American tribal document","Native American tribal document"]])}
+      <div class="g2">${inp("cNum","Document number",{req:false})}${inp("cExp","Expires",{type:"date",req:false})}</div></div></div>
     ${cbox("perjury","I am aware that federal law provides for imprisonment and/or fines for false statements, or the use of false documents, in connection with the completion of this form.")}`,
   w9: () => `
     <p class="meta">For independent contractors: your taxpayer number for the 1099 the company files for you. No tax is taken out of your pay.</p>
@@ -478,6 +528,10 @@ function extraCheck(id){
     if(me.status==="3" && !me.aNumber) return "Enter your USCIS A-Number.";
     if(me.status==="4" && !me.aNumber && !me.i94 && !(me.passport && me.passportCountry)) return "Enter an A-Number, an I-94 number, or a foreign passport number and country."; }
   if(id==="w9" && !me.cert) return "Check the certification box.";
+  if(id==="privacy" && !me.readPrivacy) return "Check the box that you received and read the policy.";
+  if(id==="i9"){ if(!me.docWhich) return "Pick which documents you will show the office.";
+    if(me.docWhich==="A" && !me.aTitle) return "Pick your List A document.";
+    if(me.docWhich==="BC" && !(me.bTitle && me.cTitle)) return "Pick one List B and one List C document."; }
   if(id==="deposit"){ if(!PAPER.validRouting(me.routing)) return "That routing number is not valid. It is the 9 digits at the bottom left of a check.";
     if(D(me.account).length<4 || D(me.account)!==D(me.account2)) return "The two account numbers do not match."; }
   if(id==="agreement" && !me.read) return "Check the box that you have read the agreement.";
@@ -513,7 +567,7 @@ function openForm(id){
 function toggles(){
   const t = (id, on) => { const el=$(id); if(el) el.classList.toggle("hide", !on); };
   t("ex8", ["b","c"].includes(me.exempt8)); t("st3", me.status==="3"||me.status==="4"); t("st4", me.status==="4");
-  t("tSsn", me.tinType!=="ein"); t("tEin", me.tinType==="ein");
+  t("tSsn", me.tinType!=="ein"); t("tEin", me.tinType==="ein"); t("docA", me.docWhich==="A"); t("docBC", me.docWhich==="BC");
 }
 function sigPad(cv){
   const ctx = cv.getContext("2d"); let drawing=false, last=null, marks=0;
@@ -531,7 +585,7 @@ function sigPad(cv){
       const c=document.createElement("canvas"); c.width=x1-x0; c.height=y1-y0; c.getContext("2d").drawImage(cv,x0,y0,c.width,c.height,0,0,c.width,c.height); return c.toDataURL("image/png"); } };
 }
 const blankCache = {};
-async function blank(id){ if(id==="agreement") return PAPER.unb64(pkt.agreement||""); if(id==="deposit") return null;
+async function blank(id){ if(id==="agreement") return PAPER.unb64(pkt.agreement||""); if(!PAPER.FORMS[id].file) return null;
   if(!blankCache[id]){ const r = await fetch(PAPER.FORMS[id].file); if(!r.ok) throw new Error("The blank form did not load. Check your connection."); blankCache[id] = new Uint8Array(await r.arrayBuffer()); }
   return blankCache[id]; }
 async function submit(id){
