@@ -2049,11 +2049,13 @@ function wirePaper(app){
 // the top of the same tab as cards, linking to the same signing page as the email; each card disappears once signed.
 // A new hire whose agreement is not signed yet sees only this tab: signing the offer is what opens the rest.
 const TRAIN_KINDS = { deck:"Slide deck", sop:"SOP", video:"Video", doc:"Document", link:"Link" };
-const TRAIN_ROLES = { manager:"Crew managers", member:"Crew members", all:"Everyone" };
+const TRAIN_ROLES = { manager:"Crew managers", member:"Crew members", walker:"Door hangers", all:"Everyone" };
 const TRAIN_CATS = ["Safety","Lawn","Snow","Fall cleanup","Lights","Landscaping","Equipment","Customers","Company policy","Onboarding"];
 let trainLib={}, trainRoles={}, trainAssign={}, trainDone={}, onboarding=false, trainQ="", trainCat="";
 const trainItems = () => Object.entries(trainLib).filter(([,x])=>x && x.title).sort((a,b)=>(a[1].category||"").localeCompare(b[1].category||"")||(a[1].title||"").localeCompare(b[1].title||""));
-function roleKeyOf(k){ const t=team[k]||{}; return t.crewRole==="manager" ? "manager" : "member"; }
+function roleKeyOf(k){ const t=team[k]||{}; return t.tier==="walker" ? "walker" : t.crewRole==="manager" ? "manager" : "member"; }
+// Everyone who can be given training: crew and door hangers (October 17, 2026).
+const trainPeople = () => Object.entries(team).filter(([,t])=>t && (t.tier==="crew" || t.tier==="walker")).sort((a,b)=>(a[1].name||"").localeCompare(b[1].name||""));
 // Everything assigned to a person: by his role, to everyone, or to him by name.
 function assignedTo(k, roleK){
   const r=roleK||roleKeyOf(k), ids=new Set();
@@ -2107,7 +2109,7 @@ function myPaperHtml(k){
 
 // ---------- office: the library, assignments and progress ----------
 function renderTrainOffice(app){
-  const items=trainItems(), cats=[...new Set(items.map(([,x])=>x.category||"Other"))].sort(), ppl=people();
+  const items=trainItems(), cats=[...new Set(items.map(([,x])=>x.category||"Other"))].sort(), ppl=trainPeople();
   const shown=items.filter(([,x])=>(!trainCat||(x.category||"Other")===trainCat) && (!trainQ||[x.title,x.description,x.category].join(" ").toLowerCase().includes(trainQ.toLowerCase())));
   const who=id=>{ const x=trainLib[id], roles=Object.keys(TRAIN_ROLES).filter(r=>(trainRoles[r]||{})[id]); const named=ppl.filter(([k])=>(trainAssign[k]||{})[id]).length;
     const reach=ppl.filter(([k])=>assignedTo(k).includes(id)), done=reach.filter(([k])=>isDone(k,id)).length;
@@ -2115,7 +2117,7 @@ function renderTrainOffice(app){
   const byCat={}; shown.forEach(([id,x])=>{ const c=x.category||"Other"; (byCat[c]=byCat[c]||[]).push(id); });
   app.innerHTML=`<div class="bar"><span class="date">Training</span><select id="trCat" style="width:auto"><option value="">All categories</option>${cats.map(c=>`<option ${trainCat===c?"selected":""}>${esc(c)}</option>`).join("")}</select>
       <input id="trQ" value="${esc(trainQ)}" placeholder="Search" style="flex:1;min-width:120px" autocomplete="off"><button class="primary small" id="trAdd">+ Add material</button></div>
-    <p class="meta">Upload a slide deck or document, link one (Google Slides, YouTube), or write an SOP step by step. Assign it to a role, to everyone, or to single people. Crew see it on their Training tab and mark it done.</p>
+    <p class="meta">Upload a slide deck or document, link one (Google Slides, YouTube), or write an SOP step by step. Assign it to a role (crew managers, crew members, door hangers), to everyone, or to single people. Crew see it on the Crews page and door hangers on the Routes page, each on a Training tab, and mark it done.</p>
     ${Object.keys(byCat).sort().map(c=>`<h2 style="margin:16px 0 6px">${esc(c)}</h2>${byCat[c].map(id=>{ const x=trainLib[id], w=who(id);
       return `<div class="card trcard"><div class="top"><span><span class="chip">${esc(TRAIN_KINDS[x.kind]||"Material")}</span> <b>${esc(x.title)}</b></span><span class="chip ${w.reach&&w.done===w.reach?"ok":""}">${w.done} of ${w.reach} done</span></div>
         ${x.description?`<p class="meta">${esc(x.description)}</p>`:""}
@@ -2125,7 +2127,7 @@ function renderTrainOffice(app){
       || `<div class="card"><p class="meta">${items.length?"Nothing matches.":"No training material yet. Add the first slide deck or SOP."}</p></div>`}
     <h2 style="margin:18px 0 6px">Progress</h2><div class="card scroll"><table><tr><th>Name</th><th>Role</th><th>Assigned</th><th>Done</th><th>Paperwork left</th></tr>
       ${ppl.map(([k,t])=>{ const ids=assignedTo(k), d=ids.filter(id=>isDone(k,id)).length, pl=paperLeft(k).length;
-        return `<tr data-trperson="${esc(k)}" style="cursor:pointer"><td><b>${esc(t.name)}</b>${offerPending(k)?' <span class="chip warn">Offer not signed</span>':""}</td><td>${roleKeyOf(k)==="manager"?"Manager":"Crew"}</td><td>${ids.length}</td><td>${ids.length?`<span class="chip ${d===ids.length?"ok":"warn"}">${d}</span>`:"0"}</td><td>${pl||""}</td></tr>`; }).join("")||'<tr><td colspan="5" class="meta">No crew yet.</td></tr>'}</table></div>`;
+        return `<tr data-trperson="${esc(k)}" style="cursor:pointer"><td><b>${esc(t.name)}</b>${offerPending(k)?' <span class="chip warn">Offer not signed</span>':""}</td><td>${{manager:"Manager",member:"Crew",walker:"Door hanger"}[roleKeyOf(k)]}</td><td>${ids.length}</td><td>${ids.length?`<span class="chip ${d===ids.length?"ok":"warn"}">${d}</span>`:"0"}</td><td>${pl||""}</td></tr>`; }).join("")||'<tr><td colspan="5" class="meta">No crew yet.</td></tr>'}</table></div>`;
   $("#trAdd").onclick=()=>trainDialog();
   $("#trCat").onchange=e=>{ trainCat=e.target.value; render(); };
   const q=$("#trQ"); q.oninput=()=>{ trainQ=q.value; const pos=q.selectionStart; render(); const n=$("#trQ"); n.focus(); try{ n.setSelectionRange(pos,pos); }catch(e){} };
@@ -2136,7 +2138,7 @@ function renderTrainOffice(app){
     const d=openDlg(`<h2>Delete "${esc(x.title)}"?</h2><p class="meta">It comes off everyone's Training tab. ${x.fileId?"The file stays in Drive.":""}</p><div class="actions"><button class="danger" id="trDelGo">Delete</button><button data-close>Cancel</button></div>`);
     d.querySelector("#trDelGo").onclick=async()=>{ const upd={ [`trainingLib/${id}`]:null }; Object.keys(TRAIN_ROLES).forEach(r=>{ if((trainRoles[r]||{})[id]) upd[`trainingRoles/${r}/${id}`]=null; });
       Object.keys(trainAssign).forEach(k=>{ if((trainAssign[k]||{})[id]) upd[`trainingAssign/${k}/${id}`]=null; }); await store.update(upd); d.close(); toast("Deleted"); }; });
-  app.querySelectorAll("[data-trperson]").forEach(tr=>tr.onclick=()=>{ view="people"; personOpen=tr.dataset.trperson; render(); window.scrollTo(0,0); });
+  app.querySelectorAll("[data-trperson]").forEach(tr=>tr.onclick=()=>{ const k=tr.dataset.trperson; if((team[k]||{}).tier==="walker") return assignPersonDialog(k); view="people"; personOpen=k; render(); window.scrollTo(0,0); });
 }
 function trainDialog(id){
   const x=id?trainLib[id]||{}:{ kind:"deck", category:"" }, src=x.body?"sop":x.url&&!x.fileId?"link":"file";
@@ -2175,13 +2177,22 @@ function trainDialog(id){
     } catch(e){ err.textContent="Not saved: "+(e.message||e); btn.disabled=false; } };
 }
 function assignDialog(id){
-  const x=trainLib[id]||{}, ppl=people();
+  const x=trainLib[id]||{}, ppl=trainPeople();
   const d=openDlg(`<h2>Assign "${esc(x.title)}"</h2>
     <label>To a whole role</label><div class="row" style="gap:14px;flex-wrap:wrap">${Object.entries(TRAIN_ROLES).map(([r,l])=>`<label style="display:flex;gap:6px;align-items:center;margin:0;color:var(--ink)"><input type="checkbox" data-arole="${r}" ${(trainRoles[r]||{})[id]?"checked":""}> ${l}</label>`).join("")}</div>
-    <label style="margin-top:12px">To single people</label>${ppl.map(([k,t])=>`<label style="display:flex;gap:8px;align-items:center;padding:6px 0;border-top:1px solid var(--line);margin:0;color:var(--ink)"><input type="checkbox" data-aperson="${esc(k)}" ${(trainAssign[k]||{})[id]?"checked":""}> ${esc(t.name)} <span class="meta">${esc(t.crew||"")}${isDone(k,id)?" &middot; done":""}</span></label>`).join("")||'<p class="meta">No crew yet.</p>'}
+    <label style="margin-top:12px">To single people</label>${ppl.map(([k,t])=>`<label style="display:flex;gap:8px;align-items:center;padding:6px 0;border-top:1px solid var(--line);margin:0;color:var(--ink)"><input type="checkbox" data-aperson="${esc(k)}" ${(trainAssign[k]||{})[id]?"checked":""}> ${esc(t.name)} <span class="meta">${esc(t.tier==="walker"?"Door hanger":t.crew||"")}${isDone(k,id)?" &middot; done":""}</span></label>`).join("")||'<p class="meta">No crew yet.</p>'}
     <div class="actions"><button data-close>Done</button></div>`);
   d.querySelectorAll("[data-arole]").forEach(c=>c.onchange=()=>store.update({ [`trainingRoles/${c.dataset.arole}/${id}`]:c.checked?true:null }));
   d.querySelectorAll("[data-aperson]").forEach(c=>c.onchange=()=>store.update({ [`trainingAssign/${c.dataset.aperson}/${id}`]:c.checked?{ at:Date.now(), by:me.email }:null }));
+}
+// A door hanger has no Personnel page; his row in Progress opens this instead.
+function assignPersonDialog(k){
+  const t=team[k]||{}, ids=assignedTo(k);
+  const d=openDlg(`<h2>${esc(t.name||k)}: training</h2><p class="meta">Door hanger. Material for door hangers and for everyone comes to him on its own; check anything else to give it to him by name.</p>
+    ${trainItems().map(([id,x])=>{ const byRole=["walker","all"].some(r=>(trainRoles[r]||{})[id]);
+      return `<label style="display:flex;gap:8px;align-items:center;padding:6px 0;border-top:1px solid var(--line);margin:0;color:var(--ink)"><input type="checkbox" data-pa="${esc(id)}" ${byRole?"checked disabled":(trainAssign[k]||{})[id]?"checked":""}> ${esc(x.title)} <span class="meta">${esc(x.category||"")}${byRole?" &middot; by role":""}${isDone(k,id)?" &middot; done":""}</span></label>`; }).join("")||'<p class="meta">No training material yet.</p>'}
+    <div class="actions"><button data-close>Done</button></div>`);
+  d.querySelectorAll("[data-pa]").forEach(c=>c.onchange=()=>store.update({ [`trainingAssign/${k}/${c.dataset.pa}`]:c.checked?{ at:Date.now(), by:me.email }:null }));
 }
 // Personnel profile: his training at a glance, with a quick assign.
 function personTrainHtml(k){

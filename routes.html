@@ -231,6 +231,10 @@ let areas={}, routes={}, checks={}, logs={}, walkers={}, supply={};
 let allowedWalkers={}, legacyWalkers={};
 let view="today", curDate=today(), openRoute=null, walkerFilter="";
 let unsub=[];
+// Training (October 17, 2026): the office assigns material in Team Manager, Training, to door hangers as a role or by name.
+// A walker sees it on his Training tab with his unsigned paperwork, and marks each piece done. Until his offer is signed
+// he sees only that tab.
+let trainLib={}, trainRoles={}, trainAssign={}, trainDone={}, myPaper={}, onboarding=false;
 
 // ---------- auth ----------
 $("#signin").onclick = async () => {
@@ -253,6 +257,8 @@ async function enter(user){
     if(tier!=="admin" && tier!=="walker" && !legacy) return deny(`${me.email} is not on the route list. Ask Russel to add it, then sign out and back in.`);
     isAdmin = tier==="admin"; realAdmin=isAdmin; viewAs=""; meReal=null;
     if(mine?.name) me.name = mine.name; else if(legacy?.name) me.name = legacy.name;
+    if(!isAdmin && !mine?.offerSigned){ const pp=await store.get("paper/"+me.key).catch(()=>null); if(pp){ myPaper=pp; onboarding=offerPending(); } }
+    view = onboarding ? "learn" : "today";
     $("#gate").hidden=true; $("#app").hidden=false; $("#nav").hidden=false; $("#navBtn").hidden=!isAdmin; attach();
   } catch(e){
     deny(`${me.email} could not be checked against the route list. Ask Russel.`);
@@ -272,6 +278,9 @@ function attach(){
     // A walker reads only his own reports, from the copy kept under his key.
     walkers = { [me.key]: { name:me.name, email:me.email } };
     bind("routeLogsByWalker/"+me.key, v=>{ logs={}; Object.entries(v).forEach(([d,L])=>{ logs[d]={[me.key]:L}; }); });
+    bind("trainingLib", v=>trainLib=v); bind("trainingRoles", v=>trainRoles=v);
+    bind("trainingAssign/"+me.key, v=>trainAssign=v); bind("trainingDone/"+me.key, v=>trainDone=v);
+    bind("paper/"+me.key, v=>{ myPaper=v; if(onboarding && !offerPending()){ onboarding=false; toast("Offer signed. Your routes are open."); } });
   }
 }
 
@@ -323,7 +332,8 @@ const parseGeo = s => { try { return JSON.parse(s.geo||"[]"); } catch(e){ return
 
 // ---------- navigation ----------
 function tabs(){
-  const t = isAdmin ? [["today","Day"],["week","Week"],["schedule","Schedule"],["review","Review"],["setup","Setup"]].concat(Object.values(routes).some(r=>r.training)?[["training","Training"]]:[]) : [["today","Today"],["week","Week"],["mylog","My days"]];
+  const t = isAdmin ? [["today","Day"],["week","Week"],["schedule","Schedule"],["review","Review"],["setup","Setup"]].concat(Object.values(routes).some(r=>r.training)?[["training","Practice route"]]:[])
+    : onboarding && !viewAs ? [["learn","Training"]] : [["today","Today"],["week","Week"],["learn","Training"],["mylog","My days"]];
   $("#nav").innerHTML = t.map(([k,l])=>`<button data-v="${k}" class="${view===k&&!openRoute?"on":""}">${l}</button>`).join("")
     + (realAdmin && seatList().length ? `<select id="viewAs" class="viewas" aria-label="See the page as a walker"><option value="">Office view</option>${seatList().map(s=>`<option value="${esc(s)}" ${viewAs===s?"selected":""}>See as ${esc(s)}</option>`).join("")}${Object.values(routes).some(r=>r.training)?`<option value="__training" ${viewAs==="__training"?"selected":""}>Training route</option>`:""}</select>` : "");
   const pb=$("#previewBar"); pb.hidden=!viewAs;
@@ -363,7 +373,38 @@ function render(){
   const app=$("#app");
   if(openRoute && routes[openRoute]) return renderRoute(app);
   openRoute=null;
-  ({today:renderToday, week:renderWeek, schedule:renderSchedule, review:renderReview, setup:renderSetup, mylog:renderMyLog}[view]||renderToday)(app);
+  if(onboarding && !viewAs && !isAdmin) view="learn";
+  ({today:renderToday, week:renderWeek, schedule:renderSchedule, review:renderReview, setup:renderSetup, mylog:renderMyLog, learn:renderLearn}[view]||renderToday)(app);
+}
+
+// ---------- training ----------
+const TRAIN_KINDS = { deck:"Slide deck", sop:"SOP", video:"Video", doc:"Document", link:"Link" };
+const PAPER_TITLES = { agreement:"Distributor agreement (your offer)", privacy:"Employee information privacy policy", w9:"Form W-9, taxpayer ID", deposit:"Direct deposit authorization",
+  w4:"Form W-4, federal tax withholding", miw4:"Form MI-W4, Michigan tax withholding", i9:"Form I-9, employment eligibility" };
+const paperList = () => Array.isArray(myPaper.list) ? myPaper.list : Object.keys(myPaper.forms||{});
+function offerPending(){ return !!myPaper.token && paperList().includes("agreement") && ((myPaper.forms||{}).agreement||{}).status!=="done" && !myPaper.offerSigned; }
+function renderLearn(app){
+  const ids=new Set(); ["walker","all"].forEach(r=>Object.entries(trainRoles[r]||{}).forEach(([id,on])=>{ if(on) ids.add(id); }));
+  Object.entries(trainAssign||{}).forEach(([id,v])=>{ if(v) ids.add(id); });
+  const list=[...ids].filter(id=>trainLib[id]&&trainLib[id].title), done=id=>!!(trainDone||{})[id];
+  const left=paperList().filter(f=>PAPER_TITLES[f] && ((myPaper.forms||{})[f]||{}).status!=="done").sort((a,b)=>(a==="agreement"?-1:b==="agreement"?1:0));
+  const link=myPaper.token ? `paperwork.html?t=${encodeURIComponent(myPaper.token)}${myPaper.s?"&s="+encodeURIComponent(myPaper.s):""}` : "";
+  const byCat={}; list.forEach(id=>{ const c=trainLib[id].category||"Other"; (byCat[c]=byCat[c]||[]).push(id); });
+  app.innerHTML = (onboarding ? `<div class="card"><h2 style="margin:0 0 6px">Welcome to Mangiapane Brothers</h2><p>Sign your distributor agreement below to get started. Once it is signed, your routes open up. The rest of your paperwork can be done here any time before your first check.</p></div>` : "")
+    + (left.length && link ? `<h2 style="margin:6px 0 8px">Paperwork to sign</h2>` + left.map(f=>`<div class="card" style="border-left:4px solid var(--amber)"><p style="margin:0 0 4px"><span class="chip warn">To sign</span> <b>${esc(PAPER_TITLES[f])}</b></p>
+        <p class="meta">${f==="agreement"?"Your offer. Sign it to get your routes.":f==="deposit"?"Optional. Without it you are paid by check.":"Needed before your first check. Tax and bank forms are locked on your phone before they are sent."}</p>
+        <div class="actions"><a class="mapbtn" href="${esc(link)}">Sign now</a></div></div>`).join("") : "")
+    + `<div class="bar"><span class="date">Training</span>${list.length?`<span class="chip ${list.every(done)?"ok":"warn"}">${list.filter(done).length} of ${list.length} done</span>`:""}</div>`
+    + (list.length ? Object.keys(byCat).sort().map(c=>`<h3 style="margin:14px 0 6px">${esc(c)}</h3>`+byCat[c].sort((a,b)=>done(a)-done(b)).map(id=>{ const x=trainLib[id];
+        return `<div class="card"><p style="margin:0 0 4px"><span class="chip">${esc(TRAIN_KINDS[x.kind]||"Material")}</span> <b>${esc(x.title)}</b> ${done(id)?'<span class="chip ok">Done</span>':""}</p>
+          ${x.description?`<p class="meta">${esc(x.description)}</p>`:""}
+          <div class="actions">${x.url?`<a class="mapbtn" href="${esc(x.url)}" target="_blank" rel="noopener">${x.kind==="deck"?"Open slides":x.kind==="video"?"Watch":"Open"}</a>`:""}${x.body?`<button class="small" data-sop="${esc(id)}">Read the SOP</button>`:""}
+          ${done(id)?`<button class="small" data-undone="${esc(id)}">Not done</button>`:`<button class="small primary" data-done="${esc(id)}">Mark done</button>`}</div></div>`; }).join("")).join("")
+      : `<div class="card"><p class="meta">${onboarding?"Your training shows up here after you sign your agreement.":"Nothing assigned to you yet. The office adds how-tos and videos for door hangers here."}</p></div>`);
+  app.querySelectorAll("[data-sop]").forEach(b=>b.onclick=()=>{ const x=trainLib[b.dataset.sop]||{}; const steps=String(x.body||"").split(/\n+/).map(t=>t.trim()).filter(Boolean);
+    openDlg(`<h2>${esc(x.title)}</h2><ol style="padding-left:22px">${steps.map(t=>`<li style="margin:0 0 8px">${esc(t.replace(/^\d+[.)]\s*/,""))}</li>`).join("")}</ol><div class="actions"><button data-close>Close</button></div>`); });
+  app.querySelectorAll("[data-done],[data-undone]").forEach(b=>b.onclick=async()=>{ if(previewOnly()) return; const id=b.dataset.done||b.dataset.undone;
+    try { await store.update({ [`trainingDone/${me.key}/${id}`]: b.dataset.done ? { at:Date.now() } : null }); } catch(e){ toast("Not saved: "+(e.message||e)); } });
 }
 
 function renderToday(app){
@@ -712,7 +753,13 @@ if(DEMO){
   $("#demoBanner").hidden=false;
   fetch(SEED_URL).then(r=>r.json()).catch(()=>({areas:{},routes:{}})).then(async s=>{
     const upd={"allowed/walker,one@example,com":{name:"Walker One",email:"walker.one@example.com",tier:"walker"},"allowed/walker,two@example,com":{name:"Walker Two",email:"walker.two@example.com",tier:"walker"},
-      ["allowed/"+emailKey(ADMIN_EMAIL)]:{name:"Russel",email:ADMIN_EMAIL,tier:"admin"}};
+      ["allowed/"+emailKey(ADMIN_EMAIL)]:{name:"Russel",email:ADMIN_EMAIL,tier:"admin"},
+      "trainingLib/w1":{ title:"Hanging a door hanger the right way", category:"Door hangers", kind:"sop", body:"Front door handle only. Never in or on a mailbox.\nUse the walk and the driveway. Never the lawn or the beds.\nSkip any house posted No Soliciting or No Trespassing.\nCheck the street off with a photo when it is done." },
+      "trainingLib/w2":{ title:"Strava and the route page", category:"Door hangers", kind:"video", description:"Five minutes: following the company on Strava and checking streets off.", url:"https://www.youtube.com/" },
+      "trainingLib/w3":{ title:"Customer at the door", category:"Customers", kind:"sop", body:"Smile and introduce yourself and the company.\nDo not quote prices. Give them the office number: 734-450-2400." },
+      "trainingRoles/walker":{ w1:true, w2:true }, "trainingRoles/all":{ w3:true },
+      "trainingDone/walker,one@example,com/w1":{ at:Date.now()-864e5 },
+      "paper/walker,one@example,com":{ token:"p_demo_w1", s:"DEMO", position:"walker", type:"1099", list:["agreement","privacy","w9","deposit"], offerSigned:Date.now()-5*864e5, forms:{ agreement:{ status:"done", at:Date.now()-5*864e5 } } }};
     Object.entries(s.areas||{}).forEach(([k,v])=>upd["routeAreas/"+k]=v);
     Object.entries(s.routes||{}).forEach(([k,v],i)=>upd["routes/"+k]={...v,walker:v.training?v.walker:v.seat==="Walker 2"?"walker,two@example,com":v.seat==="Walker 1"?"walker,one@example,com":""});
     await store.update(upd);
