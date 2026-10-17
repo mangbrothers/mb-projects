@@ -75,13 +75,18 @@ td strong{font-weight:650}
 .note p{font-size:14px}
 .note .rec{color:var(--ink);font-weight:600}
 .found{border-left:4px solid var(--amber)}
+.guide{display:flex;flex-direction:column;gap:12px}
+.guide .gh{font-size:17px;margin:14px 0 0}
+.guide .gcard ul{margin:4px 0 0;padding-left:18px;display:flex;flex-direction:column;gap:5px;font-size:14px}
+.guide p{font-size:15px}
+.guide .gcard p{font-size:14px}
 </style>
 
 <div class="page central" id="root">
 <header>
-  <span class="eyebrow">Mangiapane Brothers LLC · internal · drawn October 7, 2026 · last updated October 17, 2026</span>
+  <span class="eyebrow">Mangiapane Brothers LLC · internal · drawn October 7, 2026 · last updated October 17, 2026 (night)</span>
   <h1>System Map</h1>
-  <p class="lede">Where each kind of company data lives, which system owns it, and which tool carries it from one system to the next. The first view is the central system for the next month. The second view adds everything planned after it.</p>
+  <p class="lede">Where each kind of company data lives, which system owns it, and which tool carries it from one system to the next. A plain-language guide to every part follows the map. The first view is the central system for the next month. The second view adds everything planned after it.</p>
 </header>
 
 <div class="bar">
@@ -114,12 +119,10 @@ td strong{font-weight:650}
 <text class="t" x="620" y="37" text-anchor="middle">Door hanger walkers</text>
 <text class="s" x="620" y="54" text-anchor="middle">see own routes only</text>
 
-<g class="future">
-<rect class="n part" x="720" y="16" width="180" height="50" rx="6"/>
-<text class="t" x="810" y="37" text-anchor="middle">Crews</text>
-<text class="s" x="810" y="54" text-anchor="middle">own routes, check-offs, hours</text>
-<path class="a" d="M810 66V110" marker-end="url(#ah)" stroke-dasharray="7 3"/>
-</g>
+<rect class="n" x="720" y="16" width="180" height="50" rx="6"/>
+<text class="t" x="810" y="37" text-anchor="middle">Crews and new hires</text>
+<text class="s" x="810" y="54" text-anchor="middle">routes, schedule, paperwork, training</text>
+<path class="a" d="M810 66V110" marker-end="url(#ah)"/>
 
 <rect class="n" x="970" y="16" width="190" height="50" rx="6"/>
 <text class="t" x="1065" y="37" text-anchor="middle">Accountant and CFO</text>
@@ -159,55 +162,55 @@ td strong{font-weight:650}
 <text class="s" x="440" y="133">one web app at apps.mangbrothers.com, one sign-in list</text>
 
 <rect class="n" x="320" y="144" width="580" height="42" rx="6"/>
-<text class="t" x="610" y="161" text-anchor="middle">Sign-in and access tiers</text>
-<text class="s" x="610" y="177" text-anchor="middle">Firebase Authentication · admin: everything · walker: own routes · crew: own crew's routes, managers approve their crew (built Oct 16, not live)</text>
+<text class="t" x="610" y="161" text-anchor="middle">Front door: sign-in and access tiers</text>
+<text class="s" x="610" y="177" text-anchor="middle">Google sign-in · admin: all pages · manager: his crew · member: himself · walker: own routes</text>
 
-<rect class="n" x="320" y="200" width="104" height="90" rx="6"/>
-<text class="t" x="372" y="222" text-anchor="middle">Projects</text>
-<text class="s" x="372" y="242" text-anchor="middle">admin tasks,</text>
-<text class="s" x="372" y="257" text-anchor="middle">projects,</text>
-<text class="s" x="372" y="272" text-anchor="middle">timelines</text>
-
-<rect class="n" x="439" y="200" width="104" height="90" rx="6"/>
-<text class="t" x="491" y="222" text-anchor="middle">CRM</text>
-<text class="s" x="491" y="242" text-anchor="middle">clients, leads,</text>
-<text class="s" x="491" y="257" text-anchor="middle">contact log,</text>
-<text class="s" x="491" y="272" text-anchor="middle">contracts, billing</text>
-
-<rect class="n" x="558" y="200" width="104" height="90" rx="6"/>
-<text class="t" x="610" y="222" text-anchor="middle">Routes</text>
-<text class="s" x="610" y="242" text-anchor="middle">door hanger</text>
-<text class="s" x="610" y="257" text-anchor="middle">routes and</text>
-<text class="s" x="610" y="272" text-anchor="middle">verification</text>
-
-<g class="future">
-<rect class="n plan" x="677" y="200" width="104" height="90" rx="6"/>
-<text class="t" x="729" y="222" text-anchor="middle">Team manager</text>
-<text class="s" x="729" y="242" text-anchor="middle">workforce</text>
-<text class="s" x="729" y="257" text-anchor="middle">pipeline, docs,</text>
-<text class="s" x="729" y="272" text-anchor="middle">pay status</text>
-<rect class="n part" x="796" y="200" width="104" height="90" rx="6"/>
-<text class="t" x="848" y="222" text-anchor="middle">Crews</text>
-<text class="s" x="848" y="242" text-anchor="middle">routes, map,</text>
-<text class="s" x="848" y="257" text-anchor="middle">check-off, crew</text>
-<text class="s" x="848" y="272" text-anchor="middle">day approval</text>
-</g>
+<rect class="n" x="320" y="200" width="90" height="90" rx="6"/>
+<text class="t" x="365" y="222" text-anchor="middle" style="font-size:12px">Projects</text>
+<text class="s" x="365" y="242" text-anchor="middle">admin tasks,</text>
+<text class="s" x="365" y="257" text-anchor="middle">passwords</text>
+<text class="s" x="365" y="272" text-anchor="middle">and links</text>
+<rect class="n" x="418" y="200" width="90" height="90" rx="6"/>
+<text class="t" x="463" y="222" text-anchor="middle" style="font-size:12px">CRM</text>
+<text class="s" x="463" y="242" text-anchor="middle">clients, leads,</text>
+<text class="s" x="463" y="257" text-anchor="middle">contracts,</text>
+<text class="s" x="463" y="272" text-anchor="middle">billing</text>
+<rect class="n" x="516" y="200" width="90" height="90" rx="6"/>
+<text class="t" x="561" y="222" text-anchor="middle" style="font-size:11px">Team Manager</text>
+<text class="s" x="561" y="242" text-anchor="middle">hiring, people,</text>
+<text class="s" x="561" y="257" text-anchor="middle">paperwork,</text>
+<text class="s" x="561" y="272" text-anchor="middle">training, pay</text>
+<rect class="n" x="614" y="200" width="90" height="90" rx="6"/>
+<text class="t" x="659" y="222" text-anchor="middle" style="font-size:12px">Crews</text>
+<text class="s" x="659" y="242" text-anchor="middle">routes, map,</text>
+<text class="s" x="659" y="257" text-anchor="middle">schedules,</text>
+<text class="s" x="659" y="272" text-anchor="middle">day approval</text>
+<rect class="n" x="712" y="200" width="90" height="90" rx="6"/>
+<text class="t" x="757" y="222" text-anchor="middle" style="font-size:12px">Routes</text>
+<text class="s" x="757" y="242" text-anchor="middle">door hanger</text>
+<text class="s" x="757" y="257" text-anchor="middle">routes and</text>
+<text class="s" x="757" y="272" text-anchor="middle">verification</text>
+<rect class="n" x="810" y="200" width="90" height="90" rx="6"/>
+<text class="t" x="855" y="222" text-anchor="middle" style="font-size:12px">Previews</text>
+<text class="s" x="855" y="242" text-anchor="middle">sample-data</text>
+<text class="s" x="855" y="257" text-anchor="middle">views of every</text>
+<text class="s" x="855" y="272" text-anchor="middle">outside page</text>
 
 <rect class="n" x="320" y="306" width="420" height="114" rx="6"/>
 <text class="t" x="530" y="330" text-anchor="middle">Firebase Realtime Database</text>
 <text class="s" x="530" y="348" text-anchor="middle">System of record for: clients and leads · contact log</text>
 <text class="s" x="530" y="363" text-anchor="middle">signed contracts · billing status · card on file (brand, last 4)</text>
-<text class="s" x="530" y="378" text-anchor="middle">door hanger routes · admin tasks · the access list</text>
-<text class="s future" x="530" y="396" text-anchor="middle">Planned: jobs, time records, workforce profiles,</text>
-<text class="s future" x="530" y="410" text-anchor="middle">pay status copied from QuickBooks Payroll</text>
+<text class="s" x="530" y="378" text-anchor="middle">door hanger routes · admin tasks · the access list · crews, shifts, time</text>
+<text class="s" x="530" y="396" text-anchor="middle">workforce profiles, hiring, training · sealed paperwork vault</text>
+<text class="s future" x="530" y="410" text-anchor="middle">Planned: pay status copied from QuickBooks Payroll</text>
 
 <rect class="n" x="755" y="306" width="145" height="114" rx="6"/>
 <text class="t" x="827" y="328" text-anchor="middle">Signing service</text>
 <text class="s" x="827" y="346" text-anchor="middle">Apps Script on admin@</text>
 <text class="s" x="827" y="361" text-anchor="middle">contract mail and PDFs</text>
 <text class="s" x="827" y="376" text-anchor="middle">card charges, receipts</text>
-<text class="s" x="827" y="391" text-anchor="middle">reCAPTCHA on card step</text>
-<text class="s" x="827" y="406" text-anchor="middle">CRM charge and refund</text>
+<text class="s" x="827" y="391" text-anchor="middle">paperwork, Indeed import</text>
+<text class="s" x="827" y="406" text-anchor="middle">crew-day billing, refunds</text>
 <path class="a" d="M900 340H970" marker-start="url(#ah)" marker-end="url(#ah)"/>
 <text class="l" x="935" y="332" text-anchor="middle">API</text>
 
@@ -228,13 +231,13 @@ td strong{font-weight:650}
 <text class="l" x="945" y="422" text-anchor="middle">PDFs</text>
 <rect class="n" x="970" y="400" width="120" height="62" rx="6"/>
 <text class="t" x="1030" y="424" text-anchor="middle">Google Drive</text>
-<text class="s" x="1030" y="441" text-anchor="middle">signed agreements</text>
-<text class="s" x="1030" y="455" text-anchor="middle">moving to company Drive</text>
+<text class="s" x="1030" y="441" text-anchor="middle">contracts, staff</text>
+<text class="s" x="1030" y="455" text-anchor="middle">training, backups</text>
 
 <!-- Claude -->
 <path class="a" d="M520 520V420" marker-start="url(#ah)" marker-end="url(#ah)" stroke-dasharray="7 3"/>
 <text class="l" x="532" y="466">writes clients, leads, contact log, billing status · reads the QuickBooks queue</text>
-<text class="s" x="532" y="482">today through Russel's signed-in Chrome, by hand</text>
+<text class="s" x="532" y="482">own database sign-in since Oct 16 · shut out of the paperwork vault</text>
 
 <rect class="hub" x="380" y="520" width="420" height="100" rx="8"/>
 <text class="t hubt" x="590" y="547" text-anchor="middle">Claude on Russel's account</text>
@@ -256,17 +259,17 @@ td strong{font-weight:650}
 <!-- future add-ons -->
 <g class="future">
 <text class="cap" x="20" y="752">FUTURE ADD-ONS</text>
-<rect class="n plan" x="20" y="764" width="216" height="84" rx="6"/>
-<text class="tag" x="32" y="782">NEXT</text>
+<rect class="n" x="20" y="764" width="216" height="84" rx="6"/>
+<text class="tag" x="32" y="782">LIVE SINCE OCTOBER 17</text>
 <text class="t" x="32" y="800">Portal front page</text>
 <text class="s" x="32" y="818">One address for staff. Sign in once,</text>
 <text class="s" x="32" y="833">land on the page your tier allows.</text>
 
-<rect class="n plan" x="251" y="764" width="216" height="84" rx="6"/>
-<text class="tag" x="263" y="782">NEXT</text>
-<text class="t" x="263" y="800">Password manager</text>
-<text class="s" x="263" y="818">A purchased tool with vaults by tier.</text>
-<text class="s" x="263" y="833">Linked from the portal, never in it.</text>
+<rect class="n part" x="251" y="764" width="216" height="84" rx="6"/>
+<text class="tag" x="263" y="782">STOPGAP LIVE OCTOBER 17</text>
+<text class="t" x="263" y="800">Passwords and links</text>
+<text class="s" x="263" y="818">A tab in Projects for admins today.</text>
+<text class="s" x="263" y="833">A real password manager still advised.</text>
 
 <rect class="n" x="482" y="764" width="216" height="84" rx="6"/>
 <text class="tag" x="494" y="782">LIVE SINCE OCTOBER 9</text>
@@ -291,12 +294,159 @@ td strong{font-weight:650}
 <figcaption>The signing service is the first piece that runs on its own: it sends contract mail, retries failed sends every 5 minutes, refreshes the QuickBooks connection every day, charges cards at signing straight through the QuickBooks API (card mode on since October 15), and runs later charges and refunds when an admin taps them in the CRM. A card number goes from the customer's browser to Intuit only; the service receives a one-time token. Claude is still the only bridge for everything else between Quo, the CRM and QuickBooks. Dashed lines work only when someone asks Claude to do the transfer in a session. Statuses come from the project build notes and from live checks. The build log below records each change since October 7. Correct any that are wrong.</figcaption>
 </figure>
 
+<section id="guide">
+  <h2>Plain-language guide to every part</h2>
+  <p class="lede">For a reader who is educated but not technical: what each part of the system is, and what each of its pieces does.</p>
+  <div class="guide"><h3 class="gh">What this is</h3>
+<p>Mangiapane Brothers runs its business on a private web application it built for itself, reached at <strong>apps.mangbrothers.com</strong>. Owners, office staff, crew managers, crew members and door-hanger distributors all sign in at the same front door with their Google account. Each person then sees only the pages their role needs.</p>
+<p>Behind those pages sit a handful of services, each with one job:</p>
+<ul>
+<li>a database that holds the records;</li>
+<li>an automated service that sends email, files documents and charges cards;</li>
+<li>QuickBooks for the books and payments;</li>
+<li>Google Workspace for company email and file storage;</li>
+<li>a phone system for calls and texts.</li>
+</ul>
+<p>Most small service companies run on paper, text threads and a dozen disconnected apps. This system puts every customer, job, worker, signature and payment in one place, with clear rules about who owns each kind of data.</p>
+<h3 class="gh">How to read the map</h3>
+<p>The map draws each part of the system as a box (&quot;card&quot;) and the flow of information as arrows. Two ideas explain most of it.</p>
+<p>1. <strong>One owner per kind of data.</strong></p>
+<ul>
+<li>The CRM owns customer records.</li>
+<li>QuickBooks owns money received and the books.</li>
+<li>The Team Manager owns worker records.</li>
+</ul>
+<p>Every other system holds a copy, never the master.</p>
+<p>2. <strong>Sensitive data goes the shortest possible way.</strong></p>
+<ul>
+<li>A customer&#x27;s card number goes from their browser straight to the payment processor (Intuit). The company never receives it.</li>
+<li>A new hire&#x27;s tax and bank forms are locked on his own phone before they are sent. Only the owner can unlock them.</li>
+</ul>
+<h3 class="gh">The subprojects</h3>
+<div class="note gcard"><h3>1. Front door (the portal)</h3>
+<p>The single sign-in page for everyone who works for the company. A person signs in with Google once, and the system checks the company&#x27;s team list to decide where he lands. Owners and office staff land on Projects, crew managers on their crew&#x27;s route, crew members on their schedule, and door-hanger distributors on their routes. Someone not on the list is turned away with a plain explanation.</p>
+<ul>
+<li><strong>Google sign-in:</strong> no new passwords for staff to remember or lose. Google&#x27;s security, including two-step verification, protects every account.</li>
+<li><strong>Team list and access levels:</strong> one list decides who may enter and at what level: admin, crew (manager or member), or walker (door hanger).</li>
+<li><strong>Return-to-page:</strong> someone who follows a link while signed out is sent back to that exact page after signing in.</li>
+</ul>
+</div>
+<div class="note gcard"><h3>2. Projects (the admin dashboard)</h3>
+<p>The owners&#x27; task manager: every company initiative, from the fall marketing order to securing a second crew truck, broken into tasks with owners, due dates and categories.</p>
+<ul>
+<li><strong>Projects and tasks:</strong> each initiative with its tasks, who is responsible and the deadline.</li>
+<li><strong>Timeline and deadlines:</strong> key dates grouped by week, color-coded by category (hiring, sales, ordering, equipment, service, digital infrastructure, admin and finance).</li>
+<li><strong>Team list:</strong> where admins add people and set their access level.</li>
+<li><strong>Passwords and links:</strong> one-tap links to the company&#x27;s outside services (QuickBooks, Canva, the phone system) with the shared sign-in details, for admins only.</li>
+<li><strong>Files:</strong> documents attached to projects.</li>
+</ul>
+</div>
+<div class="note gcard"><h3>3. CRM (customer relationship management)</h3>
+<p>The system of record for every lead and customer: contact details, where each lead stands, every call and note, the services sold and their prices, signed contracts, and billing status.</p>
+<ul>
+<li><strong>Leads board:</strong> each lead is a card that moves across stages (New, Contacted, Quoted, Active) by drag and drop, on a computer, iPad or phone.</li>
+<li><strong>Clients:</strong> the full record for each customer, with services, prices, contracts, payment method on file (brand and last four digits only) and billing status.</li>
+<li><strong>Quote and agreement builder:</strong> builds the seasonal services agreement with live pricing by neighborhood and service, ready to sign in person or by email.</li>
+<li><strong>Charges to run:</strong> every charge on the schedule: due now, waiting for a job to be finished, failed, or charged. It also holds the one-tap &quot;charge card on file&quot; and refund buttons.</li>
+<li><strong>Service log:</strong> every visit a crew completes, which bills only after a manager approves the day.</li>
+<li><strong>Contracts:</strong> every signed agreement, locked so it can never be edited after signing.</li>
+</ul>
+</div>
+<div class="note gcard"><h3>4. Customer signing and payment</h3>
+<p>The page a customer opens from the quote email. They read the quote and the full agreement, sign by typing their name, and save a card. The card number goes straight to Intuit, the payment processor, which hands back a one-time token. The amount due at signing is charged on the spot and a receipt is emailed.</p>
+<ul>
+<li><strong>Emailed quote:</strong> a clear table of services, the total and what is charged today, with one button.</li>
+<li><strong>Signature:</strong> a consent box and a typed signature, stamped with the time, device and a digital fingerprint of the exact text signed.</li>
+<li><strong>Card step:</strong> the card goes to Intuit only. It is protected by Google reCAPTCHA against bots, closes after three declines, and has a hard cap per charge.</li>
+<li><strong>Signed copy:</strong> a PDF of the agreement and the cancellation notice is saved to company Drive and emailed to the customer.</li>
+<li><strong>$1 test agreement:</strong> a safe way to test the whole path end to end with $1 charges that are then refunded.</li>
+</ul>
+</div>
+<div class="note gcard"><h3>5. The signing service (automation engine)</h3>
+<p>An automated service that runs inside the company&#x27;s Google account and does the jobs no person should have to remember. It runs on demand and on a schedule every five minutes.</p>
+<ul>
+<li><strong>Email:</strong> sends quotes, signed copies, receipts, refunds, paperwork links and reminders from the company address.</li>
+<li><strong>Documents:</strong> saves signed agreements, employee reports and personnel files as PDFs in organized Drive folders.</li>
+<li><strong>Payments:</strong> connects to QuickBooks Payments to save cards, charge, refund and void. It has built-in limits, and a charge can never run twice.</li>
+<li><strong>Billing:</strong> charges approved work automatically, such as snow visits past the season limit, light installs and landscaping balances, with a receipt each time.</li>
+<li><strong>Hiring:</strong> imports job applications from Indeed emails onto the hiring board and numbers employee reports.</li>
+<li><strong>Paperwork and training:</strong> sends new-hire paperwork links, stores sealed forms, and files training material in Drive.</li>
+</ul>
+</div>
+<div class="note gcard"><h3>6. Crews (routes and schedules)</h3>
+<p>The page crews work from on their phones. The office sees every crew; a manager sees his crew; a member sees himself.</p>
+<ul>
+<li><strong>Day and week boards (office):</strong> every crew&#x27;s routes and progress on one screen.</li>
+<li><strong>Routes and map:</strong> numbered stops on a street map, with directions, check-offs, photos and notes. Snow routes start when a storm is called.</li>
+<li><strong>Clock in and out:</strong> time records for every shift.</li>
+<li><strong>Crew log and day approval (manager):</strong> the manager reviews the day, fixes missed clock-outs and approves it. Approval unlocks billing and approves the hours.</li>
+<li><strong>Schedule:</strong> each person&#x27;s next month of shifts, storm call-outs and meetings.</li>
+<li><strong>Hours and pay log:</strong> past hours by pay period and what payroll paid.</li>
+<li><strong>Training tab:</strong> training for his role, and any paperwork still to sign.</li>
+<li><strong>See as:</strong> the office can look at the page exactly as any crew member sees it.</li>
+</ul>
+</div>
+<div class="note gcard"><h3>7. Team Manager (people operations)</h3>
+<p>The office&#x27;s workforce system: hiring, personnel files, crew assignments, paperwork, training, employee reports and payroll inputs.</p>
+<ul>
+<li><strong>Onboarding board:</strong> applicants move by drag and drop through Applied, Phone screen, Interview, Offer, Hired, Backup and Not hired. Indeed applications arrive automatically. Moving someone to Hired asks first, then creates his employee profile and sends his paperwork.</li>
+<li><strong>Personnel:</strong> each employee&#x27;s profile, contact and emergency information, files, shifts, pay log and a running personnel file of calls, interviews, notes and reports.</li>
+<li><strong>Crews:</strong> who is on each crew and who manages it.</li>
+<li><strong>Paperwork:</strong> every person grouped by position and legal status (W-2 employee or 1099 contractor), with each form&#x27;s status and an Email button per form.</li>
+<li><strong>Training:</strong> the library of slide decks, how-to procedures (SOPs), videos and documents, assigned by role or by person, with progress.</li>
+<li><strong>Reports:</strong> every employee report by reference number, filed by crew managers from their daily log.</li>
+<li><strong>Payroll:</strong> pay rates by job and role, pay periods and what was paid.</li>
+<li><strong>Past:</strong> former employees, with their whole record archived and restorable.</li>
+</ul>
+</div>
+<div class="note gcard"><h3>8. Employee paperwork and the vault</h3>
+<p>A new hire signs everything online from his phone: his offer, the company&#x27;s privacy policy, and the official federal and Michigan tax forms (W-4, MI-W4), the I-9 and direct deposit. Contractors sign the W-9 instead. The page fills in the real government PDFs and places his drawn signature on them.</p>
+<ul>
+<li><strong>Packet by position:</strong> the system knows which forms each role and legal status needs.</li>
+<li><strong>Offer first:</strong> signing the offer is what opens his crew pages. Until then he sees only his paperwork and training.</li>
+<li><strong>The vault:</strong> tax, I-9 and bank forms are encrypted on his phone before they are sent. Opening one takes a separate paperwork password, and only the owner and admins he names can try it. Everyone in the office can see that a form is signed; almost no one can read it.</li>
+<li><strong>I-9 Section 2:</strong> the office checks his original documents in person and completes the employer section, with a paper I-9 kept as a backup.</li>
+<li><strong>Privacy policy:</strong> the written policy Michigan law requires for Social Security numbers, extended to all worker information. Every worker signs that he received it.</li>
+</ul>
+</div>
+<div class="note gcard"><h3>9. Routes (door-hanger distribution)</h3>
+<p>The page for door-hanger distributors, the company&#x27;s main way of finding new customers. Each walker sees his assigned routes on a map, checks off streets with a photo as proof, and logs his daily count. The office sees every route, walker and count.</p>
+</div>
+<div class="note gcard"><h3>10. Previews</h3>
+<p>An admin page showing every customer-facing and employee-facing screen with sample data, built from the live pages. It is used to review changes with the admin team and to demonstrate the system to outside audiences without exposing real customers or employees.</p>
+</div>
+<div class="note gcard"><h3>11. Public website</h3>
+<p>mangbrothers.com, the marketing site customers find. It is hosted separately from the internal system and carries the company&#x27;s privacy policy and terms of service.</p>
+</div>
+<h3 class="gh">The supporting services (cards on the map)</h3>
+<ul>
+<li><strong>Firebase Realtime Database:</strong> the system&#x27;s database, where records live and update live on every screen. A set of access rules, tested automatically, decides exactly who may read or change each kind of record.</li>
+<li><strong>Google Workspace:</strong> company email (admin@mangbrothers.com) and Drive, where signed agreements, personnel folders, paperwork and training files are stored.</li>
+<li><strong>QuickBooks:</strong> the books, invoices, payments (through QuickBooks Payments, approved by Intuit) and payroll. QuickBooks is the system of record for money.</li>
+<li><strong>Intuit Payments:</strong> the card processor. Card numbers go to Intuit only.</li>
+<li><strong>Quo:</strong> the company&#x27;s phone system for calls, texts, voicemail and transcripts.</li>
+<li><strong>GitHub:</strong> where the application&#x27;s code lives and is published to the web. Every change is recorded and can be rolled back.</li>
+<li><strong>Claude (AI assistant):</strong> builds and maintains the system, and carries data between systems that have no direct link yet (for example the phone system and the CRM). By design, it cannot open the employee paperwork vault on its own.</li>
+</ul>
+<h3 class="gh">Why it matters</h3>
+<ul>
+<li><strong>One source of truth.</strong> Every customer, worker, job and payment has exactly one home, so the numbers agree.</li>
+<li><strong>Approval before money moves.</strong> Nothing is billed until a manager approves the work, and no charge can run twice.</li>
+<li><strong>Built-in compliance.</strong> Locked contracts with a three-day cancellation window, the I-9 and tax forms done correctly, a written privacy policy, and records kept and destroyed on schedule.</li>
+<li><strong>Security by design.</strong> Card numbers never touch company systems, sensitive employee forms are encrypted end to end, and each person sees only what their role needs.</li>
+<li><strong>Built to scale.</strong> Adding a crew, a manager or a new hire is a few taps. The same system serves two crews or twenty.</li>
+</ul></div>
+</section>
+
 <section>
   <h2>Build log</h2>
   <p class="lede">Every change to the company's digital infrastructure since this map was drawn, newest first. This section is updated as the work moves.</p>
   <div class="tw"><table>
     <thead><tr><th>Date</th><th>Change</th><th>State</th></tr></thead>
     <tbody>
+    <tr><td><strong>Oct 17, night</strong></td><td><strong>Employee paperwork, the vault and Training, pushed (9d92d84, 8aefb35).</strong> New hires sign online from a private link: the offer, the Employee Information Privacy Policy, the official W-4, MI-W4 and I-9 (with the documents they will show), or the W-9 for contractors, and direct deposit. The page fills the real government PDFs and places the drawn signature. Tax, I-9 and bank forms are encrypted on the phone before they leave it; opening them takes the paperwork password, and the rules let only Russel and admins he names read them. Claude's own sign-in is shut out. Team Manager's Paperwork tab groups people by position and W-2 or 1099, with an Email button per form, I-9 Section 2 and paper I-9 tracking. Training: a library of decks, SOPs, videos and documents, assigned by role or person; the crew Training tab shows paperwork cards until signed, and a new hire sees only Training until his offer is signed. Hiring someone now sends his paperwork automatically. Tests: 223 rules, 13 service, 34 page, 40 tab, 32 training.</td><td><span class="pill part">Pushed, deploy rules and Code.gs</span></td></tr>
+    <tr><td><strong>Oct 17, night</strong></td><td><strong>Previews page and menu, live (7537438).</strong> previews.html (admins) shows every outside page on sample data, built from the live pages: customer signing and emails, the CRM phone sale, the sale process map, the front door, new-hire paperwork and emails, a new hire's first sign-in, crew member, crew manager, door hanger routes, Team Manager and the Crews office view, and this map. Every page menu lists Admin pages first and Employee pages at the bottom.</td><td><span class="pill live">Live</span></td></tr>
+    <tr><td><strong>Oct 17, night</strong></td><td><strong>Projects: Passwords and links tab, live.</strong> One-tap links to outside services with the shared sign-ins, admins only. New projects: <em>Handbook policies and SOPs</em> (28 tasks) and <em>New-hire compliance and reporting</em> (8 tasks, starting with Michigan new-hire reporting within 20 days).</td><td><span class="pill live">Live</span></td></tr>
     <tr><td><strong>Oct 17, late</strong></td><td><strong>Team Manager is its own page, live (95eb68c).</strong> <em>Crews</em> (crews.html) is routes and schedules: Day, Week, Routes, Schedules (everyone's shifts for two weeks, by crew), Log, Meetings, and See as. <em>Team Manager</em> (team.html, admins only) is Onboarding, Personnel, Crews (who is on each crew and who manages it), Paperwork (who is missing, expired or expiring what), Reports and Payroll. Crew managers and employees still use only the Crews page. Both pages are in every menu and on the portal.</td><td><span class="pill live">Live</span></td></tr>
     <tr><td><strong>Oct 17, late</strong></td><td><strong>Front portal, live (e95db06).</strong> apps.mangbrothers.com is now one sign-in page in the logo's green, with mowing stripes. Sign in with Google and the team list decides where you land: admins on Projects, crew managers on their crew's route, crew members on their schedule, walkers on the door hanger routes. Someone not on the list, not active, or not yet on a crew is told why. Projects moved to projects.html. Any page opened while signed out sends you to the portal and back to that page. Admins can open the portal with <code>?pick</code> to choose a page.</td><td><span class="pill live">Live</span></td></tr>
     <tr><td><strong>Oct 17, night</strong></td><td><strong>Team Manager, pushed live (64b4510); new rules and Code.gs to deploy.</strong> On the Crews page, office side. <em>Onboarding:</em> the hiring board, built like the CRM's Leads board: Applied, Phone screen, Interview, Offer, Hired, Backup, Not hired, Past. Cards drag by mouse, and by finger on the iPad and iPhone (hold, then drag). Applicants keep their own profile (details, hiring steps, Indeed profile, applicant file, files in Drive under Potential Hires) and get no employee record. Dragging to <em>Hired</em> asks first, then makes the Personnel profile and Team entry and carries the file, notes, Indeed profile and files over. Dragging to <em>Past</em> asks first (and shows any unpaid pay), then moves the profile, files, shifts, hours and pay log to the archive and takes away sign-in; Past to Hired brings it all back. <em>Personnel:</em> the employee list (was People), each with a personnel file: Indeed profile, calls, interviews, reference checks, notes, stage changes and reports, kept as one PDF in his Drive folder. <em>Reports:</em> every employee report by number. Crew managers can add an optional employee report in the crew log; the signing service numbers it (ER-date-number), saves a PDF to his Drive folder and adds it to his personnel file. New Indeed application emails in admin@ load onto Applied every 5 minutes. The Fall 2026 round (29 people, call and interview notes) loads on the first run. Also: drag on the CRM Leads board now works on iPad and iPhone; a Passwords tab on Projects for the admins' outside logins.</td><td><span class="pill part">Pushed, deploy rules and Code.gs</span></td></tr>
@@ -323,7 +473,7 @@ td strong{font-weight:650}
     <tr><td><strong>Oct 8</strong></td><td>Internal system given its own address, apps.mangbrothers.com.</td><td><span class="pill live">Done</span></td></tr>
     </tbody>
   </table></div>
-  <p class="lede"><strong>Done October 15:</strong> QuickBooks production connected and live tested; Google Workspace billing set up with a backup card; legal context sent to the accountant for attorney review. <strong>Done October 16:</strong> service log with approval-first billing, one-tap Save and charge, Claude sign-in and scheduled QuickBooks push, landscaping agreement, Refund? pop-up live. <strong>Open:</strong> lawn (contract, charges, monthly billing, crew side) is on hold until after Crew View. <strong>Next, in order:</strong> publish the October 17 night rules and paste the October 17 night Code.gs (Team Manager is already pushed). Point Indeed's application emails at admin@. Set up crews, people and files. Then schedules (with Russel), agreements signed on the page and schedules. Finish the $1 test. Then, from before: paste the new Code.gs and deploy a New version, then push the CRM and signing page (c1ba2b4). Run the $1 test agreement on yourself, end to end, including the second $1 and a Refund. Attorney answers on the authorization to charge, the typed-name signature, and the emailed cancellation notice; card mode is already on, and contracts go to real customers only after those answers. Check that contract PDFs land in the company Drive folder. Copy the Mac business folder to the company Drive. Give Claude its own database sign-in and put the Quo and QuickBooks transfers on a schedule. Cancel the GoDaddy site builder, then Microsoft 365 after the old-mailbox pull and two clean weeks.</p>
+  <p class="lede"><strong>Next, in order:</strong> publish the October 17 rules and the latest Code.gs. Set the paperwork password and keep the recovery code on paper. Send Indeed application emails to admin@. Set each person's position and W-2 or 1099 on his profile, then email paperwork. Write the handbook policy modules and SOPs (Projects) and load them into Training. Register for Michigan new-hire reporting. Then schedules with Russel, the $1 test end to end, attorney answers on the charge authorization and typed signature, lawn billing, and Claude's scheduled Quo and QuickBooks transfers.</p>
 </section>
 
 <section>
@@ -351,11 +501,13 @@ td strong{font-weight:650}
     <tr><td><strong>Admin tasks, projects, timelines</strong></td><td>Projects page</td><td>None</td><td>Nobody</td><td><span class="pill live">Live</span></td></tr>
     <tr><td><strong>Door hanger routes and verification</strong></td><td>Routes page</td><td>None</td><td>Nobody</td><td><span class="pill live">Live</span></td></tr>
     <tr><td><strong>Who can sign in and at what tier</strong></td><td>Team list in the internal system</td><td>None</td><td>Admins only</td><td><span class="pill live">Live</span></td></tr>
-    <tr class="future"><td><strong>Workforce profiles and files</strong></td><td>Crews page, People tab (files in the company Drive)</td><td>QuickBooks Payroll employee setup</td><td>Claude</td><td><span class="pill part">Built, pipeline planned</span></td></tr>
+    <tr><td><strong>Workforce profiles, hiring and files</strong></td><td>Team Manager (files in the company Drive)</td><td>QuickBooks Payroll employee setup</td><td>Claude</td><td><span class="pill part">Live, payroll push planned</span></td></tr>
+    <tr><td><strong>Signed tax, I-9 and bank forms</strong></td><td>Paperwork vault (sealed in the database, sealed backup in Drive)</td><td>Nowhere unsealed</td><td>The employee's browser, sealed before sending</td><td><span class="pill live">Live</span></td></tr>
+    <tr><td><strong>Training material and progress</strong></td><td>Team Manager, Training (files in the company Drive)</td><td>None</td><td>Nobody</td><td><span class="pill live">Live</span></td></tr>
     <tr class="future"><td><strong>Jobs verified and hours worked</strong></td><td>Internal system, from crew check-offs and clock times, approved by each crew's manager</td><td>QuickBooks Payroll, after approval</td><td>Claude</td><td><span class="pill part">Built, payroll push planned</span></td></tr>
     <tr class="future"><td><strong>Wages, taxes, pay stubs</strong></td><td>QuickBooks Payroll</td><td>Pay status shown on each worker profile</td><td>Claude</td><td><span class="pill plan">Planned</span></td></tr>
-    <tr class="future"><td><strong>Worker documents and terms</strong></td><td>Company shared Drive</td><td>Link on the worker profile</td><td>Nobody</td><td><span class="pill plan">Planned</span></td></tr>
-    <tr class="future"><td><strong>Passwords, door codes, bank logins</strong></td><td>Password manager</td><td>Nowhere</td><td>Nobody</td><td><span class="pill plan">Planned</span></td></tr>
+    <tr><td><strong>Worker documents and terms</strong></td><td>Company Drive, one folder per person</td><td>Link on the worker profile</td><td>The signing service</td><td><span class="pill live">Live</span></td></tr>
+    <tr><td><strong>Passwords for outside services</strong></td><td>Projects, Passwords and links (stopgap); a password manager advised</td><td>Nowhere</td><td>Nobody</td><td><span class="pill part">Stopgap</span></td></tr>
     </tbody>
   </table></div>
 </section>
