@@ -67,6 +67,25 @@
   .pill.event{background:var(--accent-soft);color:var(--accent);border:1px solid var(--accent)}
   .conn{width:18px;flex:none;border-top:2px solid var(--line)}
   .pill.essential{background:var(--accent);color:var(--accent-ink)}
+  :root{--cat-hiring:#534AB7;--cat-hiring-soft:#EEEDFE;--cat-sales:#0F6E56;--cat-sales-soft:#E1F5EE;--cat-order:#854F0B;--cat-order-soft:#FAEEDA;--cat-equipment:#5F5E5A;--cat-equipment-soft:#F1EFE8;--cat-service:#993C1D;--cat-service-soft:#FAECE7}
+  @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--cat-hiring:#AFA9EC;--cat-hiring-soft:#26215C;--cat-sales:#5DCAA5;--cat-sales-soft:#04342C;--cat-order:#EF9F27;--cat-order-soft:#412402;--cat-equipment:#B4B2A9;--cat-equipment-soft:#2C2C2A;--cat-service:#F0997B;--cat-service-soft:#4A1B0C}}
+  :root[data-theme="dark"]{--cat-hiring:#AFA9EC;--cat-hiring-soft:#26215C;--cat-sales:#5DCAA5;--cat-sales-soft:#04342C;--cat-order:#EF9F27;--cat-order-soft:#412402;--cat-equipment:#B4B2A9;--cat-equipment-soft:#2C2C2A;--cat-service:#F0997B;--cat-service-soft:#4A1B0C}
+  .cat-hiring{--cat:var(--cat-hiring);--cat-soft:var(--cat-hiring-soft)} .cat-sales{--cat:var(--cat-sales);--cat-soft:var(--cat-sales-soft)} .cat-order{--cat:var(--cat-order);--cat-soft:var(--cat-order-soft)} .cat-equipment{--cat:var(--cat-equipment);--cat-soft:var(--cat-equipment-soft)} .cat-service{--cat:var(--cat-service);--cat-soft:var(--cat-service-soft)}
+  .pill.cat{background:var(--cat-soft);color:var(--cat);border:1px solid var(--cat)}
+  .catdot{display:inline-block;width:9px;height:9px;border-radius:2px;background:var(--cat);margin-right:6px;vertical-align:0}
+  .catkey{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+  .dl-wk{font-size:13px;color:var(--muted);font-weight:600;margin:18px 0 4px}
+  .dl-wk:first-child{margin-top:0}
+  .dl-wk.overdue{color:var(--red)}
+  .dl-row{display:grid;grid-template-columns:64px 92px minmax(0,1fr) auto auto;gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line);font-size:14px}
+  .dl-row:last-child{border-bottom:0}
+  .dl-date{font-weight:600;white-space:nowrap}
+  .dl-tag{font-size:12px;padding:2px 8px;border-radius:var(--r);text-align:center;background:var(--cat-soft,var(--surface2));color:var(--cat,var(--ink2));border:1px solid var(--cat,var(--line));white-space:nowrap}
+  .dl-what{min-width:0}
+  .dl-ev{color:var(--accent);font-size:10px;vertical-align:1px}
+  .dl-who{font-size:12px;padding:2px 8px;border:1px solid var(--line);border-radius:var(--r);background:var(--bg);color:var(--ink2);white-space:nowrap}
+  .dl-act{white-space:nowrap}
+  @media(max-width:700px){.dl-row{grid-template-columns:56px minmax(0,1fr);row-gap:6px}.dl-row .dl-tag{justify-self:start}.dl-row .dl-what{grid-column:1/-1}.dl-row .dl-who{justify-self:start}.dl-row .dl-act{justify-self:end}}
   button.lbl{padding:0;border:0;background:transparent;cursor:pointer}
   button.lbl:hover{color:var(--accent)}
   .tl{cursor:grab;user-select:none;-webkit-user-select:none}
@@ -79,6 +98,8 @@
   .task .pill{font-size:11px;padding:1px 6px;vertical-align:1px}
   .board .card{transition:box-shadow .12s}
   .board .card.pinned{border-left:3px solid var(--accent)}
+  .board .card.has-cat{border-left:4px solid var(--cat)}
+  .tl .chip.has-cat{border-left:4px solid var(--cat)}
   button.fold{padding:2px 4px;width:22px;border-color:transparent;background:transparent;color:var(--muted);font-size:12px;line-height:1}
   button.fold:hover{color:var(--ink)}
   .card.folded .foldable{display:none}
@@ -243,6 +264,7 @@
     <div><label>Owner</label><select name="owner" id="projOwner"></select></div>
     <div><label>Status</label><select name="status"><option value="idea">Idea</option><option value="planned">Planned</option><option value="active">Active</option><option value="done">Done</option></select></div>
     <div><label>Deadline</label><input type="date" name="deadline"></div>
+    <div><label>Category</label><select name="category" id="projCat"></select></div>
   </div>
   <label class="check"><input type="checkbox" name="essential"> Essential to the yearly goal <span class="meta">(shows on the timeline at the top of every tab)</span></label>
   <label class="check"><input type="checkbox" name="event"> Event or launch <span class="meta">(a date, not a deadline; shows on the timeline with a diamond)</span></label>
@@ -257,6 +279,7 @@
     <div><label>Status</label><select name="status"><option value="todo">To do</option><option value="doing">Doing</option><option value="done">Done</option></select></div>
     <div><label>Due</label><input type="date" name="due"></div>
     <div><label>Project</label><select name="projectId" id="taskProjectSel"></select></div>
+    <div><label>Category</label><select name="category" id="taskCat"></select></div>
   </div>
   <label>Notes</label><textarea name="notes"></textarea>
   <label class="check"><input type="checkbox" name="essential"> Essential <span class="meta">(shows this task on the timeline by its due date)</span></label>
@@ -305,7 +328,7 @@ The page is a single file hosted on GitHub Pages. All data lives in a database o
 
 ## What is in the tool
 
-Projects have a name, description, owner, deadline, status, an "essential to the yearly goal" flag, and an "event or launch" flag. Status is one of: idea, planned, active, done.
+Projects have a name, description, owner, deadline, status, a category, an "essential to the yearly goal" flag, and an "event or launch" flag. Category is optional and one of: hiring, sales, order, equipment, service; it colors the project everywhere, and its tasks inherit it unless a task sets its own. Status is one of: idea, planned, active, done.
 
 Tasks belong to a project and have a title, assignee, due date, status, notes, and the same two flags as a project: essential, and event or launch. Task status is one of: todo, doing, done. A checkbox on each task marks it done. A task can be moved to a different project from its edit dialog, or reassigned by dragging it between columns in By person.
 
@@ -438,7 +461,7 @@ function calLink(title, date, details){
 
 let me=null, isAdmin=false, view="board";
 let projects={}, tasks={}, team={}, files={};
-let personFilter="", statusFilter="";
+let personFilter="", statusFilter="", catFilter="";
 
 // ---------- auth ----------
 $("#signin").onclick = async () => {
@@ -752,11 +775,18 @@ function render(){
 // Since Sept 25: single tasks flagged essential or event ride on the strip too (by their due
 // date, with the project name under it), a "today" marker separates past from ahead, the
 // strip scrolls sideways by mouse drag, and it opens at today. Clicking "Timeline" jumps back.
+// Categories (Oct 17, 2026): a color per kind of work, set on a project (tasks inherit it, or set their own).
+const CATS=[["hiring","Hiring"],["sales","Sales"],["order","Order"],["equipment","Equipment"],["service","Service"]];
+const catName = c => (CATS.find(x=>x[0]===c)||[])[1]||"";
+const catCls = c => catName(c) ? " has-cat cat-"+c : "";
+const catPill = c => catName(c) ? `<span class="pill cat cat-${c}" title="Category">${catName(c)}</span>` : "";
+const catDot = c => catName(c) ? `<span class="catdot cat-${c}" title="${catName(c)}"></span>` : "";
+const catOptions = (sel, blank) => `<option value="">${blank}</option>`+CATS.map(([v,n])=>`<option value="${v}" ${sel===v?"selected":""}>${n}</option>`).join("");
 const abbr = (s,n=26) => s.length>n ? s.slice(0,n-2).trimEnd()+"\u2026" : s;
 const essentialProjects = () => openProjects().map(([id,p])=>({id,...p})).filter(p=>(p.essential||p.event) && p.status!=="done").sort((a,b)=>(a.deadline||"9").localeCompare(b.deadline||"9"));
 function timelineItems(){
-  const items=essentialProjects().map(p=>({key:"p:"+p.id, kind:"project", name:p.name, date:p.deadline||"", event:!!p.event}));
-  openTasks().forEach(([id,t])=>{ if((t.essential||t.event) && t.status!=="done") items.push({key:"t:"+id, kind:"task", name:t.title, date:t.due||"", event:!!t.event, sub:projects[t.projectId]?.name||""}); });
+  const items=essentialProjects().map(p=>({key:"p:"+p.id, kind:"project", name:p.name, date:p.deadline||"", event:!!p.event, cat:p.category||""}));
+  openTasks().forEach(([id,t])=>{ if((t.essential||t.event) && t.status!=="done") items.push({key:"t:"+id, kind:"task", name:t.title, date:t.due||"", event:!!t.event, sub:projects[t.projectId]?.name||"", cat:t.category||projects[t.projectId]?.category||""}); });
   return items.sort((a,b)=>(a.date||"9").localeCompare(b.date||"9") || a.name.localeCompare(b.name));
 }
 let tlScroll=null; // where the person left the strip; kept across re-renders in this tab
@@ -774,7 +804,7 @@ function renderEssential(){
   const marker=()=>{ parts.push('<span class="today" id="tlNow"><span>today</span></span>'); placed=true; };
   list.forEach(it=>{
     if(!placed && (!it.date || it.date>=td)) marker();
-    const dc=dueClass(it.date,false); const cls=(dc==="overdue"?"c-over":dc==="soon"?"c-soon":"")+(it.event?" ev":"")+(it.kind==="task"?" tk":"");
+    const dc=dueClass(it.date,false); const cls=(dc==="overdue"?"c-over":dc==="soon"?"c-soon":"")+(it.event?" ev":"")+(it.kind==="task"?" tk":"")+catCls(it.cat);
     const kind=it.event?"event":it.kind==="task"?"task due":"deadline";
     parts.push(`<button class="chip ${cls}" data-tl="${it.key}" title="${esc(it.name)}${it.sub?" ("+esc(it.sub)+")":""}${it.date?" \u00b7 "+kind+" "+fmtDate(it.date):" \u00b7 no date set"}"><b>${esc(abbr(it.name))}</b><span>${it.date?fmtDate(it.date):"no date"}${it.sub?` <em>\u00b7 ${esc(abbr(it.sub,18))}</em>`:""}</span></button>`);
   });
@@ -813,13 +843,13 @@ function loadFolded(){ try { return new Set(JSON.parse(localStorage.getItem(fold
 function toggleFold(id){ const s=loadFolded(); s.has(id)?s.delete(id):s.add(id); try { localStorage.setItem(foldKey(), JSON.stringify([...s])); } catch(e){} render(); }
 function renderBoard(m){
   const folded=loadFolded();
-  const list=boardList().filter(p=>!statusFilter||p.status===statusFilter);
+  const list=boardList().filter(p=>(!statusFilter||p.status===statusFilter)&&(!catFilter||(p.category||"")===catFilter));
   m.innerHTML = `<div class="filters"><button class="primary" id="newProj">+ New project</button>
-    <select id="statusFilter"><option value="">All statuses</option>${["idea","planned","active","done"].map(s=>`<option value="${s}" ${statusFilter===s?"selected":""}>${s[0].toUpperCase()+s.slice(1)}</option>`).join("")}</select><span class="meta">Sorted by the nearest date, a deadline or an open task. Pin keeps a project at the top.</span></div>` +
+    <select id="statusFilter"><option value="">All statuses</option>${["idea","planned","active","done"].map(s=>`<option value="${s}" ${statusFilter===s?"selected":""}>${s[0].toUpperCase()+s.slice(1)}</option>`).join("")}</select><select id="catFilter">${catOptions(catFilter,"All categories")}</select><span class="catkey">${CATS.map(([c])=>catPill(c)).join("")}</span><span class="meta">Sorted by the nearest date, a deadline or an open task. Pin keeps a project at the top.</span></div>` +
     `<div class="board">` + (list.length? list.map(p=>{
       const ts=tasksFor(p.id); const done=ts.filter(t=>t.status==="done").length; const isF=folded.has(p.id);
       const others=new Set(ts.map(t=>t.assignee||p.owner||"").filter(n=>n && n!==(p.owner||""))); // people other than the owner working on it
-      return `<div class="card ${p.pinned?"pinned":""} ${isF?"folded":""}" data-proj="${p.id}"><div class="row head"><button class="fold" data-fold="${p.id}" title="${isF?"Show tasks":"Hide tasks"}" aria-expanded="${!isF}">${isF?"\u25B8":"\u25BE"}</button><h2 style="flex:1">${esc(p.name)}</h2>${p.essential?`<span class="pill essential" title="Essential to the yearly goal">essential</span>`:""}${p.event?`<span class="pill event" title="Event or launch">\u25C6 event</span>`:""}<span class="pill ${p.status}">${p.status}</span><button class="small pin ${p.pinned?"on":""}" data-pin="${p.id}" title="${p.pinned?"Unpin: let it sort normally":"Pin to the top of the board"}">${p.pinned?"Pinned":"Pin"}</button>${p.status==="done"?`<button class="small" data-archive-proj="${p.id}">Archive</button>`:""}<button class="small" data-edit-proj="${p.id}">Edit</button></div>
+      return `<div class="card ${p.pinned?"pinned":""} ${isF?"folded":""}${catCls(p.category)}" data-proj="${p.id}"><div class="row head"><button class="fold" data-fold="${p.id}" title="${isF?"Show tasks":"Hide tasks"}" aria-expanded="${!isF}">${isF?"\u25B8":"\u25BE"}</button><h2 style="flex:1">${esc(p.name)}</h2>${catPill(p.category)}${p.essential?`<span class="pill essential" title="Essential to the yearly goal">essential</span>`:""}${p.event?`<span class="pill event" title="Event or launch">\u25C6 event</span>`:""}<span class="pill ${p.status}">${p.status}</span><button class="small pin ${p.pinned?"on":""}" data-pin="${p.id}" title="${p.pinned?"Unpin: let it sort normally":"Pin to the top of the board"}">${p.pinned?"Pinned":"Pin"}</button>${p.status==="done"?`<button class="small" data-archive-proj="${p.id}">Archive</button>`:""}<button class="small" data-edit-proj="${p.id}">Edit</button></div>
         <div class="meta">${p.owner?`Owner: ${esc(p.owner)}`:"No owner"}${p.deadline?` · <span class="${dueClass(p.deadline,p.status==="done")}">${p.event?"on":"deadline"} ${fmtDate(p.deadline)}</span> ${calLink("MB: "+p.name,p.deadline,p.description)}`:""}${(n=>n&&(!p.deadline||n<p.deadline)?` · <span class="${dueClass(n,false)}">next task due ${fmtDate(n)}</span>`:"")(nextTaskDue(p.id))} · ${done}/${ts.length} tasks done${isF&&ts.length-done?` · <span class="meta">${ts.length-done} open, hidden</span>`:""}</div>
         <div class="foldable">${p.description?`<p style="margin:8px 0">${esc(p.description)}</p>`:""}
         ${ts.map(t=>taskRow(t,false,!others.size)).join("")}
@@ -827,6 +857,7 @@ function renderBoard(m){
     }).join("") : `<div class="empty">${statusFilter?"No projects with that status.":"No projects yet. Create one or use Import from Claude."}${archivedProjects().length?` <span class="meta">(${archivedProjects().length} in Archive)</span>`:""}</div>`) + `</div>`;
   $("#newProj").onclick=()=>openProject(null);
   $("#statusFilter").onchange=e=>{statusFilter=e.target.value;render();};
+  $("#catFilter").onchange=e=>{catFilter=e.target.value;render();};
   wire(m);
   m.querySelectorAll("[data-fold]").forEach(b=>b.onclick=()=>toggleFold(b.dataset.fold));
   m.querySelectorAll("[data-pin]").forEach(b=>b.onclick=()=>pinProject(b.dataset.pin));
@@ -914,16 +945,30 @@ function renderPerson(m){
   });
 }
 
+// Deadlines (Oct 17, 2026): one list grouped by week, the way the season plan was laid out:
+// day, a category tag in its color, what is due (with its project under it), and a small box
+// naming who is responsible (a task's assignee, else its project's owner).
+function weekStart(d){ const [y,m,dd]=d.split("-").map(Number); const dt=new Date(y,m-1,dd); dt.setDate(dt.getDate()-((dt.getDay()+6)%7)); return dt; }
+const MON=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"], DOW=["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
 function renderDeadlines(m){
   const items=[];
-  openProjects().forEach(([id,p])=>{ const d=effDate({id,...p}); if(d&&p.status!=="done") items.push({ess:!!(p.essential||p.event),kind:p.event?"Event":"Project",date:d,title:p.name,who:p.owner,sub:d!==p.deadline?`next task due; deadline ${p.deadline?fmtDate(p.deadline):"not set"}`:"",cal:p.deadline?calLink("MB: "+p.name,p.deadline,p.description):"",edit:`data-edit-proj="${id}"`}); });
-  openTasks().forEach(([id,t])=>{ const p=projects[t.projectId]; if(t.due&&t.status!=="done") items.push({ess:!!(t.essential||t.event||p?.essential||p?.event),kind:t.event?"Event":"Task",date:t.due,title:t.title,who:t.assignee,sub:p?.name,cal:calLink("MB: "+t.title,t.due,p?.name),edit:`data-edit-task="${id}"`}); });
-  items.sort((a,b)=>a.date.localeCompare(b.date));
-  const table = list => `<table><thead><tr><th>Date</th><th>What</th><th>Who</th><th></th></tr></thead><tbody>`+
-    list.map(i=>`<tr><td class="${dueClass(i.date)}">${fmtDate(i.date)}</td><td><span class="meta">${i.kind}</span> ${esc(i.title)}${i.sub?`<div class="meta">${esc(i.sub)}</div>`:""}</td><td>${esc(i.who||"")}</td><td style="white-space:nowrap">${i.cal} <button class="small" ${i.edit}>Edit</button></td></tr>`).join("")+`</tbody></table>`;
-  const ess=items.filter(i=>i.ess), rest=items.filter(i=>!i.ess);
-  m.innerHTML = (ess.length ? `<div class="card"><h2>Timeline <span class="meta">essential projects, events and launches, and their tasks</span></h2>${table(ess)}</div>` : "") +
-    `<div class="card"><h2>${ess.length?"Everything else":"Upcoming"}</h2>${rest.length?table(rest):`<div class="meta">${ess.length?"No other open deadlines.":"No open deadlines."}</div>`}</div>`;
+  openProjects().forEach(([id,p])=>{ if(p.deadline&&p.status!=="done") items.push({cat:p.category||"",kind:p.event?"Event":"Project",date:p.deadline,title:p.name,who:p.owner||"",sub:p.event?"":"Project deadline",cal:calLink("MB: "+p.name,p.deadline,p.description),edit:`data-edit-proj="${id}"`}); });
+  openTasks().forEach(([id,t])=>{ const p=projects[t.projectId]; if(t.due&&t.status!=="done") items.push({cat:t.category||p?.category||"",kind:t.event?"Event":"Task",date:t.due,title:t.title,who:t.assignee||p?.owner||"",sub:p?.name||"",cal:calLink("MB: "+t.title,t.due,p?.name),edit:`data-edit-task="${id}"`}); });
+  const list=items.filter(i=>!catFilter||i.cat===catFilter).sort((a,b)=>a.date.localeCompare(b.date)||a.title.localeCompare(b.title));
+  const td=today(), thisWk=weekStart(td).getTime();
+  const groups=[]; let cur=null;
+  list.forEach(i=>{
+    const ws=weekStart(i.date); const key=i.date<td?"over":String(ws.getTime());
+    const label=key==="over"?"Overdue":ws.getTime()===thisWk?"This week":`Week of ${MON[ws.getMonth()]} ${ws.getDate()}`;
+    if(!cur||cur.key!==key){ cur={key,label,rows:[]}; groups.push(cur); }
+    cur.rows.push(i);
+  });
+  const day = d => { const [y,mo,dd]=d.split("-").map(Number); const dt=new Date(y,mo-1,dd); return d<td ? fmtDate(d) : `${DOW[dt.getDay()]} ${dd}`; };
+  const tag = c => `<span class="dl-tag${catName(c)?" cat-"+c:""}">${catName(c)||"Other"}</span>`;
+  const row = i => `<div class="dl-row"><span class="dl-date ${dueClass(i.date)}">${day(i.date)}</span>${tag(i.cat)}<div class="dl-what">${i.kind==="Event"?'<span class="dl-ev" title="Event or launch">◆</span> ':""}${esc(i.title)}${i.sub?`<div class="meta">${esc(i.sub)}</div>`:""}</div><span class="dl-who" title="Responsible">${i.who?esc(i.who):"Unassigned"}</span><span class="dl-act">${i.cal} <button class="small" ${i.edit}>Edit</button></span></div>`;
+  m.innerHTML = `<div class="filters"><select id="dlCat">${catOptions(catFilter,"All categories")}</select><span class="catkey">${CATS.map(([c])=>catPill(c)).join("")}</span></div>` +
+    `<div class="card">${groups.length ? groups.map(g=>`<div class="dl-wk${g.key==="over"?" overdue":""}">${g.label}</div>${g.rows.map(row).join("")}`).join("") : `<div class="meta">No open deadlines${catFilter?" in this category":""}.</div>`}</div>`;
+  $("#dlCat").onchange=e=>{ catFilter=e.target.value; render(); };
   wire(m);
 }
 
@@ -947,8 +992,8 @@ function renderImport(m){
     for(const item of list){
       const p = item.project || item; if(!p.name){ $("#importMsg").textContent="Each project needs a name."; return; }
       const pk = db.ref("projects").push().key;
-      upd["projects/"+pk] = { name:p.name, description:p.description||"", owner:p.owner||"", deadline:p.deadline||"", essential:p.essential===true, event:p.event===true, status:["idea","planned","active","done"].includes(p.status)?p.status:"planned", createdAt:Date.now(), createdBy:me.email, ...stamp() }; np++;
-      for(const t of (item.tasks||[])){ if(!t.title) continue; upd["tasks/"+db.ref("tasks").push().key] = { projectId:pk, title:t.title, assignee:t.assignee||"", due:t.due||"", notes:t.notes||"", essential:t.essential===true, event:t.event===true, status:["todo","doing","done"].includes(t.status)?t.status:"todo", createdAt:Date.now(), createdBy:me.email, ...stamp() }; nt++; }
+      upd["projects/"+pk] = { name:p.name, description:p.description||"", owner:p.owner||"", deadline:p.deadline||"", category:catName(p.category)?p.category:"", essential:p.essential===true, event:p.event===true, status:["idea","planned","active","done"].includes(p.status)?p.status:"planned", createdAt:Date.now(), createdBy:me.email, ...stamp() }; np++;
+      for(const t of (item.tasks||[])){ if(!t.title) continue; upd["tasks/"+db.ref("tasks").push().key] = { projectId:pk, title:t.title, assignee:t.assignee||"", due:t.due||"", notes:t.notes||"", category:catName(t.category)?t.category:"", essential:t.essential===true, event:t.event===true, status:["todo","doing","done"].includes(t.status)?t.status:"todo", createdAt:Date.now(), createdBy:me.email, ...stamp() }; nt++; }
     }
     await commit(`Imported ${np} project(s), ${nt} task(s)`, upd);
     $("#importBox").value=""; $("#importMsg").textContent=`Imported ${np} project(s) and ${nt} task(s).`;
@@ -1150,24 +1195,25 @@ function openProject(id){
   editingProj=id; const f=$("#projForm"); f.reset(); const p=id?projects[id]:{};
   $("#projDlgTitle").textContent=id?"Edit project":"New project"; $("#projDelete").hidden=!id; $("#projArchive").hidden=!id||!!p.archivedAt;
   f.name.value=p.name||""; f.description.value=p.description||""; f.status.value=p.status||"planned"; f.deadline.value=p.deadline||""; f.essential.checked=!!p.essential; f.event.checked=!!p.event;
+  $("#projCat").innerHTML=catOptions(p.category||"","None");
   optionList($("#projOwner"), p.owner||""); $("#projDlg").showModal();
 }
 $("#projCancel").onclick=()=>$("#projDlg").close();
 $("#projDelete").onclick=async()=>{ $("#projDlg").close(); await trashProject(editingProj); };
 $("#projArchive").onclick=async()=>{ $("#projDlg").close(); await archiveProject(editingProj); };
-$("#projForm").onsubmit=async e=>{ const f=e.target; await saveProject(editingProj,{name:f.name.value.trim(),description:f.description.value.trim(),owner:f.owner.value,status:f.status.value,deadline:f.deadline.value,essential:f.essential.checked,event:f.event.checked}); };
+$("#projForm").onsubmit=async e=>{ const f=e.target; await saveProject(editingProj,{name:f.name.value.trim(),description:f.description.value.trim(),owner:f.owner.value,status:f.status.value,deadline:f.deadline.value,category:f.category.value,essential:f.essential.checked,event:f.event.checked}); };
 
 function openTask(id,pid){
   editingTask=id; taskProject=pid; const f=$("#taskForm"); f.reset(); const t=id?tasks[id]:{};
   $("#taskDlgTitle").textContent=id?"Edit task":"New task in "+(projects[pid]?.name||""); $("#taskDelete").hidden=!id;
-  f.title.value=t.title||""; f.status.value=t.status||"todo"; f.due.value=t.due||""; f.notes.value=t.notes||""; f.essential.checked=!!t.essential; f.event.checked=!!t.event;
+  f.title.value=t.title||""; f.status.value=t.status||"todo"; f.due.value=t.due||""; f.notes.value=t.notes||""; f.essential.checked=!!t.essential; f.event.checked=!!t.event; $("#taskCat").innerHTML=catOptions(t.category||"","Same as project");
   optionList($("#taskAssignee"), t.assignee||"");
   const cur=t.projectId||pid; $("#taskProjectSel").innerHTML=live(projects).filter(([k,p])=>!p.archivedAt||k===cur).sort((a,b)=>a[1].name.localeCompare(b[1].name)).map(([k,p])=>`<option value="${k}" ${k===cur?"selected":""}>${esc(p.name)}</option>`).join("");
   $("#taskDlg").showModal();
 }
 $("#taskCancel").onclick=()=>$("#taskDlg").close();
 $("#taskDelete").onclick=async()=>{ $("#taskDlg").close(); await trashTask(editingTask); };
-$("#taskForm").onsubmit=async e=>{ const f=e.target; const data={title:f.title.value.trim(),assignee:f.assignee.value,status:f.status.value,due:f.due.value,notes:f.notes.value.trim(),essential:f.essential.checked,event:f.event.checked,projectId:f.projectId.value||taskProject}; await saveTask(editingTask,data); };
+$("#taskForm").onsubmit=async e=>{ const f=e.target; const data={title:f.title.value.trim(),assignee:f.assignee.value,status:f.status.value,due:f.due.value,notes:f.notes.value.trim(),category:f.category.value,essential:f.essential.checked,event:f.event.checked,projectId:f.projectId.value||taskProject}; await saveTask(editingTask,data); };
 </script>
 <div class="pgdrawer-bg" id="pgDrawerBg"></div>
 <nav class="pgdrawer" id="pgDrawer" aria-label="Pages" aria-hidden="true">
