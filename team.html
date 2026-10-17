@@ -1,0 +1,1635 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Mangiapane Brothers Team Manager</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+  :root{color-scheme:light dark;
+    --bg:#f3f5f8;--card:#ffffff;--surface2:#e9edf2;--line:#d3dae3;
+    --ink:#16233a;--ink2:#4a5a72;--muted:#7a889c;
+    --accent:#1f4e8c;--accent-ink:#ffffff;--accent-soft:#e2ebf7;
+    --green:#1c7a4c;--green-soft:#e1f0e8;--amber:#b0741b;--amber-soft:#fbf1dc;--red:#a63b3b;--red-soft:#f6e3e3;
+    --header:#1f4e8c;--header-ink:#ffffff;--shadow:0 8px 28px rgba(22,35,58,.12);--r:6px}
+  @media (prefers-color-scheme:dark){:root{
+    --bg:#0f1521;--card:#171f2e;--surface2:#1f2a3b;--line:#2c394d;
+    --ink:#e8edf4;--ink2:#b3bfd0;--muted:#7f8ca0;
+    --accent:#6da3e6;--accent-ink:#0f1521;--accent-soft:#1d2d47;
+    --green:#4fbf85;--green-soft:#163326;--amber:#e0a94a;--amber-soft:#3a2d14;--red:#e07a7a;--red-soft:#3a1d1d;
+    --header:#171f2e;--header-ink:#e8edf4;--shadow:0 8px 28px rgba(0,0,0,.45)}}
+  *{box-sizing:border-box}
+  body{margin:0;font:16px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--ink)}
+  header{background:var(--header);color:var(--header-ink);padding:10px 14px;display:flex;align-items:center;gap:6px 14px;flex-wrap:wrap;position:sticky;top:0;z-index:1000}
+  header h1{font-size:17px;margin:0;font-weight:650}
+  header .who{font-size:12px;opacity:.85;margin-left:auto}
+  header .xlinks{display:flex;gap:12px}
+  [hidden]{display:none!important}
+  header a.xlink{color:var(--header-ink);opacity:.8;font-size:13px;text-decoration:none;white-space:nowrap}
+  header a.xlink.here{opacity:1;font-weight:650;text-decoration:underline}
+  nav{display:flex;gap:4px;overflow-x:auto;width:100%;scrollbar-width:none}
+  nav::-webkit-scrollbar{display:none}
+  nav button{background:transparent;border:0;color:var(--header-ink);opacity:.75;padding:6px 10px;border-radius:var(--r);white-space:nowrap}
+  nav button.on{opacity:1;background:rgba(255,255,255,.18);font-weight:600}
+  button{font:inherit;cursor:pointer;border:1px solid var(--line);background:var(--card);color:var(--ink);padding:9px 13px;border-radius:var(--r);font-weight:500}
+  button.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+  button.small{padding:5px 9px;font-size:14px}
+  button.ghost{background:transparent;border-color:var(--header-ink);color:var(--header-ink)}
+  button.danger{color:var(--red)}
+  main{max-width:900px;margin:0 auto;padding:12px 12px 60px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:14px;margin:0 0 12px}
+  .card h2{font-size:17px;margin:0 0 6px}
+  .card h3{font-size:15px;margin:0 0 4px}
+  .meta{color:var(--ink2);font-size:14px}
+  .muted{color:var(--muted);font-size:13px}
+  .bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:0 0 12px}
+  .bar .date{font-weight:650;font-size:17px;flex:1;min-width:150px}
+  .routecard{cursor:pointer}
+  .routecard .top{display:flex;justify-content:space-between;gap:10px;align-items:baseline}
+  .prog{height:8px;background:var(--surface2);border-radius:4px;overflow:hidden;margin:8px 0 4px}
+  .prog i{display:block;height:100%;background:var(--green)}
+  .chip{display:inline-block;font-size:12px;padding:2px 8px;border-radius:99px;background:var(--accent-soft);color:var(--accent);font-weight:600}
+  .chip.warn{background:var(--amber-soft);color:var(--amber)}
+  .chip.ok{background:var(--green-soft);color:var(--green)}
+  #mapSlot{height:46vh;min-height:260px;border:1px solid var(--line);border-radius:var(--r);overflow:hidden;margin:0 0 10px;position:relative}
+  #mapEl{height:100%;width:100%}
+  .streets{list-style:none;margin:0;padding:0}
+  .streets li{display:flex;align-items:center;gap:10px;padding:9px 4px;border-bottom:1px solid var(--line)}
+  .streets li .nm{flex:1;min-width:0}
+  .streets li.done .nm b{text-decoration:line-through;color:var(--muted)}
+  .tick{width:38px;height:38px;border-radius:8px;border:2px solid var(--line);background:var(--card);font-size:20px;line-height:1;padding:0;flex:none}
+  li.done .tick{background:var(--green);border-color:var(--green);color:#fff}
+  .iconbtn{padding:6px 9px;font-size:14px;flex:none}
+  label{display:block;font-size:13px;color:var(--ink2);margin:8px 0 3px}
+  input,select,textarea{font:inherit;width:100%;padding:9px;border:1px solid var(--line);border-radius:var(--r);background:var(--card);color:var(--ink)}
+  input[type=checkbox]{width:auto}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:0 12px}
+  table{width:100%;border-collapse:collapse;font-size:14px}
+  th,td{text-align:left;padding:7px 6px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{color:var(--ink2);font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.3px}
+  .scroll{overflow-x:auto}
+  dialog{border:1px solid var(--line);border-radius:var(--r);background:var(--card);color:var(--ink);padding:16px;width:min(560px,94vw);max-height:90vh;overflow:auto;box-shadow:var(--shadow)}
+  dialog::backdrop{background:rgba(0,0,0,.45)}
+  .actions{display:flex;gap:8px;justify-content:flex-end;margin-top:14px;flex-wrap:wrap}
+  #toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:9px 14px;border-radius:var(--r);opacity:0;transition:opacity .2s;pointer-events:none;z-index:3000;font-size:14px}
+  #toast.show{opacity:1}
+  .lanes{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-start;margin:0 0 12px}
+  .lane{flex:1 1 250px;min-width:0;background:var(--surface2);border:1px solid var(--line);border-radius:var(--r);padding:10px}
+  .lane.light{flex:.7 1 210px;background:transparent;border-style:dashed}
+  .lane>h3{margin:0;font-size:16px}
+  .lane .lanewho{color:var(--ink2);font-size:13px;margin:0 0 8px}
+  .lane .card{margin:0 0 8px}
+  .lane .card:last-child{margin-bottom:0}
+  .flyer{font-size:17px;font-weight:700;margin:0 0 2px}
+  .flyerlist{margin:0;padding:0;list-style:none}
+  .flyerlist li{padding:6px 0;border-bottom:1px dashed var(--line);display:flex;flex-wrap:wrap;gap:4px 10px;align-items:baseline}
+  .flyerlist li:last-child{border-bottom:0}
+  .wk{display:grid;gap:6px 10px;grid-template-columns:repeat(var(--n),minmax(0,1fr))}
+  .wk .cell{font-size:13px;min-width:0}
+  .wk .cell b{display:block;font-size:14px}
+  .wk .cell[data-open]{cursor:pointer}
+  .wkhead{font-size:12px;color:var(--muted);font-weight:650;text-transform:uppercase;letter-spacing:.04em}
+  .daycol h3.daylink{cursor:pointer;color:var(--accent)}
+  @media (max-width:560px){.wk{grid-template-columns:1fr}.wkhead{display:none}.wk .cell::before{content:attr(data-seat) ": ";color:var(--muted);font-weight:650}}
+  .daycol{border-left:3px solid var(--line);padding:2px 0 2px 10px;margin:0 0 12px}
+  .daycol.today{border-color:var(--accent)}
+  .daycol h3{margin:0 0 6px}
+  .rowlink{display:flex;justify-content:space-between;gap:8px;padding:7px 0;border-bottom:1px dashed var(--line);cursor:pointer}
+  img.photo{max-width:100%;border-radius:var(--r)}
+  .mapbtn{display:inline-block;padding:7px 12px;border-radius:var(--r);border:1px solid var(--line);background:var(--accent);color:var(--accent-ink) !important;font-weight:650;font-size:14px;text-decoration:none;cursor:pointer}
+  button.mapbtn{background:var(--card);color:var(--ink) !important}
+  .viewas{width:auto;margin-left:auto;font-size:13px;padding:5px 8px}
+  .demo button{margin-left:8px}
+  .demo{background:var(--amber-soft);color:var(--amber);padding:6px 12px;font-size:13px;text-align:center}
+  @media (max-width:520px){.grid2{grid-template-columns:1fr}}
+
+  /* page menu: three-line button left of the company name, drawer from the left edge */
+  .navbtn{flex:none;width:40px;height:40px;padding:0;border:1px solid transparent;border-radius:8px;background:transparent;color:var(--header-ink);display:inline-flex;align-items:center;justify-content:center;cursor:pointer}
+  .navbtn:hover{background:rgba(255,255,255,.14)}
+  .navbtn svg{width:24px;height:24px;display:block}
+  .pgdrawer-bg{position:fixed;inset:0;background:rgba(10,16,28,.45);z-index:2000;opacity:0;pointer-events:none;transition:opacity .2s}
+  .pgdrawer-bg.open{opacity:1;pointer-events:auto}
+  .pgdrawer{position:fixed;top:0;left:0;bottom:0;width:min(290px,84vw);background:var(--card);color:var(--ink);z-index:2001;box-shadow:var(--shadow);transform:translateX(-102%);transition:transform .22s;display:flex;flex-direction:column;padding:14px 12px;touch-action:pan-y}
+  .pgdrawer.open{transform:none}
+  .pgdrawer .pdhead{display:flex;align-items:center;gap:8px;padding:0 4px 12px;border-bottom:1px solid var(--line);margin-bottom:8px}
+  .pgdrawer .pdhead b{flex:1;font-size:15px}
+  .pgdrawer .pdx{width:36px;height:36px;border-radius:50%;border:0;background:var(--surface2);color:var(--ink);font-size:22px;line-height:1;padding:0;cursor:pointer}
+  .pgdrawer a{display:block;padding:11px 12px;border-radius:8px;color:var(--ink);text-decoration:none;margin:2px 0}
+  .pgdrawer a span{display:block;font-size:12px;color:var(--muted);margin-top:1px}
+  .pgdrawer a:hover{background:var(--surface2)}
+  .pgdrawer a.here{background:var(--accent-soft);color:var(--accent);font-weight:650}
+  .pgdrawer .pdfoot{margin-top:auto;font-size:12px;color:var(--muted);padding:8px 4px 0}
+</style>
+<style>
+  /* Crews additions: the same look as the routes page, plus what a job carries */
+  .chip.svc-snow{background:#e3eefb;color:#1f5aa6}.chip.svc-lights{background:#fbf1dc;color:#9a6512}.chip.svc-landscaping{background:#e1f0e8;color:#1c7a4c}
+  .chip.svc-fall{background:#f8e6d8;color:#a5501b}.chip.svc-lawn{background:#e6f2dc;color:#3f7a1c}.chip.svc-other{background:var(--surface2);color:var(--ink2)}
+  @media (prefers-color-scheme:dark){.chip.svc-snow{background:#1d2d47;color:#8db8ef}.chip.svc-lights{background:#3a2d14;color:#e0a94a}.chip.svc-landscaping{background:#163326;color:#4fbf85}
+    .chip.svc-fall{background:#3a2416;color:#e59a63}.chip.svc-lawn{background:#1f3317;color:#8fcf63}}
+  .chip.bad{background:var(--red-soft);color:var(--red)}
+  .stops{list-style:none;margin:0;padding:0}
+  .stops li{display:flex;align-items:flex-start;gap:10px;padding:10px 4px;border-bottom:1px solid var(--line)}
+  .stops li .nm{flex:1;min-width:0}
+  .stops li .nm .addr{font-size:14px;color:var(--ink2)}
+  .stops li .nm .cnote{font-size:14px;margin-top:3px;padding:4px 8px;border-left:3px solid var(--amber);background:var(--amber-soft);border-radius:4px;color:var(--ink)}
+  .stops li.done .nm b{text-decoration:line-through;color:var(--muted)}
+  .stops li.skip .nm b{color:var(--muted)}
+  .stops li .num{flex:none;width:24px;text-align:right;color:var(--muted);font-weight:650;padding-top:9px;font-size:14px}
+  .stops li .acts{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+  .stops li .acts:empty{display:none}
+  li.done .tick{background:var(--green);border-color:var(--green);color:#fff}
+  li.skip .tick{background:var(--amber-soft);border-color:var(--amber);color:var(--amber)}
+  .clock{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .clock .big{font-size:20px;font-weight:700}
+  .storm{background:#e3eefb;border:1px solid #9ec0ea;color:#173f73;border-radius:var(--r);padding:10px 12px;margin:0 0 12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  @media (prefers-color-scheme:dark){.storm{background:#1d2d47;border-color:#2f4f7f;color:#cfe0f7}}
+  .pin{width:26px;height:26px;border-radius:50%;color:#fff;font:700 12px/22px -apple-system,BlinkMacSystemFont,sans-serif;text-align:center;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4)}
+  .logrow{display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-bottom:1px dashed var(--line)}
+  .logrow .t{flex:none;width:68px;color:var(--muted);font-size:13px;padding-top:2px}
+  .logrow .w{flex:1;min-width:0}
+  .who-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:6px 0;border-bottom:1px dashed var(--line)}
+  .who-row input[type=time]{width:auto}
+  .editlist li{display:flex;gap:8px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line)}
+  .editlist li .nm{flex:1;min-width:0}
+  .editlist li input{font-size:16px}
+  .pick{max-height:300px;overflow:auto;border:1px solid var(--line);border-radius:var(--r);margin-top:6px}
+  .pick button{display:block;width:100%;text-align:left;border:0;border-bottom:1px solid var(--line);border-radius:0}
+  .ok-banner{background:var(--green-soft);color:var(--green);border-radius:var(--r);padding:10px 12px;font-weight:600;margin:10px 0}
+  input,select,textarea{font-size:16px}
+  header{z-index:1100}
+  .viewas{font-size:16px}
+  .kindbtns{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+  .kindbtns button{padding:14px 10px;font-weight:650}
+  /* Team Manager: the Onboarding board, built like the CRM's Leads board */
+  .quick{display:grid;grid-template-columns:repeat(6,1fr) auto;gap:8px;align-items:end}
+  .quick label{margin:0 0 3px} .quick .quickbtns{display:flex;gap:6px}
+  @media(max-width:1000px){.quick{grid-template-columns:1fr 1fr 1fr}} @media(max-width:600px){.quick{grid-template-columns:1fr}}
+  .board{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(158px,1fr);gap:8px;overflow-x:auto;padding-bottom:6px;align-items:stretch}
+  /* the board uses the whole screen width, not the page column */
+  @media(min-width:701px){.board.wide{width:calc(100vw - 32px);margin-left:calc(50% - 50vw + 16px)}}
+  .col{background:var(--surface2);border:1px solid var(--line);border-radius:var(--r);padding:10px;min-height:300px;display:flex;flex-direction:column;gap:8px}
+  .col h2{font-size:13px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink2);margin:0 0 2px;display:flex;align-items:center;gap:6px;cursor:pointer;user-select:none}
+  .col h2 .n{margin-left:auto;font-weight:500;color:var(--muted)} .col h2 .fold{font-size:11px;color:var(--muted);width:12px}
+  .col.drop{box-shadow:inset 0 0 0 2px var(--accent)} .col.won{background:var(--green-soft)} .col.lost{background:var(--red-soft)}
+  .col.shut{padding:10px 4px;align-items:center} .col.shut h2{writing-mode:vertical-rl;transform:rotate(180deg);flex-direction:row-reverse;margin:0;white-space:nowrap}
+  .col.shut h2 .n{margin-left:0;margin-top:auto} .col.shut h2 .fold{transform:rotate(90deg)}
+  .tcard{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:8px 10px;cursor:grab;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
+  .tcard .name{font-weight:600} .tcard .meta{margin-top:2px} .tcard.dragging{opacity:.35} .tcard.ghost{box-shadow:0 8px 24px rgba(0,0,0,.25);transform:rotate(2deg);opacity:.95;cursor:grabbing}
+  .tcard.past .name{color:var(--ink2)} .tcard select{margin-top:6px;width:100%}
+  @media(min-width:701px){.tcard select{display:none}}
+  @media(max-width:700px){.board{grid-auto-flow:row;grid-auto-columns:auto;grid-template-columns:1fr!important}.col{min-height:0}.col.shut{padding:10px;align-items:stretch}.col.shut h2{writing-mode:horizontal-tb;transform:none;flex-direction:row}.col.shut h2 .fold{transform:none}.col.shut h2 .n{margin-left:auto}}
+  .clip{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;margin-top:3px}
+  .srcstrip{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px} .srcstrip .pill{background:var(--card);border:1px solid var(--line);color:var(--ink2);border-radius:999px;padding:3px 10px;font-size:13px}
+  .pfe{border-top:1px solid var(--line);padding:10px 0} .pfe .h{display:flex;gap:6px;align-items:center;flex-wrap:wrap} .pfe .h .muted{margin-left:auto}
+  .pfe .t{white-space:pre-wrap;margin-top:4px;line-height:1.45}
+  .checkrow{display:flex;gap:8px;align-items:center;color:var(--ink);margin:6px 0} .checkrow .muted{margin-left:auto}
+  textarea{width:100%;box-sizing:border-box}
+</style>
+</head>
+<body>
+<div id="previewBar" class="demo" hidden></div>
+<div id="demoBanner" class="demo" hidden>Demo mode. Nothing here is saved.</div>
+<header>
+  <button type="button" class="navbtn" id="navBtn" hidden aria-label="Open page menu" aria-controls="pgDrawer" aria-expanded="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+  <h1 id="title">Mangiapane Brothers Team Manager</h1>
+  <span class="who" id="who"></span>
+  <button class="ghost small" id="signout" hidden>Sign out</button>
+  <nav id="nav" hidden></nav>
+</header>
+
+<main>
+  <div id="gate" class="card" hidden>
+    <h2>Sign in</h2>
+    <p class="meta">Use the Google account Russel added to the team list.</p>
+    <button class="primary" id="signin">Sign in with Google</button>
+    <p class="meta" id="gateMsg"></p>
+  </div>
+  <div id="app" hidden></div>
+</main>
+
+<dialog id="dlg"></dialog>
+<div id="toast"></div>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
+<script>
+// ===== CONFIG (same Firebase project as the Projects page) =====
+const firebaseConfig = {
+  apiKey: "AIzaSyDLndoLTcm8zKyN3WlVfYoGVQmVlbMlib4",
+  authDomain: "mb-projects-c4383.firebaseapp.com",
+  databaseURL: "https://mb-projects-c4383-default-rtdb.firebaseio.com",
+  projectId: "mb-projects-c4383",
+  storageBucket: "mb-projects-c4383.firebasestorage.app",
+  messagingSenderId: "246828597156",
+  appId: "1:246828597156:web:dfa85db16f51d85b5fcb31"
+};
+const ADMIN_EMAIL = "russel.mangiapaneiii@gmail.com";
+// Two pages from one source (October 17, 2026): crews.html is routes and schedules; team.html (Team Manager) is personnel,
+// hiring, payroll, paperwork and management. The build sets this line. Crews and employees only ever use crews.html.
+const PAGE = "team";
+const OFFICE_TABS = PAGE==="team"
+  ? [["onboard","Onboarding"],["people","Personnel"],["crews","Crews"],["paper","Paperwork"],["reports","Reports"],["paycfg","Payroll"]]
+  : [["today","Day"],["week","Week"],["routes","Routes"],["sched","Schedules"],["log","Log"],["events","Meetings"]];
+// Where each clearance tier lands. Admins and crews use this page; walkers use the door hanger Routes page.
+const TIER_HOME = { admin:"projects.html", crew:"crews.html", walker:"routes.html" };
+const HOME = [42.3836,-83.3527];   // Livonia, for an empty map
+const KEEP_DAYS = 45;              // check-offs loaded: today back this many days
+const SCHEDULE_DAYS = 31;          // an employee sees his schedule this far ahead
+const PERIOD_DAYS = 14;            // pay period: every two weeks (Russel, Oct 17)
+const MIN_WAGE_DEFAULT = 13.73;    // Michigan, 2026; $15.00 from January 1, 2027. Set on the Pay tab.
+// Files kept on an employee's record. Sensitive ones (tax and ID forms) stay in Drive only: the record shows they are
+// on file and when, with no link. Everything else opens and downloads from the employee's Files tab.
+const DOC_KINDS = { agreement:"Employment or contractor agreement", payterms:"Pay terms", handbook:"Handbook or policy acknowledgment", equipment:"Equipment sign-out", cert:"License or certification", other:"Other file",
+  w4:"W-4 tax withholding", i9:"I-9 work eligibility", w9:"W-9 (contractor)", deposit:"Direct deposit form", id:"ID copy" };
+const SENSITIVE = ["w4","i9","w9","deposit","id"];
+// ================================================================
+// Three views (October 17, 2026): the office; crew managers, who run the routes (the full mirror of the door hanger
+// Routes page: map, check-off, crew log and approval, plus their crew's contact info and shifts); and employees, who
+// see their schedule for the next month, past hours, pay log, their files with the company and their own info.
+// Crews and Crew View (October 16, 2026). Built on the door hanger routes page: the same map, check-off and day log,
+// with what a job carries. Each crew works its own routes. A snow route is standing: it shows on a day once a storm is
+// started (by an admin for every crew, or by a crew's manager for his own crew). Other routes run on dates.
+// Checking a stop off writes a service log entry. Each crew's manager approves his own crew's day in Crew log, which
+// locks it and approves the day's time; the signing service then bills the day (snow past 16, lights and landscaping
+// balances, service calls) and charges saved cards. Crews never see client records, prices or payment details:
+// a stop carries its own copy of the name, address, phone and the crew note.
+
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const emailKey = e => e.toLowerCase().replace(/\./g, ",");
+const TZ = "America/Detroit";
+const today = () => new Intl.DateTimeFormat("en-CA",{timeZone:TZ,year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date());
+const pd = d => { const [y,m,dd]=d.split("-").map(Number); return new Date(Date.UTC(y,m-1,dd,12)); };
+const iso = dt => dt.toISOString().slice(0,10);
+const addDays = (d,n) => { const x=pd(d); x.setUTCDate(x.getUTCDate()+n); return iso(x); };
+const mondayOf = d => { const x=pd(d); const w=(x.getUTCDay()+6)%7; return addDays(d,-w); };
+const DOW = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"], MON = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+const fmtDay = d => { if(!d) return ""; const x=pd(d); return `${DOW[x.getUTCDay()]} ${MON[x.getUTCMonth()]} ${x.getUTCDate()}`; };
+const fmtRange = (a,b) => !a ? "Not scheduled" : (a===b||!b ? fmtDay(a) : `${fmtDay(a)} to ${fmtDay(b)}`);
+const fmtTime = ms => ms ? new Intl.DateTimeFormat("en-US",{timeZone:TZ,hour:"numeric",minute:"2-digit"}).format(new Date(ms)) : "";
+const hhmm = ms => ms ? new Intl.DateTimeFormat("en-GB",{timeZone:TZ,hour:"2-digit",minute:"2-digit",hour12:false}).format(new Date(ms)) : "";
+const hrs = n => (Math.round(n*10)/10).toFixed(1).replace(/\.0$/,"");
+function toast(m){ const t=$("#toast"); t.textContent=m; t.classList.add("show"); clearTimeout(toast.t); toast.t=setTimeout(()=>t.classList.remove("show"),2600); }
+// A time typed for a day ("07:30") as a timestamp in Michigan time.
+function atTime(d, hm){ if(!hm) return null; const [h,m]=hm.split(":").map(Number); const guess=Date.UTC(...d.split("-").map((v,i)=>i===1?v-1:+v), h, m);
+  for(const off of [4,5]){ const ms=guess+off*3600e3; if(hhmm(ms)===hm && new Intl.DateTimeFormat("en-CA",{timeZone:TZ}).format(new Date(ms))===d) return ms; } return guess+5*3600e3; }
+
+// What a stop can log, per service. The kind goes on the service log entry; billing reads it.
+const SERVICES = { snow:"Snow", lights:"Christmas lights", landscaping:"Landscaping", fall:"Fall cleanup", lawn:"Lawn", other:"Other" };
+const KINDS = { snow:"Snow push", lights:"Lights installed", takedown:"Lights takedown", call:"Lights service call", landscaping:"Landscaping job done", fall:"Fall cleanup pass", lawn:"Lawn cut", other:"Other work" };
+const KINDS_FOR = { snow:["snow"], lights:["lights","takedown","call"], landscaping:["landscaping"], fall:["fall"], lawn:["lawn"], other:["other"] };
+const DONE_WORD = { snow:"Pushed", lights:"Installed", takedown:"Taken down", call:"Service call", landscaping:"Job done", fall:"Pass done", lawn:"Cut", other:"Done" };
+
+// ---------- data layer: Firebase, or an in-memory copy when the URL has ?demo ----------
+const DEMO = new URLSearchParams(location.search).get("demo");
+function fbStore(){
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.database();
+  return {
+    auth: firebase.auth(),
+    on(path, cb, err){ const r=db.ref(path); r.on("value", s=>cb(s.val()), err||(()=>{})); return ()=>r.off(); },
+    onFrom(path, startKey, cb){ const q=db.ref(path).orderByKey().startAt(startKey); q.on("value", s=>cb(s.val()), ()=>{}); return ()=>q.off(); },
+    get(path){ return db.ref(path).once("value").then(s=>s.val()); },
+    update(obj){ return db.ref().update(obj); },
+    key(){ return db.ref("crewRoutes").push().key; }
+  };
+}
+function demoStore(){
+  const tree = {}; const subs = [];
+  const read = p => p.split("/").reduce((o,k)=> (o && typeof o==="object") ? o[k] : undefined, tree);
+  const write = (p,v) => { const ks=p.split("/"); let o=tree; ks.slice(0,-1).forEach(k=>{ if(typeof o[k]!=="object"||o[k]===null) o[k]={}; o=o[k]; }); const last=ks[ks.length-1]; if(v===null||v===undefined) delete o[last]; else o[last]=JSON.parse(JSON.stringify(v)); };
+  const copy = v => v===undefined ? null : JSON.parse(JSON.stringify(v));
+  const fire = () => subs.forEach(s=>s.cb(s.from ? Object.fromEntries(Object.entries(read(s.path)||{}).filter(([k])=>k>=s.from)) : copy(read(s.path))));
+  let n=0;
+  return {
+    auth:null, _tree:tree,
+    on(path, cb){ const s={path,cb}; subs.push(s); cb(copy(read(path))); return ()=>subs.splice(subs.indexOf(s),1); },
+    onFrom(path, from, cb){ const s={path,cb,from}; subs.push(s); cb(Object.fromEntries(Object.entries(read(path)||{}).filter(([k])=>k>=from))); return ()=>subs.splice(subs.indexOf(s),1); },
+    get(path){ return Promise.resolve(copy(read(path))); },
+    update(obj){ Object.entries(obj).forEach(([p,v])=>write(p,v)); fire(); return Promise.resolve(); },
+    key(){ return "d"+Date.now().toString(36)+(n++); }
+  };
+}
+const store = DEMO ? demoStore() : fbStore();
+
+// ---------- state ----------
+let me=null, isAdmin=false, realAdmin=false, viewAs="", meReal=null;
+let role="", myCrew="";              // crew tier: role manager or member, and the crew's name
+let crews={}, routes={}, storms={}, checks={}, events={}, team={}, clients={}, svcLog={}, dayLogs={}, timeAll={};
+// People data, keyed by person (emailKey). The office reads all of it; an employee binds his own; a manager also his crew's contact info and shifts.
+let staffAll={}, privAll={}, docsAll={}, shiftsAll={}, payLogAll={}, vault={}, payRates={}, svcCfg=null;
+let view="today", curDate=today(), openRoute=null, crewFilter="", editing=null, meTab="schedule", personOpen=null, payPeriod=null;
+let unsub=[], dayUnsub=[], memUnsub=[];
+let pendingSeeAs = (location.hash.match(/^#seeas=(.+)$/)||[])[1] ? decodeURIComponent(location.hash.slice(7)) : "";
+const isMgr = () => (isAdmin && !viewAs) || role==="manager";
+const previewOnly = () => { if(viewAs){ toast("Preview. Nothing is saved."); return true; } return false; };
+const isEmpPreview = () => viewAs.startsWith("emp:");
+
+// ---------- auth ----------
+$("#signin").onclick = async () => {
+  const p = new firebase.auth.GoogleAuthProvider();
+  try { await store.auth.signInWithPopup(p); }
+  catch(e){ if(/popup/.test(e.code)) store.auth.signInWithRedirect(p); else $("#gateMsg").textContent = e.message; }
+};
+$("#signout").onclick = () => store.auth && store.auth.signOut();
+
+async function enter(user){
+  me = { email:user.email.toLowerCase(), name:user.displayName||user.email, key:emailKey(user.email) };
+  $("#who").textContent = me.email; $("#signout").hidden = !!DEMO;
+  const deny = m => { $("#gate").hidden=false; $("#app").hidden=true; $("#nav").hidden=true; $("#navBtn").hidden=true; $("#gateMsg").textContent = m; };
+  try {
+    const mine = await store.get("allowed/"+me.key).catch(()=>null);
+    const tier = mine?.tier || (me.email===ADMIN_EMAIL.toLowerCase() ? "admin" : "");
+    if(tier==="walker"){ location.replace(TIER_HOME.walker); return; }
+    if(PAGE==="team" && tier!=="admin"){ location.replace("crews.html"); return; }
+    if(tier!=="admin" && tier!=="crew") return deny(`${me.email} is not on the team list. Ask Russel to add it, then sign out and back in.`);
+    if(tier==="crew" && mine.active===false) return deny(`${me.email} is not active on the team list. Ask Russel.`);
+    if(tier==="crew" && !mine.crew) return deny(`${mine.name||me.email} is on the team list but not on a crew yet. Ask Russel to put you on a crew.`);
+    isAdmin = tier==="admin"; realAdmin=isAdmin; viewAs=""; meReal=null;
+    role = isAdmin ? "" : (mine.crewRole==="manager" ? "manager" : "member"); myCrew = isAdmin ? "" : mine.crew;
+    if(mine?.name) me.name = mine.name;
+    view = role==="member" ? "schedule" : isAdmin ? OFFICE_TABS[0][0] : "today";
+    $("#title").textContent = isAdmin ? (PAGE==="team" ? "Mangiapane Brothers Team Manager" : "Mangiapane Brothers Crews") : `${myCrew}`;
+    $("#gate").hidden=true; $("#app").hidden=false; $("#nav").hidden=false; $("#navBtn").hidden=!isAdmin; attach();
+  } catch(e){ deny(`${me.email} could not be checked against the team list. Ask Russel.`); }
+}
+function leave(){ me=null; isAdmin=false; unsub.forEach(f=>f()); unsub=[]; dayUnsub.forEach(f=>f()); dayUnsub=[]; memUnsub.forEach(f=>f()); memUnsub=[]; $("#who").textContent=""; $("#signout").hidden=true; $("#nav").hidden=true; $("#navBtn").hidden=true; $("#gate").hidden=false; $("#app").hidden=true; }
+function attach(){
+  unsub.forEach(f=>f()); unsub=[];
+  const bind = (path, set) => unsub.push(store.on(path, v=>{ set(v||{}); render(); }));
+  const w = winterOf(today()), from = [addDays(today(), -KEEP_DAYS), today()>=w.from ? w.from : "9"].sort()[0];
+  bind("crews", v=>{ const had=JSON.stringify(crewMembers(myCrew)); crews=v; if(!isAdmin && JSON.stringify(crewMembers(myCrew))!==had) memberBind(); }); bind("crewRoutes", v=>routes=v); bind("events", v=>events=v);
+  bind("payRates", v=>payRates=v);
+  unsub.push(store.onFrom("storms", from, v=>{ storms=v||{}; render(); }));
+  unsub.push(store.onFrom("crewChecks", from, v=>{ checks=v||{}; render(); }));
+  if(isAdmin){
+    bind("allowed", v=>team=v); bind("clients", v=>clients=v);
+    unsub.push(store.onFrom("serviceLog", from, v=>{ svcLog=v||{}; render(); }));
+    unsub.push(store.onFrom("dayLogs", from, v=>{ dayLogs=v||{}; render(); }));
+    bind("timeEntries", v=>timeAll=v);
+    bind("staff", v=>staffAll=v); bind("staffPrivate", v=>privAll=v); bind("staffDocs", v=>docsAll=v); bind("shifts", v=>shiftsAll=v);
+    bind("payLog", v=>payLogAll=v); bind("staffVault", v=>vault=v); bind("contractTemplates/_signing", v=>svcCfg=v&&v.url?v:null);
+    bind("applicants", v=>applicants=v); bind("personFile", v=>personFile=v); bind("staffReports", v=>reportsAll=v); bind("staffArchive", v=>archive=v); bind("personFileDoc", v=>fileDocs=v);
+  } else {
+    // An employee's own record. The office preview reads the office's copy instead.
+    const own = (path, map) => unsub.push(store.on(path+"/"+me.key, v=>{ map[me.key]=v||{}; render(); }));
+    own("timeEntries", timeAll); own("staff", staffAll); own("staffPrivate", privAll); own("staffDocs", docsAll); own("shifts", shiftsAll); own("payLog", payLogAll);
+    // A manager reads the employee reports he and the office filed for his crew.
+    if(role==="manager" && myCrew) unsub.push(store.on("staffReports/"+myCrew, v=>{ reportsAll={ [myCrew]:v||{} }; render(); }));
+  }
+  dayBind(); memberBind();
+}
+// A manager reads his crew's contact info, shifts and clock times (the rules allow nothing more).
+function memberBind(){
+  memUnsub.forEach(f=>f()); memUnsub=[];
+  if(isAdmin || viewAs || role!=="manager") return;
+  Object.keys(crewMembers(myCrew)).forEach(k=>{ if(k===me.key) return;
+    [["staff",staffAll],["shifts",shiftsAll],["timeEntries",timeAll]].forEach(([p,map])=>memUnsub.push(store.on(p+"/"+k, v=>{ map[k]=v||{}; render(); }))); });
+}
+// What depends on the day on screen, for crew sign-ins: the crew's approval for that day and (managers) the crew's time.
+function dayBind(){
+  dayUnsub.forEach(f=>f()); dayUnsub=[];
+  const crew = viewCrew(); if(isAdmin && !viewAs) return; if(!crew) return;
+  if(viewAs) return; // the office already reads everything
+  dayUnsub.push(store.on(`dayLogs/${curDate}/crews/${crew}`, v=>{ setApproval(curDate, crew, v); render(); }));
+}
+function setApproval(d, crew, v){ const day=dayLogs[d]=dayLogs[d]||{}; day.crews=day.crews||{}; if(v) day.crews[crew]=v; else delete day.crews[crew]; }
+// Approvals for days off screen (pay periods), read once each for a crew sign-in.
+const fetched={};
+function fetchApprovals(dates, crew){
+  if(isAdmin || viewAs || !crew) return;
+  const need=dates.filter(d=>!fetched[d+"|"+crew]); if(!need.length) return;
+  need.forEach(d=>{ fetched[d+"|"+crew]=1; store.get(`dayLogs/${d}/crews/${crew}`).then(v=>{ if(v){ setApproval(d,crew,v); render(); } }).catch(()=>{}); });
+}
+function setViewAs(c){
+  if(!realAdmin) return;
+  viewAs=c||""; isAdmin=!viewAs;
+  if(!meReal) meReal={...me};
+  if(viewAs.startsWith("emp:")){ const k=viewAs.slice(4), t=team[k]||{}; role="member"; myCrew=t.crew||""; me={...meReal, key:k, name:t.name||k}; view="schedule"; }
+  else if(viewAs){ const mk=(crews[viewAs]||{}).manager; role="manager"; myCrew=viewAs; me={...meReal, key:mk||"preview", name:mk?personName(mk):viewAs}; view="today"; }
+  else { role=""; myCrew=""; if(meReal) me=meReal; view="today"; }
+  openRoute=null; editing=null; personOpen=null; render(); window.scrollTo(0,0);
+}
+
+// ---------- helpers on the data ----------
+const crewList = () => Object.entries(crews).filter(([,c])=>c && c.active!==false).sort((a,b)=>(a[1].order??99)-(b[1].order??99)||a[0].localeCompare(b[0],undefined,{numeric:true})).map(([k])=>k);
+const crewMembers = c => (crews[c]||{}).members||{};
+const personName = k => !k ? "No one" : ((team[k]||{}).name || (Object.values(crews).map(c=>(c.members||{})[k]).find(Boolean)) || (archive[k]||{}).name || k.replace(/,/g,"."));
+const viewCrew = () => viewAs || myCrew;
+const routeName = r => r.name || SERVICES[r.service] || "Route";
+const stopsOf = r => Object.entries(r.stops||{}).map(([id,s])=>({id,...s})).sort((a,b)=>(a.order??999)-(b.order??999)||(a.name||"").localeCompare(b.name||""));
+const stormOn = (d,c) => !!((storms[d]||{})[c]);
+// Routes a crew works on a day: standing (snow) routes when a storm is on, dated routes inside their dates.
+const routesOn = (d, crew) => Object.entries(routes).filter(([,r])=>r && (!crew || r.crew===crew) && (r.standing ? stormOn(d,r.crew) : (r.start && r.start<=d && d<=(r.end||r.start))))
+  .sort((a,b)=>(a[1].service==="snow"?0:1)-(b[1].service==="snow"?0:1) || routeName(a[1]).localeCompare(routeName(b[1])));
+// Check-offs that count for a route on a day: that day only for standing routes, any day of the run for dated routes.
+function checksFor(rid, d){
+  const r=routes[rid]||{}; if(r.standing) return Object.fromEntries(Object.entries((checks[d]||{})[rid]||{}).map(([s,v])=>[s,{...v,date:d}]));
+  const out={}; Object.keys(checks).sort().forEach(x=>{ if(x<(r.start||x) || x>d) return; Object.entries((checks[x]||{})[rid]||{}).forEach(([s,v])=>{ out[s]={...v,date:x}; }); }); return out;
+}
+function progress(rid, d){ const r=routes[rid]; const st=stopsOf(r); const c=checksFor(rid,d); const done=st.filter(s=>c[s.id]&&!c[s.id].skipped).length, skip=st.filter(s=>c[s.id]&&c[s.id].skipped).length; return {done,skip,total:st.length,pct:st.length?Math.round((done+skip)/st.length*100):0}; }
+const approvalOf = (d,c) => (((dayLogs[d]||{}).crews||{})[c]||null);
+const dayApproved = (d,c) => (approvalOf(d,c)||{}).status==="approved";
+const APPLE = /iPhone|iPad|iPod|Macintosh/.test(navigator.userAgent);
+const dirUrl = dest => APPLE ? "https://maps.apple.com/?dirflg=d&daddr="+encodeURIComponent(dest) : "https://www.google.com/maps/dir/?api=1&destination="+encodeURIComponent(dest);
+const stopDest = s => s.lat&&s.lon ? s.lat+","+s.lon : (s.address||s.name||"");
+const telLink = p => p ? `<a href="tel:${esc(String(p).replace(/[^\d+]/g,""))}">${esc(p)}</a>` : "";
+const svcChip = s => `<span class="chip svc-${esc(s)}">${esc(SERVICES[s]||s)}</span>`;
+// Hours from time entries (in and out stamps); an entry still open counts to now on today only.
+function entryHours(e, d){ if(!e||!e.in) return 0; const out=e.out || (d===today()?Date.now():e.in); return Math.max(0,(out-e.in)/3600e3); }
+const dayHours = (map, d) => Object.values((map||{})[d]||{}).reduce((n,e)=>n+entryHours(e,d),0);
+const myTimeMap = () => timeAll[me.key]||{};
+
+// ---------- navigation ----------
+function tabs(){
+  // A "See as" link from Team Manager lands here as crews.html#seeas=emp:<key>.
+  if(pendingSeeAs && realAdmin && PAGE==="crews" && (team[pendingSeeAs.slice(4)] || crews[pendingSeeAs])){ const v=pendingSeeAs; pendingSeeAs=""; history.replaceState(null,"",location.pathname+location.search); setTimeout(()=>setViewAs(v),0); }
+  const t = isAdmin ? OFFICE_TABS
+    : role==="manager" ? [["today","Today"],["week","Week"],["crewlog","Crew log"],["crew","Crew"],["me","Me"]]
+    : [["schedule","Schedule"],["hours","Hours"],["pay","Pay"],["files","Files"],["info","My info"]];
+  $("#nav").innerHTML = t.map(([k,l])=>`<button data-v="${k}" class="${view===k&&!openRoute&&!editing?"on":""}">${l}</button>`).join("")
+    + (realAdmin && PAGE==="crews" && (crewList().length || people().length) ? `<select id="viewAs" class="viewas" aria-label="See the page as someone else"><option value="">Office view</option>${crewList().map(c=>`<option value="${esc(c)}" ${viewAs===c?"selected":""}>See as ${esc(c)} manager</option>`).join("")}${people().map(([k,t])=>`<option value="emp:${esc(k)}" ${viewAs==="emp:"+k?"selected":""}>See as ${esc(t.name)}</option>`).join("")}</select>` : "");
+  const pb=$("#previewBar"); pb.hidden=!viewAs;
+  if(viewAs){ pb.innerHTML=`${isEmpPreview()?`Employee preview: this is what <b>${esc(me.name)}</b> sees.`:`Manager preview: this is what the <b>${esc(viewAs)}</b> manager sees.`} Nothing is saved. <button class="small" id="exitPreview">Back to office view</button>`; $("#exitPreview").onclick=()=>setViewAs(""); }
+  const va=$("#viewAs"); if(va) va.onchange=()=>setViewAs(va.value);
+  $("#nav").querySelectorAll("button[data-v]").forEach(b=>b.onclick=()=>{ view=b.dataset.v; openRoute=null; editing=null; personOpen=null; applicantOpen=null; archiveOpen=null; render(); window.scrollTo(0,0); });
+}
+function dateBar(step){
+  const sel = isAdmin && ["today","week","log"].includes(view) ? `<select id="cf" style="width:auto"><option value="">All crews</option>${crewList().map(c=>`<option ${crewFilter===c?"selected":""}>${esc(c)}</option>`).join("")}</select>` : "";
+  return `<div class="bar"><button class="small" id="prevD" aria-label="Previous">&#8249;</button><span class="date">${step===7?"Week of "+fmtDay(mondayOf(curDate)):fmtDay(curDate)}${curDate===today()&&step!==7?' <span class="chip">Today</span>':""}</span><button class="small" id="nextD" aria-label="Next">&#8250;</button><button class="small" id="nowD">Today</button>${sel}</div>`;
+}
+function wireDateBar(step){
+  const go = d => { curDate=d; dayBind(); render(); };
+  $("#prevD").onclick=()=>go(addDays(curDate,-step)); $("#nextD").onclick=()=>go(addDays(curDate,step)); $("#nowD").onclick=()=>go(today());
+  if($("#cf")) $("#cf").onchange=e=>{ crewFilter=e.target.value; render(); };
+}
+function routeCard(id,r,d){
+  const p=progress(id,d), st=stopsOf(r);
+  return `<div class="card routecard" data-open="${esc(id)}"><div class="top"><p class="flyer">${esc(routeName(r))}</p><span class="chip ${p.pct===100?"ok":""}">${p.done}/${p.total} stops</span></div>
+    <div class="meta">${svcChip(r.service)} ${r.standing?"Standing route, runs each storm":fmtRange(r.start,r.end)}</div>
+    ${p.skip?`<div class="meta"><span class="chip warn">${p.skip} skipped</span></div>`:""}
+    ${st[0]?`<div class="meta">First stop: ${esc(st[0].name||"")}, ${esc(st[0].address||"")}</div>`:""}
+    <div class="prog"><i style="width:${p.pct}%"></i></div>${r.note?`<div class="muted">${esc(r.note)}</div>`:""}</div>`;
+}
+const wireCards = () => document.querySelectorAll("[data-open]").forEach(el=>el.onclick=e=>{ if(e.target.closest("[data-stop]")) return; openRoute=el.dataset.open; render(); window.scrollTo(0,0); });
+
+// ---------- views ----------
+function render(){
+  if(!me) return;
+  tabs();
+  const app=$("#app");
+  if(editing) return renderEditRoute(app);
+  if(openRoute && routes[openRoute]) return renderRoute(app);
+  openRoute=null;
+  if(role==="member" && !["schedule","hours","pay","files","info"].includes(view)) view="schedule";
+  if(isAdmin && !OFFICE_TABS.some(([k])=>k===view)) view=OFFICE_TABS[0][0];
+  ({today:renderToday, week:renderWeek, crewlog:renderCrewLog, crew:renderCrewTab, me:renderMe, schedule:renderMySchedule, hours:renderHours, pay:renderPay, files:renderFiles, info:renderInfo,
+    routes:renderRoutes, crews:renderCrews, people:renderPeople, onboard:renderOnboard, reports:renderReports, sched:renderSched, paper:renderPaper, log:renderLog, events:renderSchedule, paycfg:renderPayCfg}[view]||renderToday)(app);
+}
+
+// Today: for a crew, the clock, the storm, the day's routes and meetings. For the office, one lane per crew.
+function renderToday(app){
+  let h = dateBar(1);
+  if(isAdmin){
+    const list = crewFilter ? [crewFilter] : crewList();
+    const snowCrews = crewList().filter(c=>Object.values(routes).some(r=>r&&r.standing&&r.crew===c));
+    const off = snowCrews.filter(c=>!stormOn(curDate,c));
+    if(snowCrews.length) h += `<div class="storm">${off.length?`<span>No storm on for ${esc(off.join(", "))} on ${fmtDay(curDate)}.</span><button class="primary small" id="stormAll">Start storm for every crew</button>`:`<span><b>Storm on</b> for ${esc(snowCrews.join(", "))} on ${fmtDay(curDate)}.</span>`}</div>`;
+    if(!crewList().length) h += `<div class="card"><p class="meta">No crews yet. Open the Crews tab to set them up, then build their routes under Routes.</p></div>`;
+    h += `<div class="lanes">${list.map(c=>{ const rs=routesOn(curDate,c); const a=approvalOf(curDate,c); const mk=(crews[c]||{}).manager;
+      return `<section class="lane"><h3>${esc(c)} ${stormOn(curDate,c)?'<span class="chip svc-snow">Storm</span>':""} ${a&&a.status==="approved"?'<span class="chip ok">Approved</span>':""}</h3><p class="lanewho">${mk?"Manager "+esc(personName(mk)):"No manager"} &middot; ${Object.keys(crewMembers(c)).length} on the crew</p>${rs.length?rs.map(([id,r])=>routeCard(id,r,curDate)).join(""):'<p class="muted">No route this day.</p>'}</section>`; }).join("")}</div>`;
+    h += eventsCard(curDate, "");
+    app.innerHTML=h; wireDateBar(1); wireCards();
+    const sa=$("#stormAll"); if(sa) sa.onclick=()=>startStorm(off);
+    return;
+  }
+  const crew=viewCrew(), rs=routesOn(curDate,crew), a=approvalOf(curDate,crew);
+  if(curDate===today()) h += clockCard();
+  const hasSnow = Object.values(routes).some(r=>r&&r.standing&&r.crew===crew);
+  if(hasSnow){
+    if(stormOn(curDate,crew)){ const s=storms[curDate][crew]; h += `<div class="storm"><b>Storm on</b><span>Started ${fmtTime(s.at)}${s.by?" by "+esc(personName(s.by)):""}. Your snow route is below.</span></div>`; }
+    else if(role==="manager" && curDate>=today() && !(a&&a.status==="approved")) h += `<div class="storm"><span>No storm on for ${esc(crew)} on ${fmtDay(curDate)}.</span><button class="primary small" id="stormMine">Start storm</button></div>`;
+  }
+  if(a && a.status==="approved") h += `<div class="ok-banner">This day is approved. Check-offs are locked.</div>`;
+  h += rs.length ? rs.map(([id,r])=>routeCard(id,r,curDate)).join("") : `<div class="card"><p class="meta">No route for ${esc(crew)} on ${fmtDay(curDate)}.${hasSnow&&!stormOn(curDate,crew)?" The snow route shows once a storm is started.":""}</p></div>`;
+  h += eventsCard(curDate, crew);
+  app.innerHTML=h; wireDateBar(1); wireCards(); wireClock();
+  const sm=$("#stormMine"); if(sm) sm.onclick=()=>startStorm([crew]);
+}
+function eventsCard(d, crew){
+  const ev=Object.entries(events).filter(([,e])=>e&&e.date===d && (!crew || !e.crew || e.crew==="all" || e.crew===crew)).sort((a,b)=>(a[1].start||"").localeCompare(b[1].start||""));
+  if(!ev.length) return "";
+  return `<div class="card"><h2>Trainings and meetings</h2>${ev.map(([,e])=>`<div class="rowlink" style="cursor:default"><span><b>${esc(e.title)}</b> <span class="meta">${esc(e.where||"")}</span></span><span class="meta">${esc(e.start||"")}${e.end?" to "+esc(e.end):""}${!crew&&e.crew&&e.crew!=="all"?" &middot; "+esc(e.crew):""}</span></div>`).join("")}</div>`;
+}
+// Starting a storm asks how deep it is: snow pay and the route bonus go by depth. It can be changed in Crew log until the day is approved.
+function startStorm(list){
+  const dl=openDlg(`<h2>Start storm, ${fmtDay(curDate)}</h2><p class="meta">How much snow? ${esc(list.join(", "))}</p><div class="kindbtns">${Object.entries(TIERS).map(([t,l])=>`<button class="primary" data-tier="${t}">${l}</button>`).join("")}<button data-close>Cancel</button></div>`);
+  dl.querySelectorAll("[data-tier]").forEach(b=>b.onclick=async()=>{ dl.close(); if(previewOnly()) return;
+    const upd={}; list.forEach(c=>{ if(!stormOn(curDate,c)) upd[`storms/${curDate}/${c}`]={ at:Date.now(), by:me.key, tier:b.dataset.tier }; });
+    if(!Object.keys(upd).length) return;
+    try { await store.update(upd); toast(`Storm started for ${list.join(", ")}: ${TIERS[b.dataset.tier].toLowerCase()}`); } catch(e){ toast("Could not start the storm: "+(e.message||e)); } });
+}
+
+// Clock in and out: one entry per stretch of work, under the person's own key.
+function clockCard(){
+  const day=myTimeMap()[curDate]||{}, list=Object.entries(day).sort((a,b)=>(a[1].in||0)-(b[1].in||0)), open=list.find(([,e])=>e.in&&!e.out);
+  const total=dayHours(myTimeMap(), curDate), locked=list.some(([,e])=>e.status==="approved");
+  return `<div class="card"><div class="clock">${open?`<span class="big">On the clock</span><span class="meta">since ${fmtTime(open[1].in)}</span><button class="primary" id="clockOut" style="margin-left:auto">Clock out</button>`:`<span class="big">${total?hrs(total)+" hrs today":"Not clocked in"}</span><button class="primary" id="clockIn" style="margin-left:auto" ${locked?"disabled":""}>Clock in</button>`}</div>
+    ${list.length?`<div class="muted" style="margin-top:6px">${list.map(([,e])=>`${fmtTime(e.in)} to ${e.out?fmtTime(e.out):"now"}`).join(" &middot; ")}${locked?" &middot; approved":""}</div>`:""}</div>`;
+}
+function wireClock(){
+  const ci=$("#clockIn"), co=$("#clockOut");
+  if(ci) ci.onclick=async()=>{ if(previewOnly()) return; const id=store.key(); await store.update({[`timeEntries/${me.key}/${today()}/${id}`]:{ in:Date.now(), crew:viewCrew() }}); toast("Clocked in"); };
+  if(co) co.onclick=async()=>{ if(previewOnly()) return; const open=Object.entries(myTimeMap()[today()]||{}).find(([,e])=>e.in&&!e.out); if(!open) return; await store.update({[`timeEntries/${me.key}/${today()}/${open[0]}/out`]:Date.now()}); toast("Clocked out"); };
+}
+
+function renderWeek(app){
+  const mon=mondayOf(curDate); let h=dateBar(7);
+  const crew = isAdmin ? crewFilter : viewCrew();
+  for(let i=0;i<7;i++){ const d=addDays(mon,i); const rs=routesOn(d, crew||undefined);
+    const ev=Object.values(events).filter(e=>e&&e.date===d && (!crew || !e.crew || e.crew==="all" || e.crew===crew));
+    h+=`<div class="daycol ${d===today()?"today":""}"><h3 class="daylink" data-day="${d}">${fmtDay(d)} &rsaquo;</h3>${rs.length?rs.map(([id,r])=>{ const p=progress(id,d); return `<div class="rowlink" data-open="${esc(id)}" data-d="${d}"><span><b>${esc(routeName(r))}</b> <span class="meta">${isAdmin&&!crew?esc(r.crew)+" &middot; ":""}${p.total} stops${r.standing?", storm":""}</span></span><span class="chip ${p.pct===100?"ok":""}">${p.done}/${p.total}</span></div>`; }).join(""):`<div class="muted">No routes</div>`}
+      ${ev.map(e=>`<div class="rowlink" style="cursor:default"><span>${esc(e.title)}</span><span class="meta">${esc(e.start||"")}</span></div>`).join("")}</div>`; }
+  app.innerHTML=h; wireDateBar(7);
+  app.querySelectorAll("[data-open]").forEach(el=>el.onclick=()=>{ curDate=el.dataset.d; openRoute=el.dataset.open; dayBind(); render(); window.scrollTo(0,0); });
+  app.querySelectorAll("[data-day]").forEach(el=>el.onclick=()=>{ curDate=el.dataset.day; view="today"; dayBind(); render(); window.scrollTo(0,0); });
+}
+
+// ---------- one route: map and stop list ----------
+let map=null, mapEl=null, layer=null, meMarker=null, fitFor=null;
+function canCheckOn(r, d){ if(isAdmin&&!viewAs) return true; return role==="manager" && r.crew===viewCrew() && !dayApproved(d, r.crew); }
+function renderRoute(app){
+  const id=openRoute, r=routes[id], st=stopsOf(r), c=checksFor(id,curDate), p=progress(id,curDate), d=curDate;
+  const can=canCheckOn(r,d), locked=dayApproved(d,r.crew);
+  app.innerHTML=`<div class="bar"><button class="small" id="back">&#8249; Back</button><span class="date">${esc(routeName(r))}</span><span class="chip ${p.pct===100?"ok":""}">${p.done}/${p.total}</span></div>
+    <div class="meta" style="margin:-6px 0 10px">${svcChip(r.service)} ${esc(r.crew||"")} &middot; ${r.standing?"Storm of "+fmtDay(d):fmtRange(r.start,r.end)}${(crews[r.crew]||{}).start?`<br>Yard: <a href="${dirUrl(crews[r.crew].start)}" target="_blank" rel="noopener">${esc(crews[r.crew].start)}</a>`:""}${r.note?"<br>"+esc(r.note):""}</div>
+    ${locked?`<div class="ok-banner">${esc(r.crew)}'s day is approved. Check-offs are locked.</div>`:""}
+    <div id="mapSlot"></div>
+    <div class="bar"><button class="small" id="locate">Show where I am</button><span class="muted">Green is done. Tap the map for directions. Tap a stop to check it off.</span></div>
+    <ul class="stops">${st.map((s,i)=>{ const k=c[s.id];
+      return `<li class="${k?(k.skipped?"skip":"done"):""}"><span class="num">${i+1}</span><button class="tick" data-tick="${esc(s.id)}" aria-label="Check off ${esc(s.name)}" ${can?"":"disabled"}>${k?(k.skipped?"&ndash;":"&#10003;"):""}</button>
+        <span class="nm"><b>${esc(s.name)}</b> ${(KINDS_FOR[r.service]||[]).length>1||s.kind==="call"?`<span class="chip">${esc(KINDS[s.kind]||"")}</span>`:""}<div class="addr">${esc(s.address||"")}${s.phone?" &middot; "+telLink(s.phone):""}</div>
+          ${s.note?`<div class="cnote">${esc(s.note)}</div>`:""}
+          ${k?`<div class="muted">${k.skipped?"Skipped: "+esc(k.reason||""):esc(DONE_WORD[k.kind]||"Done")+(k.ladder?", ladder":"")} &middot; ${k.date!==d?fmtDay(k.date)+" ":""}${fmtTime(k.at)} &middot; ${esc(personName(k.by))}${k.note?" &middot; "+esc(k.note):""}</div>`:""}
+          ${s.lat?"":'<div class="muted">Not on the map</div>'}
+          <div class="acts">${k&&k.photo?`<button class="iconbtn small" data-view="${esc(s.id)}">Photo</button>`:""}
+          ${can&&k&&!k.skipped?`<label class="iconbtn small" style="margin:0;border:1px solid var(--line);border-radius:var(--r);cursor:pointer;color:var(--ink)">${k.photo?"Retake photo":"Add photo"}<input type="file" accept="image/*" capture="environment" data-photo="${esc(s.id)}" hidden></label>`:""}
+          ${can&&k?`<button class="iconbtn small" data-note="${esc(s.id)}">Note</button>`:""}
+          ${can&&!k?`<button class="iconbtn small" data-skip="${esc(s.id)}">Skip</button>`:""}</div></span>
+        <a class="mapbtn" target="_blank" rel="noopener" href="${dirUrl(stopDest(s))}" data-stop style="flex:none">Directions</a></li>`; }).join("")||'<li class="meta">No stops on this route yet.</li>'}</ul>`;
+  $("#back").onclick=()=>{ openRoute=null; render(); };
+  app.querySelectorAll("[data-tick]").forEach(b=>b.onclick=()=>tapStop(id,b.dataset.tick));
+  app.querySelectorAll("[data-photo]").forEach(i=>i.onchange=()=>i.files[0]&&addPhoto(id,i.dataset.photo,i.files[0]));
+  app.querySelectorAll("[data-view]").forEach(b=>b.onclick=()=>viewPhoto(id,b.dataset.view));
+  app.querySelectorAll("[data-note]").forEach(b=>b.onclick=()=>editNote(id,b.dataset.note));
+  app.querySelectorAll("[data-skip]").forEach(b=>b.onclick=()=>skipStop(id,b.dataset.skip));
+  drawMap(id, st, c, can);
+  $("#locate").onclick=locate;
+}
+// The walker page's map: the same tiles, colors, directions and check-off, with numbered stops in route order.
+function drawMap(id, st, c, can){
+  if(typeof L==="undefined"){ $("#mapSlot").innerHTML='<p class="meta" style="padding:12px">The map could not load. The stop list below still works.</p>'; return; }
+  if(!mapEl){ mapEl=document.createElement("div"); mapEl.id="mapEl"; }
+  $("#mapSlot").appendChild(mapEl);
+  if(!map){ map=L.map(mapEl,{zoomControl:true}); L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:19,attribution:"&copy; OpenStreetMap contributors"}).addTo(map); layer=L.layerGroup().addTo(map); }
+  layer.clearLayers(); const all=[]; map.closePopup();
+  map.off("click"); map.on("click",e=>mapPopup(e.latlng,"This spot",null));
+  const pts=st.filter(s=>s.lat&&s.lon);
+  if(pts.length>1) L.polyline(pts.map(s=>[s.lat,s.lon]),{color:"#1f4e8c",weight:3,opacity:.45,dashArray:"6 8"}).addTo(layer);
+  st.forEach((s,i)=>{ if(!s.lat||!s.lon) return; const k=c[s.id], col=k?(k.skipped?"#b0741b":"#1c7a4c"):"#c0392b";
+    const mk=L.marker([s.lat,s.lon],{icon:L.divIcon({className:"",html:`<div class="pin" style="background:${col}">${i+1}</div>`,iconSize:[26,26],iconAnchor:[13,13]})}).addTo(layer);
+    mk.bindTooltip(`${i+1}. ${s.name}`); mk.on("click",e=>{ L.DomEvent.stopPropagation(e); mapPopup(e.latlng, `${i+1}. ${s.name}`, can?{done:!!k, go:()=>tapStop(id,s.id)}:null, s); }); all.push([s.lat,s.lon]); });
+  map.invalidateSize();
+  if(fitFor!==id+curDate && all.length){ all.length===1?map.setView(all[0],16):map.fitBounds(L.latLngBounds(all),{padding:[24,24]}); fitFor=id+curDate; }
+  else if(!all.length && fitFor!==id+curDate){ map.setView(HOME,12); fitFor=id+curDate; }
+}
+function mapPopup(ll, title, check, s){
+  const el=document.createElement("div"); el.style.minWidth="160px";
+  el.innerHTML=`<b>${esc(title)}</b>${s&&s.address?`<div class="muted">${esc(s.address)}</div>`:""}<div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap"><a class="mapbtn" target="_blank" rel="noopener" href="${dirUrl(s?stopDest(s):ll.lat.toFixed(5)+","+ll.lng.toFixed(5))}">Directions</a>${check?`<button type="button" class="mapbtn" id="mapTick">${check.done?"Uncheck":"Check off"}</button>`:""}</div>`;
+  const pop=L.popup({closeButton:true}).setLatLng(ll).setContent(el).openOn(map);
+  const b=el.querySelector("#mapTick"); if(b) b.onclick=()=>{ map.closePopup(pop); check.go(); };
+}
+function locate(){
+  if(!navigator.geolocation||!map) return toast("Location is not available on this phone");
+  navigator.geolocation.getCurrentPosition(p=>{ const ll=[p.coords.latitude,p.coords.longitude]; if(meMarker) meMarker.remove(); meMarker=L.circleMarker(ll,{radius:8,color:"#1f4e8c",fillColor:"#1f4e8c",fillOpacity:.9}).addTo(map); map.setView(ll,Math.max(map.getZoom(),17)); }, ()=>toast("Could not get your location"), {enableHighAccuracy:true,timeout:10000});
+}
+// Tapping a stop: checks it off with one tap. A lights stop asks once what was done (installed, or a service call
+// with or without a ladder), because each bills differently. Tapping a checked stop takes the check back.
+function tapStop(rid, sid){
+  const r=routes[rid], s=(r.stops||{})[sid]; if(!s) return;
+  const k=checksFor(rid,curDate)[sid];
+  if(k) return uncheck(rid, sid, k);
+  if(r.service==="lights") return openDlg(`<h2>${esc(s.name)}</h2><p class="meta">What was done?</p><div class="kindbtns">
+      <button class="primary" data-k="lights">Lights installed</button><button class="primary" data-k="takedown|0">Takedown, no ladder</button><button class="primary" data-k="takedown|1">Takedown, ladder</button><button data-k="call|0">Service call, no ladder</button><button data-k="call|1">Service call, ladder</button><button data-close>Cancel</button></div>`)
+    .querySelectorAll("[data-k]").forEach(b=>b.onclick=()=>{ $("#dlg").close(); const [kind,l]=b.dataset.k.split("|"); checkStop(rid,sid,{kind, ladder:l==="1"}); });
+  checkStop(rid, sid, { kind: s.kind || (KINDS_FOR[r.service]||["other"])[0] });
+}
+// One check-off = the check plus its service log entry, saved together. The entry waits for the manager's approval.
+async function checkStop(rid, sid, o){
+  if(previewOnly()) return;
+  const r=routes[rid], s=r.stops[sid], d=curDate, eid=store.key(), now=Date.now();
+  const chk={ by:me.key, at:now, kind:o.kind, eid, ...(o.ladder?{ladder:true}:{}), ...(o.note?{note:o.note}:{}) };
+  const entry={ clientId:s.clientId, kind:o.kind, ...(s.svcId?{sid:s.svcId}:{}), ...(o.kind==="call"||o.kind==="takedown"?{ladder:!!o.ladder}:{}), note:o.note||"", at:now, by:me.key, source:"crew", crew:r.crew, route:rid, stop:sid };
+  try { await store.update({ [`crewChecks/${d}/${rid}/${sid}`]:chk, [`serviceLog/${d}/${eid}`]:entry }); toast(`${s.name}: ${DONE_WORD[o.kind]||"done"}`); }
+  catch(e){ toast("Not saved: "+(e.message||e)); }
+}
+async function uncheck(rid, sid, k){
+  if(previewOnly()) return;
+  const d=k.date||curDate, upd={ [`crewChecks/${d}/${rid}/${sid}`]:null, [`crewPhotos/${d}/${rid}/${sid}`]:null };
+  if(k.eid) upd[`serviceLog/${d}/${k.eid}`]=null;
+  try { await store.update(upd); toast("Taken back"); } catch(e){ toast("Not changed: "+(e.message||e)); }
+}
+function skipStop(rid, sid){
+  const s=routes[rid].stops[sid];
+  const dl=openDlg(`<h2>Skip ${esc(s.name)}</h2><label>Why was it skipped?</label><input id="skipWhy" maxlength="120" placeholder="Car in the driveway, gate locked, client asked" autocomplete="off"><div class="actions"><button data-close>Cancel</button><button class="primary" id="skipGo">Skip stop</button></div>`);
+  dl.querySelector("#skipGo").onclick=async()=>{ const why=$("#skipWhy").value.trim(); if(!why) return toast("Say why it was skipped");
+    if(previewOnly()) return dl.close();
+    await store.update({ [`crewChecks/${curDate}/${rid}/${sid}`]:{ by:me.key, at:Date.now(), skipped:true, reason:why } }); dl.close(); toast("Skipped. Nothing is billed."); };
+}
+// A note changes the check and replaces its service log entry (crews cannot edit an entry, only take it back).
+function editNote(rid, sid){
+  const k=checksFor(rid,curDate)[sid]; if(!k) return;
+  const dl=openDlg(`<h2>Note</h2><textarea id="noteTxt" rows="3" maxlength="200">${esc(k.note||k.reason||"")}</textarea><div class="actions"><button data-close>Cancel</button><button class="primary" id="noteGo">Save note</button></div>`);
+  dl.querySelector("#noteGo").onclick=async()=>{ if(previewOnly()) return dl.close(); const note=$("#noteTxt").value.trim(), d=k.date, r=routes[rid], s=r.stops[sid];
+    if(k.skipped){ await store.update({ [`crewChecks/${d}/${rid}/${sid}/reason`]:note||k.reason }); dl.close(); return; }
+    const eid=store.key(), upd={ [`crewChecks/${d}/${rid}/${sid}/note`]:note||null, [`crewChecks/${d}/${rid}/${sid}/eid`]:eid,
+      [`serviceLog/${d}/${eid}`]:{ clientId:s.clientId, kind:k.kind, ...(s.svcId?{sid:s.svcId}:{}), ...(k.kind==="call"?{ladder:!!k.ladder}:{}), note, at:k.at, by:k.by, source:"crew", crew:r.crew, route:rid, stop:sid } };
+    if(k.eid) upd[`serviceLog/${d}/${k.eid}`]=null;
+    try { await store.update(upd); dl.close(); toast("Note saved"); } catch(e){ toast("Not saved: "+(e.message||e)); } };
+}
+function shrinkImage(file){
+  return new Promise((res,rej)=>{ const img=new Image(), url=URL.createObjectURL(file);
+    img.onload=()=>{ const sc=Math.min(1,1280/Math.max(img.width,img.height)); const cv=document.createElement("canvas"); cv.width=Math.round(img.width*sc); cv.height=Math.round(img.height*sc); cv.getContext("2d").drawImage(img,0,0,cv.width,cv.height); URL.revokeObjectURL(url); res(cv.toDataURL("image/jpeg",.7)); };
+    img.onerror=()=>{ URL.revokeObjectURL(url); rej(new Error("That file is not a photo")); }; img.src=url; });
+}
+async function addPhoto(rid,sid,file){
+  if(previewOnly()) return;
+  const k=checksFor(rid,curDate)[sid]; if(!k) return;
+  try { toast("Uploading photo"); const data=await shrinkImage(file);
+    await store.update({ [`crewPhotos/${k.date}/${rid}/${sid}`]:{data, at:Date.now(), by:me.key}, [`crewChecks/${k.date}/${rid}/${sid}/photo`]:true }); toast("Photo saved"); }
+  catch(e){ toast(e.message||"Photo failed"); }
+}
+async function viewPhoto(rid,sid,date){
+  const k=checksFor(rid,curDate)[sid]||{}; const d=date||k.date||curDate;
+  const p=await store.get(`crewPhotos/${d}/${rid}/${sid}`); const s=(routes[rid]?.stops||{})[sid]||{};
+  openDlg(`<h2>${esc(s.name||"Photo")}</h2>${p?`<img class="photo" src="${p.data}" alt="Stop photo"><p class="muted">${fmtDay(d)} ${fmtTime(p.at)} &middot; ${esc(personName(p.by))}</p>`:'<p class="meta">No photo found.</p>'}<div class="actions"><button data-close>Close</button></div>`);
+}
+function openDlg(html){ const d=$("#dlg"); d.innerHTML=html; d.querySelectorAll("[data-close]").forEach(b=>b.onclick=()=>d.close()); if(!d.open) d.showModal(); return d; }
+
+// ---------- the crew's day log (manager) and approval ----------
+// Every check-off for the crew that day, who did it and when, photos, skips, stops not done, and the crew's clock.
+function dayReport(d, crew){
+  const rs=routesOn(d,crew), rows=[], skipped=[], open=[];
+  rs.forEach(([rid,r])=>{ const c=(checks[d]||{})[rid]||{}; const all=checksFor(rid,d);
+    stopsOf(r).forEach(s=>{ const k=c[s.id]; if(k){ (k.skipped?skipped:rows).push({rid,r,s,k}); } else if(!all[s.id]) open.push({rid,r,s}); }); });
+  // check-offs on routes no longer on the day (a dated route that ended) still belong to the day
+  Object.entries(checks[d]||{}).forEach(([rid,c])=>{ const r=routes[rid]; if(!r||r.crew!==crew||rs.some(([x])=>x===rid)) return; Object.entries(c||{}).forEach(([sid,k])=>{ const s={id:sid,...((r.stops||{})[sid]||{name:"(removed stop)"})}; (k.skipped?skipped:rows).push({rid,r,s,k}); }); });
+  rows.sort((a,b)=>a.k.at-b.k.at);
+  return {rows, skipped, open};
+}
+function timeOf(crew, d){
+  const out={}; Object.keys(crewMembers(crew)).forEach(k=>{ out[k]=(timeAll[k]||{})[d]||{}; }); return out;
+}
+function logHtml(d, crew){
+  const {rows, skipped, open}=dayReport(d,crew), a=approvalOf(d,crew), t=timeOf(crew,d), locked=a&&a.status==="approved";
+  const counts={}; rows.forEach(x=>{ counts[x.k.kind]=(counts[x.k.kind]||0)+1; });
+  return `<div class="card" data-crew="${esc(crew)}"><h2>${esc(crew)} &middot; ${fmtDay(d)}</h2>
+    ${locked?`<div class="ok-banner">Approved by ${esc(personName(String(a.approvedBy||"").includes("@")?emailKey(a.approvedBy):a.approvedBy))} at ${fmtTime(a.approvedAt)}. ${a.billedAt?"Billed.":"Billing runs within 5 minutes."}</div>`:""}
+    <p class="meta">${rows.length} stops done${Object.keys(counts).length?": "+Object.entries(counts).map(([k,v])=>`${v} ${esc(KINDS[k]||k).toLowerCase()}`).join(", "):""}${skipped.length?` &middot; ${skipped.length} skipped`:""}${open.length?` &middot; ${open.length} not done`:""}</p>
+    ${(()=>{ const st=stormOf(d,crew); if(!st) return ""; const can=!locked&&(isAdmin||role==="manager");
+      return `<div class="storm"><b>Storm</b>${can?`<select id="stTier" style="width:auto" aria-label="Snow depth">${Object.entries(TIERS).map(([x,l])=>`<option value="${x}" ${(st.tier||"t2")===x?"selected":""}>${l}</option>`).join("")}</select><label style="display:flex;gap:6px;align-items:center;margin:0;color:inherit"><input type="checkbox" id="stTwo" ${st.twoPass?"checked":""}> Two-pass storm</label>`:`<span>${esc(TIERS[st.tier||"t2"])}${st.twoPass?", two passes":""}</span>`}${callbacksOn(d,crew)?`<span class="chip warn">${callbacksOn(d,crew)} callback${callbacksOn(d,crew)>1?"s":""}${callbacksOn(d,crew)>1?": no route bonus":""}</span>`:""}</div>`; })()}
+    ${(()=>{ const np=rows.filter(x=>!x.k.photo).length, late=rows.filter(x=>{ const h=+hhmm(x.k.at).slice(0,2); return h<7||h>=23; }).length;
+      return (np?`<p><span class="chip bad">${np} without a photo</span> <span class="meta">A stop with no photo is not paid.</span></p>`:"")+(late?`<p><span class="chip bad">${late} logged before 7 a.m. or after 11 p.m.</span> <span class="meta">No equipment outside those hours.</span></p>`:""); })()}
+    <h3>On the clock</h3>${Object.entries(t).map(([k,day])=>{ const list=Object.entries(day).sort((x,y)=>(x[1].in||0)-(y[1].in||0)); const h=list.reduce((n,[,e])=>n+entryHours(e,d),0);
+      return `<div class="who-row"><b style="min-width:110px">${esc(personName(k))}</b>${list.length?list.map(([id,e])=>locked?`<span class="meta">${fmtTime(e.in)} to ${e.out?fmtTime(e.out):"no clock-out"}</span>`:`<span><input type="time" data-tin="${esc(k)}|${esc(id)}" value="${hhmm(e.in)}" aria-label="In"> to <input type="time" data-tout="${esc(k)}|${esc(id)}" value="${hhmm(e.out)}" aria-label="Out">${e.out?"":' <span class="chip warn">no clock-out</span>'}</span>`).join(" "):`<span class="muted">Did not clock in</span>${stormOf(d,crew)?(excused(d,crew,k)?' <span class="chip ok">Missed storm cleared</span>':' <span class="chip bad">Missed storm</span>')+(isAdmin&&!viewAs?` <button class="small" data-excuse="${esc(k)}">${excused(d,crew,k)?"Undo clear":"Cleared ahead of time"}</button>`:""):""}`}<span class="meta" style="margin-left:auto">${hrs(h)} hrs</span></div>`; }).join("")||'<p class="muted">No one is on this crew.</p>'}
+    <h3 style="margin-top:12px">Stops</h3>${rows.map(x=>`<div class="logrow"><span class="t">${fmtTime(x.k.at)}</span><span class="w"><b>${esc(x.s.name)}</b> <span class="meta">${esc(x.s.address||"")}</span><div class="meta">${esc(KINDS[x.k.kind]||x.k.kind)}${x.k.ladder?", ladder":""} &middot; ${esc(personName(x.k.by))} &middot; ${esc(routeName(x.r))}${x.k.note?" &middot; "+esc(x.k.note):""}</div></span>${(((payRates.callbacks||{})[d]||{})[x.rid]||{})[x.s.id]?' <span class="chip bad">Callback</span>':""}${x.k.photo?`<button class="small" data-lview="${esc(x.rid)}|${esc(x.s.id)}">Photo</button>`:'<span class="chip bad">No photo</span>'}${isAdmin&&!viewAs?`<button class="small" data-cb="${esc(x.rid)}|${esc(x.s.id)}">${(((payRates.callbacks||{})[d]||{})[x.rid]||{})[x.s.id]?"Undo callback":"Callback"}</button>`:""}</div>`).join("")||'<p class="muted">Nothing checked off.</p>'}
+    ${skipped.length?`<h3 style="margin-top:12px">Skipped</h3>${skipped.map(x=>`<div class="logrow"><span class="t">${fmtTime(x.k.at)}</span><span class="w"><b>${esc(x.s.name)}</b><div class="meta">${esc(x.k.reason||"")} &middot; ${esc(personName(x.k.by))}</div></span></div>`).join("")}`:""}
+    ${open.length?`<h3 style="margin-top:12px">Not done</h3><p class="meta">${open.map(x=>esc(x.s.name)).join(", ")}</p>`:""}
+    ${reportsHtml(d, crew)}
+    ${locked?"":`<div class="actions"><span class="muted" style="margin-right:auto">Approving locks the day, approves the hours above and sends the stops to billing.</span><button class="primary" id="approveDay" data-crew="${esc(crew)}">Approve ${esc(crew)} day</button></div>`}</div>`;
+}
+function wireLog(root, d){
+  root.querySelectorAll("[data-lview]").forEach(b=>b.onclick=()=>{ const [rid,sid]=b.dataset.lview.split("|"); viewPhoto(rid,sid,d); });
+  const setT = async (inp, field) => { if(previewOnly()) return; const [k,id]=inp.dataset[field==="in"?"tin":"tout"].split("|"); const ms=atTime(d, inp.value);
+    try { await store.update({ [`timeEntries/${k}/${d}/${id}/${field}`]: ms }); toast("Time changed"); } catch(e){ toast("Not saved: "+(e.message||e)); } };
+  root.querySelectorAll("[data-tin]").forEach(i=>i.onchange=()=>setT(i,"in"));
+  root.querySelectorAll("[data-tout]").forEach(i=>i.onchange=()=>setT(i,"out"));
+  root.querySelectorAll("#approveDay").forEach(b=>b.onclick=()=>approveDay(d, b.dataset.crew));
+  root.querySelectorAll("[data-report]").forEach(b=>b.onclick=()=>reportDialog(b.dataset.report, d));
+  const crewOfCard = el => { const c=el.closest(".card"); const b=c&&c.querySelector("#approveDay"); return b?b.dataset.crew:(c&&c.dataset.crew)||viewCrew(); };
+  root.querySelectorAll("#stTier").forEach(sel=>sel.onchange=()=>{ if(previewOnly()) return; store.update({[`storms/${d}/${crewOfCard(sel)}/tier`]:sel.value}).then(()=>toast("Depth changed")); });
+  root.querySelectorAll("#stTwo").forEach(cb=>cb.onchange=()=>{ if(previewOnly()) return; store.update({[`storms/${d}/${crewOfCard(cb)}/twoPass`]:cb.checked||null}).then(()=>toast(cb.checked?"Marked two-pass":"Not two-pass")); });
+  root.querySelectorAll("[data-cb]").forEach(b=>b.onclick=()=>{ const [rid,sid]=b.dataset.cb.split("|"), on=(((payRates.callbacks||{})[d]||{})[rid]||{})[sid];
+    store.update({[`payRates/callbacks/${d}/${rid}/${sid}`]: on?null:{ at:Date.now(), by:me.email }}).then(()=>toast(on?"Callback removed":"Marked as a callback: redone unpaid")); });
+  root.querySelectorAll("[data-excuse]").forEach(b=>b.onclick=()=>{ const k=b.dataset.excuse, c=crewOfCard(b), on=excused(d,c,k);
+    store.update({[`payRates/excused/${d}/${c}/${k}`]: on?null:true}).then(()=>toast(on?"Missed storm counts again":"Cleared: no penalty")); });
+}
+async function approveDay(d, crew){
+  if(previewOnly()) return;
+  const {rows}=dayReport(d,crew), t=timeOf(crew,d);
+  const openClock=Object.entries(t).filter(([,day])=>Object.values(day).some(e=>e.in&&!e.out)).map(([k])=>personName(k));
+  if(openClock.length) return toast(`Set a clock-out time for ${openClock.join(", ")} first`);
+  const upd={ [`dayLogs/${d}/crews/${crew}`]:{ status:"approved", approvedBy:isAdmin?me.email:me.key, approvedAt:Date.now(), entries:rows.length } };
+  Object.entries(t).forEach(([k,day])=>Object.keys(day).forEach(id=>{ upd[`timeEntries/${k}/${d}/${id}/status`]="approved"; }));
+  try { await store.update(upd); toast(`${crew} day approved. Billing runs within 5 minutes.`); } catch(e){ toast("Not approved: "+(e.message||e)); }
+}
+function renderCrewLog(app){
+  app.innerHTML = dateBar(1) + logHtml(curDate, viewCrew()); wireDateBar(1); wireLog(app, curDate);
+}
+
+// ---------- office: log, routes, crews, schedule ----------
+function renderLog(app){
+  const list = crewList().filter(c=>!crewFilter||c===crewFilter);
+  app.innerHTML = dateBar(1) + (list.map(c=>logHtml(curDate,c)).join("") || '<div class="card"><p class="meta">No crews yet.</p></div>')
+    + `<p class="muted">Visits logged by hand in the CRM's Service log tab are under Office there.</p>`;
+  wireDateBar(1); wireLog(app, curDate);
+}
+
+function renderRoutes(app){
+  const list=Object.entries(routes).filter(([,r])=>r).sort((a,b)=>(a[1].crew||"").localeCompare(b[1].crew||"",undefined,{numeric:true})||(a[1].standing?0:1)-(b[1].standing?0:1)||(a[1].start||"").localeCompare(b[1].start||""));
+  app.innerHTML=`<div class="bar"><span class="date">Routes</span><button class="primary small" id="addRoute">Add route</button></div>
+    <p class="meta">Each crew works its own routes. A snow route is standing: it runs every storm. Other routes run on their dates. Tap a route to change it or its stops.</p>
+    <div class="card scroll"><table><tr><th>Crew</th><th>Route</th><th>Service</th><th>When</th><th>Stops</th></tr>
+    ${list.map(([id,r])=>`<tr data-edit="${esc(id)}" style="cursor:pointer"><td>${esc(r.crew||"No crew")}</td><td><b>${esc(routeName(r))}</b>${r.note?`<div class="muted">${esc(r.note)}</div>`:""}</td><td>${svcChip(r.service)}</td><td>${r.standing?"Every storm":fmtRange(r.start,r.end)}</td><td>${stopsOf(r).length}${stopsOf(r).some(s=>!s.lat)?' <span class="chip warn">not all mapped</span>':""}</td></tr>`).join("")||'<tr><td colspan="5" class="meta">No routes yet. Set up crews first, then add a route.</td></tr>'}</table></div>`;
+  $("#addRoute").onclick=()=>routeDialog(null);
+  app.querySelectorAll("[data-edit]").forEach(tr=>tr.onclick=()=>{ editing=tr.dataset.edit; render(); window.scrollTo(0,0); });
+}
+function routeDialog(id){
+  const r=id?routes[id]:{ service:"snow", standing:true, crew:crewList()[0]||"" };
+  const dl=openDlg(`<h2>${id?"Change route":"Add route"}</h2>
+    <div class="grid2"><div><label>Crew</label><select id="rCrew">${crewList().map(c=>`<option ${r.crew===c?"selected":""}>${esc(c)}</option>`).join("")}</select></div>
+    <div><label>Service</label><select id="rSvc">${Object.entries(SERVICES).map(([k,v])=>`<option value="${k}" ${r.service===k?"selected":""}>${esc(v)}</option>`).join("")}</select></div></div>
+    <label>Name</label><input id="rName" value="${esc(r.name||"")}" placeholder="Snow route, Lights installs week 1" autocomplete="off">
+    <label class="row" style="color:var(--ink);display:flex;gap:8px;align-items:center;margin-top:10px"><input type="checkbox" id="rStand" ${r.standing?"checked":""}> Standing route: runs every storm (snow)</label>
+    <div class="grid2" id="rDates" ${r.standing?"hidden":""}><div><label>First day</label><input type="date" id="rStart" value="${esc(r.start||today())}"></div><div><label>Last day</label><input type="date" id="rEnd" value="${esc(r.end||r.start||today())}"></div></div>
+    <label>Note for the crew (optional)</label><input id="rNote" value="${esc(r.note||"")}" maxlength="160" autocomplete="off">
+    <div class="actions">${id?`<button class="danger" id="rDel" style="margin-right:auto">Delete route</button>`:""}<button data-close>Cancel</button><button class="primary" id="rSave">${id?"Save":"Add and choose stops"}</button></div>`);
+  dl.querySelector("#rStand").onchange=e=>{ dl.querySelector("#rDates").hidden=e.target.checked; };
+  dl.querySelector("#rSvc").onchange=e=>{ if(e.target.value==="snow"){ dl.querySelector("#rStand").checked=true; dl.querySelector("#rDates").hidden=true; } };
+  dl.querySelector("#rSave").onclick=async()=>{
+    const crew=$("#rCrew").value; if(!crew) return toast("Set up a crew first");
+    const standing=$("#rStand").checked, v={ crew, service:$("#rSvc").value, name:$("#rName").value.trim(), note:$("#rNote").value.trim()||null, standing:standing||null, start:standing?null:$("#rStart").value, end:standing?null:($("#rEnd").value||$("#rStart").value) };
+    if(!standing && (!v.start || v.end<v.start)) return toast("Check the dates");
+    const rid=id||store.key(), upd={}; Object.entries(v).forEach(([k,x])=>upd[`crewRoutes/${rid}/${k}`]=x===""?null:x);
+    await store.update(upd); dl.close(); editing=rid; render(); toast(id?"Route saved":"Route added. Now add its stops."); };
+  const del=dl.querySelector("#rDel"); if(del) del.onclick=async()=>{ await store.update({[`crewRoutes/${id}`]:null}); dl.close(); editing=null; render(); toast("Route deleted"); };
+}
+// Route editor: stops in order, with the client's address placed on the map and a note for the crew.
+let pinFor=null;
+function renderEditRoute(app){
+  const id=editing, r=routes[id]; if(!r){ editing=null; return render(); }
+  const st=stopsOf(r), kinds=KINDS_FOR[r.service]||["other"];
+  app.innerHTML=`<div class="bar"><button class="small" id="back">&#8249; Routes</button><span class="date">${esc(routeName(r))}</span><button class="small" id="rEdit">Name, crew, dates</button></div>
+    <div class="meta" style="margin:-6px 0 10px">${svcChip(r.service)} ${esc(r.crew)} &middot; ${r.standing?"Every storm":fmtRange(r.start,r.end)} &middot; ${st.length} stops
+      ${r.service==="fall"?` &middot; <select id="rVisit" style="width:auto" aria-label="Fall visit"><option value="1" ${r.visit!==2?"selected":""}>Visit 1: leaves</option><option value="2" ${r.visit===2?"selected":""}>Visit 2: leaves and gutters</option></select>`:""}</div>
+    <div id="mapSlot"></div>
+    ${pinFor?`<div class="storm"><span>Tap the map where <b>${esc((r.stops[pinFor]||{}).name||"")}</b> is.</span><button class="small" id="pinCancel">Cancel</button></div>`:""}
+    <div class="card"><h2>Add a stop</h2><input id="cSearch" placeholder="Search clients by name or address" autocomplete="off"><div class="pick" id="cPick" hidden></div>
+      <p class="muted">The stop keeps its own copy of the name, address and phone, so the crew never opens the client record. Prices and payment stay in the CRM.</p></div>
+    <div class="card"><h2>Stops in order</h2><ul class="editlist" style="list-style:none;margin:0;padding:0">${st.map((s,i)=>`<li><span class="num" style="width:22px;color:var(--muted);font-weight:650">${i+1}</span>
+      <span class="nm"><b>${esc(s.name)}</b> <span class="meta">${esc(s.address||"")}</span>${s.lat?"":' <span class="chip warn">not on the map</span>'}
+        <div style="display:flex;gap:6px;margin-top:4px;flex-wrap:wrap">${r.service==="fall"||r.service==="lights"?`<select data-zone="${esc(s.id)}" style="width:auto" aria-label="Section">${Object.entries(ZONES).map(([z,l])=>`<option value="${z}" ${(s.zone||"rosedale")===z?"selected":""}>${l}</option>`).join("")}</select>`:""}${r.service==="lights"?`<select data-pkg="${esc(s.id)}" style="width:auto" aria-label="Package"><option value="">Package?</option>${Object.entries(PKGS).map(([z,l])=>`<option value="${z}" ${s.pkg===z?"selected":""}>${l}</option>`).join("")}</select>`:""}${kinds.length>1?`<select data-kind="${esc(s.id)}" style="width:auto">${kinds.map(k=>`<option value="${k}" ${s.kind===k?"selected":""}>${esc(KINDS[k])}</option>`).join("")}</select>`:""}
+        <input data-snote="${esc(s.id)}" value="${esc(s.note||"")}" placeholder="Note for the crew: gate code, dog, where to pile snow" maxlength="160" style="flex:1;min-width:180px"></div></span>
+      <span style="display:flex;flex-direction:column;gap:4px"><button class="small" data-up="${esc(s.id)}" ${i?"":"disabled"} aria-label="Move up">&uarr;</button><button class="small" data-down="${esc(s.id)}" ${i<st.length-1?"":"disabled"} aria-label="Move down">&darr;</button></span>
+      <span style="display:flex;flex-direction:column;gap:4px"><button class="small" data-pin="${esc(s.id)}">Pin</button><button class="small danger" data-rm="${esc(s.id)}">Remove</button></span></li>`).join("")||'<li class="meta">No stops yet. Search for a client above.</li>'}</ul></div>`;
+  $("#back").onclick=()=>{ editing=null; pinFor=null; view="routes"; render(); };
+  $("#rEdit").onclick=()=>routeDialog(id);
+  const pc=$("#pinCancel"); if(pc) pc.onclick=()=>{ pinFor=null; render(); };
+  const box=$("#cSearch"), pick=$("#cPick");
+  box.oninput=()=>{ const q=box.value.trim().toLowerCase(); if(q.length<2){ pick.hidden=true; return; }
+    const hits=Object.entries(clients).filter(([,c])=>c&&c.status!=="lost"&&[c.name,c.address].join(" ").toLowerCase().includes(q)).slice(0,20);
+    pick.hidden=false; pick.innerHTML=hits.map(([cid,c])=>`<button data-cid="${esc(cid)}"><b>${esc(c.name)}</b> <span class="meta">${esc(c.address||"no address")}</span>${Object.values(r.stops||{}).some(s=>s.clientId===cid)?' <span class="chip">on this route</span>':""}</button>`).join("")||'<div class="meta" style="padding:8px">No client matches.</div>';
+    pick.querySelectorAll("[data-cid]").forEach(b=>b.onclick=()=>addStop(id, b.dataset.cid)); };
+  app.querySelectorAll("[data-up]").forEach(b=>b.onclick=()=>moveStop(id,b.dataset.up,-1));
+  app.querySelectorAll("[data-down]").forEach(b=>b.onclick=()=>moveStop(id,b.dataset.down,1));
+  app.querySelectorAll("[data-rm]").forEach(b=>b.onclick=()=>store.update({[`crewRoutes/${id}/stops/${b.dataset.rm}`]:null}));
+  app.querySelectorAll("[data-pin]").forEach(b=>b.onclick=()=>{ pinFor=b.dataset.pin; render(); });
+  app.querySelectorAll("[data-snote]").forEach(i=>i.onchange=()=>store.update({[`crewRoutes/${id}/stops/${i.dataset.snote}/note`]:i.value.trim()||null}).then(()=>toast("Note saved")));
+  app.querySelectorAll("[data-kind]").forEach(i=>i.onchange=()=>store.update({[`crewRoutes/${id}/stops/${i.dataset.kind}/kind`]:i.value}));
+  app.querySelectorAll("[data-zone]").forEach(i=>i.onchange=()=>store.update({[`crewRoutes/${id}/stops/${i.dataset.zone}/zone`]:i.value}));
+  app.querySelectorAll("[data-pkg]").forEach(i=>i.onchange=()=>store.update({[`crewRoutes/${id}/stops/${i.dataset.pkg}/pkg`]:i.value||null}));
+  const rv=$("#rVisit"); if(rv) rv.onchange=()=>store.update({[`crewRoutes/${id}/visit`]:+rv.value});
+  drawMap(id, st, {}, false);
+  if(map && pinFor){ map.off("click"); map.on("click",async e=>{ const sid=pinFor; pinFor=null; await store.update({[`crewRoutes/${id}/stops/${sid}/lat`]:+e.latlng.lat.toFixed(6), [`crewRoutes/${id}/stops/${sid}/lon`]:+e.latlng.lng.toFixed(6)}); toast("Pin placed"); }); }
+}
+// OpenStreetMap's free address search, biased to the service area. One lookup at a time.
+async function geocode(addr){
+  if(!addr || DEMO) return null;
+  try { const u="https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=us&viewbox=-83.75,42.55,-83.05,42.15&q="+encodeURIComponent(/\bMI\b|Michigan/i.test(addr)?addr:addr+", MI");
+    const j=await (await fetch(u,{headers:{"Accept":"application/json"}})).json(); return j[0]?{lat:+(+j[0].lat).toFixed(6), lon:+(+j[0].lon).toFixed(6)}:null; }
+  catch(e){ return null; }
+}
+async function addStop(rid, cid){
+  const r=routes[rid], c=clients[cid]||{}; if(!c.name) return;
+  const svc=Object.entries(c.services||{}).find(([,s])=>s&&s.type===r.service);
+  const order=Math.max(0,...stopsOf(r).map(s=>s.order||0))+1, sid=store.key();
+  const stop={ clientId:cid, name:c.name, address:c.address||"", phone:c.phone||null, order, kind:(KINDS_FOR[r.service]||["other"])[0], ...(svc?{svcId:svc[0]}:{}),
+    zone: c.region==="Newburgh / 7 Mile" ? "north" : "rosedale" };
+  try { const sg=Object.entries(c.contracts||{}).filter(([,m])=>m.tpl==="seasonal"&&m.status==="signed"&&!m.voided).sort((a,b)=>b[1].signedAt-a[1].signedAt)[0];
+    if(sg){ const det=((await store.get(`contracts/${cid}/${sg[0]}`))||{}).details||{}; if(det.zone) stop.zone=det.zone==="north"?"north":"rosedale"; if(det.lights&&det.lights.package) stop.pkg=det.lights.package; } } catch(e){}
+  toast("Placing "+c.name+" on the map");
+  const g=await geocode(c.address); if(g) Object.assign(stop,g);
+  await store.update({[`crewRoutes/${rid}/stops/${sid}`]:stop});
+  $("#cSearch") && ($("#cSearch").value=""); toast(g?`${c.name} added`:`${c.name} added. The address was not found: tap Pin and place it on the map.`);
+}
+async function moveStop(rid, sid, dir){
+  const st=stopsOf(routes[rid]); const i=st.findIndex(s=>s.id===sid), j=i+dir; if(j<0||j>=st.length) return;
+  [st[i],st[j]]=[st[j],st[i]]; const upd={}; st.forEach((s,n)=>upd[`crewRoutes/${rid}/stops/${s.id}/order`]=n+1); await store.update(upd);
+}
+
+// Crews: who manages, who is on each crew, and where the crew starts. Writes each person's team entry too.
+function renderCrews(app){
+  const people=Object.entries(team).filter(([,t])=>t&&t.tier==="crew").sort((a,b)=>(a[1].name||"").localeCompare(b[1].name||""));
+  const loose=people.filter(([,t])=>!t.crew || !crews[t.crew]);
+  app.innerHTML=`<div class="bar"><span class="date">Crews</span><button class="primary small" id="addCrew">Add crew</button></div>
+    <p class="meta">Each crew has one manager. Managers run the routes: the map, check-offs and the crew log, and they approve their crew's day, which sends the stops to billing and approves the crew's hours. Everyone else on a crew sees a simpler page: their schedule, hours, pay and files. People reach this list by being added to the Team list in Projects with the Crew access level.</p>
+    ${crewList().map(c=>{ const cr=crews[c]||{}, mem=Object.keys(cr.members||{});
+      return `<div class="card"><div class="top" style="display:flex;justify-content:space-between;gap:10px"><h2>${esc(c)}</h2><button class="small" data-cedit="${esc(c)}">Yard and note</button></div>
+        <p class="meta">${cr.start?"Yard: "+esc(cr.start):"No yard address"}${cr.note?" &middot; "+esc(cr.note):""}</p>
+        <table>${mem.map(k=>`<tr><td><b>${esc(personName(k))}</b><div class="muted">${esc((team[k]||{}).email||"")}</div></td><td>${cr.manager===k?'<span class="chip ok">Manager</span>':`<button class="small" data-mgr="${esc(c)}|${esc(k)}">Make manager</button>`}</td><td><button class="small danger" data-off="${esc(c)}|${esc(k)}">Take off crew</button></td></tr>`).join("")||'<tr><td class="meta">No one on this crew.</td></tr>'}</table>
+        <div class="bar" style="margin-top:10px"><select data-addto="${esc(c)}" style="width:auto;flex:1"><option value="">Add a person to ${esc(c)}</option>${people.filter(([k,t])=>t.crew!==c).map(([k,t])=>`<option value="${esc(k)}">${esc(t.name)}${t.crew?" (now "+esc(t.crew)+")":""}</option>`).join("")}</select></div></div>`; }).join("")||'<div class="card"><p class="meta">No crews yet. Add one.</p></div>'}
+    ${loose.length?`<div class="card"><h2>Not on a crew</h2><p class="meta">${loose.map(([,t])=>esc(t.name)).join(", ")}. They cannot open the Crew View until they are on a crew.</p></div>`:""}`;
+  $("#addCrew").onclick=()=>{ const n=crewList().length+1; const dl=openDlg(`<h2>Add crew</h2><label>Name</label><input id="ncName" value="Crew ${n}" maxlength="30"><div class="actions"><button data-close>Cancel</button><button class="primary" id="ncGo">Add</button></div>`);
+    dl.querySelector("#ncGo").onclick=async()=>{ const name=$("#ncName").value.trim().replace(/[.#$\[\]\/]/g,""); if(!name) return; if(crews[name]) return toast(name+" already exists"); await store.update({[`crews/${name}`]:{ name, order:n }}); dl.close(); toast(name+" added"); }; };
+  app.querySelectorAll("[data-cedit]").forEach(b=>b.onclick=()=>{ const c=b.dataset.cedit, cr=crews[c]||{};
+    const dl=openDlg(`<h2>${esc(c)}</h2><label>Yard or start address</label><input id="ceStart" value="${esc(cr.start||"")}" autocomplete="off"><label>Note</label><input id="ceNote" value="${esc(cr.note||"")}" maxlength="120"><div class="actions"><button data-close>Cancel</button><button class="primary" id="ceGo">Save</button></div>`);
+    dl.querySelector("#ceGo").onclick=async()=>{ await store.update({[`crews/${c}/start`]:$("#ceStart").value.trim()||null,[`crews/${c}/note`]:$("#ceNote").value.trim()||null}); dl.close(); }; });
+  app.querySelectorAll("[data-addto]").forEach(s=>s.onchange=async()=>{ const c=s.dataset.addto, k=s.value; if(!k) return; const t=team[k]||{}, old=t.crew, upd={};
+    if(old && crews[old]){ upd[`crews/${old}/members/${k}`]=null; if(crews[old].manager===k) upd[`crews/${old}/manager`]=null; }
+    upd[`crews/${c}/members/${k}`]=t.name||k; upd[`allowed/${k}/crew`]=c; upd[`allowed/${k}/crewRole`]="member"; if(t.email) upd[`staff/${k}/email`]=t.email;
+    await store.update(upd); toast(`${t.name} is on ${c}`); });
+  app.querySelectorAll("[data-mgr]").forEach(b=>b.onclick=async()=>{ const [c,k]=b.dataset.mgr.split("|"), cr=crews[c]||{}, upd={ [`crews/${c}/manager`]:k, [`allowed/${k}/crewRole`]:"manager" };
+    if(cr.manager && cr.manager!==k && team[cr.manager]) upd[`allowed/${cr.manager}/crewRole`]="member";
+    await store.update(upd); toast(`${personName(k)} manages ${c}`); });
+  app.querySelectorAll("[data-off]").forEach(b=>b.onclick=async()=>{ const [c,k]=b.dataset.off.split("|"), upd={ [`crews/${c}/members/${k}`]:null, [`allowed/${k}/crew`]:null, [`allowed/${k}/crewRole`]:null };
+    if((crews[c]||{}).manager===k) upd[`crews/${c}/manager`]=null; await store.update(upd); toast(`${personName(k)} is off ${c}`); });
+}
+
+function renderSchedule(app){
+  const list=Object.entries(events).filter(([,e])=>e&&e.date>=addDays(today(),-7)).sort((a,b)=>(a[1].date+(a[1].start||"")).localeCompare(b[1].date+(b[1].start||"")));
+  app.innerHTML=`<div class="bar"><span class="date">Trainings and meetings</span></div>
+    <div class="card"><div class="grid2"><div><label>What</label><input id="evTitle" placeholder="Snow training, crew meeting" maxlength="80"></div><div><label>Where</label><input id="evWhere" maxlength="80"></div>
+      <div><label>Day</label><input type="date" id="evDate" value="${today()}"></div><div><label>Who</label><select id="evCrew"><option value="all">Every crew</option>${crewList().map(c=>`<option>${esc(c)}</option>`).join("")}</select></div>
+      <div><label>Starts</label><input type="time" id="evStart" value="08:00"></div><div><label>Ends</label><input type="time" id="evEnd" value="09:00"></div></div>
+      <div class="actions"><button class="primary" id="evAdd">Add to the schedule</button></div></div>
+    <div class="card scroll"><table><tr><th>Day</th><th>What</th><th>Who</th><th></th></tr>${list.map(([id,e])=>`<tr><td>${fmtDay(e.date)}<div class="muted">${esc(e.start||"")}${e.end?" to "+esc(e.end):""}</div></td><td><b>${esc(e.title)}</b><div class="muted">${esc(e.where||"")}</div></td><td>${esc(e.crew==="all"||!e.crew?"Every crew":e.crew)}</td><td><button class="small danger" data-evrm="${esc(id)}">Remove</button></td></tr>`).join("")||'<tr><td colspan="4" class="meta">Nothing scheduled.</td></tr>'}</table></div>`;
+  $("#evAdd").onclick=async()=>{ const title=$("#evTitle").value.trim(); if(!title) return toast("Say what it is");
+    await store.update({[`events/${store.key()}`]:{ title, where:$("#evWhere").value.trim(), date:$("#evDate").value||today(), start:$("#evStart").value, end:$("#evEnd").value, crew:$("#evCrew").value }}); toast("Added"); };
+  app.querySelectorAll("[data-evrm]").forEach(b=>b.onclick=()=>store.update({[`events/${b.dataset.evrm}`]:null}));
+}
+
+// ---------- people: schedule, hours, pay, files, info (October 17, 2026) ----------
+const people = () => Object.entries(team).filter(([,t])=>t && t.tier==="crew").sort((a,b)=>(a[1].name||"").localeCompare(b[1].name||""));
+const money = n => "$"+(Math.round((+n||0)*100)/100).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2});
+const fmtShort = d => { if(!d) return ""; const x=pd(d); return `${MON[x.getUTCMonth()]} ${x.getUTCDate()}`; };
+const crewOfPerson = k => (team[k]||{}).crew || (k===me.key ? myCrew : Object.keys(crews).find(c=>(crewMembers(c)||{})[k]) || "");
+const staffOf = k => staffAll[k]||{};
+const minWage = () => +payRates.minWage || MIN_WAGE_DEFAULT;
+// Pay periods run every two weeks from the start date set on the Pay tab.
+const periodAnchor = () => payRates.periodStart || "2026-10-05";
+function periodOf(d){ const a=pd(periodAnchor()), x=pd(d); const n=Math.floor((x-a)/864e5/PERIOD_DAYS); return addDays(periodAnchor(), n*PERIOD_DAYS); }
+const periodEnd = p => addDays(p, PERIOD_DAYS-1);
+const datesIn = (a,b) => { const out=[]; for(let x=a; x<=b; x=addDays(x,1)) out.push(x); return out; };
+// Employee: the next month. Shifts set by the office or the crew manager, storm call-outs and meetings.
+function renderMySchedule(app){
+  const k=me.key, crew=crewOfPerson(k), sh=shiftsAll[k]||{}, t=today(); let h="";
+  if(crew) h += clockCard();
+  const days=datesIn(t, addDays(t, SCHEDULE_DAYS-1)).map(d=>{ const items=[];
+    const s=sh[d]; if(s) items.push(`<div class="rowlink" style="cursor:default"><span><b>Work${s.crew&&s.crew!==crew?" with "+esc(s.crew):""}</b>${s.note?` <span class="meta">${esc(s.note)}</span>`:""}</span><span class="meta">${esc(s.start||"")}${s.end?" to "+esc(s.end):""}</span></div>`);
+    if(crew && stormOn(d,crew)) items.push(`<div class="rowlink" style="cursor:default"><span><span class="chip svc-snow">Storm</span> <b>Snow call-out</b></span><span class="meta">Started ${fmtTime(storms[d][crew].at)}</span></div>`);
+    Object.values(events).filter(e=>e&&e.date===d&&(!e.crew||e.crew==="all"||e.crew===crew)).forEach(e=>items.push(`<div class="rowlink" style="cursor:default"><span><b>${esc(e.title)}</b> <span class="meta">${esc(e.where||"")}</span></span><span class="meta">${esc(e.start||"")}${e.end?" to "+esc(e.end):""}</span></div>`));
+    return items.length ? `<div class="daycol ${d===t?"today":""}"><h3>${fmtDay(d)}</h3>${items.join("")}</div>` : ""; }).join("");
+  h += `<div class="card"><h2>Your schedule</h2><p class="meta">The next ${SCHEDULE_DAYS} days. Your manager or the office sets your shifts. Storm call-outs show the moment a storm is started.</p>${days||'<p class="meta">Nothing scheduled in the next month yet.</p>'}</div>`;
+  app.innerHTML=h; wireClock();
+}
+
+// Employee: past hours by pay period, with the manager's approval.
+function renderHours(app){
+  const k=me.key, tm=timeAll[k]||{}, cur=periodOf(today()); let h="";
+  for(let i=0;i<6;i++){ const p=addDays(cur,-PERIOD_DAYS*i), rows=datesIn(p,periodEnd(p)).reverse().filter(d=>tm[d]&&Object.keys(tm[d]).length);
+    if(!rows.length && i>0) continue;
+    const tot=rows.reduce((n,d)=>n+dayHours(tm,d),0);
+    h+=`<div class="card"><h2>${fmtShort(p)} to ${fmtShort(periodEnd(p))} <span class="meta">${hrs(tot)} hrs</span></h2>${rows.length?`<div class="scroll"><table><tr><th>Day</th><th>Clock</th><th>Hours</th><th></th></tr>${rows.map(d=>{ const es=Object.values(tm[d]).sort((a,b)=>(a.in||0)-(b.in||0)), ap=es.every(e=>e.status==="approved");
+      return `<tr><td>${fmtDay(d)}</td><td>${es.map(e=>`${fmtTime(e.in)} to ${e.out?fmtTime(e.out):"now"}`).join("<br>")}</td><td style="font-variant-numeric:tabular-nums">${hrs(dayHours(tm,d))}</td><td>${ap?'<span class="chip ok">Approved</span>':'<span class="chip warn">Waiting</span>'}</td></tr>`; }).join("")}</table></div>`:'<p class="meta">No hours yet this period.</p>'}</div>`; }
+  app.innerHTML=h||'<div class="card"><p class="meta">No hours yet.</p></div>';
+}
+
+// Files: everything on file with the company. Sensitive forms show only that they are on file.
+const requiredFor = k => (staffOf(k).type==="1099" ? ["agreement","payterms","handbook","w9"] : ["agreement","payterms","handbook","w4","i9","deposit"]);
+function docStatus(k){
+  const docs=Object.entries(docsAll[k]||{}).filter(([,d])=>d); const have=new Set(docs.map(([,d])=>d.kind)); const t=today(), soon=addDays(t,30);
+  return { docs:docs.sort((a,b)=>(b[1].at||0)-(a[1].at||0)), missing:requiredFor(k).filter(x=>!have.has(x)),
+    expired:docs.filter(([,d])=>d.expires&&d.expires<t), soon:docs.filter(([,d])=>d.expires&&d.expires>=t&&d.expires<=soon) };
+}
+function docRow(k, id, d, office){
+  const t=today(), chip = d.expires ? (d.expires<t?'<span class="chip bad">Expired</span>':d.expires<=addDays(t,30)?'<span class="chip warn">Expires soon</span>':"") : "";
+  const link = d.sensitive ? (office && (vault[k]||{})[id] ? `<a class="mapbtn" href="${esc(vault[k][id].url)}" target="_blank" rel="noopener">Open in Drive</a>` : '<span class="chip">On file, kept in Drive</span>')
+    : d.url ? `<a class="mapbtn" href="${esc(d.url)}" target="_blank" rel="noopener">Open</a>` : "";
+  return `<div class="logrow"><span class="w"><b>${esc(d.name)}</b> ${chip}<div class="meta">${esc(DOC_KINDS[d.kind]||d.kind)}${d.signedAt?" &middot; signed "+fmtShort(d.signedAt):""}${d.expires?" &middot; expires "+fmtShort(d.expires):""} &middot; added ${fmtShort(iso(new Date(d.at||Date.now())))}${d.shareError?` &middot; <span style="color:var(--red)">not shared: ${esc(d.shareError)}</span>`:""}</div>${d.note?`<div class="muted">${esc(d.note)}</div>`:""}</span>
+    <span style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end">${link}${office?`<button class="small danger" data-docrm="${esc(id)}">Remove record</button>`:""}</span></div>`;
+}
+function renderFiles(app){
+  const k=me.key, st=docStatus(k);
+  app.innerHTML=`<div class="card"><h2>Your files with Mangiapane Brothers</h2><p class="meta">Agreements and papers on file. Tap Open to view or download. Tax and ID forms are kept in the company's Google Drive and only show here as on file.</p>
+    ${st.missing.length?`<p><span class="chip warn">Still needed</span> ${st.missing.map(x=>esc(DOC_KINDS[x])).join(", ")}. Talk to the office.</p>`:""}
+    ${st.docs.map(([id,d])=>docRow(k,id,d,false)).join("")||'<p class="meta">No files yet.</p>'}</div>`;
+}
+
+// My info: the employee keeps his phone, address and emergency contact current.
+function renderInfo(app){
+  const k=me.key, s=staffOf(k), em=s.emergency||{}, crew=crewOfPerson(k), mk=(crews[crew]||{}).manager;
+  app.innerHTML=`<div class="card"><h2>${esc(me.name)}</h2><table>
+      <tr><td>Email</td><td>${esc((team[k]||{}).email||me.email)}</td></tr><tr><td>Crew</td><td>${esc(crew||"Not on a crew")}${role==="manager"?" (manager)":""}</td></tr>
+      ${mk&&mk!==k?`<tr><td>Manager</td><td>${esc(personName(mk))}</td></tr>`:""}${s.startDate?`<tr><td>Started</td><td>${fmtDay(s.startDate)}</td></tr>`:""}</table></div>
+    <form class="card" id="infoForm"><h2>Keep this current</h2><div class="grid2">
+      <div><label for="inPhone">Phone</label><input id="inPhone" type="tel" value="${esc(s.phone||"")}" autocomplete="tel"></div>
+      <div><label for="inAddr">Home address</label><input id="inAddr" value="${esc(s.address||"")}" autocomplete="street-address"></div>
+      <div><label for="inEmName">Emergency contact</label><input id="inEmName" value="${esc(em.name||"")}"></div>
+      <div><label for="inEmPhone">Their phone</label><input id="inEmPhone" type="tel" value="${esc(em.phone||"")}"></div>
+      <div><label for="inEmRel">Relationship</label><input id="inEmRel" value="${esc(em.relation||"")}" placeholder="Mother, spouse"></div></div>
+      <div class="actions"><button class="primary">Save</button></div></form>`;
+  $("#infoForm").onsubmit=async e=>{ e.preventDefault(); if(previewOnly()) return;
+    try { await store.update({ [`staff/${k}/phone`]:$("#inPhone").value.trim()||null, [`staff/${k}/address`]:$("#inAddr").value.trim()||null,
+      [`staff/${k}/emergency`]:{ name:$("#inEmName").value.trim(), phone:$("#inEmPhone").value.trim(), relation:$("#inEmRel").value.trim() } }); toast("Saved"); }
+    catch(err){ toast("Not saved: "+(err.message||err)); } };
+}
+
+// Manager: his own employee pages under one tab.
+function renderMe(app){
+  const subs=[["schedule","Schedule"],["hours","Hours"],["pay","Pay"],["files","Files"],["info","My info"]];
+  app.innerHTML=`<div class="bar">${subs.map(([v,l])=>`<button class="small ${meTab===v?"primary":""}" data-me="${v}">${l}</button>`).join("")}</div><div id="meBody"></div>`;
+  app.querySelectorAll("[data-me]").forEach(b=>b.onclick=()=>{ meTab=b.dataset.me; render(); });
+  ({schedule:renderMySchedule, hours:renderHours, pay:renderPay, files:renderFiles, info:renderInfo}[meTab]||renderMySchedule)($("#meBody"));
+}
+
+// Shifts: set by the office or the person's crew manager.
+function shiftList(k, from, days){
+  const sh=shiftsAll[k]||{}; const to=addDays(from,days-1);
+  return Object.keys(sh).filter(d=>d>=from&&d<=to).sort().map(d=>`<div class="who-row"><span style="min-width:96px">${fmtDay(d)}</span><span class="meta">${esc(sh[d].start||"")}${sh[d].end?" to "+esc(sh[d].end):""}${sh[d].note?" &middot; "+esc(sh[d].note):""}</span><button class="small danger" style="margin-left:auto" data-shrm="${esc(k)}|${d}">Remove</button></div>`).join("") || '<p class="muted">No shifts set.</p>';
+}
+function shiftDialog(k){
+  const t=today(), crew=crewOfPerson(k);
+  const dl=openDlg(`<h2>Shifts for ${esc(personName(k))}</h2><div class="grid2"><div><label for="shFrom">From</label><input type="date" id="shFrom" value="${t}"></div><div><label for="shTo">To</label><input type="date" id="shTo" value="${addDays(t,13)}"></div>
+    <div><label for="shStart">Start</label><input type="time" id="shStart" value="07:00"></div><div><label for="shEnd">End (optional)</label><input type="time" id="shEnd"></div></div>
+    <label>Days</label><div style="display:flex;gap:10px;flex-wrap:wrap">${[1,2,3,4,5,6,0].map(w=>`<label style="display:flex;gap:4px;align-items:center;margin:0;color:var(--ink)"><input type="checkbox" data-wd="${w}" ${w>=1&&w<=5?"checked":""}> ${DOW[w]}</label>`).join("")}</div>
+    <label for="shNote">Note (optional)</label><input id="shNote" maxlength="80" placeholder="Meet at the yard">
+    <div class="actions"><button data-close>Cancel</button><button class="primary" id="shGo">Add shifts</button></div>`);
+  dl.querySelector("#shGo").onclick=async()=>{ const a=$("#shFrom").value, b=$("#shTo").value, st=$("#shStart").value; if(!a||!b||b<a) return toast("Check the dates"); if(!st) return toast("Set a start time");
+    const wds=[...dl.querySelectorAll("[data-wd]:checked")].map(x=>+x.dataset.wd); const upd={};
+    datesIn(a,b).forEach(d=>{ if(wds.includes(pd(d).getUTCDay())) upd[`shifts/${k}/${d}`]={ start:st, end:$("#shEnd").value||null, note:$("#shNote").value.trim()||null, crew:crew||null, by:me.key, at:Date.now() }; });
+    if(!Object.keys(upd).length) return toast("No days match"); if(previewOnly()) return dl.close();
+    try { await store.update(upd); dl.close(); toast(`${Object.keys(upd).length} shifts added`); } catch(e){ toast("Not saved: "+(e.message||e)); } };
+}
+function wireShifts(root){
+  root.querySelectorAll("[data-shadd]").forEach(b=>b.onclick=()=>shiftDialog(b.dataset.shadd));
+  root.querySelectorAll("[data-shrm]").forEach(b=>b.onclick=async()=>{ if(previewOnly()) return; const [k,d]=b.dataset.shrm.split("|"); await store.update({[`shifts/${k}/${d}`]:null}); toast("Shift removed"); });
+}
+const contactHtml = k => { const s=staffOf(k), em=s.emergency||{}, t=team[k]||{};
+  return `<table><tr><td>Phone</td><td>${s.phone?telLink(s.phone):'<span class="muted">not given</span>'}</td></tr><tr><td>Email</td><td>${esc(s.email||t.email||"")}</td></tr>
+    <tr><td>Address</td><td>${s.address?esc(s.address):'<span class="muted">not given</span>'}</td></tr>
+    <tr><td>Emergency</td><td>${em.name?`${esc(em.name)}${em.relation?" ("+esc(em.relation)+")":""} ${telLink(em.phone)}`:'<span class="chip warn">none on file</span>'}</td></tr></table>`; };
+
+// Manager: his crew's contact and emergency info, and their shifts.
+function renderCrewTab(app){
+  const crew=viewCrew(), mem=Object.keys(crewMembers(crew));
+  app.innerHTML=`<p class="meta">${esc(crew)}: contact and emergency info for your crew, and their shifts for the next two weeks. Pay and files are kept by the office.</p>`
+    + mem.map(k=>`<div class="card"><div class="top" style="display:flex;justify-content:space-between;gap:10px;align-items:baseline"><h2>${esc(personName(k))}${(crews[crew]||{}).manager===k?' <span class="chip ok">Manager</span>':""}</h2><button class="small primary" data-shadd="${esc(k)}">Add shifts</button></div>
+      ${contactHtml(k)}<h3 style="margin-top:10px">Shifts, next two weeks</h3>${shiftList(k, today(), 14)}</div>`).join("") || '<div class="card"><p class="meta">No one is on your crew.</p></div>';
+  wireShifts(app);
+}
+
+// Office: the people database. Profiles, pay share, files and shifts.
+function renderPeople(app){
+  if(personOpen && team[personOpen]) return renderPerson(app, personOpen);
+  const list=people();
+  app.innerHTML=`<div class="bar"><span class="date">Personnel</span></div><p class="meta">Every employee. People come here from Onboarding when you drag them to Hired, or from the Team list in Projects with the Crew access level; put them on a crew under Crews. Past employees are in the Past column on Onboarding. Files go to the company Google Drive; tax and ID forms are never shown on an employee's page.</p>
+    <div class="card scroll"><table><tr><th>Name</th><th>Crew</th><th>Phone</th><th>Pay rate</th><th>Files</th></tr>
+    ${list.map(([k,t])=>{ const st=docStatus(k); return `<tr data-person="${esc(k)}" style="cursor:pointer"><td><b>${esc(t.name)}</b><div class="muted">${esc(t.email)}</div></td><td>${esc(t.crew||"No crew")}${t.crewRole==="manager"?" (manager)":""}</td><td>${esc(staffOf(k).phone||"")}</td><td>${roleOf(k)==="manager"?"Manager":"Crew"}</td>
+      <td>${st.missing.length?`<span class="chip warn">${st.missing.length} missing</span> `:""}${st.expired.length?`<span class="chip bad">${st.expired.length} expired</span> `:""}${st.soon.length?`<span class="chip warn">${st.soon.length} expiring</span>`:""}${!st.missing.length&&!st.expired.length&&!st.soon.length?'<span class="chip ok">Up to date</span>':""}</td></tr>`; }).join("")||'<tr><td colspan="5" class="meta">No crew people on the Team list yet.</td></tr>'}</table></div>`;
+  app.querySelectorAll("[data-person]").forEach(tr=>tr.onclick=()=>{ personOpen=tr.dataset.person; render(); window.scrollTo(0,0); });
+}
+function renderPerson(app, k){
+  const t=team[k]||{}, s=staffOf(k), em=s.emergency||{}, pv=privAll[k]||{}, st=docStatus(k);
+  app.innerHTML=`<div class="bar"><button class="small" id="back">&#8249; Personnel</button><span class="date">${esc(t.name)}</span><button class="small" id="seeAs">See as ${esc((t.name||"").split(" ")[0])}</button></div>
+    <form class="card" id="pfForm"><h2>Profile</h2><div class="grid2">
+      <div><label for="pfPhone">Phone</label><input id="pfPhone" type="tel" value="${esc(s.phone||"")}"></div><div><label for="pfAddr">Home address</label><input id="pfAddr" value="${esc(s.address||"")}"></div>
+      <div><label for="pfEmName">Emergency contact</label><input id="pfEmName" value="${esc(em.name||"")}"></div><div><label for="pfEmPhone">Their phone</label><input id="pfEmPhone" type="tel" value="${esc(em.phone||"")}"></div>
+      <div><label for="pfEmRel">Relationship</label><input id="pfEmRel" value="${esc(em.relation||"")}"></div><div><label for="pfStart">Start date</label><input id="pfStart" type="date" value="${esc(s.startDate||"")}"></div>
+      <div><label for="pfType">Paid as</label><select id="pfType"><option value="W-2" ${s.type!=="1099"?"selected":""}>Employee (W-2)</option><option value="1099" ${s.type==="1099"?"selected":""}>Contractor (1099)</option></select></div>
+</div></div>
+      <div class="actions"><button class="primary">Save profile</button></div></form>
+    <div class="card"><h2>Files</h2>${st.missing.length?`<p><span class="chip warn">Missing</span> ${st.missing.map(x=>esc(DOC_KINDS[x])).join(", ")}</p>`:'<p><span class="chip ok">All required files on file</span></p>'}
+      ${st.docs.map(([id,d])=>docRow(k,id,d,true)).join("")||'<p class="meta">No files yet.</p>'}
+      <h3 style="margin-top:12px">Add a file</h3><div class="grid2"><div><label for="upKind">What it is</label><select id="upKind">${Object.entries(DOC_KINDS).map(([x,l])=>`<option value="${x}">${esc(l)}${SENSITIVE.includes(x)?" (kept in Drive only)":""}</option>`).join("")}</select></div>
+        <div><label for="upLabel">Name on the record</label><input id="upLabel" placeholder="2026 employment agreement"></div><div><label for="upSigned">Signed</label><input id="upSigned" type="date"></div><div><label for="upExp">Expires (optional)</label><input id="upExp" type="date"></div></div>
+        <label for="upFile">File (PDF or photo, up to 7 MB)</label><input id="upFile" type="file" accept="application/pdf,image/*,.doc,.docx">
+        <div class="actions"><button class="primary" id="upGo">Upload to Drive</button></div><p class="muted">Ordinary files are shared view-only with ${esc(t.email||"the employee")} so they can open them. Tax and ID forms stay in the office's Drive and show only as on file.</p></div>
+    <div class="card"><div class="top" style="display:flex;justify-content:space-between;gap:10px;align-items:baseline"><h2>Shifts, next month</h2>${PAGE==="team"?'<a class="mapbtn" href="crews.html">Set on Crews, Schedules</a>':`<button class="small primary" data-shadd="${esc(k)}">Add shifts</button>`}</div>${shiftList(k, today(), SCHEDULE_DAYS)}</div>
+    <h2 style="margin:14px 0 8px">Pay log</h2>${payRowsHtml(k)}
+    ${s.applicantId||s.indeedUrl?`<div class="card"><h2>Hiring</h2><p class="meta">${s.hiredAt?"Hired "+fmtDay(iso(new Date(s.hiredAt)))+" from Onboarding":"Hired"}${s.appliedFor?", applied for "+esc(APPLIED_FOR[s.appliedFor]||s.appliedFor):""}${s.source?" through "+esc(s.source):""}.</p>${s.indeedUrl?`<a class="mapbtn" href="${esc(s.indeedUrl)}" target="_blank" rel="noopener">Indeed profile</a>`:""}</div>`:""}
+    ${pfileHtml(k)}
+    <div class="card"><h2>Leaving</h2><p class="meta">Moves ${esc(firstName(t.name))}'s whole record to the archive and takes him off the Team list. It asks first.</p><div class="actions"><button class="danger" id="toPast">Move to Past</button></div></div>`;
+  $("#back").onclick=()=>{ personOpen=null; render(); };
+  $("#toPast").onclick=()=>archiveDialog(k); wirePfile(app, k);
+  $("#seeAs").onclick=()=>{ if(PAGE==="team") location.href="crews.html#seeas="+encodeURIComponent("emp:"+k); else setViewAs("emp:"+k); };
+  $("#pfForm").onsubmit=async e=>{ e.preventDefault();
+    try { await store.update({ [`staff/${k}/phone`]:$("#pfPhone").value.trim()||null, [`staff/${k}/address`]:$("#pfAddr").value.trim()||null,
+      [`staff/${k}/emergency`]:{ name:$("#pfEmName").value.trim(), phone:$("#pfEmPhone").value.trim(), relation:$("#pfEmRel").value.trim() },
+      [`staff/${k}/startDate`]:$("#pfStart").value||null, [`staff/${k}/type`]:$("#pfType").value }); toast("Profile saved"); }
+    catch(err){ toast("Not saved: "+(err.message||err)); } };
+  $("#upKind").onchange=()=>{ if(!$("#upLabel").value) $("#upLabel").placeholder=DOC_KINDS[$("#upKind").value]; };
+  $("#upGo").onclick=()=>uploadDoc(k);
+  app.querySelectorAll("[data-docrm]").forEach(b=>b.onclick=async()=>{ await store.update({[`staffDocs/${k}/${b.dataset.docrm}`]:null}); toast("Record removed. The file stays in Drive."); });
+  wireShifts(app);
+}
+const readB64 = f => new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>res(String(r.result).split(",")[1]||""); r.onerror=()=>rej(new Error("Could not read the file")); r.readAsDataURL(f); });
+async function uploadDoc(k){
+  const f=$("#upFile").files[0]; if(!f) return toast("Choose a file");
+  if(f.size>7*1024*1024) return toast("That file is over 7 MB");
+  const kind=$("#upKind").value, label=$("#upLabel").value.trim()||DOC_KINDS[kind], id=store.key(), btn=$("#upGo"); btn.disabled=true;
+  try { toast("Uploading");
+    const up={ k, personName:(team[k]||{}).name||(applicants[k]||{}).name||"", fileName:f.name, mime:f.type||"application/octet-stream", data:await readB64(f), kind, sensitive:SENSITIVE.includes(kind), label,
+      signedAt:($("#upSigned")||{}).value||null, expires:($("#upExp")||{}).value||null, at:Date.now(), by:me.email };
+    if(DEMO){ await store.update({ [`staffDocs/${k}/${id}`]:{ name:label, fileName:f.name, kind, sensitive:up.sensitive, at:Date.now(), by:me.email, signedAt:up.signedAt, expires:up.expires, ...(up.sensitive?{}:{url:"https://drive.google.com/", shared:true}) } }); toast("Saved (demo)"); return; }
+    await store.update({ [`sync/staffUpload/${id}`]:up });
+    if(!svcCfg) { toast("Queued. The signing service is not set here, so it uploads on its next 5-minute run."); return; }
+    const r=await (await fetch(svcCfg.url+"?action=staffdoc&k="+encodeURIComponent(id))).json().catch(()=>null);
+    if(r&&r.ok) toast(r.sensitive?"Saved to Drive. Shown to the employee as on file only.":r.shared?"Saved to Drive and shared with the employee.":"Saved to Drive. Not shared: "+(r.shareError||"check Drive sharing"));
+    else toast((r&&r.error)||"The upload is queued and finishes on the next 5-minute run.");
+  } catch(e){ toast("Not uploaded: "+(e.message||e)); }
+  finally { btn.disabled=false; }
+}
+
+// ---------- pay rules: the 2026-27 crew manager and crew member pay overviews (Russel, October 17, 2026) ----------
+// By the job: every person on the crew that day earns the per-house rate for his role on each approved stop.
+// Snow by depth (the manager runs the ATV at 2 inches and over; blower otherwise), fall by section and visit, lights
+// install by section and package, takedown $40 or $65 split across the crew, lawn per house. Route bonuses per storm
+// (lost on a second callback), a $100 minimum per call-out, fall clean-window bonuses, an $18 an hour floor every week,
+// and overtime on hours over 40. Season bonus and the $3,750 winter guarantee are shown on the winter card.
+// Every number is editable on the office Pay tab (payRates/tables). No photo, no pay for that stop.
+const PAY_DEFAULT = {
+  member:  { lawn:6.30, fall:{ rosedale:[19,29], north:[26,40] }, lights:{ rosedale:{ roofline:38, fullfront:54, showcase:70 }, north:{ roofline:48, fullfront:63, showcase:78 } },
+             takedown:{ plain:40, ladder:65 }, snowBlower:{ t1:4.00, t2:4.25, t3:7.50 }, snowAtv:null, snowBonus:{ t1:50, t2:85, t3:175, twoPass:200 },
+             callout:100, floor:18, seasonBonus:500, missBonus:100, missGuarantee:250, guarantee:3750, windowBonus:100 },
+  manager: { lawn:9.45, fall:{ rosedale:[22,32], north:[29,43] }, lights:{ rosedale:{ roofline:51, fullfront:67, showcase:83 }, north:{ roofline:61, fullfront:76, showcase:91 } },
+             takedown:{ plain:40, ladder:65 }, snowBlower:{ t1:4.00, t2:4.25, t3:7.50 }, snowAtv:{ t2:5.50, t3:9.75 }, snowBonus:{ t1:50, t2:85, t3:175, twoPass:200 },
+             callout:100, floor:18, seasonBonus:750, missBonus:250, missGuarantee:250, guarantee:3750, windowBonus:100 }
+};
+const TIERS = { t1:"1 to 2 inches", t2:"2 to 5 inches", t3:"5 inches and over" };
+const PKGS = { roofline:"Roofline", fullfront:"Full Front", showcase:"Showcase" };
+const ZONES = { rosedale:"Rosedale", north:"North Livonia" };
+const deepMerge = (a,b) => { if(b==null) return a; if(typeof a!=="object"||a===null||Array.isArray(a)) return b; const o={...a}; Object.keys(b).forEach(k=>{ o[k]=deepMerge(a[k],b[k]); }); return o; };
+const roleOf = k => k===me.key && role ? role : ((team[k]||{}).crewRole==="manager" ? "manager" : "member");
+const tableFor = k => { const r=roleOf(k)==="manager"?"manager":"member"; return deepMerge(PAY_DEFAULT[r], ((payRates.tables||{})[r])||null); };
+const stormOf = (d,c) => (storms[d]||{})[c]||null;
+const tierOf = s => { const t=(s&&s.tier)||"t2"; return s&&s.twoPass&&t==="t1" ? "t2" : t; };
+const callbacksOn = (d, c) => Object.entries((payRates.callbacks||{})[d]||{}).filter(([rid])=>(routes[rid]||{}).crew===c).reduce((n,[,st])=>n+Object.keys(st||{}).length,0);
+const excused = (d,c,k) => !!((((payRates.excused||{})[d]||{})[c]||{})[k]);
+// Crew on a house at check time: the crew members clocked in on that day (for the takedown split).
+const crewOnDay = (d,c) => Object.keys(crewMembers(c)).filter(k=>Object.values((timeAll[k]||{})[d]||{}).some(e=>(e.crew||c)===c)).length || 1;
+// What one stop pays one person.
+function stopPay(k, T, d, c, rid, sid, x){
+  const r=routes[rid]||{}, s=(r.stops||{})[sid]||{};
+  if(x.kind==="snow"){ const st=stormOf(d,c), t=tierOf(st); const atv=T.snowAtv&&T.snowAtv[t]; return { label:`Snow, ${TIERS[t].toLowerCase()}${atv?", ATV":""}`, amt: atv || (T.snowBlower||{})[t] || 0 }; }
+  if(x.kind==="lawn") return { label:"Lawn route", amt:+T.lawn||0 };
+  if(x.kind==="fall"){ const v=r.visit===2?2:1, z=s.zone==="north"?"north":"rosedale"; return { label:`Fall visit ${v}, ${ZONES[z]}`, amt:((T.fall||{})[z]||[])[v-1]||0 }; }
+  if(x.kind==="lights"){ const z=s.zone==="north"?"north":"rosedale", p=s.pkg; if(!p) return { label:"Lights install (no package on the stop)", amt:0 }; return { label:`Lights install, ${PKGS[p]}, ${ZONES[z]}`, amt:((T.lights||{})[z]||{})[p]||0 }; }
+  if(x.kind==="takedown"){ const n=crewOnDay(d,c), whole=x.ladder?(T.takedown||{}).ladder:(T.takedown||{}).plain; return { label:`Lights takedown${x.ladder?", ladder":""} (split ${n} ways)`, amt:(+whole||0)/n }; }
+  return { label:`${KINDS[x.kind]||x.kind} (hourly)`, amt:0 };
+}
+// One week of pay for one person: stops, bonuses, call-out minimums, the hourly floor, then overtime.
+function payWeek(k, from){
+  const T=tableFor(k), tm=timeAll[k]||{}, lines={}, add=(label,amt,n)=>{ const L=lines[label]=lines[label]||{n:0,amt:0}; L.n+=(n??1); L.amt+=amt; };
+  const out={ hours:0, hoursOpen:0, pending:0, noPhoto:0, lines };
+  datesIn(from, addDays(from,6)).forEach(d=>{ const es=Object.values(tm[d]||{}); if(!es.length) return;
+    es.forEach(e=>{ const h=entryHours(e,d); if(e.status==="approved") out.hours+=h; else out.hoursOpen+=h; });
+    [...new Set(es.map(e=>e.crew||crewOfPerson(k)).filter(Boolean))].forEach(c=>{
+      fetchApprovals([d], c);
+      const ok=dayApproved(d,c); let snowDay=0, worked=false;
+      Object.entries(checks[d]||{}).forEach(([rid,st])=>{ if((routes[rid]||{}).crew!==c) return; Object.entries(st||{}).forEach(([sid,x])=>{ if(!x||x.skipped) return;
+        const p=stopPay(k,T,d,c,rid,sid,x); worked=true;
+        if(!x.photo){ if(ok) out.noPhoto++; return; }
+        if(ok){ add(p.label, p.amt); if(x.kind==="snow") snowDay+=p.amt; } else out.pending+=p.amt; }); });
+      const storm=stormOf(d,c);
+      if(storm && ok){
+        const snowRoutes=Object.entries(routes).filter(([,r])=>r&&r.standing&&r.crew===c);
+        const total=snowRoutes.reduce((n,[,r])=>n+stopsOf(r).length,0), done=snowRoutes.reduce((n,[rid,r])=>n+stopsOf(r).filter(s=>{ const x=((checks[d]||{})[rid]||{})[s.id]; return x&&!x.skipped; }).length,0);
+        if(total && done===total && callbacksOn(d,c)<2){ const b=storm.twoPass?T.snowBonus.twoPass:T.snowBonus[tierOf(storm)]; add(storm.twoPass?"Two-pass storm bonus":`Route bonus, ${TIERS[tierOf(storm)].toLowerCase()}`, +b||0); snowDay+=+b||0; }
+        if(snowDay < (+T.callout||0)) add("Call-out minimum top-up", (+T.callout||0)-snowDay);
+      }
+    });
+  });
+  // Fall clean-window bonus: windows ending this week that the office marked earned for his crew.
+  (payRates.fallWindows||[]).forEach((w,i)=>{ if(w&&w.end>=from&&w.end<=addDays(from,6)&&(((payRates.fallEarned||{})[crewOfPerson(k)]||{})[i])) add(`Clean window bonus, ${w.name||"window "+(i+1)}`, +T.windowBonus||0); });
+  out.piece=Object.values(lines).reduce((n,L)=>n+L.amt,0);
+  out.floorTopup=Math.max(0, out.hours*(+T.floor||0) - out.piece);
+  const straight=out.piece+out.floorTopup;
+  out.ot = out.hours>40 ? 0.5*(straight/out.hours)*(out.hours-40) : 0;   // half-time premium on the regular rate (piece-rate overtime)
+  out.total=straight+out.ot;
+  return out;
+}
+function earnings(k, p){
+  const w=[payWeek(k,p), payWeek(k,addDays(p,7))];
+  const e={ weeks:w, hours:w[0].hours+w[1].hours, hoursOpen:w[0].hoursOpen+w[1].hoursOpen, pending:w[0].pending+w[1].pending, noPhoto:w[0].noPhoto+w[1].noPhoto,
+    piece:w[0].piece+w[1].piece, floorTopup:w[0].floorTopup+w[1].floorTopup, ot:w[0].ot+w[1].ot, earned:w[0].total+w[1].total, days:0 };
+  e.days=datesIn(p,periodEnd(p)).filter(d=>Object.keys((timeAll[k]||{})[d]||{}).length).length;
+  e.paid=(payLogAll[k]||{})[p]||null; return e;
+}
+// The winter: November 1 to March 15. Storms called, missed, the season bonus and the guarantee.
+function winterOf(d){ const [y,m]=d.split("-").map(Number); const y0 = m>=7 ? y : y-1; return { from:`${y0}-11-01`, to:`${y0+1}-03-15`, bonus1:`${y0+1}-01-15`, bonus2:`${y0+1}-03-20` }; }
+function winterCard(k){
+  const W=winterOf(today()), T=tableFor(k), crew=crewOfPerson(k), t=today();
+  if(t<addDays(W.from,-14) || t>addDays(W.to,10)) return "";
+  const dates=Object.keys(storms).filter(d=>d>=W.from&&d<=W.to&&d<=t&&stormOf(d,crew)).sort();
+  const worked=dates.filter(d=>Object.keys((timeAll[k]||{})[d]||{}).length), missed=dates.filter(d=>!worked.includes(d)&&!excused(d,crew,k));
+  let snowPay=0; for(let p=periodOf(W.from); p<=t && p<=W.to; p=addDays(p,PERIOD_DAYS)) earnings(k,p).weeks.forEach(w=>Object.entries(w.lines).forEach(([l,L])=>{ if(/^Snow|bonus, 1|bonus, 2|bonus, 5|Two-pass|Call-out/.test(l)) snowPay+=L.amt; }));
+  const bonus=Math.max(0,(+T.seasonBonus||0)-missed.length*(+T.missBonus||0)), guar=Math.max(0,(+T.guarantee||0)-missed.length*(+T.missGuarantee||0));
+  return `<div class="card"><h2>Winter ${W.from.slice(0,4)}-${W.to.slice(2,4)}</h2><table>
+    <tr><td>Storms called for ${esc(crew)}</td><td>${dates.length}</td></tr><tr><td>You worked</td><td>${worked.length}</td></tr>
+    <tr><td>Missed without clearing it</td><td>${missed.length?`<span class="chip bad">${missed.length}</span> ${missed.map(fmtShort).join(", ")}`:"none"}</td></tr>
+    <tr><td>Snow pay so far</td><td style="font-variant-numeric:tabular-nums">${money(snowPay)}</td></tr>
+    <tr><td>Season bonus</td><td>${money(bonus)}: half on ${fmtShort(W.bonus1)}, half on ${fmtShort(W.bonus2)}</td></tr>
+    <tr><td>Winter guarantee if you stay through ${fmtShort(W.to)}</td><td>${money(guar)}${snowPay<guar?`: we make up about ${money(guar-snowPay)} if the winter ends where it is now`:": already passed"}</td></tr></table>
+    <p class="muted">A missed storm costs ${money(T.missBonus)} off the season bonus and ${money(T.missGuarantee)} off the guarantee unless you clear it with us ahead of time.</p></div>`;
+}
+function payRowsHtml(k){
+  const cur=periodOf(today()); let h=winterCard(k);
+  for(let i=0;i<6;i++){ const p=addDays(cur,-PERIOD_DAYS*i), e=earnings(k,p);
+    if(!e.days && !e.paid && i>0) continue;
+    const L={}; e.weeks.forEach(w=>Object.entries(w.lines).forEach(([l,x])=>{ const y=L[l]=L[l]||{n:0,amt:0}; y.n+=x.n; y.amt+=x.amt; }));
+    h+=`<div class="card"><h2>${fmtShort(p)} to ${fmtShort(periodEnd(p))}${i===0?' <span class="chip">This period</span>':""}</h2><table>
+      ${Object.entries(L).map(([l,x])=>`<tr><td>${esc(l)}${x.n>1?` <span class="muted">x ${x.n}</span>`:""}</td><td style="font-variant-numeric:tabular-nums">${money(x.amt)}</td></tr>`).join("")||'<tr><td colspan="2" class="muted">No approved jobs yet.</td></tr>'}
+      <tr><td>Hours approved</td><td style="font-variant-numeric:tabular-nums">${hrs(e.hours)}${e.hoursOpen?` <span class="muted">(+${hrs(e.hoursOpen)} waiting)</span>`:""}</td></tr>
+      ${e.floorTopup>0.005?`<tr><td>${money(tableFor(k).floor)} an hour floor</td><td style="font-variant-numeric:tabular-nums">${money(e.floorTopup)}</td></tr>`:""}
+      ${e.ot>0.005?`<tr><td>Overtime premium (hours over 40 a week)</td><td style="font-variant-numeric:tabular-nums">${money(e.ot)}</td></tr>`:""}
+      <tr><td><b>Earned</b></td><td style="font-variant-numeric:tabular-nums"><b>${money(e.earned)}</b>${e.pending>0.005?` <span class="muted">+ about ${money(e.pending)} waiting for approval</span>`:""}</td></tr>
+      ${e.noPhoto?`<tr><td colspan="2"><span class="chip bad">${e.noPhoto} stop${e.noPhoto>1?"s":""} with no photo, not paid</span></td></tr>`:""}
+      <tr><td>Paid</td><td>${e.paid&&e.paid.paidAmount!=null?`<b>${money(e.paid.paidAmount)}</b> on ${fmtDay(e.paid.paidDate)}${e.paid.ref?` <span class="muted">${esc(e.paid.ref)}</span>`:""}`:'<span class="chip warn">Not paid yet</span>'}</td></tr></table></div>`; }
+  return h;
+}
+function renderPay(app){
+  const T=tableFor(me.key);
+  app.innerHTML = `<p class="meta">You are paid by the job: a set amount for every house your crew services, at the ${roleOf(me.key)==="manager"?"manager":"crew"} rate, with a ${money(T.floor)} an hour floor every week and overtime past 40 hours. A stop pays once its photo is in and your manager approves the day. Paid amounts come from payroll, before taxes.</p>` + payRowsHtml(me.key);
+}
+
+// Office: the two rate tables, fall clean windows, and each period's pay with what payroll paid.
+function rateInputs(r){
+  const T=deepMerge(PAY_DEFAULT[r], ((payRates.tables||{})[r])||null), f=(path,label)=>{ const v=path.split(".").reduce((o,x)=>o==null?o:o[x],T); return `<div><label for="pt_${r}_${path}">${esc(label)}</label><input id="pt_${r}_${path}" data-pt="${r}|${path}" type="number" inputmode="decimal" step="0.01" value="${v==null?"":esc(v)}"></div>`; };
+  return `<div class="grid2">${f("lawn","Lawn, per house")}${f("fall.rosedale.0","Fall visit 1, Rosedale")}${f("fall.north.0","Fall visit 1, North Livonia")}${f("fall.rosedale.1","Fall visit 2, Rosedale")}${f("fall.north.1","Fall visit 2, North Livonia")}
+    ${Object.keys(PKGS).map(p=>f("lights.rosedale."+p,`Lights ${PKGS[p]}, Rosedale`)+f("lights.north."+p,`Lights ${PKGS[p]}, North Livonia`)).join("")}
+    ${f("takedown.plain","Takedown per house, no ladder (split)")}${f("takedown.ladder","Takedown per house, ladder (split)")}
+    ${Object.keys(TIERS).map(t=>f("snowBlower."+t,`Snow ${TIERS[t]}, blower`)).join("")}${r==="manager"?f("snowAtv.t2","Snow 2 to 5 inches, ATV")+f("snowAtv.t3","Snow 5 inches and over, ATV"):""}
+    ${Object.keys(TIERS).map(t=>f("snowBonus."+t,`Route bonus, ${TIERS[t]}`)).join("")}${f("snowBonus.twoPass","Two-pass storm bonus")}
+    ${f("callout","Call-out minimum")}${f("floor","Hourly floor")}${f("windowBonus","Clean window bonus")}${f("seasonBonus","Snow season bonus")}${f("missBonus","Missed storm, off the bonus")}${f("missGuarantee","Missed storm, off the guarantee")}${f("guarantee","Winter guarantee")}</div>`;
+}
+function renderPayCfg(app){
+  const p=payPeriod||periodOf(today()), list=people(), wins=payRates.fallWindows||[];
+  app.innerHTML=`<div class="bar"><span class="date">Pay</span></div>
+    <div class="card scroll"><div class="bar"><button class="small" id="ppPrev">&#8249;</button><span class="date">${fmtShort(p)} to ${fmtShort(periodEnd(p))}</span><button class="small" id="ppNext">&#8250;</button></div>
+      <table><tr><th>Person</th><th>Hours</th><th>Jobs</th><th>Floor</th><th>OT</th><th>Earned</th><th>Paid</th></tr>
+      ${list.map(([k,t])=>{ const e=earnings(k,p), pd0=e.paid||{}; return `<tr><td><b>${esc(t.name)}</b><div class="muted">${roleOf(k)==="manager"?"Manager rate":"Crew rate"}${e.noPhoto?` &middot; <span style="color:var(--red)">${e.noPhoto} no photo</span>`:""}</div></td><td style="font-variant-numeric:tabular-nums">${hrs(e.hours)}${e.hoursOpen?`<div class="muted">+${hrs(e.hoursOpen)} waiting</div>`:""}</td><td style="font-variant-numeric:tabular-nums">${money(e.piece)}</td><td style="font-variant-numeric:tabular-nums">${e.floorTopup>0.005?money(e.floorTopup):""}</td><td style="font-variant-numeric:tabular-nums">${e.ot>0.005?money(e.ot):""}</td><td style="font-variant-numeric:tabular-nums"><b>${money(e.earned)}</b></td>
+        <td><div style="display:flex;gap:4px;flex-wrap:wrap"><input type="number" step="0.01" inputmode="decimal" data-paid="${esc(k)}" value="${esc(pd0.paidAmount??"")}" placeholder="Amount" style="width:100px"><input type="date" data-paiddate="${esc(k)}" value="${esc(pd0.paidDate||"")}" style="width:auto"></div></td></tr>`; }).join("")||'<tr><td colspan="7" class="meta">No people yet.</td></tr>'}</table>
+      <p class="muted">Paid amounts are copied in from QuickBooks Payroll. Typing one here saves it on the employee's pay log. Overtime is the half-time premium on each week's regular rate (all pay for the week divided by hours), which is how overtime works on piece pay.</p></div>
+    <div class="card"><h2>Fall clean windows</h2><p class="meta">Five windows timed to the city leaf pickups. A crew that finishes a window on time with zero callbacks earns the bonus; tick it per crew.</p>
+      ${[0,1,2,3,4].map(i=>{ const w=wins[i]||{}; return `<div class="who-row"><input data-wn="${i}" value="${esc(w.name||"Window "+(i+1))}" style="width:130px" aria-label="Window name"><input type="date" data-ws="${i}" value="${esc(w.start||"")}" style="width:auto" aria-label="Starts"><input type="date" data-we="${i}" value="${esc(w.end||"")}" style="width:auto" aria-label="Ends">
+        ${crewList().map(c=>`<label style="display:flex;gap:4px;align-items:center;margin:0;color:var(--ink)"><input type="checkbox" data-wearn="${esc(c)}|${i}" ${(((payRates.fallEarned||{})[c]||{})[i])?"checked":""}> ${esc(c)}</label>`).join("")}</div>`; }).join("")}
+      <div class="actions"><button class="primary" id="wSave">Save windows</button></div></div>
+    <form class="card" id="ptForm"><h2>Rates</h2><p class="meta">From the 2026-27 pay overviews. Every person on the crew earns his role's rate on each house the crew services. Westland lights and snow pay at the Rosedale (South) rates.</p>
+      <details open><summary><b>Crew manager</b></summary>${rateInputs("manager")}</details><details style="margin-top:10px"><summary><b>Crew member</b></summary>${rateInputs("member")}</details>
+      <div class="actions"><button class="primary">Save rates</button></div></form>`;
+  $("#ppPrev").onclick=()=>{ payPeriod=addDays(p,-PERIOD_DAYS); render(); }; $("#ppNext").onclick=()=>{ payPeriod=addDays(p,PERIOD_DAYS); render(); };
+  const savePaid = k => store.update({ [`payLog/${k}/${p}`]:{ paidAmount:+(app.querySelector(`[data-paid="${k}"]`).value)||0, paidDate:app.querySelector(`[data-paiddate="${k}"]`).value||today(), by:me.email, at:Date.now() } }).then(()=>toast("Paid amount saved"));
+  app.querySelectorAll("[data-paid]").forEach(i=>i.onchange=()=>{ if(i.value!=="") savePaid(i.dataset.paid); });
+  app.querySelectorAll("[data-paiddate]").forEach(i=>i.onchange=()=>{ const a=app.querySelector(`[data-paid="${i.dataset.paiddate}"]`); if(a.value!=="") savePaid(i.dataset.paiddate); });
+  $("#wSave").onclick=async()=>{ const ws=[0,1,2,3,4].map(i=>({ name:app.querySelector(`[data-wn="${i}"]`).value.trim(), start:app.querySelector(`[data-ws="${i}"]`).value||null, end:app.querySelector(`[data-we="${i}"]`).value||null }));
+    const earned={}; app.querySelectorAll("[data-wearn]").forEach(b=>{ const [c,i]=b.dataset.wearn.split("|"); if(b.checked) (earned[c]=earned[c]||{})[i]=true; });
+    await store.update({ "payRates/fallWindows":ws, "payRates/fallEarned":earned }); toast("Windows saved"); };
+  $("#ptForm").onsubmit=async e=>{ e.preventDefault(); const upd={};
+    app.querySelectorAll("[data-pt]").forEach(i=>{ const [r,path]=i.dataset.pt.split("|"); upd[`payRates/tables/${r}/${path.split(".").join("/")}`]= i.value==="" ? null : +i.value; });
+    await store.update(upd); toast("Rates saved"); };
+}
+
+
+// ---------- Team Manager (October 17, 2026): Onboarding, Personnel, Reports ----------
+// Onboarding is the hiring board, built like the CRM's Leads board. Applicants (Indeed imports or added by hand) stay on
+// the board with their own profile, and their files sit in Drive under Potential Hires. Nobody gets an employee profile
+// until he is dragged to Hired: that asks first, then makes his Personnel profile and Team entry and carries his notes,
+// Indeed profile, interviews and files into his employee file. Dragging an employee to Past also asks first, then moves
+// his whole record (profile, files, shifts, hours, pay log) into the archive. Bringing him back restores it.
+// Every person has one personnel file: the Indeed profile, calls, interviews, reference checks, notes, stage changes
+// and employee reports. The signing service keeps it as a PDF in his Drive folder.
+const HIRE_STAGES = { applied:"Applied", screen:"Phone screen", interview:"Interview", offer:"Offer", hired:"Hired", backup:"Backup", nothired:"Not hired", past:"Past" };
+const BOARD_STAGES = ["applied","screen","interview","offer","hired","backup","nothired","past"];
+const APPLIED_FOR = { crew:"Crew member", manager:"Crew manager", walker:"Door hanger", office:"Office" };
+const HIRE_SOURCES = ["Indeed","Referral","Facebook","Walk-in","Returning","Other"];
+const HIRE_CHECKS = { screen:"Phone screen done", refs:"References called", driving:"Driving record pulled", consent:"Background check consent", offer:"Offer and contract sent", training:"Training date set" };
+const FILE_TYPES = { indeed:"Indeed profile", call:"Phone call", interview:"Interview", reference:"Reference check", note:"Note", report:"Employee report", stage:"Stage change", hired:"Hired", past:"Moved to Past" };
+const NOTE_TYPES = ["call","interview","reference","note"];
+const REPORT_KINDS = { good:"Commendation", concern:"Performance concern", attendance:"Attendance", safety:"Safety", incident:"Incident", general:"General" };
+const PAST_REASONS = ["Quit","Let go","Season ended","No call, no show","Other"];
+let applicants={}, personFile={}, reportsAll={}, archive={}, fileDocs={}, applicantOpen=null, archiveOpen=null, reportQ="";
+let tmFolded = new Set(); try { tmFolded = new Set(JSON.parse(localStorage.getItem("tmFoldedCols")||"[]")); } catch(e){}
+const pingTeam = () => { if(svcCfg && !DEMO) fetch(svcCfg.url+"?action=team").catch(()=>{}); };
+const daysSince = ms => ms ? Math.max(0, Math.floor((Date.now()-ms)/864e5)) : 0;
+const firstName = n => String(n||"").split(" ")[0];
+const fileEntries = pid => Object.entries(personFile[pid]||{}).filter(([,e])=>e).sort((a,b)=>(b[1].at||0)-(a[1].at||0));
+const fileDirty = pid => ({ [`sync/personFileDirty/${pid}`]:true });
+
+// Drag a card to another column, by mouse or by finger: on an iPad or iPhone, hold the card a moment, then drag.
+// Shared with the CRM's Leads board. onDrop(id, column) decides what the move means.
+function boardDrag(root, onDrop){
+  let st=null, raf=0;
+  const SKIP="a,button,select,input,textarea,label";
+  const colAt=(x,y)=>{ const el=document.elementFromPoint(x,y); return el&&el.closest("[data-col]"); };
+  const mark=c=>{ root.querySelectorAll("[data-col].drop").forEach(x=>{ if(x!==c) x.classList.remove("drop"); }); if(c) c.classList.add("drop"); };
+  const begin=()=>{ const r=st.card.getBoundingClientRect(), g=st.card.cloneNode(true); g.classList.add("ghost");
+    Object.assign(g.style,{position:"fixed",left:r.left+"px",top:r.top+"px",width:r.width+"px",pointerEvents:"none",zIndex:3000,margin:0});
+    document.body.appendChild(g); st.g=g; st.dx=st.x0-r.left; st.dy=st.y0-r.top; st.on=true; st.card.classList.add("dragging"); try{ navigator.vibrate&&navigator.vibrate(10); }catch(e){}
+    const tick=()=>{ if(!st||!st.on) return; const m=60, sp=14; if(st.y<m) window.scrollBy(0,-sp); else if(st.y>innerHeight-m) window.scrollBy(0,sp);
+      const b=root.querySelector(".board"); if(b){ const br=b.getBoundingClientRect(); if(st.x<br.left+m) b.scrollLeft-=sp; else if(st.x>br.right-m) b.scrollLeft+=sp; }
+      mark(colAt(st.x,st.y)); raf=requestAnimationFrame(tick); }; raf=requestAnimationFrame(tick); };
+  const move=(x,y)=>{ st.x=x; st.y=y; if(st.on){ st.g.style.left=(x-st.dx)+"px"; st.g.style.top=(y-st.dy)+"px"; } };
+  const finish=()=>{ if(!st) return; clearTimeout(st.timer); cancelAnimationFrame(raf); document.removeEventListener("touchmove",tmove,{passive:false}); document.removeEventListener("touchend",tend); document.removeEventListener("touchcancel",tcancel);
+    document.removeEventListener("mousemove",mmove); document.removeEventListener("mouseup",mup);
+    if(st.on){ const c=colAt(st.x,st.y); st.g.remove(); st.card.classList.remove("dragging"); mark(null); root._dragEnd=Date.now(); const id=st.id; st=null; if(c&&c.dataset.col) onDrop(id,c.dataset.col); return; }
+    st=null; };
+  const tmove=e=>{ const p=e.touches[0]; if(!st||!p) return; if(!st.on){ if(Math.hypot(p.clientX-st.x0,p.clientY-st.y0)>10){ clearTimeout(st.timer); finish(); } return; } e.preventDefault(); move(p.clientX,p.clientY); };
+  const tend=()=>finish(), tcancel=()=>{ if(st&&st.on){ st.g.remove(); st.card.classList.remove("dragging"); mark(null); } st&&clearTimeout(st.timer); st=null; };
+  const mmove=e=>{ if(!st) return; if(!st.on && Math.hypot(e.clientX-st.x0,e.clientY-st.y0)>5) begin(); if(st.on){ e.preventDefault(); move(e.clientX,e.clientY); } };
+  const mup=()=>finish();
+  root.querySelectorAll("[data-card]").forEach(card=>{
+    card.addEventListener("touchstart",e=>{ if(e.touches.length!==1||e.target.closest(SKIP)) return; const p=e.touches[0];
+      st={card,id:card.dataset.card,x0:p.clientX,y0:p.clientY,x:p.clientX,y:p.clientY,on:false}; st.timer=setTimeout(()=>{ if(st) begin(); },280);
+      document.addEventListener("touchmove",tmove,{passive:false}); document.addEventListener("touchend",tend); document.addEventListener("touchcancel",tcancel); },{passive:true});
+    card.addEventListener("mousedown",e=>{ if(e.button!==0||e.target.closest(SKIP)) return; e.preventDefault();
+      st={card,id:card.dataset.card,x0:e.clientX,y0:e.clientY,x:e.clientX,y:e.clientY,on:false}; document.addEventListener("mousemove",mmove); document.addEventListener("mouseup",mup); });
+    card.addEventListener("contextmenu",e=>{ if(st) e.preventDefault(); });
+  });
+}
+const justDragged = root => Date.now()-(root._dragEnd||0) < 400;
+
+// ----- the personnel file: one timeline per person, on the applicant profile and the Personnel page -----
+function pfileHtml(pid, title){
+  const doc=fileDocs[pid], list=fileEntries(pid);
+  return `<div class="card" id="pfile"><div class="top" style="display:flex;justify-content:space-between;gap:10px;align-items:baseline"><h2>${esc(title||"Personnel file")}</h2>${doc&&doc.url?`<a class="mapbtn" href="${esc(doc.url)}" target="_blank" rel="noopener">File PDF in Drive</a>`:'<span class="muted">The Drive copy is made within 5 minutes</span>'}</div>
+    <div class="grid2"><div><label for="pfType">Add</label><select id="pfType">${NOTE_TYPES.map(x=>`<option value="${x}">${esc(FILE_TYPES[x])}</option>`).join("")}</select></div><div></div></div>
+    <label for="pfText">Notes</label><textarea id="pfText" rows="4" maxlength="6000" placeholder="What was said, how he came across, what to check next"></textarea>
+    <div class="actions"><button class="primary" id="pfAdd">Add to file</button></div>
+    ${list.map(([id,e])=>`<div class="pfe"><div class="h"><b>${esc(FILE_TYPES[e.type]||e.type)}</b>${e.ref?` <span class="chip">${esc(e.ref)}</span>`:""}${e.kind?` <span class="chip ${e.kind==="good"?"ok":e.kind==="general"?"":"warn"}">${esc(REPORT_KINDS[e.kind]||e.kind)}</span>`:""}<span class="muted">${fmtDay(iso(new Date(e.at||0)))} ${fmtTime(e.at)}${e.byName||e.by?" &middot; "+esc(e.byName||String(e.by).replace(/,/g,".")):""}</span></div>
+      <div class="t">${esc(e.text||"")}</div>${e.url?`<a class="small" href="${esc(e.url)}" target="_blank" rel="noopener">${e.type==="report"?"Report PDF":"Open link"}</a>`:""}</div>`).join("")||'<p class="meta">Nothing in the file yet.</p>'}</div>`;
+}
+function wirePfile(root, pid){
+  const b=root.querySelector("#pfAdd"); if(!b) return;
+  b.onclick=async()=>{ const text=$("#pfText").value.trim(); if(!text) return toast("Write the notes first"); if(previewOnly()) return;
+    try { await store.update({ [`personFile/${pid}/${store.key()}`]:{ type:$("#pfType").value, text, at:Date.now(), by:me.email, byName:me.name }, ...fileDirty(pid) }); $("#pfText").value=""; toast("Added to the file"); pingTeam(); }
+    catch(e){ toast("Not saved: "+(e.message||e)); } };
+}
+
+// ----- Onboarding board -----
+function boardCols(){
+  const live=Object.entries(applicants).filter(([,a])=>a);
+  const cols=BOARD_STAGES.map(s=>({ key:s, label:HIRE_STAGES[s], items:[] }));
+  const col=k=>cols.find(c=>c.key===k);
+  live.forEach(([id,a])=>{ const s=a.stage||"applied";
+    if(s==="hired"){ if(Date.now()-(a.hiredAt||0) < 30*864e5) col("hired").items.push({id:"a:"+id,a}); return; }
+    if(s==="past") return; (col(s)||col("applied")).items.push({id:"a:"+id,a}); });
+  Object.entries(archive).filter(([,x])=>x).forEach(([k,x])=>col("past").items.push({id:"x:"+k,x,k}));
+  col("hired").label="Hired";
+  return cols;
+}
+function applicantCard(it){
+  if(it.x){ const x=it.x; return `<div class="tcard past" data-card="${esc(it.id)}"><div class="name">${esc(x.name||it.k)}</div><div class="meta">${esc(x.reason||"")}${x.lastDay?" &middot; last day "+fmtShort(x.lastDay):""}</div><div class="meta">${esc(x.crew||"")}${x.crewRole==="manager"?" (manager)":""}</div></div>`; }
+  const a=it.a, done=Object.keys(a.checks||{}).filter(c=>HIRE_CHECKS[c]&&a.checks[c]).length, last=fileEntries(it.id.slice(2)).find(([,e])=>NOTE_TYPES.includes(e.type));
+  return `<div class="tcard" data-card="${esc(it.id)}"><div class="name">${esc(a.name)}</div>
+    <div class="meta">${esc(APPLIED_FOR[a.role]||"Applicant")}${a.city?" &middot; "+esc(a.city):""}</div>
+    <div class="meta">${a.phone?telLink(a.phone):""}${a.phone&&a.source?" &middot; ":""}${a.source?`<span class="chip ${a.source==="Indeed"?"svc-snow":""}">${esc(a.source)}</span>`:""}</div>
+    <div class="meta">${a.stage==="hired"?`Hired ${fmtShort(iso(new Date(a.hiredAt)))}`:`${(n=>n===0?"New today":n===1?"1 day here":n+" days here")(daysSince(a.stageAt||a.createdAt))}`}${done?` &middot; ${done}/${Object.keys(HIRE_CHECKS).length} steps`:""}</div>
+    ${last?`<div class="muted clip">${esc(last[1].text)}</div>`:""}
+    <select data-stage="${esc(it.id)}" aria-label="Move to">${BOARD_STAGES.map(s=>`<option value="${s}" ${(a.stage||"applied")===s?"selected":""}>${esc(HIRE_STAGES[s])}</option>`).join("")}</select></div>`;
+}
+function renderOnboard(app){
+  if(applicantOpen && applicants[applicantOpen]) return renderApplicant(app, applicantOpen);
+  if(archiveOpen && archive[archiveOpen]) return renderArchived(app, archiveOpen);
+  applicantOpen=null; archiveOpen=null;
+  const cols=boardCols(), open=Object.values(applicants).filter(a=>a&&!["hired","past","nothired"].includes(a.stage)), src={};
+  open.forEach(a=>{ src[a.source||"Other"]=(src[a.source||"Other"]||0)+1; });
+  const prev=$("#apForm") ? Object.fromEntries(new FormData($("#apForm")).entries()) : null;
+  app.innerHTML=`<div class="bar"><span class="date">Onboarding</span></div>
+    <form class="card quick" id="apForm" onsubmit="return false">
+      <div><label for="apName">Name</label><input id="apName" name="name" autocomplete="off"></div><div><label for="apPhone">Phone</label><input id="apPhone" name="phone" type="tel"></div>
+      <div><label for="apEmail">Email</label><input id="apEmail" name="email" type="email" autocapitalize="off" autocomplete="off"></div><div><label for="apCity">Lives in</label><input id="apCity" name="city" placeholder="Westland" autocomplete="off"></div>
+      <div><label for="apRole">Applied for</label><select id="apRole" name="role">${Object.entries(APPLIED_FOR).map(([v,l])=>`<option value="${v}">${esc(l)}</option>`).join("")}</select></div>
+      <div><label for="apSrc">Source</label><select id="apSrc" name="source">${HIRE_SOURCES.map(s=>`<option>${esc(s)}</option>`).join("")}</select></div>
+      <div class="quickbtns"><button class="primary" type="button" id="apAdd">Add applicant</button></div></form>
+    <p class="meta">New Indeed applications land in Applied on their own within 5 minutes. Drag a card to move it: on an iPad or iPhone, hold it a moment, then drag. Hired makes the employee profile. Past moves an employee's record to the archive. Both ask first.</p>
+    <div class="srcstrip">${Object.entries(src).map(([s,n])=>`<span class="pill">${esc(s)} <b>${n}</b></span>`).join("")}</div>
+    <div class="board wide" style="grid-template-columns:${cols.map(c=>tmFolded.has(c.key)?"52px":"minmax(158px,1fr)").join(" ")}">${cols.map(c=>{ const shut=tmFolded.has(c.key); return `
+      <div class="col ${c.key==="hired"?"won":c.key==="past"||c.key==="nothired"?"lost":""}${shut?" shut":""}" data-col="${c.key}"><h2 data-fold="${c.key}"><span class="fold">${shut?"▸":"▾"}</span><span class="lbl">${esc(c.label)}</span><span class="n">${c.items.length}</span></h2>
+        ${shut?"":(c.items.sort((x,y)=>((y.a||y.x).stageAt||(y.x||{}).archivedAt||0)-((x.a||x.x).stageAt||(x.x||{}).archivedAt||0)).map(applicantCard).join("")||'<div class="muted" style="padding:10px">None</div>')}</div>`; }).join("")}</div>`;
+  if(prev) Object.entries(prev).forEach(([k,v])=>{ const el=$("#apForm").elements[k]; if(el) el.value=v; });
+  $("#apAdd").onclick=async()=>{ const f=$("#apForm"), name=f.name.value.trim(); if(!name) return toast("Name is required");
+    if(f.email.value.trim() && !/^\S+@\S+\.\S+$/.test(f.email.value.trim())) return toast("That email does not look right");
+    if(previewOnly()) return; const id="a_"+store.key(), now=Date.now();
+    await store.update({ [`applicants/${id}`]:{ name, phone:f.phone.value.trim()||null, email:f.email.value.trim().toLowerCase()||null, city:f.city.value.trim()||null, role:f.role.value, source:f.source.value, stage:"applied", stageAt:now, createdAt:now, by:me.email } });
+    f.reset(); toast(name+" added to Applied"); };
+  app.querySelectorAll("[data-fold]").forEach(h=>h.onclick=()=>{ const k=h.dataset.fold; tmFolded.has(k)?tmFolded.delete(k):tmFolded.add(k); try{ localStorage.setItem("tmFoldedCols",JSON.stringify([...tmFolded])); }catch(e){} render(); });
+  app.querySelectorAll("[data-card]").forEach(c=>c.onclick=e=>{ if(justDragged(app)||e.target.closest("a,select")) return; openBoardCard(c.dataset.card); });
+  app.querySelectorAll("select[data-stage]").forEach(s=>s.onchange=()=>moveCard(s.dataset.stage, s.value));
+  boardDrag(app, moveCard);
+}
+function openBoardCard(id){
+  const [t,k]=[id.slice(0,1),id.slice(2)];
+  if(t==="x"){ archiveOpen=k; render(); }
+  else { const a=applicants[k]; if(a&&a.stage==="hired"&&a.hiredKey&&team[a.hiredKey]){ view="people"; personOpen=a.hiredKey; } else applicantOpen=k; render(); }
+  window.scrollTo(0,0);
+}
+// What a move on the board means.
+function moveCard(id, to){
+  const t=id.slice(0,1), k=id.slice(2);
+  if(t==="x"){ if(to==="hired") return restoreDialog(k); if(to!=="past") toast("Drag a past employee to Hired to bring him back."); return render(); }
+  const a=applicants[k]; if(!a) return; const from=a.stage||"applied"; if(from===to) return;
+  const emp=a.hiredKey&&team[a.hiredKey];
+  if(to==="hired") return emp ? toast(`${a.name} is already an employee.`) : hireDialog(k);
+  if(to==="past"){ if(emp) return archiveDialog(a.hiredKey); toast("Past is for people who worked here. Drag to Not hired instead."); return render(); }
+  if(from==="hired" && emp){ toast(`${a.name} is an employee. Drag him to Past to take him off.`); return render(); }
+  if(previewOnly()) return render();
+  store.update({ [`applicants/${k}/stage`]:to, [`applicants/${k}/stageAt`]:Date.now(),
+    [`personFile/${k}/${store.key()}`]:{ type:"stage", text:`${HIRE_STAGES[from]} to ${HIRE_STAGES[to]}`, at:Date.now(), by:me.email, byName:me.name }, ...fileDirty(k) })
+    .then(()=>toast(`${a.name}: ${HIRE_STAGES[to]}`)).catch(e=>toast("Not moved: "+(e.message||e)));
+}
+
+// ----- hire: the applicant becomes an employee -----
+function hireDialog(aid){
+  const a=applicants[aid]; if(!a) return;
+  const dl=openDlg(`<h2>Hire ${esc(a.name)}?</h2>
+    <p class="meta">This makes ${esc(firstName(a.name))}'s employee profile under Personnel and puts him on the Team list with Crew access so he can sign in. His applicant file, notes, Indeed profile and files move into his employee file, and his Drive folder moves from Potential Hires to Staff.</p>
+    <label for="hEmail">His Google account (the email he signs in with)</label><input id="hEmail" type="email" autocapitalize="off" value="${esc(/@indeedemail\.com$/i.test(a.email||"")?"":(a.email||""))}" placeholder="name@gmail.com">
+    <div class="grid2"><div><label for="hRole">Position</label><select id="hRole"><option value="member" ${a.role!=="manager"?"selected":""}>Crew member</option><option value="manager" ${a.role==="manager"?"selected":""}>Crew manager</option></select></div>
+      <div><label for="hCrew">Crew</label><select id="hCrew"><option value="">Not on a crew yet</option>${crewList().map(c=>`<option>${esc(c)}</option>`).join("")}</select></div>
+      <div><label for="hType">Paid as</label><select id="hType"><option value="W-2">Employee (W-2)</option><option value="1099">Contractor (1099)</option></select></div>
+      <div><label for="hStart">Start date</label><input id="hStart" type="date" value="${esc(today())}"></div></div>
+    <p class="muted">He cannot open his schedule until he is on a crew. You can put him on one later under Crews.</p>
+    <div class="actions"><button data-close>Cancel</button><button class="primary" id="hGo">Yes, hire ${esc(firstName(a.name))}</button></div>`);
+  dl.querySelector("#hGo").onclick=async()=>{
+    const email=$("#hEmail").value.trim().toLowerCase(); if(!/^\S+@\S+\.\S+$/.test(email)) return toast("Enter his Google account email");
+    const k=emailKey(email); if(archive[k]) return toast("That person is in Past. Drag his Past card to Hired to bring him back.");
+    if(team[k] && team[k].tier==="admin") return toast("That email is an admin.");
+    if(previewOnly()) return dl.close();
+    const role=$("#hRole").value, crew=$("#hCrew").value, now=Date.now(), upd={};
+    upd[`allowed/${k}`]={ ...(team[k]||{}), name:a.name, email, tier:"crew", crewRole:role, ...(crew?{crew}:{}) };
+    if(crew){ upd[`crews/${crew}/members/${k}`]=a.name; const cr=crews[crew]||{};
+      if(role==="manager"){ upd[`crews/${crew}/manager`]=k; if(cr.manager&&cr.manager!==k&&team[cr.manager]) upd[`allowed/${cr.manager}/crewRole`]="member"; } }
+    upd[`staff/${k}`]={ ...(staffAll[k]||{}), name:a.name, email, phone:a.phone||null, address:a.address||null, city:a.city||null, startDate:$("#hStart").value||today(), type:$("#hType").value,
+      applicantId:aid, appliedFor:a.role||null, job:a.job||null, source:a.source||null, indeedUrl:a.indeedUrl||null, hiredAt:now, hiredBy:me.email };
+    Object.entries(personFile[aid]||{}).forEach(([id,e])=>{ upd[`personFile/${k}/${id}`]=e; }); upd[`personFile/${aid}`]=null;
+    upd[`personFile/${k}/${store.key()}`]={ type:"hired", text:`Hired as ${role==="manager"?"crew manager":"crew member"}${crew?" on "+crew:""}, starting ${fmtDay($("#hStart").value||today())}. Paid as ${$("#hType").value}.`, at:now, by:me.email, byName:me.name };
+    const docs=docsAll[aid]||{}, vlt=vault[aid]||{}; Object.entries(docs).forEach(([id,d])=>{ upd[`staffDocs/${k}/${id}`]=d; }); Object.entries(vlt).forEach(([id,v])=>{ upd[`staffVault/${k}/${id}`]=v; });
+    if(Object.keys(docs).length) upd[`staffDocs/${aid}`]=null; if(Object.keys(vlt).length) upd[`staffVault/${aid}`]=null;
+    if(fileDocs[aid]){ upd[`personFileDoc/${k}`]=fileDocs[aid]; upd[`personFileDoc/${aid}`]=null; }
+    Object.assign(upd, { [`applicants/${aid}/stage`]:"hired", [`applicants/${aid}/stageAt`]:now, [`applicants/${aid}/hiredAt`]:now, [`applicants/${aid}/hiredKey`]:k,
+      [`sync/staffMove/${store.key()}`]:{ action:"hire", from:aid, to:k, name:a.name, email, at:now }, [`sync/personFileDirty/${aid}`]:null, ...fileDirty(k) });
+    try { await store.update(upd); dl.close(); toast(`${a.name} is hired. His profile is under Personnel.`); pingTeam(); }
+    catch(e){ toast("Not hired: "+(e.message||e)); }
+  };
+}
+// ----- Past: the employee's whole record moves to the archive -----
+function archiveDialog(k){
+  const t=team[k]||{}, s=staffAll[k]||{}, name=t.name||s.name||personName(k); if(t.tier!=="crew") return toast("Only crew people can be moved to Past here.");
+  const cur=periodOf(today()), prev=addDays(cur,-PERIOD_DAYS), owed=[prev,cur].map(p=>({p,e:earnings(k,p)})).filter(x=>x.e.earned>0.005 && !(x.e.paid&&x.e.paid.paidAmount!=null));
+  const dl=openDlg(`<h2>Move ${esc(name)} to Past?</h2>
+    <p class="meta">This takes ${esc(firstName(name))} off the Team list so he can no longer sign in${t.crew?`, takes him off ${esc(t.crew)}`:""}, and moves his profile, files, shifts, hours and pay log into the archive. His personnel file stays, and his Drive folder moves to Archive. Nothing is deleted: drag his card from Past to Hired to bring him back.</p>
+    ${owed.length?`<div class="storm"><span><b>Not paid yet:</b> ${owed.map(x=>`${money(x.e.earned)} for ${fmtShort(x.p)} to ${fmtShort(periodEnd(x.p))}`).join("; ")}. His final pay is due by the next regular payday.</span></div>`:""}
+    <div class="grid2"><div><label for="xWhy">Reason</label><select id="xWhy">${PAST_REASONS.map(r=>`<option>${esc(r)}</option>`).join("")}</select></div><div><label for="xLast">Last day worked</label><input id="xLast" type="date" value="${esc(today())}"></div></div>
+    <label for="xNote">Note for his file (optional)</label><textarea id="xNote" rows="3" maxlength="2000"></textarea>
+    <div class="actions"><button data-close>Cancel</button><button class="danger" id="xGo">Yes, move to Past</button></div>`);
+  dl.querySelector("#xGo").onclick=async()=>{ if(previewOnly()) return dl.close();
+    const now=Date.now(), why=$("#xWhy").value, note=$("#xNote").value.trim(), crew=t.crew||"";
+    const copy=v=>v==null?null:JSON.parse(JSON.stringify(v));
+    const rec={ name, email:t.email||s.email||null, crew:crew||null, crewRole:t.crewRole||null, archivedAt:now, by:me.email, reason:why, note:note||null, lastDay:$("#xLast").value||null,
+      allowed:copy(t), staff:copy(staffAll[k]), staffPrivate:copy(privAll[k]), staffDocs:copy(docsAll[k]), payLog:copy(payLogAll[k]), timeEntries:copy(timeAll[k]), shifts:copy(shiftsAll[k]) };
+    const upd={ [`staffArchive/${k}`]:JSON.parse(JSON.stringify(rec)), [`allowed/${k}`]:null, [`staff/${k}`]:null, [`staffPrivate/${k}`]:null, [`staffDocs/${k}`]:null, [`payLog/${k}`]:null, [`timeEntries/${k}`]:null, [`shifts/${k}`]:null,
+      [`personFile/${k}/${store.key()}`]:{ type:"past", text:`Moved to Past: ${why}.${note?" "+note:""}`, at:now, by:me.email, byName:me.name },
+      [`sync/staffMove/${store.key()}`]:{ action:"archive", k, name, at:now }, ...fileDirty(k) };
+    Object.entries(crews).forEach(([c,cr])=>{ if((cr.members||{})[k]) upd[`crews/${c}/members/${k}`]=null; if(cr.manager===k) upd[`crews/${c}/manager`]=null; });
+    Object.entries(applicants).forEach(([aid,a])=>{ if(a&&a.hiredKey===k){ upd[`applicants/${aid}/stage`]="past"; upd[`applicants/${aid}/stageAt`]=now; } });
+    try { await store.update(upd); dl.close(); personOpen=null; toast(`${name} moved to Past`); pingTeam(); render(); }
+    catch(e){ toast("Not moved: "+(e.message||e)); } };
+}
+function restoreDialog(k){
+  const x=archive[k]; if(!x) return;
+  const crewOk=x.crew&&crews[x.crew];
+  const dl=openDlg(`<h2>Bring ${esc(x.name)} back?</h2><p class="meta">This puts ${esc(firstName(x.name))} back on the Team list${crewOk?` and on ${esc(x.crew)}`:""} and restores his profile, files, shifts, hours and pay log from the archive.</p>
+    <div class="actions"><button data-close>Cancel</button><button class="primary" id="rGo">Yes, bring him back</button></div>`);
+  dl.querySelector("#rGo").onclick=async()=>{ if(previewOnly()) return dl.close(); const now=Date.now();
+    const al={ ...(x.allowed||{}), name:x.name, email:x.email, tier:"crew", crewRole:x.crewRole==="manager"&&crewOk&&!(crews[x.crew]||{}).manager?"manager":"member" }; if(crewOk) al.crew=x.crew; else delete al.crew;
+    const upd={ [`allowed/${k}`]:al, [`staffArchive/${k}`]:null, [`personFile/${k}/${store.key()}`]:{ type:"hired", text:"Brought back from Past.", at:now, by:me.email, byName:me.name },
+      [`sync/staffMove/${store.key()}`]:{ action:"restore", k, name:x.name, at:now }, ...fileDirty(k) };
+    [["staff","staff"],["staffPrivate","staffPrivate"],["staffDocs","staffDocs"],["payLog","payLog"],["timeEntries","timeEntries"],["shifts","shifts"]].forEach(([node,f])=>{ if(x[f]) upd[`${node}/${k}`]=x[f]; });
+    if(crewOk){ upd[`crews/${x.crew}/members/${k}`]=x.name; if(al.crewRole==="manager") upd[`crews/${x.crew}/manager`]=k; }
+    Object.entries(applicants).forEach(([aid,a])=>{ if(a&&a.hiredKey===k){ upd[`applicants/${aid}/stage`]="hired"; upd[`applicants/${aid}/stageAt`]=now; upd[`applicants/${aid}/hiredAt`]=now; } });
+    try { await store.update(upd); dl.close(); archiveOpen=null; toast(`${x.name} is back`); pingTeam(); render(); } catch(e){ toast("Not restored: "+(e.message||e)); } };
+}
+
+// ----- applicant profile -----
+function renderApplicant(app, aid){
+  const a=applicants[aid], ch=a.checks||{}, indeed=fileEntries(aid).filter(([,e])=>e.type==="indeed"), docs=Object.entries(docsAll[aid]||{});
+  app.innerHTML=`<div class="bar"><button class="small" id="back">&#8249; Onboarding</button><span class="date">${esc(a.name)}</span><span class="chip">${esc(HIRE_STAGES[a.stage||"applied"])}</span></div>
+    <form class="card" id="apfForm"><h2>Applicant</h2><div class="grid2">
+      <div><label for="afName">Name</label><input id="afName" value="${esc(a.name||"")}"></div><div><label for="afPhone">Phone</label><input id="afPhone" type="tel" value="${esc(a.phone||"")}"></div>
+      <div><label for="afEmail">Email</label><input id="afEmail" type="email" autocapitalize="off" value="${esc(a.email||"")}"></div><div><label for="afCity">Lives in</label><input id="afCity" value="${esc(a.city||"")}"></div>
+      <div><label for="afRole">Applied for</label><select id="afRole">${Object.entries(APPLIED_FOR).map(([v,l])=>`<option value="${v}" ${a.role===v?"selected":""}>${esc(l)}</option>`).join("")}</select></div>
+      <div><label for="afSrc">Source</label><select id="afSrc">${HIRE_SOURCES.map(s=>`<option ${a.source===s?"selected":""}>${esc(s)}</option>`).join("")}</select></div>
+      <div><label for="afJob">Listing</label><input id="afJob" value="${esc(a.job||"")}" placeholder="Landscape Laborer, Year Round"></div><div><label for="afIndeed">Indeed profile link</label><input id="afIndeed" value="${esc(a.indeedUrl||"")}" placeholder="https://employers.indeed.com/candidates/view?id=..." autocapitalize="off"></div>
+      <div><label for="afStage">Stage</label><select id="afStage">${BOARD_STAGES.map(s=>`<option value="${s}" ${(a.stage||"applied")===s?"selected":""}>${esc(HIRE_STAGES[s])}</option>`).join("")}</select></div>
+      <div><label>Applied</label><input disabled value="${a.appliedAt||a.createdAt?esc(fmtDay(iso(new Date(a.appliedAt||a.createdAt)))):""}"></div></div>
+      <div class="actions">${a.indeedUrl?`<a class="mapbtn" href="${esc(a.indeedUrl)}" target="_blank" rel="noopener" style="margin-right:auto">Open on Indeed</a>`:""}${a.mailUrl?`<a class="mapbtn" href="${esc(a.mailUrl)}" target="_blank" rel="noopener">Indeed email</a>`:""}<button class="primary">Save</button></div></form>
+    <div class="card"><h2>Hiring steps</h2>${Object.entries(HIRE_CHECKS).map(([c,l])=>`<label class="checkrow"><input type="checkbox" data-hc="${c}" ${ch[c]?"checked":""}> <span>${esc(l)}</span>${ch[c]?`<span class="muted">${fmtShort(iso(new Date(ch[c])))}</span>`:""}</label>`).join("")}
+      <p class="muted">References and the driving record before the in-person meeting; the full background check after hire. Hired asks first and then makes his employee profile.</p></div>
+    ${indeed.length?`<div class="card"><h2>Indeed profile</h2>${indeed.map(([,e])=>`<div class="t" style="white-space:pre-wrap">${esc(e.text)}</div>`).join("<hr>")}</div>`:""}
+    ${pfileHtml(aid,"Applicant file")}
+    <div class="card"><h2>Files</h2><p class="meta">Résumé, consent forms, driving record. Kept in Drive under Potential Hires; they move with him if he is hired.</p>
+      ${docs.map(([id,d])=>docRow(aid,id,d,true)).join("")||'<p class="meta">No files yet.</p>'}
+      <div class="grid2"><div><label for="upKind">What it is</label><select id="upKind"><option value="other">Résumé or other file</option>${Object.entries(DOC_KINDS).filter(([x])=>x!=="other").map(([x,l])=>`<option value="${x}">${esc(l)}${SENSITIVE.includes(x)?" (kept in Drive only)":""}</option>`).join("")}</select></div>
+        <div><label for="upLabel">Name on the record</label><input id="upLabel" placeholder="Résumé"></div></div>
+      <label for="upFile">File (PDF or photo, up to 7 MB)</label><input id="upFile" type="file" accept="application/pdf,image/*,.doc,.docx">
+      <div class="actions"><button class="primary" id="upGo">Upload to Drive</button></div></div>`;
+  $("#back").onclick=()=>{ applicantOpen=null; render(); };
+  $("#apfForm").onsubmit=async e=>{ e.preventDefault(); if(previewOnly()) return; const name=$("#afName").value.trim(); if(!name) return toast("Name is required");
+    await store.update({ [`applicants/${aid}/name`]:name, [`applicants/${aid}/phone`]:$("#afPhone").value.trim()||null, [`applicants/${aid}/email`]:$("#afEmail").value.trim().toLowerCase()||null,
+      [`applicants/${aid}/city`]:$("#afCity").value.trim()||null, [`applicants/${aid}/role`]:$("#afRole").value, [`applicants/${aid}/source`]:$("#afSrc").value,
+      [`applicants/${aid}/job`]:$("#afJob").value.trim()||null, [`applicants/${aid}/indeedUrl`]:$("#afIndeed").value.trim()||null, ...fileDirty(aid) }); toast("Saved"); };
+  $("#afStage").onchange=e=>moveCard("a:"+aid, e.target.value);
+  app.querySelectorAll("[data-hc]").forEach(b=>b.onchange=()=>{ if(previewOnly()) return; store.update({ [`applicants/${aid}/checks/${b.dataset.hc}`]: b.checked?Date.now():null }); });
+  wirePfile(app, aid);
+  $("#upGo").onclick=()=>uploadDoc(aid);
+  app.querySelectorAll("[data-docrm]").forEach(b=>b.onclick=async()=>{ await store.update({[`staffDocs/${aid}/${b.dataset.docrm}`]:null}); toast("Record removed. The file stays in Drive."); });
+}
+function renderArchived(app, k){
+  const x=archive[k], th=Object.values(x.timeEntries||{}).reduce((n,day)=>n+Object.values(day||{}).reduce((m,e)=>m+(e&&e.in&&e.out?(e.out-e.in)/3600e3:0),0),0);
+  const paid=Object.values(x.payLog||{}).reduce((n,p)=>n+(+((p||{}).paidAmount)||0),0), s=x.staff||{};
+  app.innerHTML=`<div class="bar"><button class="small" id="back">&#8249; Onboarding</button><span class="date">${esc(x.name)}</span><span class="chip bad">Past</span><button class="small primary" id="bring">Bring back</button></div>
+    <div class="card"><h2>Archived record</h2><table><tr><td>Moved to Past</td><td>${fmtDay(iso(new Date(x.archivedAt)))}: ${esc(x.reason||"")}${x.note?" &middot; "+esc(x.note):""}</td></tr>
+      <tr><td>Last day</td><td>${x.lastDay?fmtDay(x.lastDay):""}</td></tr><tr><td>Crew</td><td>${esc(x.crew||"")}${x.crewRole==="manager"?" (manager)":""}</td></tr>
+      <tr><td>Started</td><td>${s.startDate?fmtDay(s.startDate):""}</td></tr><tr><td>Phone</td><td>${telLink(s.phone)}</td></tr><tr><td>Email</td><td>${esc(x.email||"")}</td></tr>
+      <tr><td>Hours on record</td><td>${hrs(th)}</td></tr><tr><td>Paid on record</td><td>${money(paid)}</td></tr><tr><td>Files</td><td>${Object.values(x.staffDocs||{}).map(d=>esc(d.name)).join(", ")||"none"}</td></tr></table></div>
+    ${pfileHtml(k)}`;
+  $("#back").onclick=()=>{ archiveOpen=null; render(); }; $("#bring").onclick=()=>restoreDialog(k); wirePfile(app,k);
+}
+
+// ----- Crews page, office: everyone's shifts for the next two weeks, set here -----
+function renderSched(app){
+  const days=14, from=curDate<today()?today():curDate, list=people().filter(([k,t])=>!crewFilter||t.crew===crewFilter);
+  const byCrew={}; list.forEach(([k,t])=>{ (byCrew[t.crew||"No crew"]=byCrew[t.crew||"No crew"]||[]).push([k,t]); });
+  app.innerHTML=`<div class="bar"><span class="date">Schedules</span><select id="cf" style="width:auto"><option value="">All crews</option>${crewList().map(c=>`<option ${crewFilter===c?"selected":""}>${esc(c)}</option>`).join("")}</select></div>
+    <p class="meta">Shifts for the next two weeks, by crew. Crew managers set their own crew's shifts too. Storm call-outs and meetings show on each person's schedule on their own.</p>
+    ${Object.entries(byCrew).sort((a,b)=>a[0].localeCompare(b[0],undefined,{numeric:true})).map(([c,ps])=>`<h2 style="margin:14px 0 8px">${esc(c)}</h2>`+ps.map(([k,t])=>`<div class="card"><div class="top" style="display:flex;justify-content:space-between;gap:10px;align-items:baseline"><h2>${esc(t.name)}${t.crewRole==="manager"?' <span class="chip ok">Manager</span>':""}</h2><button class="small primary" data-shadd="${esc(k)}">Add shifts</button></div>${shiftList(k, from, days)||'<p class="muted">No shifts in the next two weeks.</p>'}</div>`).join("")).join("")||'<div class="card"><p class="meta">No crew people yet. Hire them on Team Manager.</p></div>'}`;
+  $("#cf").onchange=e=>{ crewFilter=e.target.value; render(); };
+  wireShifts(app);
+}
+// ----- Team Manager, office: whose paperwork is missing, expired or expiring -----
+function renderPaper(app){
+  const rows=people().map(([k,t])=>({k,t,st:docStatus(k)}));
+  const bad=rows.filter(r=>r.st.missing.length||r.st.expired.length||r.st.soon.length);
+  app.innerHTML=`<div class="bar"><span class="date">Paperwork</span><span class="chip ${bad.length?"warn":"ok"}">${bad.length?bad.length+" need attention":"Everyone is up to date"}</span></div>
+    <p class="meta">Required for W-2: agreement, pay terms, handbook, W-4, I-9, direct deposit. For 1099: agreement, pay terms, handbook, W-9. Licenses and certifications are flagged 30 days before they expire. Tap a person to upload.</p>
+    <div class="card scroll"><table><tr><th>Name</th><th>Paid as</th><th>Missing</th><th>Expired or expiring</th><th>On file</th></tr>
+    ${rows.sort((a,b)=>(b.st.missing.length+b.st.expired.length*2)-(a.st.missing.length+a.st.expired.length*2)||(a.t.name||"").localeCompare(b.t.name||"")).map(r=>`<tr data-person="${esc(r.k)}" style="cursor:pointer"><td><b>${esc(r.t.name)}</b><div class="muted">${esc(r.t.crew||"No crew")}</div></td><td>${esc(staffOf(r.k).type||"W-2")}</td>
+      <td>${r.st.missing.length?r.st.missing.map(x=>`<span class="chip warn">${esc(DOC_KINDS[x])}</span>`).join(" "):'<span class="chip ok">None</span>'}</td>
+      <td>${[...r.st.expired.map(([,d])=>`<span class="chip bad">${esc(d.name)}: expired ${fmtShort(d.expires)}</span>`),...r.st.soon.map(([,d])=>`<span class="chip warn">${esc(d.name)}: ${fmtShort(d.expires)}</span>`)].join(" ")||""}</td><td>${r.st.docs.length}</td></tr>`).join("")||'<tr><td colspan="5" class="meta">No employees yet.</td></tr>'}</table></div>`;
+  app.querySelectorAll("[data-person]").forEach(tr=>tr.onclick=()=>{ view="people"; personOpen=tr.dataset.person; render(); window.scrollTo(0,0); });
+}
+
+// ----- employee reports: optional, from the manager's crew log -----
+const reportsFor = (crew, d) => Object.entries(reportsAll[crew]||{}).filter(([,r])=>r&&(!d||r.date===d)).sort((a,b)=>(a[1].at||0)-(b[1].at||0));
+function reportsHtml(d, crew){
+  if(!(isAdmin || role==="manager")) return "";
+  const list=reportsFor(crew,d);
+  return `<div class="reports"><h3 style="margin-top:12px">Employee reports <span class="muted" style="font-weight:400">(optional)</span></h3>
+    ${list.map(([,r])=>`<div class="logrow"><span class="t">${r.ref?esc(r.ref.slice(-3)):"..."}</span><span class="w"><b>${esc(r.name||personName(r.k))}</b> <span class="chip ${r.kind==="good"?"ok":r.kind==="general"?"":"warn"}">${esc(REPORT_KINDS[r.kind]||r.kind)}</span>
+      <div class="meta">${r.ref?esc(r.ref):"Reference number within 5 minutes"} &middot; ${esc(r.byName||personName(r.by))}</div><div class="muted clip">${esc(r.text)}</div></span></div>`).join("")||'<p class="muted">None today. Write one when someone did something worth the record, good or bad. It goes to the office and into his personnel file; he does not see it.</p>'}
+    <div class="actions"><button class="small" data-report="${esc(crew)}">Write an employee report</button></div></div>`;
+}
+function reportDialog(crew, d){
+  const mem=Object.keys(crewMembers(crew)).filter(k=>k!==me.key);
+  if(!mem.length) return toast("No one else is on "+crew);
+  const dl=openDlg(`<h2>Employee report</h2><p class="meta">${esc(crew)} &middot; ${fmtDay(d)}. It gets a reference number, is saved to his Drive folder and goes into his personnel file. He does not see it.</p>
+    <div class="grid2"><div><label for="erWho">About</label><select id="erWho">${mem.map(k=>`<option value="${esc(k)}">${esc(personName(k))}</option>`).join("")}</select></div>
+      <div><label for="erKind">Kind</label><select id="erKind">${Object.entries(REPORT_KINDS).map(([v,l])=>`<option value="${v}">${esc(l)}</option>`).join("")}</select></div></div>
+    <label for="erText">What happened</label><textarea id="erText" rows="6" maxlength="4000" placeholder="What he did, where and when, and what you told him"></textarea>
+    <div class="actions"><button data-close>Cancel</button><button class="primary" id="erGo">Send report</button></div>`);
+  dl.querySelector("#erGo").onclick=async()=>{ const text=$("#erText").value.trim(); if(!text) return toast("Write what happened"); if(previewOnly()) return dl.close();
+    const k=$("#erWho").value, id=store.key();
+    try { await store.update({ [`staffReports/${crew}/${id}`]:{ k, name:personName(k), crew, date:d, kind:$("#erKind").value, text, by:me.key, byName:me.name, at:Date.now() } });
+      dl.close(); toast("Report sent. Its reference number comes within 5 minutes."); pingTeam(); } catch(e){ toast("Not sent: "+(e.message||e)); } };
+}
+function renderReports(app){
+  const q=reportQ.toLowerCase(), all=[]; Object.entries(reportsAll).forEach(([c,list])=>Object.entries(list||{}).forEach(([id,r])=>{ if(r) all.push({c,id,...r}); }));
+  const rows=all.filter(r=>!q||[r.ref,r.name,personName(r.k),r.crew,r.text,REPORT_KINDS[r.kind]].join(" ").toLowerCase().includes(q)).sort((a,b)=>(b.at||0)-(a.at||0));
+  app.innerHTML=`<div class="bar"><span class="date">Employee reports</span><input id="rq" value="${esc(reportQ)}" placeholder="Search by number, name or word" style="flex:1;min-width:160px" autocomplete="off"></div>
+    <p class="meta">Filed by crew managers from their crew log. Each has a reference number (ER-date-number), a PDF in the person's Drive folder, and a line in his personnel file.</p>
+    <div class="card scroll"><table><tr><th>Number</th><th>Date</th><th>About</th><th>Crew</th><th>Kind</th><th>Filed by</th><th></th></tr>
+    ${rows.map(r=>`<tr data-rep="${esc(r.c)}|${esc(r.id)}" style="cursor:pointer"><td><b>${esc(r.ref||"pending")}</b></td><td>${fmtShort(r.date)}</td><td>${esc(r.name||personName(r.k))}</td><td>${esc(r.crew||r.c)}</td><td><span class="chip ${r.kind==="good"?"ok":r.kind==="general"?"":"warn"}">${esc(REPORT_KINDS[r.kind]||r.kind)}</span></td><td>${esc(r.byName||personName(r.by))}</td><td>${r.url?`<a href="${esc(r.url)}" target="_blank" rel="noopener">PDF</a>`:""}</td></tr>`).join("")||'<tr><td colspan="7" class="meta">No reports yet.</td></tr>'}</table></div>`;
+  const rq=$("#rq"); rq.oninput=()=>{ reportQ=rq.value; const pos=rq.selectionStart; render(); const n=$("#rq"); n.focus(); try{ n.setSelectionRange(pos,pos); }catch(e){} };
+  app.querySelectorAll("[data-rep]").forEach(tr=>tr.onclick=e=>{ if(e.target.closest("a")) return; const [c,id]=tr.dataset.rep.split("|"), r=(reportsAll[c]||{})[id]; if(!r) return;
+    openDlg(`<h2>${esc(r.ref||"Report")}</h2><p class="meta">${esc(r.name||personName(r.k))} &middot; ${esc(r.crew||c)} &middot; ${fmtDay(r.date)} &middot; ${esc(REPORT_KINDS[r.kind]||r.kind)} &middot; filed by ${esc(r.byName||personName(r.by))}</p><div style="white-space:pre-wrap">${esc(r.text)}</div>
+      <div class="actions">${r.url?`<a class="mapbtn" href="${esc(r.url)}" target="_blank" rel="noopener">Open PDF</a>`:""}<button data-person-go="${esc(r.k)}">Open his file</button><button data-close>Close</button></div>`);
+    const go=document.querySelector("[data-person-go]"); if(go) go.onclick=()=>{ $("#dlg").close(); if(team[r.k]){ view="people"; personOpen=r.k; } else if(archive[r.k]){ view="onboard"; archiveOpen=r.k; } render(); window.scrollTo(0,0); }; });
+}
+
+// ---------- start ----------
+function demoSeed(){
+  const K = e => emailKey(e), d=today(), mon=mondayOf(d);
+  const ppl = { boss:"marcus.reed@example.com", m1:"tyler.ng@example.com", m2:"sam.ortiz@example.com", boss2:"dave.kim@example.com", m3:"luis.park@example.com" };
+  const T = (k,name,crew,r) => ({ name, email:ppl[k], tier:"crew", crew, crewRole:r });
+  const cl = [["Helen Brooks","34521 Hees St, Livonia, MI",42.3956,-83.3633,"734-555-0101"],["Tom Walsh","33740 Lyndon St, Livonia, MI",42.4001,-83.3608,"734-555-0102"],["Grace Patel","15620 Ellen Dr, Livonia, MI",42.4006,-83.3554,"734-555-0103"],
+    ["Mark Ruiz","15900 Fairfield St, Livonia, MI",42.4039,-83.3519,""],["Anna Cole","34000 Munger St, Livonia, MI",42.3981,-83.3575,"734-555-0105"],["Joe Lin","9300 Hix Rd, Westland, MI",42.3592,-83.4128,"734-555-0106"],["Ruth Diaz","35400 Glenwood Rd, Westland, MI",42.3247,-83.3742,""]];
+  const clientsSeed={}; cl.forEach(([n,a,la,lo,p],i)=>clientsSeed["c"+i]={ name:n, address:a, phone:p, status:"active", services:{ s1:{type:i<5?"snow":"lights"} } });
+  const stop = (i,o,extra) => ({ clientId:"c"+i, name:cl[i][0], address:cl[i][1], lat:cl[i][2], lon:cl[i][3], phone:cl[i][4]||null, order:o, kind:"snow", svcId:"s1", ...(extra||{}) });
+  const upd = {
+    ["allowed/"+K(ADMIN_EMAIL)]:{name:"Russel",email:ADMIN_EMAIL,tier:"admin"},
+    ["allowed/"+K(ppl.boss)]:T("boss","Marcus Reed","Crew 1","manager"), ["allowed/"+K(ppl.m1)]:T("m1","Tyler Ng","Crew 1","member"), ["allowed/"+K(ppl.m2)]:T("m2","Sam Ortiz","Crew 1","member"),
+    ["allowed/"+K(ppl.boss2)]:T("boss2","Dave Kim","Crew 2","manager"), ["allowed/"+K(ppl.m3)]:T("m3","Luis Park","",""),
+    "crews/Crew 1":{ name:"Crew 1", order:1, manager:K(ppl.boss), start:"3540 Thorn Tree Ct, Ann Arbor, MI", members:{[K(ppl.boss)]:"Marcus Reed",[K(ppl.m1)]:"Tyler Ng",[K(ppl.m2)]:"Sam Ortiz"} },
+    "crews/Crew 2":{ name:"Crew 2", order:2, manager:K(ppl.boss2), members:{[K(ppl.boss2)]:"Dave Kim"} },
+    "crewRoutes/snow1":{ crew:"Crew 1", service:"snow", name:"Livonia snow route", standing:true, stops:{ a:stop(0,1,{note:"Pile snow on the north side. Dog in the back yard."}), b:stop(1,2), c:stop(2,3,{note:"Long driveway, salt the walk"}), d:stop(3,4), e:stop(4,5) } },
+    "crewRoutes/lights1":{ crew:"Crew 2", service:"lights", name:"Lights installs", start:d, end:addDays(d,2), stops:{ a:stop(5,1,{kind:"lights",pkg:"fullfront"}), b:stop(6,2,{kind:"call",pkg:"roofline",note:"Two strands out over the garage"}) } },
+    [`storms/${d}/Crew 1`]:{ at:Date.now()-3*3600e3, by:K(ppl.boss), tier:"t2" },
+    [`crewChecks/${d}/snow1/a`]:{ by:K(ppl.m1), at:Date.now()-2.5*3600e3, kind:"snow", eid:"x1", photo:true },
+    [`crewChecks/${d}/snow1/b`]:{ by:K(ppl.m2), at:Date.now()-2.2*3600e3, kind:"snow", eid:"x2" },
+    [`crewPhotos/${d}/snow1/a`]:{ data:"data:image/svg+xml;utf8,"+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="480" height="300"><rect width="480" height="300" fill="#dfe6ee"/><rect y="200" width="480" height="100" fill="#8a96a3"/><text x="240" y="150" font-size="22" text-anchor="middle" fill="#41505f" font-family="sans-serif">Sample photo: cleared driveway</text></svg>'), at:Date.now()-2.5*3600e3, by:K(ppl.m1) },
+    [`serviceLog/${d}/x1`]:{ clientId:"c0", kind:"snow", source:"crew", crew:"Crew 1", at:Date.now()-2.5*3600e3, by:K(ppl.m1) },
+    [`serviceLog/${d}/x2`]:{ clientId:"c1", kind:"snow", source:"crew", crew:"Crew 1", at:Date.now()-2.2*3600e3, by:K(ppl.m2) },
+    [`timeEntries/${K(ppl.boss)}/${d}/t1`]:{ in:Date.now()-3*3600e3, crew:"Crew 1" }, [`timeEntries/${K(ppl.m1)}/${d}/t1`]:{ in:Date.now()-3*3600e3, crew:"Crew 1" }, [`timeEntries/${K(ppl.m2)}/${d}/t1`]:{ in:Date.now()-2.8*3600e3, out:Date.now()-0.5*3600e3, crew:"Crew 1" },
+    [`events/ev1`]:{ title:"Snow training", where:"The yard", date:addDays(mon,5), start:"09:00", end:"11:00", crew:"all" },
+    clients: clientsSeed
+  };
+  // Past days: Tyler worked, the crew logged stops, and the manager approved two of the three days.
+  for(let i=1;i<=3;i++){ const x=addDays(d,-i); upd[`timeEntries/${K(ppl.m1)}/${x}/t1`]={ in:atTime(x,"07:00"), out:atTime(x,"15:30"), crew:"Crew 1", status:i>1?"approved":undefined };
+    upd[`storms/${x}/Crew 1`]={ at:atTime(x,"05:00"), by:K(ppl.boss), tier:i===2?"t3":"t2" }; ["a","b","c","d","e"].forEach((sid,j)=>{ upd[`crewChecks/${x}/snow1/${sid}`]={ by:K(ppl.boss), at:atTime(x,"07:30")+j*1800e3, kind:"snow", eid:"p"+i+sid, photo:!(i===3&&sid==="e") }; });
+    if(i>1) upd[`dayLogs/${x}/crews/Crew 1`]={ status:"approved", approvedBy:K(ppl.boss), approvedAt:atTime(x,"16:00"), entries:5 }; }
+  // People records: contact, pay share, files and shifts
+  const S = k => K(ppl[k]);
+  Object.assign(upd, {
+    "payRates":{ periodStart:"2026-10-05", fallWindows:[{name:"Section 34",start:"2026-10-19",end:"2026-10-24"},{name:"Section 35",start:"2026-10-26",end:"2026-10-31"},{name:"North 5/6/7",start:"2026-11-02",end:"2026-11-07"},{name:"North 8",start:"2026-11-09",end:"2026-11-14"},{name:"Final pass",start:"2026-11-16",end:"2026-11-28"}] },
+    [`staff/${S("m1")}`]:{ email:ppl.m1, phone:"734-555-0141", address:"29500 Six Mile Rd, Livonia, MI", emergency:{ name:"Linda Ng", phone:"734-555-0142", relation:"Mother" }, startDate:"2026-09-28", type:"W-2" },
+    [`staff/${S("m2")}`]:{ email:ppl.m2, phone:"734-555-0151", startDate:"2026-10-01", type:"W-2" },
+    [`staff/${S("boss")}`]:{ email:ppl.boss, phone:"734-555-0161", address:"15100 Farmington Rd, Livonia, MI", emergency:{ name:"Jen Reed", phone:"734-555-0162", relation:"Spouse" }, startDate:"2026-09-15", type:"W-2" },
+    [`staffDocs/${S("m1")}/f1`]:{ name:"2026 employment agreement", kind:"agreement", at:Date.now()-18*864e5, signedAt:addDays(d,-18), url:"https://drive.google.com/", shared:true },
+    [`staffDocs/${S("m1")}/f2`]:{ name:"Pay terms, snow season", kind:"payterms", at:Date.now()-18*864e5, signedAt:addDays(d,-18), url:"https://drive.google.com/", shared:true },
+    [`staffDocs/${S("m1")}/f3`]:{ name:"W-4", kind:"w4", sensitive:true, at:Date.now()-18*864e5, signedAt:addDays(d,-18) },
+    [`staffDocs/${S("m1")}/f4`]:{ name:"Chauffeur license", kind:"cert", at:Date.now()-18*864e5, expires:addDays(d,20), url:"https://drive.google.com/", shared:true },
+    [`staffVault/${S("m1")}/f3`]:{ fileId:"demo", url:"https://drive.google.com/" },
+    [`payLog/${S("m1")}/2026-09-21`]:{ paidAmount:612.4, paidDate:"2026-10-09", ref:"Payroll check 1042" }
+  });
+  // Hiring board: applicants at each stage, their files, an employee report and one past employee.
+  const ago=n=>Date.now()-n*864e5, A=(name,role,stage,extra)=>({ name, role, stage, source:"Indeed", stageAt:ago(extra&&extra.days||2), createdAt:ago(9), appliedAt:ago(9), by:"Indeed import", ...(extra||{}) });
+  Object.assign(upd, {
+    "applicants/a_1":A("Jordan Hale","crew","applied",{ city:"Westland, MI", phone:"734-555-0201", job:"Landscape Laborer, Year Round (Lawn, Leaf, Snow)", indeedUrl:"https://employers.indeed.com/candidates/view?id=1a2b3c4d5e6f", days:1 }),
+    "applicants/a_2":A("Chris Moreno","manager","applied",{ city:"Livonia, MI", phone:"734-555-0202", job:"Landscape Crew Leader, Year Round (Lawn, Leaf, Snow)", days:0 }),
+    "applicants/a_3":A("Devon Price","crew","screen",{ city:"Redford, MI", phone:"313-555-0203", checks:{ screen:ago(1) }, days:1 }),
+    "applicants/a_4":A("Alex Turner","manager","interview",{ city:"Plymouth, MI", phone:"313-555-0204", email:"alex.turner@example.com", checks:{ screen:ago(4), refs:ago(2), driving:ago(2) }, days:2 }),
+    "applicants/a_5":A("Sam Brooks","crew","offer",{ city:"Garden City, MI", phone:"734-555-0205", email:"sam.brooks@example.com", source:"Referral", checks:{ screen:ago(6), refs:ago(4), driving:ago(4), consent:ago(4), offer:ago(1) }, days:1 }),
+    "applicants/a_6":A("Riley Shaw","crew","backup",{ city:"Canton, MI", phone:"734-555-0206", days:5 }),
+    "applicants/a_7":A("Pat Quinn","walker","nothired",{ city:"Detroit, MI", days:6 }),
+    "applicants/a_8":A("Tyler Ng","crew","hired",{ hiredAt:ago(19), hiredKey:S("m1"), days:19 }),
+    [`personFile/a_1/i1`]:{ type:"indeed", text:"Applied for Landscape Laborer, Year Round (Lawn, Leaf, Snow).\n\nJordan Hale\nWestland, MI 48185\nExperience: two seasons on a residential mowing crew; push blowers and string trimmers.\nScreener: weekday snow dispatch, yes. Valid license, yes.", at:ago(9), by:"Indeed import" },
+    [`personFile/a_4/c1`]:{ type:"call", text:"Ten minutes. Ran a three-man crew at his last company for two seasons. First question was where the yard is. Wants steady winter work.", at:ago(4), by:ADMIN_EMAIL, byName:"Russel" },
+    [`personFile/a_4/r1`]:{ type:"reference", text:"Former supervisor: on time, ran the truck alone the last season, would hire him back.", at:ago(2), by:ADMIN_EMAIL, byName:"Russel" },
+    [`personFile/${S("m1")}/h1`]:{ type:"interview", text:"In person. Showed up ten minutes early. Clear answers on how he handles a missed house.", at:ago(22), by:ADMIN_EMAIL, byName:"Russel" },
+    [`personFile/${S("m1")}/h2`]:{ type:"hired", text:"Hired as crew member on Crew 1. Paid as W-2.", at:ago(19), by:ADMIN_EMAIL, byName:"Russel" },
+    [`personFile/${S("m1")}/rp1`]:{ type:"report", ref:"ER-"+addDays(d,-2).replace(/-/g,"")+"-001", kind:"good", text:"Finished the north half of the route alone when the blower went down.", at:ago(2), by:S("boss"), byName:"Marcus Reed", url:"https://drive.google.com/" },
+    [`staffReports/Crew 1/rp1`]:{ k:S("m1"), name:"Tyler Ng", crew:"Crew 1", date:addDays(d,-2), kind:"good", text:"Finished the north half of the route alone when the blower went down.", by:S("boss"), byName:"Marcus Reed", at:ago(2), ref:"ER-"+addDays(d,-2).replace(/-/g,"")+"-001", url:"https://drive.google.com/" },
+    [`personFileDoc/${S("m1")}`]:{ url:"https://drive.google.com/", at:ago(2), entries:3 },
+    "staffArchive/kevin,ward@example,com":{ name:"Kevin Ward", email:"kevin.ward@example.com", crew:"Crew 2", crewRole:"member", archivedAt:ago(12), by:ADMIN_EMAIL, reason:"Season ended", lastDay:addDays(d,-12),
+      staff:{ phone:"734-555-0299", startDate:"2026-04-06", type:"W-2" }, timeEntries:{ [addDays(d,-13)]:{ t1:{ in:ago(13), out:ago(13)+8*3600e3 } } }, payLog:{ "2026-09-21":{ paidAmount:845.5 } } }
+  });
+  for(let i=0;i<20;i++){ const x=addDays(d,i), w=pd(x).getUTCDay(); if(w===0||w===6) continue; ["m1","m2","boss"].forEach(k=>{ upd[`shifts/${S(k)}/${x}`]={ start:k==="boss"?"06:30":"07:00", end:"15:30", crew:"Crew 1", note:i%5===2?"Lights installs, meet at the yard":null }; }); }
+  return { upd, who:{ admin:{email:ADMIN_EMAIL,displayName:"Russel"}, manager:{email:ppl.boss,displayName:"Marcus Reed"}, member:{email:ppl.m1,displayName:"Tyler Ng"}, crew2:{email:ppl.boss2,displayName:"Dave Kim"} } };
+}
+if(DEMO){
+  $("#demoBanner").hidden=false;
+  const s=demoSeed(); store.update(s.upd).then(()=>enter(s.who[DEMO]||s.who.admin));
+} else {
+  store.auth.onAuthStateChanged(u => { if(u) return enter(u); leave(); location.replace("./?to=crews.html"); });  // signed out: the front page signs people in
+}
+</script>
+<div class="pgdrawer-bg" id="pgDrawerBg"></div>
+<nav class="pgdrawer" id="pgDrawer" aria-label="Pages" aria-hidden="true">
+  <div class="pdhead"><b>Mangiapane Brothers</b><button type="button" class="pdx" id="pgDrawerX" aria-label="Close page menu">&times;</button></div>
+  <a href="./projects.html">Projects<span>Admin task dashboard</span></a><a href="./crm.html">CRM<span>Leads, clients, contracts</span></a><a href="./crews.html" >Crews<span>Routes, schedules, day logs</span></a><a href="./team.html" class="here" aria-current="page">Team Manager<span>Personnel, hiring, payroll, paperwork</span></a><a href="./routes.html">Routes<span>Door hanger routes</span></a>
+  <div class="pdfoot">Full-Service Property Maintenance for Those Who Take Pride in Their Home</div>
+</nav>
+<script>
+// Page menu: opens from the three-line button, closes with the X, a tap outside, Escape, or a swipe left.
+(function(){
+  const btn=document.getElementById("navBtn"), d=document.getElementById("pgDrawer"), bg=document.getElementById("pgDrawerBg"), x=document.getElementById("pgDrawerX");
+  const set=open=>{ d.classList.toggle("open",open); bg.classList.toggle("open",open); d.setAttribute("aria-hidden",String(!open)); btn.setAttribute("aria-expanded",String(open)); if(open) x.focus(); };
+  btn.onclick=()=>set(!d.classList.contains("open")); x.onclick=()=>set(false); bg.onclick=()=>set(false);
+  document.addEventListener("keydown",e=>{ if(e.key==="Escape" && d.classList.contains("open")) set(false); });
+  let x0=null; d.addEventListener("pointerdown",e=>{ x0=e.clientX; }); d.addEventListener("pointerup",e=>{ if(x0!=null && x0-e.clientX>60) set(false); x0=null; });
+  window.__pageMenu={open:()=>set(true),close:()=>set(false)};
+})();
+</script>
+</body>
+</html>

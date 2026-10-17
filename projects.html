@@ -963,7 +963,7 @@ function renderTeam(m){
   const isR = t => (t.email||"").toLowerCase()===ADMIN_EMAIL.toLowerCase();
   const rows=list.map(([k,t])=>`<tr><td><span data-namebox="${k}">${esc(t.name)} <button class="small" data-rename="${k}" title="Change the name">Edit</button></span></td><td>${esc(t.email)}</td>
     <td>${isR(t)?'<span class="meta">Admin (owner)</span>':`<select data-tier="${k}" style="width:auto">${!t.tier?'<option value="" selected>No access level</option>':""}${Object.entries(TIERS).map(([v,l])=>`<option value="${v}" ${t.tier===v?"selected":""}>${esc(l)}</option>`).join("")}</select>`}
-      ${t.tier==="crew"?` <a href="./crews.html" class="meta">${t.crew?esc(t.crew)+(t.crewRole==="manager"?", manager":""):"No crew yet: set it on the Crews page"}</a>`:""}</td>
+      ${t.tier==="crew"?` <a href="./team.html" class="meta">${t.crew?esc(t.crew)+(t.crewRole==="manager"?", manager":""):"No crew yet: set it on Team Manager, Crews"}</a>`:""}</td>
     <td>${isR(t)?"":`<button class="small danger" data-rm="${k}">Remove</button>`}</td></tr>`).join("");
   m.innerHTML = `<div class="card"><h2>Team and access</h2><p class="meta">One sign-in list for every page. The access level decides where a person lands: <b>Admin</b> opens Projects and the CRM, including client prices. <b>Crew</b> sees only the Crew View (his crew's routes, schedule, hours); put the person on a crew on the Crews page. <b>Walker</b> sees only the door hanger Routes page. Only admins can change this list. Names of admins are what show up as owners and assignees.</p>
     <div style="overflow-x:auto"><table><thead><tr><th>Name</th><th>Google email</th><th>Access</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>
@@ -1172,7 +1172,7 @@ $("#taskForm").onsubmit=async e=>{ const f=e.target; const data={title:f.title.v
 <div class="pgdrawer-bg" id="pgDrawerBg"></div>
 <nav class="pgdrawer" id="pgDrawer" aria-label="Pages" aria-hidden="true">
   <div class="pdhead"><b>Mangiapane Brothers</b><button type="button" class="pdx" id="pgDrawerX" aria-label="Close page menu">&times;</button></div>
-  <a href="./projects.html" class="here" aria-current="page">Projects<span>Admin task dashboard</span></a><a href="./crm.html">CRM<span>Leads, clients, contracts</span></a><a href="./crews.html">Crews<span>Crew routes, day logs, approval</span></a><a href="./routes.html">Routes<span>Door hanger routes</span></a>
+  <a href="./projects.html" class="here" aria-current="page">Projects<span>Admin task dashboard</span></a><a href="./crm.html">CRM<span>Leads, clients, contracts</span></a><a href="./crews.html">Crews<span>Routes, schedules, day logs</span></a><a href="./team.html">Team Manager<span>Personnel, hiring, payroll, paperwork</span></a><a href="./routes.html">Routes<span>Door hanger routes</span></a>
   <div class="pdfoot">Full-Service Property Maintenance for Those Who Take Pride in Their Home</div>
 </nav>
 <script>

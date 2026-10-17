@@ -225,6 +225,12 @@ const firebaseConfig = {
   appId: "1:246828597156:web:dfa85db16f51d85b5fcb31"
 };
 const ADMIN_EMAIL = "russel.mangiapaneiii@gmail.com";
+// Two pages from one source (October 17, 2026): crews.html is routes and schedules; team.html (Team Manager) is personnel,
+// hiring, payroll, paperwork and management. The build sets this line. Crews and employees only ever use crews.html.
+const PAGE = "crews";
+const OFFICE_TABS = PAGE==="team"
+  ? [["onboard","Onboarding"],["people","Personnel"],["crews","Crews"],["paper","Paperwork"],["reports","Reports"],["paycfg","Payroll"]]
+  : [["today","Day"],["week","Week"],["routes","Routes"],["sched","Schedules"],["log","Log"],["events","Meetings"]];
 // Where each clearance tier lands. Admins and crews use this page; walkers use the door hanger Routes page.
 const TIER_HOME = { admin:"projects.html", crew:"crews.html", walker:"routes.html" };
 const HOME = [42.3836,-83.3527];   // Livonia, for an empty map
@@ -315,6 +321,7 @@ let crews={}, routes={}, storms={}, checks={}, events={}, team={}, clients={}, s
 let staffAll={}, privAll={}, docsAll={}, shiftsAll={}, payLogAll={}, vault={}, payRates={}, svcCfg=null;
 let view="today", curDate=today(), openRoute=null, crewFilter="", editing=null, meTab="schedule", personOpen=null, payPeriod=null;
 let unsub=[], dayUnsub=[], memUnsub=[];
+let pendingSeeAs = (location.hash.match(/^#seeas=(.+)$/)||[])[1] ? decodeURIComponent(location.hash.slice(7)) : "";
 const isMgr = () => (isAdmin && !viewAs) || role==="manager";
 const previewOnly = () => { if(viewAs){ toast("Preview. Nothing is saved."); return true; } return false; };
 const isEmpPreview = () => viewAs.startsWith("emp:");
@@ -335,14 +342,15 @@ async function enter(user){
     const mine = await store.get("allowed/"+me.key).catch(()=>null);
     const tier = mine?.tier || (me.email===ADMIN_EMAIL.toLowerCase() ? "admin" : "");
     if(tier==="walker"){ location.replace(TIER_HOME.walker); return; }
+    if(PAGE==="team" && tier!=="admin"){ location.replace("crews.html"); return; }
     if(tier!=="admin" && tier!=="crew") return deny(`${me.email} is not on the team list. Ask Russel to add it, then sign out and back in.`);
     if(tier==="crew" && mine.active===false) return deny(`${me.email} is not active on the team list. Ask Russel.`);
     if(tier==="crew" && !mine.crew) return deny(`${mine.name||me.email} is on the team list but not on a crew yet. Ask Russel to put you on a crew.`);
     isAdmin = tier==="admin"; realAdmin=isAdmin; viewAs=""; meReal=null;
     role = isAdmin ? "" : (mine.crewRole==="manager" ? "manager" : "member"); myCrew = isAdmin ? "" : mine.crew;
     if(mine?.name) me.name = mine.name;
-    view = role==="member" ? "schedule" : "today";
-    $("#title").textContent = isAdmin ? "Mangiapane Brothers Crews" : `${myCrew}`;
+    view = role==="member" ? "schedule" : isAdmin ? OFFICE_TABS[0][0] : "today";
+    $("#title").textContent = isAdmin ? (PAGE==="team" ? "Mangiapane Brothers Team Manager" : "Mangiapane Brothers Crews") : `${myCrew}`;
     $("#gate").hidden=true; $("#app").hidden=false; $("#nav").hidden=false; $("#navBtn").hidden=!isAdmin; attach();
   } catch(e){ deny(`${me.email} could not be checked against the team list. Ask Russel.`); }
 }
@@ -435,11 +443,13 @@ const myTimeMap = () => timeAll[me.key]||{};
 
 // ---------- navigation ----------
 function tabs(){
-  const t = isAdmin ? [["today","Day"],["week","Week"],["routes","Routes"],["crews","Crews"],["onboard","Onboarding"],["people","Personnel"],["reports","Reports"],["log","Log"],["events","Meetings"],["paycfg","Pay"]]
+  // A "See as" link from Team Manager lands here as crews.html#seeas=emp:<key>.
+  if(pendingSeeAs && realAdmin && PAGE==="crews" && (team[pendingSeeAs.slice(4)] || crews[pendingSeeAs])){ const v=pendingSeeAs; pendingSeeAs=""; history.replaceState(null,"",location.pathname+location.search); setTimeout(()=>setViewAs(v),0); }
+  const t = isAdmin ? OFFICE_TABS
     : role==="manager" ? [["today","Today"],["week","Week"],["crewlog","Crew log"],["crew","Crew"],["me","Me"]]
     : [["schedule","Schedule"],["hours","Hours"],["pay","Pay"],["files","Files"],["info","My info"]];
   $("#nav").innerHTML = t.map(([k,l])=>`<button data-v="${k}" class="${view===k&&!openRoute&&!editing?"on":""}">${l}</button>`).join("")
-    + (realAdmin && (crewList().length || people().length) ? `<select id="viewAs" class="viewas" aria-label="See the page as someone else"><option value="">Office view</option>${crewList().map(c=>`<option value="${esc(c)}" ${viewAs===c?"selected":""}>See as ${esc(c)} manager</option>`).join("")}${people().map(([k,t])=>`<option value="emp:${esc(k)}" ${viewAs==="emp:"+k?"selected":""}>See as ${esc(t.name)}</option>`).join("")}</select>` : "");
+    + (realAdmin && PAGE==="crews" && (crewList().length || people().length) ? `<select id="viewAs" class="viewas" aria-label="See the page as someone else"><option value="">Office view</option>${crewList().map(c=>`<option value="${esc(c)}" ${viewAs===c?"selected":""}>See as ${esc(c)} manager</option>`).join("")}${people().map(([k,t])=>`<option value="emp:${esc(k)}" ${viewAs==="emp:"+k?"selected":""}>See as ${esc(t.name)}</option>`).join("")}</select>` : "");
   const pb=$("#previewBar"); pb.hidden=!viewAs;
   if(viewAs){ pb.innerHTML=`${isEmpPreview()?`Employee preview: this is what <b>${esc(me.name)}</b> sees.`:`Manager preview: this is what the <b>${esc(viewAs)}</b> manager sees.`} Nothing is saved. <button class="small" id="exitPreview">Back to office view</button>`; $("#exitPreview").onclick=()=>setViewAs(""); }
   const va=$("#viewAs"); if(va) va.onchange=()=>setViewAs(va.value);
@@ -473,8 +483,9 @@ function render(){
   if(openRoute && routes[openRoute]) return renderRoute(app);
   openRoute=null;
   if(role==="member" && !["schedule","hours","pay","files","info"].includes(view)) view="schedule";
+  if(isAdmin && !OFFICE_TABS.some(([k])=>k===view)) view=OFFICE_TABS[0][0];
   ({today:renderToday, week:renderWeek, crewlog:renderCrewLog, crew:renderCrewTab, me:renderMe, schedule:renderMySchedule, hours:renderHours, pay:renderPay, files:renderFiles, info:renderInfo,
-    routes:renderRoutes, crews:renderCrews, people:renderPeople, onboard:renderOnboard, reports:renderReports, log:renderLog, events:renderSchedule, paycfg:renderPayCfg}[view]||renderToday)(app);
+    routes:renderRoutes, crews:renderCrews, people:renderPeople, onboard:renderOnboard, reports:renderReports, sched:renderSched, paper:renderPaper, log:renderLog, events:renderSchedule, paycfg:renderPayCfg}[view]||renderToday)(app);
 }
 
 // Today: for a crew, the clock, the storm, the day's routes and meetings. For the office, one lane per crew.
@@ -1014,14 +1025,14 @@ function renderPerson(app, k){
         <div><label for="upLabel">Name on the record</label><input id="upLabel" placeholder="2026 employment agreement"></div><div><label for="upSigned">Signed</label><input id="upSigned" type="date"></div><div><label for="upExp">Expires (optional)</label><input id="upExp" type="date"></div></div>
         <label for="upFile">File (PDF or photo, up to 7 MB)</label><input id="upFile" type="file" accept="application/pdf,image/*,.doc,.docx">
         <div class="actions"><button class="primary" id="upGo">Upload to Drive</button></div><p class="muted">Ordinary files are shared view-only with ${esc(t.email||"the employee")} so they can open them. Tax and ID forms stay in the office's Drive and show only as on file.</p></div>
-    <div class="card"><div class="top" style="display:flex;justify-content:space-between;gap:10px;align-items:baseline"><h2>Shifts, next month</h2><button class="small primary" data-shadd="${esc(k)}">Add shifts</button></div>${shiftList(k, today(), SCHEDULE_DAYS)}</div>
+    <div class="card"><div class="top" style="display:flex;justify-content:space-between;gap:10px;align-items:baseline"><h2>Shifts, next month</h2>${PAGE==="team"?'<a class="mapbtn" href="crews.html">Set on Crews, Schedules</a>':`<button class="small primary" data-shadd="${esc(k)}">Add shifts</button>`}</div>${shiftList(k, today(), SCHEDULE_DAYS)}</div>
     <h2 style="margin:14px 0 8px">Pay log</h2>${payRowsHtml(k)}
     ${s.applicantId||s.indeedUrl?`<div class="card"><h2>Hiring</h2><p class="meta">${s.hiredAt?"Hired "+fmtDay(iso(new Date(s.hiredAt)))+" from Onboarding":"Hired"}${s.appliedFor?", applied for "+esc(APPLIED_FOR[s.appliedFor]||s.appliedFor):""}${s.source?" through "+esc(s.source):""}.</p>${s.indeedUrl?`<a class="mapbtn" href="${esc(s.indeedUrl)}" target="_blank" rel="noopener">Indeed profile</a>`:""}</div>`:""}
     ${pfileHtml(k)}
     <div class="card"><h2>Leaving</h2><p class="meta">Moves ${esc(firstName(t.name))}'s whole record to the archive and takes him off the Team list. It asks first.</p><div class="actions"><button class="danger" id="toPast">Move to Past</button></div></div>`;
   $("#back").onclick=()=>{ personOpen=null; render(); };
   $("#toPast").onclick=()=>archiveDialog(k); wirePfile(app, k);
-  $("#seeAs").onclick=()=>setViewAs("emp:"+k);
+  $("#seeAs").onclick=()=>{ if(PAGE==="team") location.href="crews.html#seeas="+encodeURIComponent("emp:"+k); else setViewAs("emp:"+k); };
   $("#pfForm").onsubmit=async e=>{ e.preventDefault();
     try { await store.update({ [`staff/${k}/phone`]:$("#pfPhone").value.trim()||null, [`staff/${k}/address`]:$("#pfAddr").value.trim()||null,
       [`staff/${k}/emergency`]:{ name:$("#pfEmName").value.trim(), phone:$("#pfEmPhone").value.trim(), relation:$("#pfEmRel").value.trim() },
@@ -1466,6 +1477,29 @@ function renderArchived(app, k){
   $("#back").onclick=()=>{ archiveOpen=null; render(); }; $("#bring").onclick=()=>restoreDialog(k); wirePfile(app,k);
 }
 
+// ----- Crews page, office: everyone's shifts for the next two weeks, set here -----
+function renderSched(app){
+  const days=14, from=curDate<today()?today():curDate, list=people().filter(([k,t])=>!crewFilter||t.crew===crewFilter);
+  const byCrew={}; list.forEach(([k,t])=>{ (byCrew[t.crew||"No crew"]=byCrew[t.crew||"No crew"]||[]).push([k,t]); });
+  app.innerHTML=`<div class="bar"><span class="date">Schedules</span><select id="cf" style="width:auto"><option value="">All crews</option>${crewList().map(c=>`<option ${crewFilter===c?"selected":""}>${esc(c)}</option>`).join("")}</select></div>
+    <p class="meta">Shifts for the next two weeks, by crew. Crew managers set their own crew's shifts too. Storm call-outs and meetings show on each person's schedule on their own.</p>
+    ${Object.entries(byCrew).sort((a,b)=>a[0].localeCompare(b[0],undefined,{numeric:true})).map(([c,ps])=>`<h2 style="margin:14px 0 8px">${esc(c)}</h2>`+ps.map(([k,t])=>`<div class="card"><div class="top" style="display:flex;justify-content:space-between;gap:10px;align-items:baseline"><h2>${esc(t.name)}${t.crewRole==="manager"?' <span class="chip ok">Manager</span>':""}</h2><button class="small primary" data-shadd="${esc(k)}">Add shifts</button></div>${shiftList(k, from, days)||'<p class="muted">No shifts in the next two weeks.</p>'}</div>`).join("")).join("")||'<div class="card"><p class="meta">No crew people yet. Hire them on Team Manager.</p></div>'}`;
+  $("#cf").onchange=e=>{ crewFilter=e.target.value; render(); };
+  wireShifts(app);
+}
+// ----- Team Manager, office: whose paperwork is missing, expired or expiring -----
+function renderPaper(app){
+  const rows=people().map(([k,t])=>({k,t,st:docStatus(k)}));
+  const bad=rows.filter(r=>r.st.missing.length||r.st.expired.length||r.st.soon.length);
+  app.innerHTML=`<div class="bar"><span class="date">Paperwork</span><span class="chip ${bad.length?"warn":"ok"}">${bad.length?bad.length+" need attention":"Everyone is up to date"}</span></div>
+    <p class="meta">Required for W-2: agreement, pay terms, handbook, W-4, I-9, direct deposit. For 1099: agreement, pay terms, handbook, W-9. Licenses and certifications are flagged 30 days before they expire. Tap a person to upload.</p>
+    <div class="card scroll"><table><tr><th>Name</th><th>Paid as</th><th>Missing</th><th>Expired or expiring</th><th>On file</th></tr>
+    ${rows.sort((a,b)=>(b.st.missing.length+b.st.expired.length*2)-(a.st.missing.length+a.st.expired.length*2)||(a.t.name||"").localeCompare(b.t.name||"")).map(r=>`<tr data-person="${esc(r.k)}" style="cursor:pointer"><td><b>${esc(r.t.name)}</b><div class="muted">${esc(r.t.crew||"No crew")}</div></td><td>${esc(staffOf(r.k).type||"W-2")}</td>
+      <td>${r.st.missing.length?r.st.missing.map(x=>`<span class="chip warn">${esc(DOC_KINDS[x])}</span>`).join(" "):'<span class="chip ok">None</span>'}</td>
+      <td>${[...r.st.expired.map(([,d])=>`<span class="chip bad">${esc(d.name)}: expired ${fmtShort(d.expires)}</span>`),...r.st.soon.map(([,d])=>`<span class="chip warn">${esc(d.name)}: ${fmtShort(d.expires)}</span>`)].join(" ")||""}</td><td>${r.st.docs.length}</td></tr>`).join("")||'<tr><td colspan="5" class="meta">No employees yet.</td></tr>'}</table></div>`;
+  app.querySelectorAll("[data-person]").forEach(tr=>tr.onclick=()=>{ view="people"; personOpen=tr.dataset.person; render(); window.scrollTo(0,0); });
+}
+
 // ----- employee reports: optional, from the manager's crew log -----
 const reportsFor = (crew, d) => Object.entries(reportsAll[crew]||{}).filter(([,r])=>r&&(!d||r.date===d)).sort((a,b)=>(a[1].at||0)-(b[1].at||0));
 function reportsHtml(d, crew){
@@ -1583,7 +1617,7 @@ if(DEMO){
 <div class="pgdrawer-bg" id="pgDrawerBg"></div>
 <nav class="pgdrawer" id="pgDrawer" aria-label="Pages" aria-hidden="true">
   <div class="pdhead"><b>Mangiapane Brothers</b><button type="button" class="pdx" id="pgDrawerX" aria-label="Close page menu">&times;</button></div>
-  <a href="./projects.html">Projects<span>Admin task dashboard</span></a><a href="./crm.html">CRM<span>Leads, clients, contracts</span></a><a href="./crews.html" class="here" aria-current="page">Crews<span>Crew routes, day logs, approval</span></a><a href="./routes.html">Routes<span>Door hanger routes</span></a>
+  <a href="./projects.html">Projects<span>Admin task dashboard</span></a><a href="./crm.html">CRM<span>Leads, clients, contracts</span></a><a href="./crews.html" class="here" aria-current="page">Crews<span>Routes, schedules, day logs</span></a><a href="./team.html" >Team Manager<span>Personnel, hiring, payroll, paperwork</span></a><a href="./routes.html">Routes<span>Door hanger routes</span></a>
   <div class="pdfoot">Full-Service Property Maintenance for Those Who Take Pride in Their Home</div>
 </nav>
 <script>
