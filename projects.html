@@ -787,7 +787,7 @@ function render(){
 // date, with the project name under it), a "today" marker separates past from ahead, the
 // strip scrolls sideways by mouse drag, and it opens at today. Clicking "Timeline" jumps back.
 // Categories (Oct 17, 2026): a color per kind of work, set on a project (tasks inherit it, or set their own).
-const CATS=[["hiring","Hiring"],["sales","Sales"],["order","Order"],["equipment","Equipment"],["service","Service"],["digital","Digital Infrastructure"],["internal","Internals"]];
+const CATS=[["hiring","Hiring"],["sales","Sales"],["order","Order"],["equipment","Equipment"],["service","Service"],["digital","Digital Infrastructure"],["internal","Admin & Finance"]];
 const catName = c => (CATS.find(x=>x[0]===c)||[])[1]||"";
 const catCls = c => catName(c) ? " has-cat cat-"+c : "";
 const catPill = c => catName(c) ? `<span class="pill cat cat-${c}" title="Category">${catName(c)}</span>` : "";
