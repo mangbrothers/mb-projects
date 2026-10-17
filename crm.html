@@ -321,6 +321,7 @@ details.ssamore summary{cursor:pointer;font-weight:600}
     <button data-view="svc-snow"><span class="dot" style="background:#9ec3f0"></span>Snow</button>
     <button data-view="svc-landscaping"><span class="dot" style="background:var(--s-landscaping)"></span>Landscaping</button>
     <button data-view="servicelog">Service log</button>
+    <button data-view="charges">Charges</button>
     <div class="more" id="more">
       <button id="moreBtn" aria-haspopup="menu" aria-expanded="false">More <span class="caret">&#9662;</span></button>
       <div class="menu" id="moreMenu" role="menu">
@@ -624,7 +625,7 @@ function attach(){
   refs.c.on("value", s => { clients = s.val()||{}; render(); if(openId) refreshDialogLive(); if(!backfilled){ backfilled=true; backfillPhones(); } driveNag(); });
   refs.l.on("value", s => { logs = s.val()||{}; render(); if(openId) renderLog(); });
   refs.t.on("value", s => { templates = s.val()||{}; render(); if(openId) renderContracts(); });
-  refs.q.on("value", s => { qbRows = s.val()||{}; if(view==="tools"||view==="servicelog") render(); if(openId) { renderSvcBills(); renderStamps(); renderRecord(); } });
+  refs.q.on("value", s => { qbRows = s.val()||{}; if(view==="tools"||view==="servicelog"||view==="charges") render(); if(openId) { renderSvcBills(); renderStamps(); renderRecord(); } });
   refs.sl = db.ref("serviceLog"); refs.dl = db.ref("dayLogs");
   refs.sl.on("value", s => { svcLog = s.val()||{}; if(view==="servicelog") render(); if(openId) renderRecord(); });
   refs.dl.on("value", s => { dayLogs = s.val()||{}; if(view==="servicelog") render(); if(openId) renderRecord(); });
@@ -754,6 +755,7 @@ function render(){
   if(view.startsWith("svc-")) return renderService(m, view.slice(4));
   if(view==="import") return renderImport(m);
   if(view==="tools") return renderTools(m);
+  if(view==="charges"){ m.innerHTML = chargesHtml(); wireCharges(m); return; }
   if(view==="trash") return renderTrash(m);
   if(view==="contracts") return renderContractsView(m);
   if(view==="servicelog") return renderServiceLog(m);
@@ -1549,7 +1551,7 @@ function renderContractsView(m){
     </tbody></table></div>`:""}
     <div class="card"><h2>Google Drive copies</h2>${(()=>{ const n=driveMissing().length; return `<p class="meta">Every signed contract is also saved as a PDF and an exact record in your Google Drive folder "${esc(DRIVE_ROOT_NAME)}", one folder per client.</p>` +
       (n ? `<div class="warnline">${n} signed contract${n===1?" is":"s are"} not in Google Drive yet. <button class="small primary" id="driveAll">Save to Drive</button></div>` : `<p class="meta">All signed contracts are in Google Drive.</p>`); })()}</div>
-    <div class="card"><h2>Payment</h2><p class="meta">Every client keeps a card on file, taken right after signing, even when nothing is due that day. A bank account (ACH) is an approved exception, and prepaying everything by check is the only other choice. No card fee. Card and bank numbers are entered in QuickBooks only; this page keeps the brand and the last four digits. Charges waiting to be run are in More, QuickBooks and export.</p></div>
+    <div class="card"><h2>Payment</h2><p class="meta">Every client keeps a card on file, taken right after signing, even when nothing is due that day. A bank account (ACH) is an approved exception, and prepaying everything by check is the only other choice. No card fee. Card and bank numbers are entered in QuickBooks only; this page keeps the brand and the last four digits. Charges waiting to be run are in the Charges tab.</p></div>
     <div class="card"><h2>Signing service</h2><p class="meta">Runs in admin@mangbrothers.com. It emails the one-link contract, takes the typed signature, saves every signed PDF to admin@'s Google Drive and emails a copy, and sends the payment confirmed email.</p>
       <label>Web app address (from Apps Script: Deploy, Manage deployments)</label><input id="svcUrl" value="${esc(svcInfo()?.url||"")}" placeholder="https://script.google.com/macros/s/.../exec" autocomplete="off">
       <div class="row" style="margin-top:8px"><button class="small" id="svcTest">Test</button><button class="small primary" id="svcSave">Save</button><span class="meta" id="svcMsg">${svcReady()?"Set up.":"Not set up. Emailing contracts is off."}</span></div></div>
@@ -2697,7 +2699,7 @@ function renderTools(m){
   const all=Object.entries(qbRows).sort((a,b)=>b[1].createdAt-a[1].createdAt);
   const pending=all.filter(([,r])=>r.status==="pending" && r.type!=="charge"), recent=all.filter(([,r])=>r.status!=="pending" && r.type!=="charge").slice(0,15);
   const rowHtml = ([rid,r]) => `<tr><td>${esc(QB_LABEL[r.type]||r.type)}</td><td>${esc(clients[r.clientId]?.name||"(deleted client)")}</td><td>${esc(r.description||"")}</td><td class="num">${money(r.amount)}</td><td>${r.status==="pending"?'<span class="pill open">waiting</span>':r.status==="done"?'<span class="pill paid">done</span>':'<span class="pill pastdue">error</span>'}${r.result?.note?`<div class="meta">${esc(r.result.note)}</div>`:""}</td><td class="meta">${fmtStamp(r.createdAt)}</td></tr>`;
-  m.innerHTML = chargesHtml() + `<div class="card">
+  m.innerHTML = `<div class="card">
     <h2>QuickBooks queue <span class="meta">${pending.length} waiting for Claude</span></h2>
     <p class="meta">The page adds work here when a client becomes active or a contract is signed. Sample contracts never add work. Copy the queue, paste it into Claude, and ask it to run it with the QuickBooks connector. Paste Claude's answer in the box below to write the QuickBooks numbers back onto the clients.</p>
     <div class="row" style="margin:8px 0"><button class="primary" id="qbCopy" ${pending.length?"":"disabled"}>Copy queue for Claude</button><button id="qbDl" ${pending.length?"":"disabled"}>Download</button></div>
