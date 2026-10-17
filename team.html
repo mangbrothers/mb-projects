@@ -184,6 +184,13 @@
   .pfe .t{white-space:pre-wrap;margin-top:4px;line-height:1.45}
   .checkrow{display:flex;gap:8px;align-items:center;color:var(--ink);margin:6px 0} .checkrow .muted{margin-left:auto}
   textarea{width:100%;box-sizing:border-box}
+/* Training (October 17, 2026) */
+.trcard .top{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;flex-wrap:wrap}
+.trcard.done{opacity:.8}
+.trcard.paper{border-left:4px solid var(--amber,#b7791f)}
+.welcome{border-left:4px solid var(--brand,#1f6b33)}
+ol.sop{padding-left:22px;margin:8px 0} ol.sop li{margin:0 0 8px;line-height:1.45}
+table.kv td{padding:6px 10px 6px 0;border-bottom:1px solid var(--line);vertical-align:top}
 </style>
 </head>
 <body>
@@ -214,6 +221,264 @@
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
 <script>
+// ===== Employee paperwork: shared by the employee signing page (paperwork.html) and Team Manager (team.html) =====
+// October 17, 2026. The forms are the official blank PDFs (IRS W-4 2026 and W-9, Michigan MI-W4, USCIS I-9 edition
+// 01/20/25) kept in /forms, and the company's own agreements served by the signing service. The employee types his
+// answers on our page; this file fills the official form with them, flattens it, adds his drawn signature, then seals
+// the finished PDF and his answers for the office's public key before anything leaves his phone. Only someone with the
+// paperwork password can open them: the password unlocks the office's private key in the browser. The database and
+// Drive only ever hold sealed copies.
+const PAPER = (() => {
+  const FORMS = {
+    agreement: { title:"Employment or contractor agreement", short:"Agreement", gov:false },
+    w4:        { title:"Form W-4, federal tax withholding", short:"W-4", file:"forms/fw4.pdf", gov:true },
+    miw4:      { title:"Form MI-W4, Michigan tax withholding", short:"MI-W4", file:"forms/mi-w4.pdf", gov:true },
+    i9:        { title:"Form I-9, employment eligibility", short:"I-9", file:"forms/i-9.pdf", gov:true },
+    w9:        { title:"Form W-9, taxpayer ID for contractors", short:"W-9", file:"forms/fw9.pdf", gov:true },
+    deposit:   { title:"Direct deposit authorization", short:"Direct deposit", gov:false, optional:true }
+  };
+  const POSITIONS = { manager:"Crew manager", member:"Crew member", walker:"Door hanger distributor", walkerpt:"Door hanger (part-time)", office:"Office" };
+  // Legal status that goes with each position by default (the office can change it per person).
+  const STATUS_FOR = { manager:"w2", member:"w2", walker:"1099", walkerpt:"1099", office:"w2" };
+  // Which agreement each position signs (the signing service holds the Drive copy of each).
+  const AGREEMENT_FOR = { manager:"manager", member:"member", walker:"walker", walkerpt:"walkerpt" };
+  // The packet for a position and legal status. Direct deposit is optional (a check is paid otherwise).
+  function packet(position, type){
+    const f = [];
+    if(AGREEMENT_FOR[position]) f.push("agreement");
+    if(type === "1099") f.push("w9"); else f.push("w4","miw4","i9");
+    f.push("deposit");
+    return f;
+  }
+  const COMPANY = { name:"Mangiapane Brothers Lawn and Snow LLC", short:"Mangiapane Brothers", address:"3540 Thorn Tree Ct.", city:"Ann Arbor", state:"MI", zip:"48105",
+    phone:"734-450-2400", rep:"Russel Mangiapane III", repTitle:"Owner" };
+
+  // ---------- encoding ----------
+  const b64 = buf => { const u = buf instanceof Uint8Array ? buf : new Uint8Array(buf); let s=""; for(let i=0;i<u.length;i+=0x8000) s+=String.fromCharCode.apply(null, u.subarray(i,i+0x8000)); return btoa(s); };
+  const unb64 = s => { const bin=atob(s); const u=new Uint8Array(bin.length); for(let i=0;i<bin.length;i++) u[i]=bin.charCodeAt(i); return u; };
+  const subtle = () => crypto.subtle;
+  const ITER = 600000;
+
+  // ---------- the vault ----------
+  async function pwKey(pw, salt, iter){ const base=await subtle().importKey("raw", new TextEncoder().encode(pw), "PBKDF2", false, ["deriveKey"]);
+    return subtle().deriveKey({ name:"PBKDF2", salt, iterations:iter, hash:"SHA-256" }, base, { name:"AES-GCM", length:256 }, false, ["encrypt","decrypt"]); }
+  async function seal(key, bytes){ const iv=crypto.getRandomValues(new Uint8Array(12)); return { iv:b64(iv), ct:b64(await subtle().encrypt({ name:"AES-GCM", iv }, key, bytes)) }; }
+  async function unseal(key, o){ return new Uint8Array(await subtle().decrypt({ name:"AES-GCM", iv:unb64(o.iv) }, key, unb64(o.ct))); }
+  const normCode = c => String(c||"").replace(/[^A-Za-z0-9]/g,"").toUpperCase();
+  function recoveryCode(){ const A="ABCDEFGHJKLMNPQRSTUVWXYZ23456789", r=crypto.getRandomValues(new Uint8Array(24)); let s="";
+    r.forEach((x,i)=>{ s+=A[x%32]; if(i%4===3 && i<23) s+="-"; }); return s; }
+  // A new vault: a key pair, the private half locked by the password and, separately, by a one-time recovery code.
+  async function create(password){
+    const kp=await subtle().generateKey({ name:"RSA-OAEP", modulusLength:3072, publicExponent:new Uint8Array([1,0,1]), hash:"SHA-256" }, true, ["encrypt","decrypt"]);
+    const pub=b64(await subtle().exportKey("spki", kp.publicKey)), priv=new Uint8Array(await subtle().exportKey("pkcs8", kp.privateKey));
+    const salt=crypto.getRandomValues(new Uint8Array(16)), rsalt=crypto.getRandomValues(new Uint8Array(16)), code=recoveryCode();
+    const a=await seal(await pwKey(password, salt, ITER), priv), r=await seal(await pwKey(normCode(code), rsalt, ITER), priv);
+    priv.fill(0);
+    return { pub, key:{ v:1, iter:ITER, salt:b64(salt), iv:a.iv, priv:a.ct, rsalt:b64(rsalt), riv:r.iv, rpriv:r.ct }, code };
+  }
+  // Unlock with the password (or the recovery code). A wrong one fails the AES-GCM check and throws.
+  async function unlock(key, secret, recovery){
+    const k = recovery ? await pwKey(normCode(secret), unb64(key.rsalt), key.iter) : await pwKey(secret, unb64(key.salt), key.iter);
+    let priv; try { priv = await unseal(k, recovery ? { iv:key.riv, ct:key.rpriv } : { iv:key.iv, ct:key.priv }); }
+    catch(e){ throw new Error(recovery ? "That recovery code is not right." : "That password is not right."); }
+    const privateKey = await subtle().importKey("pkcs8", priv, { name:"RSA-OAEP", hash:"SHA-256" }, false, ["decrypt"]);
+    return { privateKey, priv };
+  }
+  // A new password for the same key pair (after unlocking with the old password or the recovery code).
+  async function rewrap(key, priv, newPassword){ const salt=crypto.getRandomValues(new Uint8Array(16)); const a=await seal(await pwKey(newPassword, salt, key.iter), priv);
+    return Object.assign({}, key, { salt:b64(salt), iv:a.iv, priv:a.ct }); }
+  // Seal answers and a file for the office: a fresh AES key per item, itself sealed with the office's public key.
+  async function sealFor(pubB64, fields, fileBytes){
+    const pub=await subtle().importKey("spki", unb64(pubB64), { name:"RSA-OAEP", hash:"SHA-256" }, false, ["encrypt"]);
+    const dk=await subtle().generateKey({ name:"AES-GCM", length:256 }, true, ["encrypt"]), raw=await subtle().exportKey("raw", dk);
+    const j=new TextEncoder().encode(JSON.stringify(fields||{})), f=fileBytes||new Uint8Array(0), buf=new Uint8Array(4+j.length+f.length);
+    new DataView(buf.buffer).setUint32(0, j.length); buf.set(j,4); buf.set(f,4+j.length);
+    const s=await seal(dk, buf);
+    return { v:1, alg:"RSA-OAEP-3072/AES-GCM-256", k:b64(await subtle().encrypt({ name:"RSA-OAEP" }, pub, raw)), iv:s.iv, ct:s.ct };
+  }
+  async function openFor(privateKey, env){
+    const raw=await subtle().decrypt({ name:"RSA-OAEP" }, privateKey, unb64(env.k));
+    const dk=await subtle().importKey("raw", raw, "AES-GCM", false, ["decrypt"]);
+    const buf=await unseal(dk, env), n=new DataView(buf.buffer, buf.byteOffset).getUint32(0);
+    return { fields:JSON.parse(new TextDecoder().decode(buf.subarray(4,4+n))), file:buf.slice(4+n) };
+  }
+
+  // ---------- checks ----------
+  const digits = s => String(s||"").replace(/\D/g,"");
+  const fmtSSN = s => { const d=digits(s); return d.length===9 ? `${d.slice(0,3)}-${d.slice(3,5)}-${d.slice(5)}` : d; };
+  const validSSN = s => { const d=digits(s); return d.length===9 && !/^(000|666|9)/.test(d) && d.slice(3,5)!=="00" && d.slice(5)!=="0000"; };
+  const validRouting = s => { const d=digits(s); if(d.length!==9) return false; const w=[3,7,1,3,7,1,3,7,1]; return d.split("").reduce((n,c,i)=>n+(+c)*w[i],0)%10===0; };
+  const mdY = iso => { if(!iso) return ""; const [y,m,d]=String(iso).split("-"); return y&&m&&d ? `${m}/${d}/${y}` : String(iso); };
+  const mdYdigits = iso => mdY(iso).replace(/\//g,"");
+  const nowStamp = ms => new Date(ms||Date.now()).toLocaleString("en-US",{ timeZone:"America/Detroit", month:"short", day:"numeric", year:"numeric", hour:"numeric", minute:"2-digit" })+" ET";
+  const todayIso = () => new Intl.DateTimeFormat("en-CA",{ timeZone:"America/Detroit", year:"numeric", month:"2-digit", day:"2-digit" }).format(new Date());
+  const money0 = v => { const n=Math.round(+v||0); return n ? n.toLocaleString("en-US") : ""; };
+
+  // ---------- PDF helpers (pdf-lib) ----------
+  const L = () => (typeof window!=="undefined" && window.PDFLib) || globalThis.PDFLib;
+  async function loadForm(bytes){ const { PDFDocument, PDFName } = L();
+    const doc = await PDFDocument.load(bytes, { ignoreEncryption:true });
+    const af = doc.catalog.lookup(PDFName.of("AcroForm")); if(af && af.has && af.has(PDFName.of("XFA"))) af.delete(PDFName.of("XFA"));
+    return doc; }
+  function fieldBox(doc, name){ const f=doc.getForm().getField(name), w=f.acroField.getWidgets()[0], r=w.getRectangle();
+    const pref=w.P(); let page=doc.getPages().findIndex(p=>p.ref===pref); if(page<0) page=0; return { page, x:r.x, y:r.y, w:r.width, h:r.height }; }
+  const setT = (form, name, v) => { if(v==null || v==="") return; const f=form.getTextField(name); try{ f.setMaxLength(undefined); }catch(e){} f.setText(String(v)); };
+  const check = (form, name, on) => { if(on) form.getCheckBox(name).check(); };
+  async function drawSig(doc, dataUrl, box){ if(!dataUrl) return; const png=await doc.embedPng(dataUrl); const page=doc.getPages()[box.page];
+    let h=Math.min(box.h+4, 26), w=png.width*(h/png.height); if(w>box.w-4){ w=box.w-4; h=w*(png.height/png.width); }
+    page.drawImage(png, { x:box.x+2, y:box.y+1, width:w, height:h }); }
+  async function drawText(doc, page, x, y, text, size){ const font=await doc.embedFont(L().StandardFonts.Helvetica); doc.getPages()[page].drawText(String(text), { x, y, size:size||9, font, color:L().rgb(0,0,0) }); }
+  async function audit(doc, page, a){ const font=await doc.embedFont(L().StandardFonts.Helvetica), p=doc.getPages()[page];
+    const t=`Signed electronically by ${a.name} on ${nowStamp(a.at)} through a private ${COMPANY.short} paperwork link sent to ${a.email||"the employee"}. Document ${a.id||""}`;
+    p.drawText(t.slice(0,190), { x:24, y:8, size:6.2, font, color:L().rgb(0.25,0.25,0.25) }); }
+  async function finish(doc){ try { doc.getForm().flatten(); } catch(e){} return await doc.save(); }
+
+  // ---------- the forms ----------
+  // f: the employee's answers; a: { name, email, at, id } for the signature line and audit footer.
+  async function buildW4(bytes, f, a){
+    const doc=await loadForm(bytes), form=doc.getForm(), P="topmostSubform[0].Page1[0].";
+    setT(form, P+"Step1a[0].f1_01[0]", [f.first, f.mi].filter(Boolean).join(" ")); setT(form, P+"Step1a[0].f1_02[0]", f.last);
+    setT(form, P+"Step1a[0].f1_03[0]", [f.street, f.apt].filter(Boolean).join(" ")); setT(form, P+"Step1a[0].f1_04[0]", `${f.city}, ${f.state} ${f.zip}`);
+    setT(form, P+"f1_05[0]", fmtSSN(f.ssn));
+    check(form, P+"c1_1[0]", f.filing==="single"); check(form, P+"c1_1[1]", f.filing==="mfj"); check(form, P+"c1_1[2]", f.filing==="hoh");
+    check(form, P+"c1_2[0]", !!f.twoJobs);
+    const kids=(+f.kids||0)*2200, others=(+f.otherDeps||0)*500, credits=+f.otherCredits||0;
+    if(kids) setT(form, P+"Step3_ReadOrder[0].f1_06[0]", money0(kids)); if(others) setT(form, P+"Step3_ReadOrder[0].f1_07[0]", money0(others));
+    if(kids+others+credits) setT(form, P+"f1_08[0]", money0(kids+others+credits));
+    setT(form, P+"f1_09[0]", money0(f.otherIncome)); setT(form, P+"f1_10[0]", money0(f.deductions)); setT(form, P+"f1_11[0]", f.extra ? (+f.extra).toFixed(2) : "");
+    check(form, P+"c1_3[0]", !!f.exempt);
+    setT(form, P+"f1_12[0]", `${COMPANY.name}\n${COMPANY.address}, ${COMPANY.city}, ${COMPANY.state} ${COMPANY.zip}`);
+    if(f.startDate) setT(form, P+"f1_13[0]", mdY(f.startDate));
+    const out=await finish(doc), d2=await L().PDFDocument.load(out);
+    await drawSig(d2, f.sig, { page:0, x:102, y:91, w:250, h:14 }); await drawText(d2, 0, 464, 94, mdY(a.date||todayIso()), 10); await audit(d2, 0, a);
+    return await d2.save();
+  }
+  async function buildMIW4(bytes, f, a){
+    const doc=await loadForm(bytes), form=doc.getForm();
+    try{ form.removeField(form.getField("Reset")); }catch(e){}
+    setT(form, "1 Full Social Security Number", fmtSSN(f.ssn)); setT(form, "2 Date of Birth", mdY(f.dob));
+    setT(form, "3 Name First Middle Initial Last", [f.first, f.mi, f.last].filter(Boolean).join(" ")); setT(form, "4 Drivers License Number or State ID", f.dl);
+    setT(form, "Home Address No Street PO Box or Rural Route", [f.street, f.apt].filter(Boolean).join(" ")); setT(form, "City or Town", f.city); setT(form, "State", f.state); setT(form, "ZIP Code", f.zip);
+    try { const r=form.getRadioGroup("5 Are you a new employee"); r.select(f.newEmployee===false?"No":"Yes"); } catch(e){}
+    if(f.newEmployee!==false && f.startDate) setT(form, "mmddyyyy", mdY(f.startDate));
+    setT(form, "Enter the number of personal and dependent exemptions", f.exempt8 ? "" : String(f.exemptions ?? ""));
+    if(+f.miExtra) setT(form, "Additional amount you want deducted from each pay", (+f.miExtra).toFixed(2));
+    check(form, "A Michigan income tax liability is not expected this year", f.exempt8==="a");
+    check(form, "b Wages are exempt from withholding", f.exempt8==="b"); if(f.exempt8==="b") setT(form, "Explain Wages are exempt from withholding", f.exemptWhy);
+    check(form, "C  Permanent home domicile is located in the following Renaissance Zone", f.exempt8==="c"); if(f.exempt8==="c") setT(form, "Permanent home domicile is located in the following Renaissance Zone", f.zone);
+    setT(form, "Date", mdY(a.date||todayIso()));
+    setT(form, "10 Employers Name", COMPANY.name); setT(form, "Address", COMPANY.address); setT(form, "City", COMPANY.city); setT(form, "State_2", COMPANY.state); setT(form, "ZIP Code_2", COMPANY.zip);
+    setT(form, "Name of Contact Person", COMPANY.rep); setT(form, "Contact Phone Number", COMPANY.phone);
+    const out=await finish(doc), d2=await L().PDFDocument.load(out);
+    await drawSig(d2, f.sig, { page:0, x:44, y:334, w:400, h:22 }); await audit(d2, 0, a);
+    return await d2.save();
+  }
+  const I9 = { s1:["Last Name (Family Name)","First Name Given Name","Employee Middle Initial (if any)","Employee Other Last Names Used (if any)"] };
+  // The I-9: Section 1 from the employee; Section 2 (s2) added later by the office after seeing his documents in person.
+  async function buildI9(bytes, f, a, s2){
+    const doc=await loadForm(bytes), form=doc.getForm();
+    setT(form, "Last Name (Family Name)", f.last); setT(form, "First Name Given Name", f.first); setT(form, "Employee Middle Initial (if any)", (f.mi||"").slice(0,1));
+    setT(form, "Employee Other Last Names Used (if any)", f.otherLast || "N/A");
+    setT(form, "Address Street Number and Name", f.street); setT(form, "Apt Number (if any)", f.apt || "N/A"); setT(form, "City or Town", f.city);
+    try { form.getDropdown("State").select(f.state); } catch(e){ }
+    setT(form, "ZIP Code", digits(f.zip).slice(0,5)); setT(form, "Date of Birth mmddyyyy", mdY(f.dob));
+    setT(form, "US Social Security Number", digits(f.ssn)); setT(form, "Employees E-mail Address", f.email); setT(form, "Telephone Number", f.phone);
+    check(form, "CB_1", f.status==="1"); check(form, "CB_2", f.status==="2"); check(form, "CB_3", f.status==="3"); check(form, "CB_4", f.status==="4");
+    if(f.status==="3") setT(form, "3 A lawful permanent resident Enter USCIS or ANumber", f.aNumber);
+    if(f.status==="4"){ setT(form, "Exp Date mmddyyyy", f.workUntil ? mdY(f.workUntil) : "N/A"); setT(form, "USCIS ANumber", f.aNumber); setT(form, "Form I94 Admission Number", f.i94); setT(form, "Foreign Passport Number and Country of IssuanceRow1", [f.passport, f.passportCountry].filter(Boolean).join(", ")); }
+    setT(form, "Today's Date mmddyyy", mdY(a.date||todayIso()));
+    const sigBox=fieldBox(doc, "Signature of Employee"); let s2Box=null;
+    if(s2){
+      const A=s2.listA||{}, B=s2.listB||{}, C=s2.listC||{};
+      setT(form, "Issuing Authority 1", A.authority); setT(form, "Document Number 0 (if any)", A.number); setT(form, "Expiration Date if any", A.expires ? mdY(A.expires) : (A.title ? "N/A" : ""));
+      setT(form, "List B Document 1 Title", B.title); setT(form, "List B Issuing Authority 1", B.authority); setT(form, "List B Document Number 1", B.number); setT(form, "List B Expiration Date 1", B.expires ? mdY(B.expires) : (B.title ? "N/A" : ""));
+      setT(form, "List C Document Title 1", C.title); setT(form, "List C Issuing Authority 1", C.authority); setT(form, "List C Document Number 1", C.number); setT(form, "List C Expiration Date 1", C.expires ? mdY(C.expires) : (C.title ? "N/A" : ""));
+      setT(form, "Additional Information", s2.note); setT(form, "FirstDayEmployed mmddyyyy", mdY(s2.firstDay));
+      setT(form, "Last Name First Name and Title of Employer or Authorized Representative", s2.repName); setT(form, "S2 Todays Date mmddyyyy", mdY(s2.date));
+      setT(form, "Employers Business or Org Name", COMPANY.name); setT(form, "Employers Business or Org Address", `${COMPANY.address}, ${COMPANY.city}, ${COMPANY.state} ${COMPANY.zip}`);
+      s2Box=fieldBox(doc, "Signature of Employer or AR");
+    }
+    const out=await finish(doc), d2=await L().PDFDocument.load(out);
+    await drawSig(d2, f.sig, sigBox); if(s2){ await drawSig(d2, s2.sig, s2Box); if((s2.listA||{}).title) await drawText(d2, 0, 130, 347, s2.listA.title, 8); } // "Document Title 1" is shared with Supplement B, so it is drawn
+    await audit(d2, 0, a);
+    return await d2.save();
+  }
+  async function buildW9(bytes, f, a){
+    const doc=await loadForm(bytes), form=doc.getForm(), P="topmostSubform[0].Page1[0].", B=P+"Boxes3a-b_ReadOrder[0].";
+    setT(form, P+"f1_01[0]", f.legalName || [f.first, f.mi, f.last].filter(Boolean).join(" ")); setT(form, P+"f1_02[0]", f.business);
+    const cls={ individual:0, ccorp:1, scorp:2, partnership:3, trust:4, llc:5, other:6 }[f.taxClass||"individual"];
+    check(form, B+`c1_1[${cls}]`, true); if(f.taxClass==="llc") setT(form, B+"f1_03[0]", f.llcCode); if(f.taxClass==="other") setT(form, B+"f1_04[0]", f.otherClass);
+    setT(form, P+"Address_ReadOrder[0].f1_07[0]", [f.street, f.apt].filter(Boolean).join(" ")); setT(form, P+"Address_ReadOrder[0].f1_08[0]", `${f.city}, ${f.state} ${f.zip}`);
+    setT(form, P+"f1_09[0]", `${COMPANY.name}\n${COMPANY.address}, ${COMPANY.city}, ${COMPANY.state} ${COMPANY.zip}`);
+    if(f.tinType==="ein"){ const e=digits(f.ein); setT(form, P+"f1_14[0]", e.slice(0,2)); setT(form, P+"f1_15[0]", e.slice(2)); }
+    else { const s=digits(f.ssn); setT(form, P+"f1_11[0]", s.slice(0,3)); setT(form, P+"f1_12[0]", s.slice(3,5)); setT(form, P+"f1_13[0]", s.slice(5)); }
+    const out=await finish(doc), d2=await L().PDFDocument.load(out);
+    await drawSig(d2, f.sig, { page:0, x:120, y:194, w:250, h:14 }); await drawText(d2, 0, 406, 196, mdY(a.date||todayIso()), 10); await audit(d2, 0, a);
+    return await d2.save();
+  }
+  // Direct deposit: our own one-page form.
+  async function buildDeposit(f, a){
+    const { PDFDocument, StandardFonts, rgb } = L();
+    const doc=await PDFDocument.create(), page=doc.addPage([612,792]), font=await doc.embedFont(StandardFonts.Helvetica), bold=await doc.embedFont(StandardFonts.HelveticaBold);
+    let y=740; const line=(t,o)=>{ o=o||{}; page.drawText(String(t), { x:o.x||54, y, size:o.size||11, font:o.bold?bold:font, color:rgb(0,0,0) }); y-=o.gap||18; };
+    line(COMPANY.name, { bold:true, size:13, gap:16 }); line(`${COMPANY.address}, ${COMPANY.city}, ${COMPANY.state} ${COMPANY.zip} · ${COMPANY.phone}`, { size:9, gap:30 });
+    line("Direct Deposit Authorization", { bold:true, size:18, gap:28 });
+    const row=(k,v)=>{ page.drawText(k, { x:54, y, size:10, font:bold }); page.drawText(String(v||""), { x:210, y, size:11, font }); y-=20; };
+    row("Employee", [f.first, f.mi, f.last].filter(Boolean).join(" ")); row("Address", `${[f.street,f.apt].filter(Boolean).join(" ")}, ${f.city}, ${f.state} ${f.zip}`);
+    row("Bank", f.bankName); row("Routing number", digits(f.routing)); row("Account number", digits(f.account)); row("Account type", f.acctType==="savings"?"Savings":"Checking");
+    row("Amount", "Entire net pay"); y-=10;
+    const para = `I authorize ${COMPANY.name} to deposit my pay into the account above and, if an amount is deposited in error, to make a correcting entry to that account for the amount of the error. This authorization stays in effect until the Company receives written notice from me to change or end it, in time for the Company to act on it. Until direct deposit starts, or if a deposit is returned, I will be paid by check.`;
+    const words=para.split(" "); let ln=""; for(const w of words){ const t=ln?ln+" "+w:w; if(font.widthOfTextAtSize(t,10.5)>500){ page.drawText(ln,{x:54,y,size:10.5,font}); y-=15; ln=w; } else ln=t; } if(ln){ page.drawText(ln,{x:54,y,size:10.5,font}); y-=30; }
+    page.drawLine({ start:{x:54,y}, end:{x:330,y}, thickness:0.8 }); page.drawLine({ start:{x:380,y}, end:{x:540,y}, thickness:0.8 });
+    if(f.sig){ const png=await doc.embedPng(f.sig), h=28, w=Math.min(260, png.width*(h/png.height)); page.drawImage(png, { x:58, y:y+2, width:w, height:h }); }
+    page.drawText(mdY(a.date||todayIso()), { x:384, y:y+5, size:11, font });
+    y-=14; page.drawText("Employee signature", { x:54, y, size:9, font }); page.drawText("Date", { x:380, y, size:9, font });
+    await audit(doc, 0, a);
+    return await doc.save();
+  }
+  // The company's agreement for the position, from the signing service, with the employee's signature and the owner's.
+  async function buildAgreement(bytes, f, a, companySig){
+    const doc=await loadForm(bytes), form=doc.getForm(), names=form.getFields().map(x=>x.getName()), has=n=>names.includes(n);
+    const date=mdY(a.date||todayIso()), name=[f.first, f.mi, f.last].filter(Boolean).join(" ");
+    let sigBox=null, coBox=null;
+    if(has("f0_0")){ // crew agreements: name | date, signature | phone, email | start date, company | date
+      setT(form,"f0_0",name); setT(form,"f0_1",date); setT(form,"f1_1",f.phone); setT(form,"f2_0",f.email); setT(form,"f2_1",mdY(f.startDate)); setT(form,"f3_1",date);
+      sigBox=fieldBox(doc,"f1_0"); coBox=fieldBox(doc,"f3_0");
+    } else if(has("distributor_name")){ // door hanger agreement
+      setT(form,"distributor_name",name); setT(form,"distributor_date",date); setT(form,"distributor_phone",f.phone); setT(form,"google_email",f.email); setT(form,"strava_username",f.strava); setT(form,"company_date",date);
+      sigBox=fieldBox(doc,"distributor_signature"); coBox=fieldBox(doc,"company_signature");
+    }
+    const out=await finish(doc), d2=await L().PDFDocument.load(out);
+    if(sigBox){ await drawSig(d2, f.sig, sigBox); if(companySig) await drawSig(d2, companySig, coBox); else await drawText(d2, coBox.page, coBox.x+2, coBox.y+3, COMPANY.rep+" (for the Company)", 9); }
+    await audit(d2, sigBox?sigBox.page:d2.getPageCount()-1, a);
+    return await d2.save();
+  }
+  async function build(form, bytes, f, a, extra){
+    if(form==="w4") return buildW4(bytes, f, a);
+    if(form==="miw4") return buildMIW4(bytes, f, a);
+    if(form==="i9") return buildI9(bytes, f, a, extra && extra.s2);
+    if(form==="w9") return buildW9(bytes, f, a);
+    if(form==="deposit") return buildDeposit(f, a);
+    if(form==="agreement") return buildAgreement(bytes, f, a, extra && extra.companySig);
+    throw new Error("Unknown form "+form);
+  }
+  // What each form keeps from the answers (sealed with the PDF), for payroll and for redoing the I-9 with Section 2.
+  const KEEP = {
+    w4:["first","mi","last","street","apt","city","state","zip","ssn","filing","twoJobs","kids","otherDeps","otherCredits","otherIncome","deductions","extra","exempt","startDate","sig"],
+    miw4:["first","mi","last","street","apt","city","state","zip","ssn","dob","dl","newEmployee","startDate","exemptions","miExtra","exempt8","exemptWhy","zone","sig"],
+    i9:["first","mi","last","otherLast","street","apt","city","state","zip","dob","ssn","email","phone","status","aNumber","workUntil","i94","passport","passportCountry","sig"],
+    w9:["legalName","business","taxClass","llcCode","otherClass","first","mi","last","street","apt","city","state","zip","tinType","ssn","ein","sig"],
+    deposit:["first","mi","last","street","apt","city","state","zip","bankName","routing","account","acctType","sig"],
+    agreement:["first","mi","last","phone","email","startDate","strava","sig"]
+  };
+  const keep = (form, f) => { const o={}; (KEEP[form]||[]).forEach(k=>{ if(f[k]!==undefined && f[k]!=="") o[k]=f[k]; }); return o; };
+  return { FORMS, POSITIONS, STATUS_FOR, AGREEMENT_FOR, packet, COMPANY, b64, unb64, create, unlock, rewrap, sealFor, openFor, build, keep,
+    digits, fmtSSN, validSSN, validRouting, mdY, todayIso, nowStamp };
+})();
+if(typeof module!=="undefined") module.exports = PAPER;
+
+</script>
+<script>
 // ===== CONFIG (same Firebase project as the Projects page) =====
 const firebaseConfig = {
   apiKey: "AIzaSyDLndoLTcm8zKyN3WlVfYoGVQmVlbMlib4",
@@ -229,7 +494,7 @@ const ADMIN_EMAIL = "russel.mangiapaneiii@gmail.com";
 // hiring, payroll, paperwork and management. The build sets this line. Crews and employees only ever use crews.html.
 const PAGE = "team";
 const OFFICE_TABS = PAGE==="team"
-  ? [["onboard","Onboarding"],["people","Personnel"],["crews","Crews"],["paper","Paperwork"],["reports","Reports"],["paycfg","Payroll"]]
+  ? [["onboard","Onboarding"],["people","Personnel"],["crews","Crews"],["paper","Paperwork"],["training","Training"],["reports","Reports"],["paycfg","Payroll"]]
   : [["today","Day"],["week","Week"],["routes","Routes"],["sched","Schedules"],["log","Log"],["events","Meetings"]];
 // Where each clearance tier lands. Admins and crews use this page; walkers use the door hanger Routes page.
 const TIER_HOME = { admin:"projects.html", crew:"crews.html", walker:"routes.html" };
@@ -241,8 +506,8 @@ const MIN_WAGE_DEFAULT = 13.73;    // Michigan, 2026; $15.00 from January 1, 202
 // Files kept on an employee's record. Sensitive ones (tax and ID forms) stay in Drive only: the record shows they are
 // on file and when, with no link. Everything else opens and downloads from the employee's Files tab.
 const DOC_KINDS = { agreement:"Employment or contractor agreement", payterms:"Pay terms", handbook:"Handbook or policy acknowledgment", equipment:"Equipment sign-out", cert:"License or certification", other:"Other file",
-  w4:"W-4 tax withholding", i9:"I-9 work eligibility", w9:"W-9 (contractor)", deposit:"Direct deposit form", id:"ID copy" };
-const SENSITIVE = ["w4","i9","w9","deposit","id"];
+  w4:"W-4 tax withholding", miw4:"MI-W4 Michigan withholding", i9:"I-9 work eligibility", w9:"W-9 (contractor)", deposit:"Direct deposit form", id:"ID copy" };
+const SENSITIVE = ["w4","miw4","i9","w9","deposit","id"];
 // ================================================================
 // Three views (October 17, 2026): the office; crew managers, who run the routes (the full mirror of the door hanger
 // Routes page: map, check-off, crew log and approval, plus their crew's contact info and shifts); and employees, who
@@ -345,11 +610,14 @@ async function enter(user){
     if(PAGE==="team" && tier!=="admin"){ location.replace("crews.html"); return; }
     if(tier!=="admin" && tier!=="crew") return deny(`${me.email} is not on the team list. Ask Russel to add it, then sign out and back in.`);
     if(tier==="crew" && mine.active===false) return deny(`${me.email} is not active on the team list. Ask Russel.`);
-    if(tier==="crew" && !mine.crew) return deny(`${mine.name||me.email} is on the team list but not on a crew yet. Ask Russel to put you on a crew.`);
+    // A new hire whose offer is not signed yet gets in to the Training tab only, crew or not.
+    let pp=null; if(tier==="crew" && !mine.offerSigned) pp=await store.get("paper/"+me.key).catch(()=>null);
+    if(pp) paperAll[me.key]=pp; onboarding = tier==="crew" && !!pp && offerPending(me.key);
+    if(tier==="crew" && !mine.crew && !onboarding) return deny(`${mine.name||me.email} is on the team list but not on a crew yet. Ask Russel to put you on a crew.`);
     isAdmin = tier==="admin"; realAdmin=isAdmin; viewAs=""; meReal=null;
     role = isAdmin ? "" : (mine.crewRole==="manager" ? "manager" : "member"); myCrew = isAdmin ? "" : mine.crew;
     if(mine?.name) me.name = mine.name;
-    view = role==="member" ? "schedule" : isAdmin ? OFFICE_TABS[0][0] : "today";
+    view = onboarding ? "training" : role==="member" ? "schedule" : isAdmin ? OFFICE_TABS[0][0] : "today";
     $("#title").textContent = isAdmin ? (PAGE==="team" ? "Mangiapane Brothers Team Manager" : "Mangiapane Brothers Crews") : `${myCrew}`;
     $("#gate").hidden=true; $("#app").hidden=false; $("#nav").hidden=false; $("#navBtn").hidden=!isAdmin; attach();
   } catch(e){ deny(`${me.email} could not be checked against the team list. Ask Russel.`); }
@@ -361,6 +629,7 @@ function attach(){
   const w = winterOf(today()), from = [addDays(today(), -KEEP_DAYS), today()>=w.from ? w.from : "9"].sort()[0];
   bind("crews", v=>{ const had=JSON.stringify(crewMembers(myCrew)); crews=v; if(!isAdmin && JSON.stringify(crewMembers(myCrew))!==had) memberBind(); }); bind("crewRoutes", v=>routes=v); bind("events", v=>events=v);
   bind("payRates", v=>payRates=v);
+  bind("trainingLib", v=>trainLib=v); bind("trainingRoles", v=>trainRoles=v);
   unsub.push(store.onFrom("storms", from, v=>{ storms=v||{}; render(); }));
   unsub.push(store.onFrom("crewChecks", from, v=>{ checks=v||{}; render(); }));
   if(isAdmin){
@@ -371,10 +640,15 @@ function attach(){
     bind("staff", v=>staffAll=v); bind("staffPrivate", v=>privAll=v); bind("staffDocs", v=>docsAll=v); bind("shifts", v=>shiftsAll=v);
     bind("payLog", v=>payLogAll=v); bind("staffVault", v=>vault=v); bind("contractTemplates/_signing", v=>svcCfg=v&&v.url?v:null);
     bind("applicants", v=>applicants=v); bind("personFile", v=>personFile=v); bind("staffReports", v=>reportsAll=v); bind("staffArchive", v=>archive=v); bind("personFileDoc", v=>fileDocs=v);
+    bind("vaultPub", v=>vaultPub=typeof v==="string"?v:null); bind("vaultKey", v=>vaultKeyRec=v&&v.priv?v:null); bind("vaultAccess", v=>vaultAccess=v); bind("paper", v=>paperAll=v);
+    bind("trainingAssign", v=>trainAssign=v); bind("trainingDone", v=>trainDone=v);
   } else {
     // An employee's own record. The office preview reads the office's copy instead.
     const own = (path, map) => unsub.push(store.on(path+"/"+me.key, v=>{ map[me.key]=v||{}; render(); }));
     own("timeEntries", timeAll); own("staff", staffAll); own("staffPrivate", privAll); own("staffDocs", docsAll); own("shifts", shiftsAll); own("payLog", payLogAll);
+    own("trainingAssign", trainAssign); own("trainingDone", trainDone);
+    // His paperwork packet. Signing the offer ends onboarding mode and opens the rest of the page.
+    unsub.push(store.on("paper/"+me.key, v=>{ paperAll[me.key]=v||{}; if(onboarding && !offerPending(me.key)){ onboarding=false; if(!myCrew) toast("Offer signed. The office puts you on a crew next."); } render(); }));
     // A manager reads the employee reports he and the office filed for his crew.
     if(role==="manager" && myCrew) unsub.push(store.on("staffReports/"+myCrew, v=>{ reportsAll={ [myCrew]:v||{} }; render(); }));
   }
@@ -446,8 +720,9 @@ function tabs(){
   // A "See as" link from Team Manager lands here as crews.html#seeas=emp:<key>.
   if(pendingSeeAs && realAdmin && PAGE==="crews" && (team[pendingSeeAs.slice(4)] || crews[pendingSeeAs])){ const v=pendingSeeAs; pendingSeeAs=""; history.replaceState(null,"",location.pathname+location.search); setTimeout(()=>setViewAs(v),0); }
   const t = isAdmin ? OFFICE_TABS
-    : role==="manager" ? [["today","Today"],["week","Week"],["crewlog","Crew log"],["crew","Crew"],["me","Me"]]
-    : [["schedule","Schedule"],["hours","Hours"],["pay","Pay"],["files","Files"],["info","My info"]];
+    : onboarding && !viewAs ? [["training","Training"]]
+    : role==="manager" ? [["today","Today"],["week","Week"],["crewlog","Crew log"],["crew","Crew"],["training","Training"],["me","Me"]]
+    : [["schedule","Schedule"],["training","Training"],["hours","Hours"],["pay","Pay"],["files","Files"],["info","My info"]];
   $("#nav").innerHTML = t.map(([k,l])=>`<button data-v="${k}" class="${view===k&&!openRoute&&!editing?"on":""}">${l}</button>`).join("")
     + (realAdmin && PAGE==="crews" && (crewList().length || people().length) ? `<select id="viewAs" class="viewas" aria-label="See the page as someone else"><option value="">Office view</option>${crewList().map(c=>`<option value="${esc(c)}" ${viewAs===c?"selected":""}>See as ${esc(c)} manager</option>`).join("")}${people().map(([k,t])=>`<option value="emp:${esc(k)}" ${viewAs==="emp:"+k?"selected":""}>See as ${esc(t.name)}</option>`).join("")}</select>` : "");
   const pb=$("#previewBar"); pb.hidden=!viewAs;
@@ -482,10 +757,11 @@ function render(){
   if(editing) return renderEditRoute(app);
   if(openRoute && routes[openRoute]) return renderRoute(app);
   openRoute=null;
-  if(role==="member" && !["schedule","hours","pay","files","info"].includes(view)) view="schedule";
+  if(onboarding && !viewAs && !isAdmin) view="training";
+  if(role==="member" && !["schedule","training","hours","pay","files","info"].includes(view)) view="schedule";
   if(isAdmin && !OFFICE_TABS.some(([k])=>k===view)) view=OFFICE_TABS[0][0];
   ({today:renderToday, week:renderWeek, crewlog:renderCrewLog, crew:renderCrewTab, me:renderMe, schedule:renderMySchedule, hours:renderHours, pay:renderPay, files:renderFiles, info:renderInfo,
-    routes:renderRoutes, crews:renderCrews, people:renderPeople, onboard:renderOnboard, reports:renderReports, sched:renderSched, paper:renderPaper, log:renderLog, events:renderSchedule, paycfg:renderPayCfg}[view]||renderToday)(app);
+    routes:renderRoutes, crews:renderCrews, people:renderPeople, onboard:renderOnboard, reports:renderReports, sched:renderSched, paper:renderPaper, training:(isAdmin?renderTrainOffice:renderTraining), log:renderLog, events:renderSchedule, paycfg:renderPayCfg}[view]||renderToday)(app);
 }
 
 // Today: for a crew, the clock, the storm, the day's routes and meetings. For the office, one lane per crew.
@@ -916,7 +1192,8 @@ function renderHours(app){
 }
 
 // Files: everything on file with the company. Sensitive forms show only that they are on file.
-const requiredFor = k => (staffOf(k).type==="1099" ? ["agreement","payterms","handbook","w9"] : ["agreement","payterms","handbook","w4","i9","deposit"]);
+// What each person must sign comes from his position and legal status (see the Paperwork tab); direct deposit is optional.
+const requiredFor = k => packetOf(k).filter(f=>f!=="deposit");
 function docStatus(k){
   const docs=Object.entries(docsAll[k]||{}).filter(([,d])=>d); const have=new Set(docs.map(([,d])=>d.kind)); const t=today(), soon=addDays(t,30);
   return { docs:docs.sort((a,b)=>(b[1].at||0)-(a[1].at||0)), missing:requiredFor(k).filter(x=>!have.has(x)),
@@ -924,7 +1201,8 @@ function docStatus(k){
 }
 function docRow(k, id, d, office){
   const t=today(), chip = d.expires ? (d.expires<t?'<span class="chip bad">Expired</span>':d.expires<=addDays(t,30)?'<span class="chip warn">Expires soon</span>':"") : "";
-  const link = d.sensitive ? (office && (vault[k]||{})[id] ? `<a class="mapbtn" href="${esc(vault[k][id].url)}" target="_blank" rel="noopener">Open in Drive</a>` : '<span class="chip">On file, kept in Drive</span>')
+  const link = d.encrypted ? (office ? (hasVault() ? `<button class="small" data-vopen="${esc(k)}|${esc(id)}">${unlocked?"Open":"🔒 Open"}</button>` : '<span class="chip">🔒 Sealed</span>') : '<span class="chip">On file, locked</span>')
+    : d.sensitive ? (office && (vault[k]||{})[id] ? `<a class="mapbtn" href="${esc(vault[k][id].url)}" target="_blank" rel="noopener">Open in Drive</a>` : '<span class="chip">On file, kept in Drive</span>')
     : d.url ? `<a class="mapbtn" href="${esc(d.url)}" target="_blank" rel="noopener">Open</a>` : "";
   return `<div class="logrow"><span class="w"><b>${esc(d.name)}</b> ${chip}<div class="meta">${esc(DOC_KINDS[d.kind]||d.kind)}${d.signedAt?" &middot; signed "+fmtShort(d.signedAt):""}${d.expires?" &middot; expires "+fmtShort(d.expires):""} &middot; added ${fmtShort(iso(new Date(d.at||Date.now())))}${d.shareError?` &middot; <span style="color:var(--red)">not shared: ${esc(d.shareError)}</span>`:""}</div>${d.note?`<div class="muted">${esc(d.note)}</div>`:""}</span>
     <span style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end">${link}${office?`<button class="small danger" data-docrm="${esc(id)}">Remove record</button>`:""}</span></div>`;
@@ -939,7 +1217,7 @@ function renderFiles(app){
 // My info: the employee keeps his phone, address and emergency contact current.
 function renderInfo(app){
   const k=me.key, s=staffOf(k), em=s.emergency||{}, crew=crewOfPerson(k), mk=(crews[crew]||{}).manager;
-  app.innerHTML=`<div class="card"><h2>${esc(me.name)}</h2><table>
+  app.innerHTML=`${myPaperHtml(k)}<div class="card"><h2>${esc(me.name)}</h2><table>
       <tr><td>Email</td><td>${esc((team[k]||{}).email||me.email)}</td></tr><tr><td>Crew</td><td>${esc(crew||"Not on a crew")}${role==="manager"?" (manager)":""}</td></tr>
       ${mk&&mk!==k?`<tr><td>Manager</td><td>${esc(personName(mk))}</td></tr>`:""}${s.startDate?`<tr><td>Started</td><td>${fmtDay(s.startDate)}</td></tr>`:""}</table></div>
     <form class="card" id="infoForm"><h2>Keep this current</h2><div class="grid2">
@@ -1017,29 +1295,32 @@ function renderPerson(app, k){
       <div><label for="pfEmName">Emergency contact</label><input id="pfEmName" value="${esc(em.name||"")}"></div><div><label for="pfEmPhone">Their phone</label><input id="pfEmPhone" type="tel" value="${esc(em.phone||"")}"></div>
       <div><label for="pfEmRel">Relationship</label><input id="pfEmRel" value="${esc(em.relation||"")}"></div><div><label for="pfStart">Start date</label><input id="pfStart" type="date" value="${esc(s.startDate||"")}"></div>
       <div><label for="pfType">Paid as</label><select id="pfType"><option value="W-2" ${s.type!=="1099"?"selected":""}>Employee (W-2)</option><option value="1099" ${s.type==="1099"?"selected":""}>Contractor (1099)</option></select></div>
+      <div><label for="pfPos">Position</label><select id="pfPos">${Object.entries(PAPER.POSITIONS).map(([v,l])=>`<option value="${v}" ${positionOf(k)===v?"selected":""}>${esc(l)}</option>`).join("")}</select></div>
 </div></div>
       <div class="actions"><button class="primary">Save profile</button></div></form>
     <div class="card"><h2>Files</h2>${st.missing.length?`<p><span class="chip warn">Missing</span> ${st.missing.map(x=>esc(DOC_KINDS[x])).join(", ")}</p>`:'<p><span class="chip ok">All required files on file</span></p>'}
       ${st.docs.map(([id,d])=>docRow(k,id,d,true)).join("")||'<p class="meta">No files yet.</p>'}
-      <h3 style="margin-top:12px">Add a file</h3><div class="grid2"><div><label for="upKind">What it is</label><select id="upKind">${Object.entries(DOC_KINDS).map(([x,l])=>`<option value="${x}">${esc(l)}${SENSITIVE.includes(x)?" (kept in Drive only)":""}</option>`).join("")}</select></div>
+      <h3 style="margin-top:12px">Add a file</h3><div class="grid2"><div><label for="upKind">What it is</label><select id="upKind">${Object.entries(DOC_KINDS).map(([x,l])=>`<option value="${x}">${esc(l)}${SENSITIVE.includes(x)?(vaultPub?" (sealed)":" (kept in Drive only)"):""}</option>`).join("")}</select></div>
         <div><label for="upLabel">Name on the record</label><input id="upLabel" placeholder="2026 employment agreement"></div><div><label for="upSigned">Signed</label><input id="upSigned" type="date"></div><div><label for="upExp">Expires (optional)</label><input id="upExp" type="date"></div></div>
         <label for="upFile">File (PDF or photo, up to 7 MB)</label><input id="upFile" type="file" accept="application/pdf,image/*,.doc,.docx">
         <div class="actions"><button class="primary" id="upGo">Upload to Drive</button></div><p class="muted">Ordinary files are shared view-only with ${esc(t.email||"the employee")} so they can open them. Tax and ID forms stay in the office's Drive and show only as on file.</p></div>
     <div class="card"><div class="top" style="display:flex;justify-content:space-between;gap:10px;align-items:baseline"><h2>Shifts, next month</h2>${PAGE==="team"?'<a class="mapbtn" href="crews.html">Set on Crews, Schedules</a>':`<button class="small primary" data-shadd="${esc(k)}">Add shifts</button>`}</div>${shiftList(k, today(), SCHEDULE_DAYS)}</div>
     <h2 style="margin:14px 0 8px">Pay log</h2>${payRowsHtml(k)}
     ${s.applicantId||s.indeedUrl?`<div class="card"><h2>Hiring</h2><p class="meta">${s.hiredAt?"Hired "+fmtDay(iso(new Date(s.hiredAt)))+" from Onboarding":"Hired"}${s.appliedFor?", applied for "+esc(APPLIED_FOR[s.appliedFor]||s.appliedFor):""}${s.source?" through "+esc(s.source):""}.</p>${s.indeedUrl?`<a class="mapbtn" href="${esc(s.indeedUrl)}" target="_blank" rel="noopener">Indeed profile</a>`:""}</div>`:""}
+    ${personTrainHtml(k)}
     ${pfileHtml(k)}
     <div class="card"><h2>Leaving</h2><p class="meta">Moves ${esc(firstName(t.name))}'s whole record to the archive and takes him off the Team list. It asks first.</p><div class="actions"><button class="danger" id="toPast">Move to Past</button></div></div>`;
   $("#back").onclick=()=>{ personOpen=null; render(); };
-  $("#toPast").onclick=()=>archiveDialog(k); wirePfile(app, k);
+  $("#toPast").onclick=()=>archiveDialog(k); wirePfile(app, k); wirePersonTrain(app, k);
   $("#seeAs").onclick=()=>{ if(PAGE==="team") location.href="crews.html#seeas="+encodeURIComponent("emp:"+k); else setViewAs("emp:"+k); };
   $("#pfForm").onsubmit=async e=>{ e.preventDefault();
     try { await store.update({ [`staff/${k}/phone`]:$("#pfPhone").value.trim()||null, [`staff/${k}/address`]:$("#pfAddr").value.trim()||null,
       [`staff/${k}/emergency`]:{ name:$("#pfEmName").value.trim(), phone:$("#pfEmPhone").value.trim(), relation:$("#pfEmRel").value.trim() },
-      [`staff/${k}/startDate`]:$("#pfStart").value||null, [`staff/${k}/type`]:$("#pfType").value }); toast("Profile saved"); }
+      [`staff/${k}/startDate`]:$("#pfStart").value||null, [`staff/${k}/type`]:$("#pfType").value, [`staff/${k}/position`]:$("#pfPos").value }); toast("Profile saved"); }
     catch(err){ toast("Not saved: "+(err.message||err)); } };
   $("#upKind").onchange=()=>{ if(!$("#upLabel").value) $("#upLabel").placeholder=DOC_KINDS[$("#upKind").value]; };
   $("#upGo").onclick=()=>uploadDoc(k);
+  app.querySelectorAll("[data-vopen]").forEach(b=>b.onclick=()=>{ const [pk,id]=b.dataset.vopen.split("|"); openSealed(pk,id); });
   app.querySelectorAll("[data-docrm]").forEach(b=>b.onclick=async()=>{ await store.update({[`staffDocs/${k}/${b.dataset.docrm}`]:null}); toast("Record removed. The file stays in Drive."); });
   wireShifts(app);
 }
@@ -1051,6 +1332,11 @@ async function uploadDoc(k){
   try { toast("Uploading");
     const up={ k, personName:(team[k]||{}).name||(applicants[k]||{}).name||"", fileName:f.name, mime:f.type||"application/octet-stream", data:await readB64(f), kind, sensitive:SENSITIVE.includes(kind), label,
       signedAt:($("#upSigned")||{}).value||null, expires:($("#upExp")||{}).value||null, at:Date.now(), by:me.email };
+    // Tax, ID and bank files are sealed here, in this browser, once the paperwork password is set. They never reach Drive unsealed.
+    if(up.sensitive && vaultPub){ const bytes=PAPER.unb64(up.data), env=await PAPER.sealFor(vaultPub, { fileName:f.name, mime:up.mime, kind }, bytes);
+      await store.update({ [`vaultDocs/${k}/${id}`]:Object.assign(env, { form:kind, at:Date.now(), by:me.email }),
+        [`staffDocs/${k}/${id}`]:{ name:label, fileName:f.name, kind, sensitive:true, encrypted:true, at:Date.now(), by:me.email, signedAt:up.signedAt||null, expires:up.expires||null, size:f.size } });
+      toast("Sealed and saved. It opens with the paperwork password."); return; }
     if(DEMO){ await store.update({ [`staffDocs/${k}/${id}`]:{ name:label, fileName:f.name, kind, sensitive:up.sensitive, at:Date.now(), by:me.email, signedAt:up.signedAt, expires:up.expires, ...(up.sensitive?{}:{url:"https://drive.google.com/", shared:true}) } }); toast("Saved (demo)"); return; }
     await store.update({ [`sync/staffUpload/${id}`]:up });
     if(!svcCfg) { toast("Queued. The signing service is not set here, so it uploads on its next 5-minute run."); return; }
@@ -1380,7 +1666,7 @@ function hireDialog(aid){
     upd[`allowed/${k}`]={ ...(team[k]||{}), name:a.name, email, tier:"crew", crewRole:role, ...(crew?{crew}:{}) };
     if(crew){ upd[`crews/${crew}/members/${k}`]=a.name; const cr=crews[crew]||{};
       if(role==="manager"){ upd[`crews/${crew}/manager`]=k; if(cr.manager&&cr.manager!==k&&team[cr.manager]) upd[`allowed/${cr.manager}/crewRole`]="member"; } }
-    upd[`staff/${k}`]={ ...(staffAll[k]||{}), name:a.name, email, phone:a.phone||null, address:a.address||null, city:a.city||null, startDate:$("#hStart").value||today(), type:$("#hType").value,
+    upd[`staff/${k}`]={ ...(staffAll[k]||{}), name:a.name, email, phone:a.phone||null, address:a.address||null, city:a.city||null, startDate:$("#hStart").value||today(), type:$("#hType").value, position:role==="manager"?"manager":"member",
       applicantId:aid, appliedFor:a.role||null, job:a.job||null, source:a.source||null, indeedUrl:a.indeedUrl||null, hiredAt:now, hiredBy:me.email };
     Object.entries(personFile[aid]||{}).forEach(([id,e])=>{ upd[`personFile/${k}/${id}`]=e; }); upd[`personFile/${aid}`]=null;
     upd[`personFile/${k}/${store.key()}`]={ type:"hired", text:`Hired as ${role==="manager"?"crew manager":"crew member"}${crew?" on "+crew:""}, starting ${fmtDay($("#hStart").value||today())}. Paid as ${$("#hType").value}.`, at:now, by:me.email, byName:me.name };
@@ -1389,7 +1675,9 @@ function hireDialog(aid){
     if(fileDocs[aid]){ upd[`personFileDoc/${k}`]=fileDocs[aid]; upd[`personFileDoc/${aid}`]=null; }
     Object.assign(upd, { [`applicants/${aid}/stage`]:"hired", [`applicants/${aid}/stageAt`]:now, [`applicants/${aid}/hiredAt`]:now, [`applicants/${aid}/hiredKey`]:k,
       [`sync/staffMove/${store.key()}`]:{ action:"hire", from:aid, to:k, name:a.name, email, at:now }, [`sync/personFileDirty/${aid}`]:null, ...fileDirty(k) });
-    try { await store.update(upd); dl.close(); toast(`${a.name} is hired. His profile is under Personnel.`); pingTeam(); }
+    try { await store.update(upd); dl.close(); toast(`${a.name} is hired. His profile is under Personnel.`); pingTeam();
+      // His new-hire paperwork goes out right away; until he signs the offer, the crew page shows him only Training.
+      setTimeout(()=>paperSend(k), 600); }
     catch(e){ toast("Not hired: "+(e.message||e)); }
   };
 }
@@ -1450,7 +1738,7 @@ function renderApplicant(app, aid){
     ${pfileHtml(aid,"Applicant file")}
     <div class="card"><h2>Files</h2><p class="meta">Résumé, consent forms, driving record. Kept in Drive under Potential Hires; they move with him if he is hired.</p>
       ${docs.map(([id,d])=>docRow(aid,id,d,true)).join("")||'<p class="meta">No files yet.</p>'}
-      <div class="grid2"><div><label for="upKind">What it is</label><select id="upKind"><option value="other">Résumé or other file</option>${Object.entries(DOC_KINDS).filter(([x])=>x!=="other").map(([x,l])=>`<option value="${x}">${esc(l)}${SENSITIVE.includes(x)?" (kept in Drive only)":""}</option>`).join("")}</select></div>
+      <div class="grid2"><div><label for="upKind">What it is</label><select id="upKind"><option value="other">Résumé or other file</option>${Object.entries(DOC_KINDS).filter(([x])=>x!=="other").map(([x,l])=>`<option value="${x}">${esc(l)}${SENSITIVE.includes(x)?(vaultPub?" (sealed)":" (kept in Drive only)"):""}</option>`).join("")}</select></div>
         <div><label for="upLabel">Name on the record</label><input id="upLabel" placeholder="Résumé"></div></div>
       <label for="upFile">File (PDF or photo, up to 7 MB)</label><input id="upFile" type="file" accept="application/pdf,image/*,.doc,.docx">
       <div class="actions"><button class="primary" id="upGo">Upload to Drive</button></div></div>`;
@@ -1487,18 +1775,379 @@ function renderSched(app){
   $("#cf").onchange=e=>{ crewFilter=e.target.value; render(); };
   wireShifts(app);
 }
-// ----- Team Manager, office: whose paperwork is missing, expired or expiring -----
-function renderPaper(app){
-  const rows=people().map(([k,t])=>({k,t,st:docStatus(k)}));
-  const bad=rows.filter(r=>r.st.missing.length||r.st.expired.length||r.st.soon.length);
-  app.innerHTML=`<div class="bar"><span class="date">Paperwork</span><span class="chip ${bad.length?"warn":"ok"}">${bad.length?bad.length+" need attention":"Everyone is up to date"}</span></div>
-    <p class="meta">Required for W-2: agreement, pay terms, handbook, W-4, I-9, direct deposit. For 1099: agreement, pay terms, handbook, W-9. Licenses and certifications are flagged 30 days before they expire. Tap a person to upload.</p>
-    <div class="card scroll"><table><tr><th>Name</th><th>Paid as</th><th>Missing</th><th>Expired or expiring</th><th>On file</th></tr>
-    ${rows.sort((a,b)=>(b.st.missing.length+b.st.expired.length*2)-(a.st.missing.length+a.st.expired.length*2)||(a.t.name||"").localeCompare(b.t.name||"")).map(r=>`<tr data-person="${esc(r.k)}" style="cursor:pointer"><td><b>${esc(r.t.name)}</b><div class="muted">${esc(r.t.crew||"No crew")}</div></td><td>${esc(staffOf(r.k).type||"W-2")}</td>
-      <td>${r.st.missing.length?r.st.missing.map(x=>`<span class="chip warn">${esc(DOC_KINDS[x])}</span>`).join(" "):'<span class="chip ok">None</span>'}</td>
-      <td>${[...r.st.expired.map(([,d])=>`<span class="chip bad">${esc(d.name)}: expired ${fmtShort(d.expires)}</span>`),...r.st.soon.map(([,d])=>`<span class="chip warn">${esc(d.name)}: ${fmtShort(d.expires)}</span>`)].join(" ")||""}</td><td>${r.st.docs.length}</td></tr>`).join("")||'<tr><td colspan="5" class="meta">No employees yet.</td></tr>'}</table></div>`;
-  app.querySelectorAll("[data-person]").forEach(tr=>tr.onclick=()=>{ view="people"; personOpen=tr.dataset.person; render(); window.scrollTo(0,0); });
+// ----- Team Manager, office: paperwork by position and legal status, with the paperwork vault (October 17, 2026) -----
+// Who signs what: crew managers and crew members are W-2 employees (agreement, W-4, MI-W4, I-9); door hangers are
+// 1099 contractors (agreement, W-9). Direct deposit is optional for everyone. Each form has its own Email button,
+// and each person an "Email all missing". The employee signs on paperwork.html; tax, I-9, W-9 and bank forms arrive
+// sealed with the vault's public key. Every admin sees that a signed copy exists. Opening one takes the paperwork
+// password, which unlocks the vault's private key in this browser only, and the rules let only Russel and the admins
+// he names read the sealed copies at all. Claude's own sign-in is never on that list. The vault locks itself after
+// 20 idle minutes. Only Russel sets or changes the password and decides who has access.
+let vaultPub=null, vaultKeyRec=null, vaultAccess={}, paperAll={}, unlocked=null, lockTimer=null;
+const LOCK_IDLE_MS = 20*60*1000;
+const isRussel = () => !!me && me.email===ADMIN_EMAIL.toLowerCase() && realAdmin;
+const hasVault = () => isRussel() || (realAdmin && vaultAccess[me.key]===true);
+const PAPER_ORDER = [["manager","w2"],["member","w2"],["walker","1099"],["walkerpt","1099"],["office","w2"]];
+const paperPeople = () => Object.entries(team).filter(([,t])=>t && (t.tier==="crew" || t.tier==="walker")).sort((a,b)=>(a[1].name||"").localeCompare(b[1].name||""));
+function positionOf(k){ const s=staffOf(k), t=team[k]||{}; return s.position || (t.tier==="walker" ? "walker" : t.crewRole==="manager" ? "manager" : "member"); }
+function legalOf(k){ const ty=staffOf(k).type; return ty==="1099" ? "1099" : ty ? "w2" : PAPER.STATUS_FOR[positionOf(k)]||"w2"; }
+const packetOf = k => PAPER.packet(positionOf(k), legalOf(k));
+// A form is done when he signed it online, or when the office uploaded that kind of file for him.
+function formState(k, f){
+  const p=((paperAll[k]||{}).forms||{})[f]||{};
+  if(p.status==="done") return { done:true, at:p.at, doc:p.doc, s2:p.s2, online:true };
+  const up=Object.entries(docsAll[k]||{}).find(([,d])=>d && d.kind===f);
+  if(up) return { done:true, at:up[1].at, doc:up[0], uploaded:true, encrypted:!!up[1].encrypted };
+  return { done:false, sentAt:p.sentAt };
 }
+const deployId = () => ((svcCfg && svcCfg.url || "").match(/\/s\/([\w-]+)\//)||[])[1] || "";
+function newToken(){ const a="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789", r=crypto.getRandomValues(new Uint8Array(32)); return "p_"+[...r].map(x=>a[x%62]).join(""); }
+
+// ---------- vault ----------
+function touchVault(){ if(!unlocked) return; clearTimeout(lockTimer); lockTimer=setTimeout(()=>lockVault("Locked after 20 idle minutes"), LOCK_IDLE_MS); }
+["pointerdown","keydown"].forEach(ev=>document.addEventListener(ev, ()=>touchVault(), { passive:true }));
+function lockVault(msg){ if(unlocked && unlocked.priv) unlocked.priv.fill(0); unlocked=null; clearTimeout(lockTimer); if(msg) toast(msg); if(view==="paper"||personOpen) render(); }
+window.addEventListener("pagehide", ()=>lockVault());
+const pwField = (id, label, auto) => `<div><label for="${id}">${label}</label><input id="${id}" type="password" autocomplete="${auto||"current-password"}" style="font-size:16px"></div>`;
+function vaultBar(){
+  if(!vaultPub) return `<div class="card vaultbar"><h2>🔒 Paperwork password</h2>${isRussel()
+      ? `<p class="meta">Signed tax, I-9 and bank forms are sealed with this password. Set it before you send any paperwork. You get a recovery code once; keep it somewhere safe. Without the password or the code, sealed forms cannot be opened by anyone, including you.</p><div class="actions"><button class="primary" id="vSet">Set password</button></div>`
+      : `<p class="meta">Not set yet. Only Russel can set it. Agreements can still be sent; tax and bank forms wait until it is set.</p>`}</div>`;
+  if(!hasVault()) return `<div class="card vaultbar"><p class="meta" style="margin:0">🔒 Signed tax, I-9 and bank forms are locked. You can see what is on file, but opening them takes access from Russel and the paperwork password.</p></div>`;
+  return `<div class="card vaultbar"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+      <span>${unlocked ? '<span class="chip ok">🔓 Unlocked</span> <span class="meta">Locks after 20 idle minutes or when you leave the page.</span>' : '<span class="chip">🔒 Locked</span> <span class="meta">Signed copies show below. Unlock to open them.</span>'}</span>
+      <span class="actions" style="margin:0">${unlocked ? '<button id="vLock">Lock</button>' : '<button class="primary" id="vUnlock">Unlock</button>'}${isRussel() ? '<button id="vChange">Change password</button><button id="vAccess">Who has access</button>' : ""}</span></div></div>`;
+}
+function wireVault(app){
+  const on=(id,f)=>{ const b=app.querySelector("#"+id); if(b) b.onclick=f; };
+  on("vSet", setPwDialog); on("vUnlock", ()=>unlockDialog()); on("vLock", ()=>lockVault("Locked")); on("vChange", changePwDialog); on("vAccess", accessDialog);
+}
+function setPwDialog(){
+  const d=openDlg(`<h2>Set the paperwork password</h2><p class="meta">At least 10 characters. Anyone you give access to needs it too, so pick one you can share in person.</p>
+    <div class="grid2">${pwField("vp1","Password","new-password")}${pwField("vp2","Type it again","new-password")}</div><p class="err" id="vErr"></p>
+    <div class="actions"><button class="primary" id="vGo">Set password</button><button data-close>Cancel</button></div>`);
+  d.querySelector("#vGo").onclick=async()=>{ const a=d.querySelector("#vp1").value, b=d.querySelector("#vp2").value, err=d.querySelector("#vErr");
+    if(a.length<10) return err.textContent="At least 10 characters."; if(a!==b) return err.textContent="The two do not match.";
+    if(vaultPub) return err.textContent="A password is already set. Use Change password.";
+    const go=d.querySelector("#vGo"); go.disabled=true; go.textContent="Setting up…";
+    try { const v=await PAPER.create(a); await store.update({ vaultPub:v.pub, vaultKey:v.key });
+      unlocked=await PAPER.unlock(v.key, a); touchVault();
+      const d2=openDlg(`<h2>Your recovery code</h2><p>Write this down and keep it away from the password. It is shown once. It opens the paperwork and resets the password if the password is lost.</p>
+        <p style="font:700 22px/1.4 ui-monospace,Menlo,monospace;letter-spacing:.04em;text-align:center;background:var(--soft,#eef2ee);padding:12px;border-radius:8px;overflow-wrap:anywhere" id="vCode">${esc(v.code)}</p>
+        <label class="ck" style="display:flex;gap:10px;align-items:flex-start"><input type="checkbox" id="vSaved" style="width:22px;height:22px"><span>I wrote the recovery code down somewhere safe.</span></label>
+        <div class="actions"><button class="primary" id="vDone" disabled>Done</button></div>`);
+      d2.addEventListener("cancel", e=>{ if(!d2.querySelector("#vSaved")?.checked) e.preventDefault(); });
+      d2.querySelector("#vSaved").onchange=e=>{ d2.querySelector("#vDone").disabled=!e.target.checked; };
+      d2.querySelector("#vDone").onclick=()=>{ d2.close(); render(); };
+    } catch(e){ err.textContent=e.message||String(e); go.disabled=false; go.textContent="Set password"; } };
+}
+function unlockDialog(then){
+  if(!vaultKeyRec) return toast(hasVault() ? "The locked key did not load. Reload the page." : "Russel has not given you access to signed paperwork.");
+  let rec=false;
+  const d=openDlg(`<h2>Unlock paperwork</h2><div id="vWrap">${pwField("vpw","Paperwork password")}</div>
+    <p><button class="small" id="vRec" type="button">Use the recovery code instead</button></p><p class="err" id="vErr"></p>
+    <div class="actions"><button class="primary" id="vGo">Unlock</button><button data-close>Cancel</button></div>`);
+  const inp=()=>d.querySelector("#vpw"); inp().focus();
+  d.querySelector("#vRec").onclick=()=>{ rec=!rec; d.querySelector("#vWrap").innerHTML = rec ? `<div><label for="vpw">Recovery code</label><input id="vpw" autocomplete="off" style="font-size:16px;text-transform:uppercase"></div>` : pwField("vpw","Paperwork password");
+    d.querySelector("#vRec").textContent = rec ? "Use the password instead" : "Use the recovery code instead"; inp().focus(); };
+  const go=async()=>{ const b=d.querySelector("#vGo"), err=d.querySelector("#vErr"); b.disabled=true; b.textContent="Unlocking…"; err.textContent="";
+    try { unlocked=await PAPER.unlock(vaultKeyRec, inp().value, rec); touchVault(); d.close(); toast("Unlocked"); render(); if(then) then(); }
+    catch(e){ err.textContent=e.message||String(e); b.disabled=false; b.textContent="Unlock"; } };
+  d.querySelector("#vGo").onclick=go; d.addEventListener("keydown", e=>{ if(e.key==="Enter"){ e.preventDefault(); go(); } });
+}
+function changePwDialog(){
+  let rec=false;
+  const d=openDlg(`<h2>Change the paperwork password</h2><p class="meta">Enter the current password first. Sealed forms stay sealed; only the password that opens them changes.</p>
+    <div id="vWrap">${pwField("vOld","Current password")}</div><p><button class="small" id="vRec" type="button">I lost it: use the recovery code</button></p>
+    <div class="grid2">${pwField("vN1","New password","new-password")}${pwField("vN2","Type it again","new-password")}</div><p class="err" id="vErr"></p>
+    <div class="actions"><button class="primary" id="vGo">Change password</button><button data-close>Cancel</button></div>`);
+  d.querySelector("#vRec").onclick=()=>{ rec=!rec; d.querySelector("#vWrap").innerHTML = rec ? `<div><label for="vOld">Recovery code</label><input id="vOld" autocomplete="off" style="font-size:16px;text-transform:uppercase"></div>` : pwField("vOld","Current password"); };
+  d.querySelector("#vGo").onclick=async()=>{ const err=d.querySelector("#vErr"), a=d.querySelector("#vN1").value, b=d.querySelector("#vN2").value, btn=d.querySelector("#vGo");
+    if(a.length<10) return err.textContent="The new password needs at least 10 characters."; if(a!==b) return err.textContent="The two new passwords do not match.";
+    btn.disabled=true; btn.textContent="Changing…"; err.textContent="";
+    try { const u=await PAPER.unlock(vaultKeyRec, d.querySelector("#vOld").value, rec); const nk=await PAPER.rewrap(vaultKeyRec, u.priv, a);
+      await store.update({ vaultKey:nk }); unlocked=u; touchVault(); d.close(); toast("Password changed. Tell anyone with access the new one."); render(); }
+    catch(e){ err.textContent=e.message||String(e); btn.disabled=false; btn.textContent="Change password"; } };
+}
+function accessDialog(){
+  const admins=Object.entries(team).filter(([k,t])=>t && t.tier==="admin" && k!==me.key).sort((a,b)=>(a[1].name||"").localeCompare(b[1].name||""));
+  const d=openDlg(`<h2>Who can open signed paperwork</h2><p class="meta">You always can. Check an admin to let him open sealed forms; he still needs the password. New admins start without access. Claude's own sign-in is never given access; Claude works on paperwork only through your account.</p>
+    ${admins.map(([k,t])=>`<label class="ck" style="display:flex;gap:10px;align-items:center;padding:8px 0;border-top:1px solid var(--line)"><input type="checkbox" data-acc="${esc(k)}" ${vaultAccess[k]===true?"checked":""} style="width:22px;height:22px"><span><b>${esc(t.name||t.email)}</b> <span class="meta">${esc(t.email||"")}</span></span></label>`).join("")||'<p class="meta">No other admins yet.</p>'}
+    <div class="actions"><button data-close>Done</button></div>`);
+  d.querySelectorAll("[data-acc]").forEach(c=>c.onchange=async()=>{ try { await store.update({ [`vaultAccess/${c.dataset.acc}`]: c.checked ? true : null }); toast(c.checked?"Access given":"Access removed"); } catch(e){ toast("Not saved: "+(e.message||e)); c.checked=!c.checked; } });
+}
+
+// ---------- opening sealed forms ----------
+const FIELD_LABELS = { first:"First name", mi:"Middle initial", last:"Last name", otherLast:"Other last names", street:"Street", apt:"Apt", city:"City", state:"State", zip:"ZIP",
+  ssn:"Social Security number", dob:"Date of birth", dl:"Driver's license", email:"Email", phone:"Phone", filing:"Filing status", twoJobs:"Two jobs (Step 2c)", kids:"Children under 17", otherDeps:"Other dependents",
+  otherIncome:"Other income", deductions:"Deductions", extra:"Extra federal withholding", exempt:"Exempt (federal)", exemptions:"MI exemptions", miExtra:"Extra Michigan withholding", exempt8:"MI exemption", status:"I-9 status",
+  aNumber:"A-Number", workUntil:"Work authorized until", i94:"I-94", passport:"Passport", passportCountry:"Passport country", legalName:"Name on tax return", business:"Business", taxClass:"Tax classification",
+  tinType:"Taxpayer number type", ein:"EIN", bankName:"Bank", routing:"Routing number", account:"Account number", acctType:"Account type", startDate:"Start date", fileName:"File", mime:"Type" };
+const MASK = ["ssn","account","ein","dl","aNumber","passport","i94"];
+let pdfLibP=null;
+function loadPdfLib(){ if(window.PDFLib) return Promise.resolve(); if(!pdfLibP) pdfLibP=new Promise((res,rej)=>{ const s=document.createElement("script"); s.src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"; s.onload=res; s.onerror=()=>{ pdfLibP=null; rej(new Error("The PDF tool did not load. Check the connection.")); }; document.head.appendChild(s); }); return pdfLibP; }
+async function openSealed(k, id){
+  if(!unlocked) return unlockDialog(()=>openSealed(k, id));
+  touchVault();
+  let env; try { env=await store.get(`vaultDocs/${k}/${id}`); } catch(e){ return toast("Could not read it: "+(e.message||e)); }
+  if(!env) return toast("No sealed copy found for that record.");
+  let o; try { o=await PAPER.openFor(unlocked.privateKey, env); } catch(e){ return toast("That copy did not open with this vault's key."); }
+  const d0=(docsAll[k]||{})[id]||{}, f=o.fields||{}, mime=f.mime||"application/pdf";
+  const url=URL.createObjectURL(new Blob([o.file], { type:mime })), name=d0.fileName||((PAPER.FORMS[env.form]||{}).short||"Form")+".pdf";
+  const rows=Object.entries(f).filter(([key,v])=>FIELD_LABELS[key] && v!=="" && v!=null && key!=="sig");
+  const dlg=openDlg(`<h2>${esc(personName(k))}: ${esc((PAPER.FORMS[env.form]||{}).title||d0.name||"Sealed file")}</h2>
+    <p class="meta">Signed ${env.at?fmtDay(iso(new Date(env.at))):""}${env.by?" &middot; "+esc(env.by):""}${f.s2?" &middot; Section 2 done":""}. Opened in this browser only.</p>
+    <div class="actions"><a class="mapbtn" href="${url}" target="_blank" rel="noopener">Open ${mime==="application/pdf"?"PDF":"file"}</a><a class="mapbtn" href="${url}" download="${esc(name)}">Download</a>
+      ${env.form==="i9" && !f.s2 ? `<button id="s2Go" class="primary">Fill in Section 2</button>` : ""}</div>
+    ${rows.length?`<h3>Payroll info</h3><table class="kv">${rows.map(([key,v])=>`<tr><td class="meta">${esc(FIELD_LABELS[key])}</td><td>${MASK.includes(key)?`<span data-mask="${esc(String(v))}">•••• ${esc(String(v).replace(/\D/g,"").slice(-4))}</span> <button class="small" data-show>Show</button>`:esc(v===true?"Yes":v===false?"No":String(v))}</td></tr>`).join("")}</table>`:""}
+    <div class="actions"><button data-close>Close</button></div>`);
+  dlg.addEventListener("close", ()=>setTimeout(()=>URL.revokeObjectURL(url), 60000), { once:true });
+  dlg.querySelectorAll("[data-show]").forEach(b=>b.onclick=()=>{ const s=b.previousElementSibling; s.textContent=s.dataset.mask; b.remove(); });
+  const s2=dlg.querySelector("#s2Go"); if(s2) s2.onclick=()=>section2Dialog(k, id, env, f);
+}
+// I-9 Section 2: the office looks at his original documents in person, then fills this in and signs.
+function section2Dialog(k, id, env, f){
+  const s=staffOf(k), doc=p=>`<div class="grid2"><div><label>Document title</label><input data-s2="${p}.title"></div><div><label>Issuing authority</label><input data-s2="${p}.authority"></div><div><label>Document number</label><input data-s2="${p}.number"></div><div><label>Expires (blank if none)</label><input type="date" data-s2="${p}.expires"></div></div>`;
+  const d=openDlg(`<h2>I-9 Section 2: ${esc(personName(k))}</h2>
+    <p class="meta">Look at his original, unexpired documents in person, by his third day of work: one from List A (for example a U.S. passport), or one from List B (for example a driver's license) and one from List C (for example a Social Security card or birth certificate). No copies or photos.</p>
+    <label class="ck" style="display:flex;gap:10px;align-items:center"><input type="radio" name="s2w" value="A" style="width:22px;height:22px"> List A</label>
+    <label class="ck" style="display:flex;gap:10px;align-items:center"><input type="radio" name="s2w" value="BC" checked style="width:22px;height:22px"> List B and List C</label>
+    <div id="s2A" hidden><h3>List A</h3>${doc("listA")}</div><div id="s2BC"><h3>List B</h3>${doc("listB")}<h3>List C</h3>${doc("listC")}</div>
+    <div class="grid2"><div><label for="s2First">First day of work</label><input id="s2First" type="date" value="${esc(s.startDate||"")}"></div><div><label for="s2Rep">Your name and title</label><input id="s2Rep" value="${esc((me.name||"")+", Owner")}"></div></div>
+    <label>Your signature</label><div style="border:1px solid var(--line);border-radius:8px;background:#fff;touch-action:none"><canvas id="s2Sig" style="display:block;width:100%;height:120px;touch-action:none"></canvas></div>
+    <p><button class="small" id="s2Clear" type="button">Clear</button></p><p class="err" id="s2Err"></p>
+    <div class="actions"><button class="primary" id="s2Save">Sign and seal</button><button data-close>Cancel</button></div>`);
+  d.querySelectorAll('[name="s2w"]').forEach(r=>r.onchange=()=>{ d.querySelector("#s2A").hidden=r.value!=="A"&&r.checked; d.querySelector("#s2BC").hidden=r.value==="A"&&r.checked; });
+  const pad=miniPad(d.querySelector("#s2Sig")); d.querySelector("#s2Clear").onclick=()=>pad.clear();
+  d.querySelector("#s2Save").onclick=async()=>{ const err=d.querySelector("#s2Err"), btn=d.querySelector("#s2Save"), which=d.querySelector('[name="s2w"]:checked').value;
+    const s2={ firstDay:d.querySelector("#s2First").value, repName:d.querySelector("#s2Rep").value.trim(), date:today(), sig:pad.png() };
+    d.querySelectorAll("[data-s2]").forEach(i=>{ const [l,key]=i.dataset.s2.split("."); if((which==="A")!==(l==="listA")) return; if(i.value.trim()) (s2[l]=s2[l]||{})[key]=i.value.trim(); });
+    if(which==="A" && !(s2.listA&&s2.listA.title)) return err.textContent="Enter the List A document.";
+    if(which!=="A" && !((s2.listB&&s2.listB.title)&&(s2.listC&&s2.listC.title))) return err.textContent="Enter one List B and one List C document.";
+    if(!s2.firstDay) return err.textContent="Enter his first day of work."; if(!s2.sig) return err.textContent="Sign in the box.";
+    btn.disabled=true; btn.textContent="Sealing…";
+    try { await loadPdfLib(); const blank=new Uint8Array(await (await fetch("forms/i-9.pdf")).arrayBuffer());
+      const a={ name:[f.first,f.mi,f.last].filter(Boolean).join(" "), email:f.email, at:env.at, id:id, date:PAPER.todayIso() };
+      const pdf=await PAPER.build("i9", blank, f, Object.assign(a, { date:iso(new Date(env.at||Date.now())) }), { s2 });
+      const sealed=await PAPER.sealFor(vaultPub, Object.assign({}, f, { s2:{ ...s2, sig:undefined } }), pdf);
+      await store.update({ [`vaultDocs/${k}/${id}`]:Object.assign(sealed, { form:"i9", at:env.at||Date.now(), by:env.by||"employee", s2At:Date.now(), s2By:me.email }),
+        [`paper/${k}/forms/i9/s2`]:Date.now(), [`staffDocs/${k}/${id}/section2`]:today() });
+      d.close(); toast("Section 2 sealed"); render();
+    } catch(e){ err.textContent=e.message||String(e); btn.disabled=false; btn.textContent="Sign and seal"; } };
+}
+function miniPad(cv){ const ctx=cv.getContext("2d"); let on=false, last=null, n=0;
+  const r=cv.getBoundingClientRect(), dp=window.devicePixelRatio||1; cv.width=Math.round(r.width*dp)||600; cv.height=Math.round(r.height*dp)||120; ctx.setTransform(dp,0,0,dp,0,0); ctx.lineWidth=2.2; ctx.lineCap="round"; ctx.strokeStyle="#0b1a4a";
+  const pt=e=>{ const b=cv.getBoundingClientRect(); return { x:e.clientX-b.left, y:e.clientY-b.top }; };
+  cv.onpointerdown=e=>{ e.preventDefault(); cv.setPointerCapture(e.pointerId); on=true; last=pt(e); n++; };
+  cv.onpointermove=e=>{ if(!on) return; const p=pt(e); ctx.beginPath(); ctx.moveTo(last.x,last.y); ctx.lineTo(p.x,p.y); ctx.stroke(); last=p; n++; };
+  cv.onpointerup=cv.onpointercancel=()=>{ on=false; };
+  return { clear(){ ctx.clearRect(0,0,cv.width,cv.height); n=0; }, png:()=> n<8 ? "" : cv.toDataURL("image/png") }; }
+
+// ---------- sending ----------
+async function paperSend(k, only){
+  const t=team[k]||{}, s=staffOf(k);
+  if(!t.email) return toast("Add an email address for "+(t.name||"him")+" first");
+  const forms=packetOf(k), sealedLeft=forms.filter(f=>f!=="agreement" && !formState(k,f).done && (!only || f===only));
+  if(sealedLeft.length && !vaultPub){ if(!forms.includes("agreement") || only) return toast(isRussel()?"Set the paperwork password first":"Russel has to set the paperwork password first"); toast("Sending the agreement only. Tax and bank forms wait for the paperwork password."); only="agreement"; }
+  const tok=(paperAll[k]||{}).token || newToken(), now=Date.now();
+  const req={ k, name:t.name||"", email:t.email, phone:s.phone||"", position:positionOf(k), type:legalOf(k), forms, startDate:s.startDate||"", s:deployId(), by:me.email, at:now };
+  if(only) req.only=[only];
+  const upd={ [`sync/paper/${tok}`]:req, [`paper/${k}/token`]:tok, [`paper/${k}/position`]:req.position, [`paper/${k}/type`]:req.type, [`paper/${k}/list`]:forms, [`paper/${k}/s`]:req.s||null };
+  try {
+    await store.update(upd);
+    if(DEMO){ const u={}; forms.filter(f=>!formState(k,f).done && (!only||f===only)).forEach(f=>u[`paper/${k}/forms/${f}/sentAt`]=now); u[`paper/${k}/sentAt`]=now; await store.update(u); return toast("Sent (demo)"); }
+    if(!svcCfg) return toast("Saved. The signing service is not set here, so nothing was emailed.");
+    const r=await (await fetch(svcCfg.url+"?action=papersend&t="+encodeURIComponent(tok))).json().catch(()=>null);
+    toast(r && r.ok ? (r.status==="nothing" ? "Nothing left to send" : `Emailed ${r.count} form${r.count===1?"":"s"} to ${t.email}`) : "Not sent: "+((r&&r.error)||"the signing service did not answer"));
+  } catch(e){ toast("Not sent: "+(e.message||e)); }
+}
+
+// ---------- the tab ----------
+function paperCard(k){
+  const t=team[k]||{}, forms=packetOf(k), states=forms.map(f=>[f,formState(k,f)]), req=states.filter(([f])=>f!=="deposit"), doneN=req.filter(([,x])=>x.done).length;
+  const left=states.filter(([,x])=>!x.done), p=paperAll[k]||{};
+  return `<div class="card paperp" data-pk="${esc(k)}"><div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap">
+      <div><b class="pname" data-person="${esc(k)}" style="cursor:pointer;font-size:17px">${esc(t.name||k)}</b> <span class="chip ${doneN===req.length?"ok":"warn"}">${doneN} of ${req.length} signed</span>
+        <div class="meta">${esc(t.crew||(t.tier==="walker"?"Door hangers":"No crew"))}${t.email?" &middot; "+esc(t.email):' &middot; <span style="color:var(--red)">no email</span>'}${p.sentAt?" &middot; last emailed "+fmtShort(iso(new Date(p.sentAt))):""}</div></div>
+      ${left.length?`<button class="small primary" data-psend="${esc(k)}">Email all missing</button>`:""}</div>
+    ${states.map(([f,x])=>{ const F=PAPER.FORMS[f], sealed=f!=="agreement", d=x.doc?(docsAll[k]||{})[x.doc]||{}:{};
+      const chip = x.done ? `<span class="chip ok">Signed ${x.at?fmtShort(iso(new Date(x.at))):""}</span>` : x.sentAt ? `<span class="chip warn">Sent ${fmtShort(iso(new Date(x.sentAt)))}</span>` : `<span class="chip">${F.optional?"Optional":"Not sent"}</span>`;
+      let act="";
+      if(x.done){ if(sealed && (x.online || x.encrypted)) act = hasVault() ? `<button class="small" data-vopen="${esc(k)}|${esc(x.doc)}">${unlocked?"Open":"🔒 Open"}</button>` : `<span class="chip">🔒 Sealed</span>`;
+        else if(d.url) act=`<a class="mapbtn" href="${esc(d.url)}" target="_blank" rel="noopener">Open</a>`;
+        else if(sealed) act=`<span class="chip">On file in Drive</span>`;
+        if(f==="i9" && x.online) act += x.s2 ? ` <span class="chip ok">Section 2 done</span>` : ` <span class="chip warn">Section 2 needed</span>`; }
+      else act=`<button class="small" data-psend1="${esc(k)}|${f}">Email</button>`;
+      return `<div class="logrow"><span class="w"><b>${esc(F.short)}</b> <span class="meta">${esc(F.title)}</span></span><span style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:flex-end">${chip}${act}</span></div>`; }).join("")}</div>`;
+}
+function renderPaper(app){
+  const ppl=paperPeople(), groups=new Map();
+  PAPER_ORDER.forEach(([pos,ty])=>groups.set(pos+"|"+ty, []));
+  ppl.forEach(([k])=>{ const g=positionOf(k)+"|"+legalOf(k); if(!groups.has(g)) groups.set(g, []); groups.get(g).push(k); });
+  const open=ppl.filter(([k])=>packetOf(k).some(f=>f!=="deposit" && !formState(k,f).done)).length;
+  const gTitle=g=>{ const [pos,ty]=g.split("|"); return `${PAPER.POSITIONS[pos]||pos} <span class="chip">${ty==="1099"?"1099 contractor":"W-2 employee"}</span>`; };
+  const gNeeds=g=>{ const [pos,ty]=g.split("|"); return PAPER.packet(pos,ty).map(f=>PAPER.FORMS[f].short+(PAPER.FORMS[f].optional?" (optional)":"")).join(", "); };
+  app.innerHTML=`<div class="bar"><span class="date">Paperwork</span><span class="chip ${open?"warn":"ok"}">${open?open+" with forms left":"Everyone is signed"}</span></div>
+    ${vaultBar()}
+    <p class="meta">Grouped by position and legal status. Set a person's position and W-2 or 1099 on his profile. Email sends him one private link to sign on his phone; the same link is on his Training tab. Signing his agreement is what opens his crew pages. There is no handbook yet, so none is asked for.</p>
+    ${[...groups.entries()].filter(([,ks])=>ks.length).map(([g,ks])=>`<h2 style="margin:18px 0 4px">${gTitle(g)}</h2><p class="meta" style="margin:0 0 8px">Signs: ${esc(gNeeds(g))}</p>${ks.map(paperCard).join("")}`).join("")||'<div class="card"><p class="meta">No crew or door hangers on the team list yet.</p></div>'}`;
+  wireVault(app); wirePaper(app);
+}
+function wirePaper(app){
+  app.querySelectorAll(".pname[data-person]").forEach(b=>b.onclick=()=>{ view="people"; personOpen=b.dataset.person; render(); window.scrollTo(0,0); });
+  app.querySelectorAll("[data-psend]").forEach(b=>b.onclick=()=>{ b.disabled=true; paperSend(b.dataset.psend).finally(()=>{ b.disabled=false; }); });
+  app.querySelectorAll("[data-psend1]").forEach(b=>b.onclick=()=>{ const [k,f]=b.dataset.psend1.split("|"); b.disabled=true; paperSend(k,f).finally(()=>{ b.disabled=false; }); });
+  app.querySelectorAll("[data-vopen]").forEach(b=>b.onclick=()=>{ const [k,id]=b.dataset.vopen.split("|"); openSealed(k,id); });
+}
+
+// ----- Training (October 17, 2026) -----
+// The office keeps a library of training material (slide decks, SOPs, videos, documents), sorted by category, and
+// assigns each piece to a whole role (crew managers, crew members, everyone) or to single people. On the crew page,
+// each person's Training tab shows what is assigned to him and lets him mark it done. His unsigned paperwork sits at
+// the top of the same tab as cards, linking to the same signing page as the email; each card disappears once signed.
+// A new hire whose agreement is not signed yet sees only this tab: signing the offer is what opens the rest.
+const TRAIN_KINDS = { deck:"Slide deck", sop:"SOP", video:"Video", doc:"Document", link:"Link" };
+const TRAIN_ROLES = { manager:"Crew managers", member:"Crew members", all:"Everyone" };
+const TRAIN_CATS = ["Safety","Lawn","Snow","Fall cleanup","Lights","Landscaping","Equipment","Customers","Company policy","Onboarding"];
+let trainLib={}, trainRoles={}, trainAssign={}, trainDone={}, onboarding=false, trainQ="", trainCat="";
+const trainItems = () => Object.entries(trainLib).filter(([,x])=>x && x.title).sort((a,b)=>(a[1].category||"").localeCompare(b[1].category||"")||(a[1].title||"").localeCompare(b[1].title||""));
+function roleKeyOf(k){ const t=team[k]||{}; return t.crewRole==="manager" ? "manager" : "member"; }
+// Everything assigned to a person: by his role, to everyone, or to him by name.
+function assignedTo(k, roleK){
+  const r=roleK||roleKeyOf(k), ids=new Set();
+  [r,"all"].forEach(x=>Object.entries(trainRoles[x]||{}).forEach(([id,on])=>{ if(on) ids.add(id); }));
+  Object.entries(trainAssign[k]||{}).forEach(([id,v])=>{ if(v) ids.add(id); });
+  return [...ids].filter(id=>trainLib[id]);
+}
+const isDone = (k,id) => !!((trainDone[k]||{})[id]);
+// The person's paperwork link, the same one the email carries.
+function paperLinkFor(k){ const p=paperAll[k]||{}; return p.token ? `paperwork.html?t=${encodeURIComponent(p.token)}${p.s?"&s="+encodeURIComponent(p.s):""}` : ""; }
+function paperLeft(k){ const p=paperAll[k]||{}, list=Array.isArray(p.list)?p.list:Object.keys(p.forms||{}); return list.filter(f=>PAPER.FORMS[f] && ((p.forms||{})[f]||{}).status!=="done"); }
+const offerPending = k => { const p=paperAll[k]; if(!p || !p.token) return false; const list=Array.isArray(p.list)?p.list:Object.keys(p.forms||{}); return list.includes("agreement") && ((p.forms||{}).agreement||{}).status!=="done" && !p.offerSigned; };
+function paperCardsHtml(k){
+  const left=paperLeft(k), link=paperLinkFor(k); if(!left.length || !link) return "";
+  return left.sort((a,b)=>(a==="agreement"?-1:b==="agreement"?1:0)).map(f=>{ const F=PAPER.FORMS[f];
+    return `<div class="card trcard paper"><div class="top"><span><span class="chip warn">To sign</span> <b>${esc(F.title)}</b></span></div>
+      <p class="meta">${f==="agreement"?"Your offer. Read it and sign it to get into the rest of the crew page.":F.optional?"Optional. Without it you are paid by check.":"Needed before your first paycheck. Tax and bank forms are locked on your phone before they are sent."}</p>
+      <div class="actions"><a class="primary mapbtn" href="${esc(link)}">Sign now</a></div></div>`; }).join("");
+}
+function trainCardHtml(k, id, office){
+  const x=trainLib[id]||{}, done=isDone(k,id);
+  return `<div class="card trcard ${done?"done":""}"><div class="top"><span><span class="chip">${esc(TRAIN_KINDS[x.kind]||"Material")}</span> <b>${esc(x.title)}</b></span>${done?'<span class="chip ok">Done</span>':""}</div>
+    ${x.description?`<p class="meta">${esc(x.description)}</p>`:""}
+    <div class="actions">${x.url?`<a class="mapbtn" href="${esc(x.url)}" target="_blank" rel="noopener">${x.kind==="deck"?"Open slides":x.kind==="video"?"Watch":"Open"}</a>`:""}${x.body?`<button class="small" data-sop="${esc(id)}">Read the SOP</button>`:""}${x.pending?'<span class="chip">Uploading to Drive</span>':""}
+      ${office?"":done?`<button class="small" data-undone="${esc(id)}">Not done</button>`:`<button class="small primary" data-done="${esc(id)}">Mark done</button>`}</div></div>`;
+}
+function sopDialog(id){ const x=trainLib[id]||{}, lines=String(x.body||"").split(/\n+/).map(s=>s.trim()).filter(Boolean);
+  openDlg(`<h2>${esc(x.title)}</h2>${x.category?`<p class="meta">${esc(x.category)}</p>`:""}<ol class="sop">${lines.map(l=>`<li>${esc(l.replace(/^\d+[.)]\s*/,""))}</li>`).join("")}</ol><div class="actions"><button data-close>Close</button></div>`); }
+// Crew side: the Training tab.
+function renderTraining(app){
+  const k=me.key, ids=assignedTo(k, role==="manager"?"manager":"member"), left=ids.filter(id=>!isDone(k,id));
+  const byCat={}; ids.forEach(id=>{ const c=trainLib[id].category||"Other"; (byCat[c]=byCat[c]||[]).push(id); });
+  const pc=paperCardsHtml(k);
+  app.innerHTML = (onboarding ? `<div class="card welcome"><h2>Welcome to Mangiapane Brothers</h2><p>Sign your offer below to get started. Once it is signed, your schedule, hours and the rest of this page open up. Your other paperwork can be done here any time before your first paycheck.</p></div>` : "")
+    + (pc ? `<h2 style="margin:6px 0 8px">Paperwork to sign</h2>${pc}` : "")
+    + `<div class="bar" style="margin-top:6px"><span class="date">Training</span>${ids.length?`<span class="chip ${left.length?"warn":"ok"}">${ids.length-left.length} of ${ids.length} done</span>`:""}</div>`
+    + (ids.length ? Object.keys(byCat).sort().map(c=>`<h3 style="margin:14px 0 6px">${esc(c)}</h3>${byCat[c].sort((a,b)=>isDone(k,a)-isDone(k,b)).map(id=>trainCardHtml(k,id,false)).join("")}`).join("")
+       : `<div class="card"><p class="meta">${onboarding?"Your training shows up here after you sign your offer.":"Nothing assigned to you yet. The office adds slide decks and how-tos for your role here."}</p></div>`);
+  app.querySelectorAll("[data-sop]").forEach(b=>b.onclick=()=>sopDialog(b.dataset.sop));
+  app.querySelectorAll("[data-done],[data-undone]").forEach(b=>b.onclick=async()=>{ if(previewOnly()) return; const id=b.dataset.done||b.dataset.undone;
+    try { await store.update({ [`trainingDone/${k}/${id}`]: b.dataset.done ? { at:Date.now() } : null }); } catch(e){ toast("Not saved: "+(e.message||e)); } });
+}
+// Profile info: the same paperwork, with what is already signed.
+function myPaperHtml(k){
+  const p=paperAll[k]; if(!p || !p.token) return "";
+  const list=Array.isArray(p.list)?p.list:Object.keys(p.forms||{}), link=paperLinkFor(k);
+  return `<div class="card"><h2>Paperwork</h2>${list.filter(f=>PAPER.FORMS[f]).map(f=>{ const st=(p.forms||{})[f]||{};
+    return `<div class="logrow"><span class="w"><b>${esc(PAPER.FORMS[f].title)}</b></span><span>${st.status==="done"?`<span class="chip ok">Signed ${st.at?fmtShort(iso(new Date(st.at))):""}</span>`:`<a class="mapbtn" href="${esc(link)}">Sign</a>`}</span></div>`; }).join("")}
+    <p class="muted">Signed tax and bank forms are locked; only the owner can open them. Your signed agreement is in Files.</p></div>`;
+}
+
+// ---------- office: the library, assignments and progress ----------
+function renderTrainOffice(app){
+  const items=trainItems(), cats=[...new Set(items.map(([,x])=>x.category||"Other"))].sort(), ppl=people();
+  const shown=items.filter(([,x])=>(!trainCat||(x.category||"Other")===trainCat) && (!trainQ||[x.title,x.description,x.category].join(" ").toLowerCase().includes(trainQ.toLowerCase())));
+  const who=id=>{ const x=trainLib[id], roles=Object.keys(TRAIN_ROLES).filter(r=>(trainRoles[r]||{})[id]); const named=ppl.filter(([k])=>(trainAssign[k]||{})[id]).length;
+    const reach=ppl.filter(([k])=>assignedTo(k).includes(id)), done=reach.filter(([k])=>isDone(k,id)).length;
+    return { roles, named, reach:reach.length, done }; };
+  const byCat={}; shown.forEach(([id,x])=>{ const c=x.category||"Other"; (byCat[c]=byCat[c]||[]).push(id); });
+  app.innerHTML=`<div class="bar"><span class="date">Training</span><select id="trCat" style="width:auto"><option value="">All categories</option>${cats.map(c=>`<option ${trainCat===c?"selected":""}>${esc(c)}</option>`).join("")}</select>
+      <input id="trQ" value="${esc(trainQ)}" placeholder="Search" style="flex:1;min-width:120px" autocomplete="off"><button class="primary small" id="trAdd">+ Add material</button></div>
+    <p class="meta">Upload a slide deck or document, link one (Google Slides, YouTube), or write an SOP step by step. Assign it to a role, to everyone, or to single people. Crew see it on their Training tab and mark it done.</p>
+    ${Object.keys(byCat).sort().map(c=>`<h2 style="margin:16px 0 6px">${esc(c)}</h2>${byCat[c].map(id=>{ const x=trainLib[id], w=who(id);
+      return `<div class="card trcard"><div class="top"><span><span class="chip">${esc(TRAIN_KINDS[x.kind]||"Material")}</span> <b>${esc(x.title)}</b></span><span class="chip ${w.reach&&w.done===w.reach?"ok":""}">${w.done} of ${w.reach} done</span></div>
+        ${x.description?`<p class="meta">${esc(x.description)}</p>`:""}
+        <p class="meta">Assigned to: ${w.roles.map(r=>`<span class="chip">${esc(TRAIN_ROLES[r])}</span>`).join(" ")||""}${w.named?` <span class="chip">${w.named} by name</span>`:""}${!w.roles.length&&!w.named?"nobody yet":""}</p>
+        <div class="actions">${x.url?`<a class="mapbtn" href="${esc(x.url)}" target="_blank" rel="noopener">Open</a>`:""}${x.body?`<button class="small" data-sop="${esc(id)}">Read</button>`:""}${x.pending?'<span class="chip">Uploading to Drive</span>':""}
+          <button class="small" data-trassign="${esc(id)}">Assign</button><button class="small" data-tredit="${esc(id)}">Edit</button><button class="small danger" data-trdel="${esc(id)}">Delete</button></div></div>`; }).join("")}`).join("")
+      || `<div class="card"><p class="meta">${items.length?"Nothing matches.":"No training material yet. Add the first slide deck or SOP."}</p></div>`}
+    <h2 style="margin:18px 0 6px">Progress</h2><div class="card scroll"><table><tr><th>Name</th><th>Role</th><th>Assigned</th><th>Done</th><th>Paperwork left</th></tr>
+      ${ppl.map(([k,t])=>{ const ids=assignedTo(k), d=ids.filter(id=>isDone(k,id)).length, pl=paperLeft(k).length;
+        return `<tr data-trperson="${esc(k)}" style="cursor:pointer"><td><b>${esc(t.name)}</b>${offerPending(k)?' <span class="chip warn">Offer not signed</span>':""}</td><td>${roleKeyOf(k)==="manager"?"Manager":"Crew"}</td><td>${ids.length}</td><td>${ids.length?`<span class="chip ${d===ids.length?"ok":"warn"}">${d}</span>`:"0"}</td><td>${pl||""}</td></tr>`; }).join("")||'<tr><td colspan="5" class="meta">No crew yet.</td></tr>'}</table></div>`;
+  $("#trAdd").onclick=()=>trainDialog();
+  $("#trCat").onchange=e=>{ trainCat=e.target.value; render(); };
+  const q=$("#trQ"); q.oninput=()=>{ trainQ=q.value; const pos=q.selectionStart; render(); const n=$("#trQ"); n.focus(); try{ n.setSelectionRange(pos,pos); }catch(e){} };
+  app.querySelectorAll("[data-sop]").forEach(b=>b.onclick=()=>sopDialog(b.dataset.sop));
+  app.querySelectorAll("[data-tredit]").forEach(b=>b.onclick=()=>trainDialog(b.dataset.tredit));
+  app.querySelectorAll("[data-trassign]").forEach(b=>b.onclick=()=>assignDialog(b.dataset.trassign));
+  app.querySelectorAll("[data-trdel]").forEach(b=>b.onclick=()=>{ const id=b.dataset.trdel, x=trainLib[id]||{};
+    const d=openDlg(`<h2>Delete "${esc(x.title)}"?</h2><p class="meta">It comes off everyone's Training tab. ${x.fileId?"The file stays in Drive.":""}</p><div class="actions"><button class="danger" id="trDelGo">Delete</button><button data-close>Cancel</button></div>`);
+    d.querySelector("#trDelGo").onclick=async()=>{ const upd={ [`trainingLib/${id}`]:null }; Object.keys(TRAIN_ROLES).forEach(r=>{ if((trainRoles[r]||{})[id]) upd[`trainingRoles/${r}/${id}`]=null; });
+      Object.keys(trainAssign).forEach(k=>{ if((trainAssign[k]||{})[id]) upd[`trainingAssign/${k}/${id}`]=null; }); await store.update(upd); d.close(); toast("Deleted"); }; });
+  app.querySelectorAll("[data-trperson]").forEach(tr=>tr.onclick=()=>{ view="people"; personOpen=tr.dataset.trperson; render(); window.scrollTo(0,0); });
+}
+function trainDialog(id){
+  const x=id?trainLib[id]||{}:{ kind:"deck", category:"" }, src=x.body?"sop":x.url&&!x.fileId?"link":"file";
+  const cats=[...new Set(TRAIN_CATS.concat(trainItems().map(([,i])=>i.category).filter(Boolean)))].sort();
+  const d=openDlg(`<h2>${id?"Edit":"Add"} training material</h2>
+    <div class="grid2"><div><label for="trTitle">Title</label><input id="trTitle" value="${esc(x.title||"")}" placeholder="Snow route: start to finish"></div>
+      <div><label for="trCatIn">Category</label><input id="trCatIn" list="trCats" value="${esc(x.category||"")}" placeholder="Snow"><datalist id="trCats">${cats.map(c=>`<option value="${esc(c)}">`).join("")}</datalist></div>
+      <div><label for="trKind">Kind</label><select id="trKind">${Object.entries(TRAIN_KINDS).map(([v,l])=>`<option value="${v}" ${x.kind===v?"selected":""}>${l}</option>`).join("")}</select></div>
+      <div><label for="trDesc">Short description</label><input id="trDesc" value="${esc(x.description||"")}" placeholder="What it covers, how long it takes"></div></div>
+    <label>Where it lives</label><div class="row" style="gap:14px;flex-wrap:wrap">${[["file","Upload a file"],["link","A link"],["sop","Write an SOP here"]].map(([v,l])=>`<label style="display:flex;gap:6px;align-items:center;margin:0;color:var(--ink)"><input type="radio" name="trSrc" value="${v}" ${src===v?"checked":""}> ${l}</label>`).join("")}</div>
+    <div data-src="file" ${src==="file"?"":"hidden"}><label for="trFile">File (PDF, PowerPoint, Word or video, up to 7 MB)</label><input id="trFile" type="file">${x.fileId?`<p class="muted">On file in Drive. Choose a new file only to replace it.</p>`:""}<p class="muted">Bigger files: put them in Drive yourself and use "A link".</p></div>
+    <div data-src="link" ${src==="link"?"":"hidden"}><label for="trUrl">Link</label><input id="trUrl" type="url" value="${esc(x.fileId?"":x.url||"")}" placeholder="https://docs.google.com/presentation/..."><p class="muted">Share Google files as "Anyone with the link can view", or the crew cannot open them.</p></div>
+    <div data-src="sop" ${src==="sop"?"":"hidden"}><label for="trBody">Steps, one per line</label><textarea id="trBody" rows="8" style="width:100%;font-size:16px">${esc(x.body||"")}</textarea></div>
+    <label>Assign to</label><div class="row" style="gap:14px;flex-wrap:wrap">${Object.entries(TRAIN_ROLES).map(([r,l])=>`<label style="display:flex;gap:6px;align-items:center;margin:0;color:var(--ink)"><input type="checkbox" data-trrole="${r}" ${id&&(trainRoles[r]||{})[id]?"checked":""}> ${l}</label>`).join("")}</div>
+    <p class="err" id="trErr" style="color:var(--red)"></p><div class="actions"><button class="primary" id="trSave">Save</button><button data-close>Cancel</button></div>`);
+  d.querySelectorAll('[name="trSrc"]').forEach(r=>r.onchange=()=>d.querySelectorAll("[data-src]").forEach(el=>el.hidden=el.dataset.src!==r.value));
+  d.querySelector("#trSave").onclick=async()=>{ const err=d.querySelector("#trErr"), btn=d.querySelector("#trSave"), title=d.querySelector("#trTitle").value.trim(), how=d.querySelector('[name="trSrc"]:checked').value;
+    if(!title) return err.textContent="Give it a title.";
+    const f=d.querySelector("#trFile").files[0], url=d.querySelector("#trUrl").value.trim(), body=d.querySelector("#trBody").value.trim();
+    if(how==="file" && !f && !x.fileId) return err.textContent="Choose a file."; if(f && f.size>7*1024*1024) return err.textContent="That file is over 7 MB. Put it in Drive and use a link.";
+    if(how==="link" && !/^https?:\/\//.test(url)) return err.textContent="Paste a full link starting with https://."; if(how==="sop" && !body) return err.textContent="Write at least one step.";
+    const tid=id||store.key(), now=Date.now();
+    const rec={ ...x, title, category:d.querySelector("#trCatIn").value.trim()||"Other", kind:d.querySelector("#trKind").value, description:d.querySelector("#trDesc").value.trim()||null, updatedAt:now, by:me.email };
+    if(!id) rec.createdAt=now;
+    if(how==="sop"){ rec.body=body; rec.url=null; rec.fileId=null; } else if(how==="link"){ rec.url=url; rec.body=null; rec.fileId=null; } else rec.body=null;
+    const upd={ [`trainingLib/${tid}`]:rec };
+    d.querySelectorAll("[data-trrole]").forEach(c=>{ upd[`trainingRoles/${c.dataset.trrole}/${tid}`]=c.checked?true:null; });
+    btn.disabled=true;
+    try {
+      if(how==="file" && f){ rec.pending=true; rec.fileName=f.name;
+        if(DEMO){ rec.pending=null; rec.url="https://drive.google.com/"; rec.fileId="demo"; }
+        else upd[`sync/trainUpload/${tid}`]={ data:await readB64(f), fileName:f.name, mime:f.type||"application/octet-stream", category:rec.category, title, at:now, by:me.email }; }
+      await store.update(upd); d.close(); toast(id?"Saved":"Added");
+      if(how==="file" && f && !DEMO){ if(!svcCfg) toast("Saved. The file goes to Drive on the signing service's next 5-minute run.");
+        else { const r=await (await fetch(svcCfg.url+"?action=trainfile&k="+encodeURIComponent(tid))).json().catch(()=>null); toast(r&&r.ok?"Uploaded to Drive":"Saved. Drive upload retries in 5 minutes."); } }
+    } catch(e){ err.textContent="Not saved: "+(e.message||e); btn.disabled=false; } };
+}
+function assignDialog(id){
+  const x=trainLib[id]||{}, ppl=people();
+  const d=openDlg(`<h2>Assign "${esc(x.title)}"</h2>
+    <label>To a whole role</label><div class="row" style="gap:14px;flex-wrap:wrap">${Object.entries(TRAIN_ROLES).map(([r,l])=>`<label style="display:flex;gap:6px;align-items:center;margin:0;color:var(--ink)"><input type="checkbox" data-arole="${r}" ${(trainRoles[r]||{})[id]?"checked":""}> ${l}</label>`).join("")}</div>
+    <label style="margin-top:12px">To single people</label>${ppl.map(([k,t])=>`<label style="display:flex;gap:8px;align-items:center;padding:6px 0;border-top:1px solid var(--line);margin:0;color:var(--ink)"><input type="checkbox" data-aperson="${esc(k)}" ${(trainAssign[k]||{})[id]?"checked":""}> ${esc(t.name)} <span class="meta">${esc(t.crew||"")}${isDone(k,id)?" &middot; done":""}</span></label>`).join("")||'<p class="meta">No crew yet.</p>'}
+    <div class="actions"><button data-close>Done</button></div>`);
+  d.querySelectorAll("[data-arole]").forEach(c=>c.onchange=()=>store.update({ [`trainingRoles/${c.dataset.arole}/${id}`]:c.checked?true:null }));
+  d.querySelectorAll("[data-aperson]").forEach(c=>c.onchange=()=>store.update({ [`trainingAssign/${c.dataset.aperson}/${id}`]:c.checked?{ at:Date.now(), by:me.email }:null }));
+}
+// Personnel profile: his training at a glance, with a quick assign.
+function personTrainHtml(k){
+  const ids=assignedTo(k), rest=trainItems().filter(([id])=>!ids.includes(id));
+  return `<div class="card"><h2>Training</h2>${ids.map(id=>`<div class="logrow"><span class="w"><b>${esc(trainLib[id].title)}</b> <span class="meta">${esc(trainLib[id].category||"")}${(trainAssign[k]||{})[id]?"":" &middot; by role"}</span></span><span>${isDone(k,id)?`<span class="chip ok">Done ${fmtShort(iso(new Date(trainDone[k][id].at||Date.now())))}</span>`:'<span class="chip warn">Not yet</span>'}</span></div>`).join("")||'<p class="meta">Nothing assigned.</p>'}
+    ${rest.length?`<div class="row" style="margin-top:8px"><select id="ptAdd" style="flex:1;min-width:180px"><option value="">Assign more…</option>${rest.map(([id,x])=>`<option value="${esc(id)}">${esc(x.category||"Other")}: ${esc(x.title)}</option>`).join("")}</select></div>`:""}</div>`;
+}
+function wirePersonTrain(app, k){ const s=app.querySelector("#ptAdd"); if(s) s.onchange=async()=>{ if(!s.value) return; await store.update({ [`trainingAssign/${k}/${s.value}`]:{ at:Date.now(), by:me.email } }); toast("Assigned"); }; }
 
 // ----- employee reports: optional, from the manager's crew log -----
 const reportsFor = (crew, d) => Object.entries(reportsAll[crew]||{}).filter(([,r])=>r&&(!d||r.date===d)).sort((a,b)=>(a[1].at||0)-(b[1].at||0));
@@ -1577,10 +2226,28 @@ function demoSeed(){
     [`staff/${S("boss")}`]:{ email:ppl.boss, phone:"734-555-0161", address:"15100 Farmington Rd, Livonia, MI", emergency:{ name:"Jen Reed", phone:"734-555-0162", relation:"Spouse" }, startDate:"2026-09-15", type:"W-2" },
     [`staffDocs/${S("m1")}/f1`]:{ name:"2026 employment agreement", kind:"agreement", at:Date.now()-18*864e5, signedAt:addDays(d,-18), url:"https://drive.google.com/", shared:true },
     [`staffDocs/${S("m1")}/f2`]:{ name:"Pay terms, snow season", kind:"payterms", at:Date.now()-18*864e5, signedAt:addDays(d,-18), url:"https://drive.google.com/", shared:true },
-    [`staffDocs/${S("m1")}/f3`]:{ name:"W-4", kind:"w4", sensitive:true, at:Date.now()-18*864e5, signedAt:addDays(d,-18) },
+    [`staffDocs/${S("m1")}/f3`]:{ name:"Form W-4", kind:"w4", sensitive:true, encrypted:true, at:Date.now()-18*864e5, signedAt:addDays(d,-18) },
     [`staffDocs/${S("m1")}/f4`]:{ name:"Chauffeur license", kind:"cert", at:Date.now()-18*864e5, expires:addDays(d,20), url:"https://drive.google.com/", shared:true },
     [`staffVault/${S("m1")}/f3`]:{ fileId:"demo", url:"https://drive.google.com/" },
-    [`payLog/${S("m1")}/2026-09-21`]:{ paidAmount:612.4, paidDate:"2026-10-09", ref:"Payroll check 1042" }
+    [`payLog/${S("m1")}/2026-09-21`]:{ paidAmount:612.4, paidDate:"2026-10-09", ref:"Payroll check 1042" },
+    // Paperwork: Tyler signed online except Section 2; Sam has his link; Jake hangs doors as a 1099 contractor.
+    ["allowed/jake,hill@example,com"]:{ name:"Jake Hill", email:"jake.hill@example.com", tier:"walker" },
+    ["staff/jake,hill@example,com"]:{ email:"jake.hill@example.com", phone:"734-555-0171", type:"1099", position:"walker", startDate:"2026-10-05" },
+    ["allowed/kim,lee@example,com"]:{ name:"Kim Lee", email:"kim.lee@example.com", tier:"admin" },
+    [`paper/${S("m1")}`]:{ token:"p_demo1", s:"DEMO", list:["agreement","w4","miw4","i9","deposit"], position:"member", type:"w2", sentAt:Date.now()-19*864e5, offerSigned:Date.now()-18*864e5,
+      forms:{ agreement:{ status:"done", at:Date.now()-18*864e5, doc:"f1" }, w4:{ status:"done", at:Date.now()-18*864e5, doc:"f3" }, miw4:{ status:"done", at:Date.now()-18*864e5, doc:"p2" }, i9:{ status:"done", at:Date.now()-18*864e5, doc:"p3" } } },
+    [`staffDocs/${S("m1")}/p2`]:{ name:"Form MI-W4", kind:"miw4", sensitive:true, encrypted:true, at:Date.now()-18*864e5, signedAt:addDays(d,-18) },
+    [`staffDocs/${S("m1")}/p3`]:{ name:"Form I-9 (Section 1)", kind:"i9", sensitive:true, encrypted:true, at:Date.now()-18*864e5, signedAt:addDays(d,-18) },
+    [`paper/${S("m2")}`]:{ token:"p_demo2", position:"member", type:"w2", sentAt:Date.now()-2*864e5, forms:{ agreement:{ sentAt:Date.now()-2*864e5 }, w4:{ sentAt:Date.now()-2*864e5 } } },
+    ["paper/jake,hill@example,com"]:{ token:"p_demo3", position:"walker", type:"1099", forms:{ agreement:{ status:"done", at:Date.now()-12*864e5, doc:"j1" } } },
+    [`paper/${S("m3")}`]:{ token:"p_demo4", s:"DEMO", position:"member", type:"w2", list:["agreement","w4","miw4","i9","deposit"], sentAt:Date.now()-3600e3, forms:{ agreement:{ sentAt:Date.now()-3600e3 } } },
+    "trainingLib/t1":{ title:"Snow route: start to finish", category:"Snow", kind:"deck", description:"Twelve slides. Storm call-out, loading the truck, route order, photos, and closing out the day.", url:"https://docs.google.com/presentation/", createdAt:Date.now()-5*864e5 },
+    "trainingLib/t2":{ title:"Blower start-up and safety check", category:"Equipment", kind:"sop", description:"Before every storm.", body:"Check the oil and fuel.\nCheck the shear pins and the chute.\nPrime three times, choke on, pull start.\nLet it warm up two minutes before you load it." , createdAt:Date.now()-5*864e5 },
+    "trainingLib/t3":{ title:"Leading a crew: the manager's day", category:"Company policy", kind:"doc", description:"Approving the day, the crew log, and employee reports.", url:"https://drive.google.com/", fileId:"demo", createdAt:Date.now()-4*864e5 },
+    "trainingLib/t4":{ title:"Customer at the door", category:"Customers", kind:"sop", body:"Smile and introduce yourself and the company.\nDo not quote prices. Give them the office number: 734-450-2400.\nWrite it in the crew log." , createdAt:Date.now()-3*864e5 },
+    "trainingRoles/all":{ t2:true, t4:true }, "trainingRoles/member":{ t1:true }, "trainingRoles/manager":{ t1:true, t3:true },
+    [`trainingDone/${S("m1")}/t2`]:{ at:Date.now()-2*864e5 },
+    ["staffDocs/jake,hill@example,com/j1"]:{ name:"Employment or contractor agreement", kind:"agreement", at:Date.now()-12*864e5, signedAt:addDays(d,-12), url:"https://drive.google.com/", shared:true }
   });
   // Hiring board: applicants at each stage, their files, an employee report and one past employee.
   const ago=n=>Date.now()-n*864e5, A=(name,role,stage,extra)=>({ name, role, stage, source:"Indeed", stageAt:ago(extra&&extra.days||2), createdAt:ago(9), appliedAt:ago(9), by:"Indeed import", ...(extra||{}) });
@@ -1605,7 +2272,7 @@ function demoSeed(){
       staff:{ phone:"734-555-0299", startDate:"2026-04-06", type:"W-2" }, timeEntries:{ [addDays(d,-13)]:{ t1:{ in:ago(13), out:ago(13)+8*3600e3 } } }, payLog:{ "2026-09-21":{ paidAmount:845.5 } } }
   });
   for(let i=0;i<20;i++){ const x=addDays(d,i), w=pd(x).getUTCDay(); if(w===0||w===6) continue; ["m1","m2","boss"].forEach(k=>{ upd[`shifts/${S(k)}/${x}`]={ start:k==="boss"?"06:30":"07:00", end:"15:30", crew:"Crew 1", note:i%5===2?"Lights installs, meet at the yard":null }; }); }
-  return { upd, who:{ admin:{email:ADMIN_EMAIL,displayName:"Russel"}, manager:{email:ppl.boss,displayName:"Marcus Reed"}, member:{email:ppl.m1,displayName:"Tyler Ng"}, crew2:{email:ppl.boss2,displayName:"Dave Kim"} } };
+  return { upd, who:{ admin:{email:ADMIN_EMAIL,displayName:"Russel"}, manager:{email:ppl.boss,displayName:"Marcus Reed"}, member:{email:ppl.m1,displayName:"Tyler Ng"}, newhire:{email:ppl.m3,displayName:"Luis Park"}, crew2:{email:ppl.boss2,displayName:"Dave Kim"} } };
 }
 if(DEMO){
   $("#demoBanner").hidden=false;
