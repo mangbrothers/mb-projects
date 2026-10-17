@@ -139,8 +139,9 @@ const ITEMS = [
   { id:"crewsoffice", title:"Crews, office view", sub:"Day board, routes, schedules, log", who:"What the office uses", src:"crews.html?demo=admin", w:1180,
     desc:"Every crew's day on one board, the routes, everyone's shifts, each crew's log, meetings, and See as to look through any crew member's eyes." },
   { grp:"How it works" },
-  { id:"diweb", title:"Digital infrastructure web", sub:"Every system and how data moves", who:"Reference", src:"previews/system-map.html", full:true,
-    desc:"The map of the whole system: where each kind of data lives, which system owns it, and what carries it between systems. With a plain-language guide to every part." }
+  { id:"diweb", title:"Digital infrastructure web", sub:"Every system, zoom into any part", who:"Reference", src:"previews/system-map.html", full:true,
+    desc:"The map of the whole system: where each kind of data lives, which system owns it, and what carries it between systems. Click any card to zoom in to its parts and their descriptions; click any empty space to zoom back out. With a plain-language guide to every part.",
+    tryit:"Click CRM, then Customer signing and payment, then Card step. Click the empty space to back out one level at a time." }
 ];
 const WIDTHS = [["Phone",400],["iPad",820],["Computer",1180]];
 let cur = null, width = 400;

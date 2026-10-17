@@ -80,11 +80,96 @@ td strong{font-weight:650}
 .guide .gcard ul{margin:4px 0 0;padding-left:18px;display:flex;flex-direction:column;gap:5px;font-size:14px}
 .guide p{font-size:15px}
 .guide .gcard p{font-size:14px}
+/* Zoom web: the map is a world of cards; clicking one flies the camera into it and opens its parts. */
+.webbar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px 16px;min-height:34px}
+.crumbs{display:flex;flex-wrap:wrap;align-items:center;gap:2px 4px;font-size:14px;min-width:0}
+.crumbs button{font:inherit;border:0;background:none;color:var(--navy);padding:4px 6px;border-radius:6px;cursor:pointer;font-weight:600}
+.crumbs button[aria-current="true"]{color:var(--ink);cursor:default}
+.crumbs button:not([aria-current="true"]):hover{background:var(--tint)}
+.crumbs .sep{color:var(--muted)}
+.crumbs .back{border:1.5px solid var(--navy);margin-right:6px;padding:3px 10px}
+.hint{font-size:13px;color:var(--muted)}
+.vp{position:relative;overflow:hidden;background:var(--surface);border:1px solid var(--line);border-radius:10px;min-height:520px}
+.wscroll{position:absolute;inset:0;overflow:auto;transform-origin:0 0}
+.wsize{position:relative}
+.world{position:absolute;left:0;top:0;width:1180px;height:866px;transform-origin:0 0}
+.world>svg{position:absolute;inset:0;width:1180px;height:866px;overflow:visible;pointer-events:none}
+.central .future{display:none!important}
+
+.grp{position:absolute;background:var(--tint);border:1.5px solid var(--line);border-radius:10px;cursor:zoom-in;transition:border-color .2s}
+.grp:hover{border-color:var(--navy)}
+.grpcap{position:absolute;left:18px;top:12px;font:inherit;border:0;background:none;padding:0;cursor:zoom-in;color:var(--muted);display:flex;gap:12px;align-items:baseline;text-align:left}
+.grpcap b{font-size:11px;letter-spacing:.08em;font-weight:700}
+.grpcap span{font-size:11px}
+.grpcap.big b{font-size:13px;letter-spacing:0;color:var(--ink);font-weight:650}
+.grpcap:focus-visible,.nd:focus-visible,.sub:focus-visible,.chip:focus-visible,.crumbs button:focus-visible,.zoomlink:focus-visible{outline:3px solid var(--amber);outline-offset:2px}
+
+.nd{position:absolute;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;padding:4px 6px;
+  font:inherit;color:var(--ink);background:var(--surface);border:1.5px solid var(--ink);border-radius:6px;cursor:zoom-in;text-align:center;
+  transition:transform .18s ease,box-shadow .18s ease,opacity .25s ease,border-color .2s;animation:pop .5s cubic-bezier(.2,.8,.2,1) backwards;animation-delay:calc(var(--i,0)*28ms)}
+.nd b{font-size:13px;font-weight:650;line-height:1.2}
+.nd span{font-size:11px;color:var(--muted);line-height:1.3}
+.nd.sm b{font-size:12px}.nd.xs b{font-size:11px}
+.nd.inner{background:var(--bg)}
+.nd.hand,.nd.part,.nd.stop,.nd.push{border-style:dashed}
+.nd.plan{border-style:dotted;border-color:var(--muted)}
+.nd.hub{background:var(--navy);border-color:var(--navy)}
+.nd.hub b,.nd.hub span{color:var(--on-navy)}
+.nd.left{align-items:flex-start;text-align:left;justify-content:flex-start;padding:12px 12px}
+.nd .tg{font-size:10px;font-weight:700;letter-spacing:.08em;color:var(--amber)}
+.nd .cnt{position:absolute;top:-8px;right:-8px;min-width:18px;height:18px;padding:0 5px;border-radius:9px;background:var(--navy);color:var(--on-navy);font-size:10px;font-weight:700;font-style:normal;display:grid;place-items:center;box-shadow:0 0 0 2px var(--surface)}
+.nd.hub .cnt{background:var(--surface);color:var(--navy);box-shadow:0 0 0 2px var(--navy)}
+.nd:hover{transform:translateY(-2px);box-shadow:0 6px 18px -8px rgba(22,35,58,.45);z-index:3}
+.vp.hov .nd:not(.hot),.vp.hov .grp:not(.hot)>.grpcap{opacity:.38}
+.vp.hov .a:not(.hot){opacity:.18}
+.vp.hov .elab:not(.hot){opacity:.25}
+.a,.elab{transition:opacity .2s}
+.a.hot{stroke:var(--navy);stroke-width:2.2}
+@keyframes pop{from{opacity:0;transform:scale(.92)}to{opacity:1;transform:none}}
+
+.pk{fill:var(--navy)}
+.pk.hand{fill:var(--amber)}
+@media (prefers-reduced-motion:reduce){.pk{display:none}.nd{animation:none}.sub{animation:none!important}}
+
+/* zoomed-in layers */
+.layer{position:absolute;inset:0;overflow:auto;background:var(--surface);transform-origin:50% 50%;outline:none}
+.lin{max-width:1060px;margin:0 auto;padding:22px 24px 30px;display:flex;flex-direction:column;gap:18px}
+.lhead{display:flex;flex-direction:column;gap:8px}
+.lmeta{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center}
+.lhead h3{font-size:26px;line-height:1.15;margin:0;text-wrap:balance}
+.lhead p{font-size:15px;max-width:72ch}
+.pill.push,.pill.stop,.pill.hand{color:var(--amber)}
+.secl{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:650;margin:0}
+.subs{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px}
+.sub{position:relative;display:flex;flex-direction:column;gap:6px;text-align:left;font:inherit;color:var(--ink);background:var(--bg);border:1.5px solid var(--ink);border-radius:8px;padding:12px 14px 12px;cursor:zoom-in;min-width:0;
+  animation:rise .45s cubic-bezier(.2,.8,.2,1) backwards;animation-delay:calc(140ms + var(--i,0)*45ms);transition:transform .18s,box-shadow .18s}
+.sub.hand,.sub.part,.sub.stop,.sub.push{border-style:dashed}
+.sub.plan{border-style:dotted;border-color:var(--muted)}
+.sub:hover{transform:translateY(-2px);box-shadow:0 8px 20px -10px rgba(22,35,58,.5)}
+.sub b{font-size:15px;font-weight:650}
+.sub p{font-size:13px;color:var(--muted);display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.sub .foot{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:auto;font-size:12px;color:var(--navy);font-weight:600}
+@keyframes rise{from{opacity:0;transform:translateY(10px) scale(.97)}to{opacity:1;transform:none}}
+.facts{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:5px;font-size:14px;max-width:72ch}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{font:inherit;font-size:13px;border:1.5px solid var(--line);background:var(--bg);color:var(--ink);border-radius:99px;padding:4px 12px;cursor:pointer;text-align:left}
+.chip:hover{border-color:var(--navy)}
+.chip em{font-style:normal;color:var(--muted)}
+.leafnote{font-size:13px;color:var(--muted)}
+.zoomlink{font:inherit;font-size:13px;font-weight:600;color:var(--navy);background:none;border:1.5px solid var(--navy);border-radius:99px;padding:2px 12px;cursor:zoom-in;align-self:flex-start}
+@media (max-width:600px){.lin{padding:18px 16px 26px}.lhead h3{font-size:22px}.hint{display:none}}
+
+.nd.tight{gap:0;padding:3px 4px}.nd.tight span{font-size:10.5px;line-height:1.25}
+.nd.inner b{font-size:12px}
+.lback{cursor:pointer;font-size:12px;padding:2px 10px}
+.nd.left{padding:8px 10px;gap:1px}.nd.left span{font-size:10.5px;line-height:1.3}
+.layer{cursor:zoom-out}
+
 </style>
 
 <div class="page central" id="root">
 <header>
-  <span class="eyebrow">Mangiapane Brothers LLC · internal · drawn October 7, 2026 · last updated October 17, 2026 (night)</span>
+  <span class="eyebrow">Mangiapane Brothers LLC · internal · drawn October 7, 2026 · last updated October 17, 2026 (night, zoom web)</span>
   <h1>System Map</h1>
   <p class="lede">Where each kind of company data lives, which system owns it, and which tool carries it from one system to the next. A plain-language guide to every part follows the map. The first view is the central system for the next month. The second view adds everything planned after it.</p>
 </header>
@@ -102,196 +187,9 @@ td strong{font-weight:650}
 </div>
 
 <figure>
-<div class="scroll">
-<svg id="map" viewBox="0 0 1180 730" role="img" aria-label="Flow of data between clients, Quo, the internal system, the signing service, Claude, QuickBooks, Google Drive and GitHub. The signing service connects to QuickBooks directly for card charges. Claude carries the rest between Quo, the CRM database and QuickBooks.">
-<defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="ahp"/></marker></defs>
-
-<!-- people -->
-<rect class="n" x="20" y="16" width="210" height="50" rx="6"/>
-<text class="t" x="125" y="37" text-anchor="middle">Clients and leads</text>
-<text class="s" x="125" y="54" text-anchor="middle">phone, text, in person. No login.</text>
-
-<rect class="n" x="340" y="16" width="180" height="50" rx="6"/>
-<text class="t" x="430" y="37" text-anchor="middle">Admin team</text>
-<text class="s" x="430" y="54" text-anchor="middle">sees every page</text>
-
-<rect class="n" x="540" y="16" width="160" height="50" rx="6"/>
-<text class="t" x="620" y="37" text-anchor="middle">Door hanger walkers</text>
-<text class="s" x="620" y="54" text-anchor="middle">see own routes only</text>
-
-<rect class="n" x="720" y="16" width="180" height="50" rx="6"/>
-<text class="t" x="810" y="37" text-anchor="middle">Crews and new hires</text>
-<text class="s" x="810" y="54" text-anchor="middle">routes, schedule, paperwork, training</text>
-<path class="a" d="M810 66V110" marker-end="url(#ah)"/>
-
-<rect class="n" x="970" y="16" width="190" height="50" rx="6"/>
-<text class="t" x="1065" y="37" text-anchor="middle">Accountant and CFO</text>
-<text class="s" x="1065" y="54" text-anchor="middle">read the books</text>
-
-<path class="a" d="M125 66V150" marker-start="url(#ah)" marker-end="url(#ah)"/>
-<text class="l" x="133" y="112">calls and texts</text>
-<path class="a" d="M430 66V110" marker-end="url(#ah)"/>
-<text class="l" x="438" y="92">sign in</text>
-<path class="a" d="M620 66V110" marker-end="url(#ah)"/>
-<text class="l" x="628" y="92">sign in</text>
-<path class="a" d="M1065 150V66" marker-end="url(#ah)"/>
-<text class="l" x="1073" y="112">reports</text>
-
-<!-- left column -->
-<rect class="n" x="20" y="150" width="210" height="90" rx="6"/>
-<text class="t" x="125" y="176" text-anchor="middle">Quo (VoIP phone system)</text>
-<text class="s" x="125" y="196" text-anchor="middle">calls, texts, voicemail</text>
-<text class="s" x="125" y="212" text-anchor="middle">transcripts and summaries</text>
-<text class="s" x="125" y="228" text-anchor="middle">raw record of every contact</text>
-
-<path class="a plan" d="M125 240V290" marker-end="url(#ah)"/>
-<text class="l" x="133" y="269">call summaries</text>
-<rect class="n plan" x="20" y="290" width="210" height="70" rx="6"/>
-<text class="t" x="125" y="315" text-anchor="middle">Email inbox</text>
-<text class="s" x="125" y="333" text-anchor="middle">second copy of each call summary</text>
-<text class="s" x="125" y="348" text-anchor="middle">none arriving yet</text>
-<path class="a plan" d="M230 325H262"/>
-
-<path class="a part" d="M230 195H262V555H380" marker-end="url(#ah)" stroke-dasharray="7 3"/>
-<text class="l" x="270" y="547">transcripts, texts</text>
-<text class="s" x="270" y="571">on request today</text>
-
-<!-- internal system -->
-<rect class="box" x="300" y="110" width="620" height="330" rx="10"/>
-<text class="cap" x="320" y="133">INTERNAL SYSTEM</text>
-<text class="s" x="440" y="133">one web app at apps.mangbrothers.com, one sign-in list</text>
-
-<rect class="n" x="320" y="144" width="580" height="42" rx="6"/>
-<text class="t" x="610" y="161" text-anchor="middle">Front door: sign-in and access tiers</text>
-<text class="s" x="610" y="177" text-anchor="middle">Google sign-in · admin: all pages · manager: his crew · member: himself · walker: own routes</text>
-
-<rect class="n" x="320" y="200" width="90" height="90" rx="6"/>
-<text class="t" x="365" y="222" text-anchor="middle" style="font-size:12px">Projects</text>
-<text class="s" x="365" y="242" text-anchor="middle">admin tasks,</text>
-<text class="s" x="365" y="257" text-anchor="middle">passwords</text>
-<text class="s" x="365" y="272" text-anchor="middle">and links</text>
-<rect class="n" x="418" y="200" width="90" height="90" rx="6"/>
-<text class="t" x="463" y="222" text-anchor="middle" style="font-size:12px">CRM</text>
-<text class="s" x="463" y="242" text-anchor="middle">clients, leads,</text>
-<text class="s" x="463" y="257" text-anchor="middle">contracts,</text>
-<text class="s" x="463" y="272" text-anchor="middle">billing</text>
-<rect class="n" x="516" y="200" width="90" height="90" rx="6"/>
-<text class="t" x="561" y="222" text-anchor="middle" style="font-size:11px">Team Manager</text>
-<text class="s" x="561" y="242" text-anchor="middle">hiring, people,</text>
-<text class="s" x="561" y="257" text-anchor="middle">paperwork,</text>
-<text class="s" x="561" y="272" text-anchor="middle">training, pay</text>
-<rect class="n" x="614" y="200" width="90" height="90" rx="6"/>
-<text class="t" x="659" y="222" text-anchor="middle" style="font-size:12px">Crews</text>
-<text class="s" x="659" y="242" text-anchor="middle">routes, map,</text>
-<text class="s" x="659" y="257" text-anchor="middle">schedules,</text>
-<text class="s" x="659" y="272" text-anchor="middle">day approval</text>
-<rect class="n" x="712" y="200" width="90" height="90" rx="6"/>
-<text class="t" x="757" y="222" text-anchor="middle" style="font-size:12px">Routes</text>
-<text class="s" x="757" y="242" text-anchor="middle">door hanger</text>
-<text class="s" x="757" y="257" text-anchor="middle">routes, check-off,</text>
-<text class="s" x="757" y="272" text-anchor="middle">training</text>
-<rect class="n" x="810" y="200" width="90" height="90" rx="6"/>
-<text class="t" x="855" y="222" text-anchor="middle" style="font-size:12px">Previews</text>
-<text class="s" x="855" y="242" text-anchor="middle">sample-data</text>
-<text class="s" x="855" y="257" text-anchor="middle">views of every</text>
-<text class="s" x="855" y="272" text-anchor="middle">outside page</text>
-
-<rect class="n" x="320" y="306" width="420" height="114" rx="6"/>
-<text class="t" x="530" y="330" text-anchor="middle">Firebase Realtime Database</text>
-<text class="s" x="530" y="348" text-anchor="middle">System of record for: clients and leads · contact log</text>
-<text class="s" x="530" y="363" text-anchor="middle">signed contracts · billing status · card on file (brand, last 4)</text>
-<text class="s" x="530" y="378" text-anchor="middle">door hanger routes · admin tasks · the access list · crews, shifts, time</text>
-<text class="s" x="530" y="396" text-anchor="middle">workforce profiles, hiring, training · sealed paperwork vault</text>
-<text class="s future" x="530" y="410" text-anchor="middle">Planned: pay status copied from QuickBooks Payroll</text>
-
-<rect class="n" x="755" y="306" width="145" height="114" rx="6"/>
-<text class="t" x="827" y="328" text-anchor="middle">Signing service</text>
-<text class="s" x="827" y="346" text-anchor="middle">Apps Script on admin@</text>
-<text class="s" x="827" y="361" text-anchor="middle">contract mail and PDFs</text>
-<text class="s" x="827" y="376" text-anchor="middle">card charges, receipts</text>
-<text class="s" x="827" y="391" text-anchor="middle">paperwork, Indeed import</text>
-<text class="s" x="827" y="406" text-anchor="middle">crew-day billing, refunds</text>
-<path class="a" d="M900 340H970" marker-start="url(#ah)" marker-end="url(#ah)"/>
-<text class="l" x="935" y="332" text-anchor="middle">API</text>
-
-<!-- right column -->
-<rect class="n" x="970" y="150" width="190" height="220" rx="6"/>
-<text class="t" x="1065" y="174" text-anchor="middle">QuickBooks</text>
-<rect class="n in" x="982" y="186" width="166" height="50" rx="4"/>
-<text class="l" x="1065" y="207" text-anchor="middle" font-weight="650">Invoices and payments</text>
-<text class="s" x="1065" y="224" text-anchor="middle">Payments API approved Oct 15</text>
-<rect class="n in" x="982" y="246" width="166" height="50" rx="4"/>
-<text class="l" x="1065" y="267" text-anchor="middle" font-weight="650">Books</text>
-<text class="s" x="1065" y="284" text-anchor="middle">ledger, financial statements</text>
-<rect class="n in" x="982" y="306" width="166" height="50" rx="4"/>
-<text class="l" x="1065" y="327" text-anchor="middle" font-weight="650">Payroll</text>
-<text class="s" x="1065" y="344" text-anchor="middle">wages, taxes, pay stubs</text>
-
-<path class="a" d="M920 430H970" marker-end="url(#ah)"/>
-<text class="l" x="945" y="422" text-anchor="middle">PDFs</text>
-<rect class="n" x="970" y="400" width="120" height="62" rx="6"/>
-<text class="t" x="1030" y="424" text-anchor="middle">Google Drive</text>
-<text class="s" x="1030" y="441" text-anchor="middle">contracts, staff</text>
-<text class="s" x="1030" y="455" text-anchor="middle">training, backups</text>
-
-<!-- Claude -->
-<path class="a" d="M520 520V420" marker-start="url(#ah)" marker-end="url(#ah)" stroke-dasharray="7 3"/>
-<text class="l" x="532" y="466">writes clients, leads, contact log, billing status · reads the QuickBooks queue</text>
-<text class="s" x="532" y="482">own database sign-in since Oct 16 · shut out of the paperwork vault</text>
-
-<rect class="hub" x="380" y="520" width="420" height="100" rx="8"/>
-<text class="t hubt" x="590" y="547" text-anchor="middle">Claude on Russel's account</text>
-<text class="l hubt" x="590" y="567" text-anchor="middle">Integration layer: carries data between the systems</text>
-<text class="l hubt" x="590" y="585" text-anchor="middle">Quo connector · QuickBooks connector · Chrome · GitHub</text>
-<text class="l hubt future" x="590" y="605" text-anchor="middle">At the Team plan: split into a company account and a personal account</text>
-
-<path class="a" d="M800 555H1128V370" marker-start="url(#ah)" marker-end="url(#ah)" stroke-dasharray="7 3"/>
-<text class="l" x="964" y="547" text-anchor="middle">customers, invoices, payments recorded</text>
-<text class="l" x="964" y="571" text-anchor="middle">who paid and when, back to the CRM</text>
-<text class="l future" x="964" y="589" text-anchor="middle">approved hours to Payroll (next)</text>
-
-<path class="a" d="M590 620V660" marker-end="url(#ah)"/>
-<text class="l" x="598" y="645">edits page code</text>
-<rect class="n" x="450" y="660" width="280" height="52" rx="6"/>
-<text class="t" x="590" y="682" text-anchor="middle">GitHub</text>
-<text class="s" x="590" y="699" text-anchor="middle">account mangbrothers · publishes the pages</text>
-
-<!-- future add-ons -->
-<g class="future">
-<text class="cap" x="20" y="752">FUTURE ADD-ONS</text>
-<rect class="n" x="20" y="764" width="216" height="84" rx="6"/>
-<text class="tag" x="32" y="782">LIVE SINCE OCTOBER 17</text>
-<text class="t" x="32" y="800">Portal front page</text>
-<text class="s" x="32" y="818">One address for staff. Sign in once,</text>
-<text class="s" x="32" y="833">land on the page your tier allows.</text>
-
-<rect class="n part" x="251" y="764" width="216" height="84" rx="6"/>
-<text class="tag" x="263" y="782">STOPGAP LIVE OCTOBER 17</text>
-<text class="t" x="263" y="800">Passwords and links</text>
-<text class="s" x="263" y="818">A tab in Projects for admins today.</text>
-<text class="s" x="263" y="833">A real password manager still advised.</text>
-
-<rect class="n" x="482" y="764" width="216" height="84" rx="6"/>
-<text class="tag" x="494" y="782">LIVE SINCE OCTOBER 9</text>
-<text class="t" x="494" y="800">Company email and Drive</text>
-<text class="s" x="494" y="818">admin@ on Google Workspace.</text>
-<text class="s" x="494" y="833">File move from the Mac still open.</text>
-
-<rect class="n part" x="713" y="764" width="216" height="84" rx="6"/>
-<text class="tag" x="725" y="782">SITE MOVED OCTOBER 13</text>
-<text class="t" x="725" y="800">Public site and client portal</text>
-<text class="s" x="725" y="818">mangbrothers.com on GitHub Pages.</text>
-<text class="s" x="725" y="833">Client view of services comes last.</text>
-
-<rect class="n plan" x="944" y="764" width="216" height="84" rx="6"/>
-<text class="tag" x="956" y="782">LATER</text>
-<text class="t" x="956" y="800">Claude organization account</text>
-<text class="s" x="956" y="818">Team plan. Company account split from</text>
-<text class="s" x="956" y="833">Russel's personal and school account.</text>
-</g>
-</svg>
-</div>
-<figcaption>The signing service is the first piece that runs on its own: it sends contract mail, retries failed sends every 5 minutes, refreshes the QuickBooks connection every day, charges cards at signing straight through the QuickBooks API (card mode on since October 15), and runs later charges and refunds when an admin taps them in the CRM. A card number goes from the customer's browser to Intuit only; the service receives a one-time token. Claude is still the only bridge for everything else between Quo, the CRM and QuickBooks. Dashed lines work only when someone asks Claude to do the transfer in a session. Statuses come from the project build notes and from live checks. The build log below records each change since October 7. Correct any that are wrong.</figcaption>
+<div class="webbar"><nav class="crumbs" id="crumbs" aria-label="Zoom path"></nav><span class="hint">Click any card to zoom in. Click any empty space to zoom back out.</span></div>
+<div class="vp" id="vp"><div class="wscroll" id="wscroll"><div class="wsize" id="wsize"><div class="world" id="world" role="group" aria-label="System map: every card zooms in to its parts"></div></div></div></div>
+<figcaption>Every card zooms in. A number on a card is how many parts sit inside it; parts zoom in again, down to the single piece. Click any empty space to zoom back out. Moving dots show where data flows on its own (navy) or only when someone asks Claude (amber). Dotted lines are planned. The signing service is the first piece that runs on its own: it sends contract mail, retries failed sends every 5 minutes, refreshes the QuickBooks connection every day, charges cards at signing straight through the QuickBooks API, and bills approved work. A card number goes from the customer's browser to Intuit only. Claude is still the only bridge for everything else between Quo, the CRM and QuickBooks. Correct any status that is wrong.</figcaption>
 </figure>
 
 <section id="guide">
@@ -322,118 +220,7 @@ td strong{font-weight:650}
 <li>A customer&#x27;s card number goes from their browser straight to the payment processor (Intuit). The company never receives it.</li>
 <li>A new hire&#x27;s tax and bank forms are locked on his own phone before they are sent. Only the owner can unlock them.</li>
 </ul>
-<h3 class="gh">The subprojects</h3>
-<div class="note gcard"><h3>1. Front door (the portal)</h3>
-<p>The single sign-in page for everyone who works for the company. A person signs in with Google once, and the system checks the company&#x27;s team list to decide where he lands. Owners and office staff land on Projects, crew managers on their crew&#x27;s route, crew members on their schedule, and door-hanger distributors on their routes. Someone not on the list is turned away with a plain explanation.</p>
-<ul>
-<li><strong>Google sign-in:</strong> no new passwords for staff to remember or lose. Google&#x27;s security, including two-step verification, protects every account.</li>
-<li><strong>Team list and access levels:</strong> one list decides who may enter and at what level: admin, crew (manager or member), or walker (door hanger).</li>
-<li><strong>Return-to-page:</strong> someone who follows a link while signed out is sent back to that exact page after signing in.</li>
-</ul>
-</div>
-<div class="note gcard"><h3>2. Projects (the admin dashboard)</h3>
-<p>The owners&#x27; task manager: every company initiative, from the fall marketing order to securing a second crew truck, broken into tasks with owners, due dates and categories.</p>
-<ul>
-<li><strong>Projects and tasks:</strong> each initiative with its tasks, who is responsible and the deadline.</li>
-<li><strong>Timeline and deadlines:</strong> key dates grouped by week, color-coded by category (hiring, sales, ordering, equipment, service, digital infrastructure, admin and finance).</li>
-<li><strong>Team list:</strong> where admins add people and set their access level.</li>
-<li><strong>Passwords and links:</strong> one-tap links to the company&#x27;s outside services (QuickBooks, Canva, the phone system) with the shared sign-in details, for admins only.</li>
-<li><strong>Files:</strong> documents attached to projects.</li>
-</ul>
-</div>
-<div class="note gcard"><h3>3. CRM (customer relationship management)</h3>
-<p>The system of record for every lead and customer: contact details, where each lead stands, every call and note, the services sold and their prices, signed contracts, and billing status.</p>
-<ul>
-<li><strong>Leads board:</strong> each lead is a card that moves across stages (New, Contacted, Quoted, Active) by drag and drop, on a computer, iPad or phone.</li>
-<li><strong>Clients:</strong> the full record for each customer, with services, prices, contracts, payment method on file (brand and last four digits only) and billing status.</li>
-<li><strong>Quote and agreement builder:</strong> builds the seasonal services agreement with live pricing by neighborhood and service, ready to sign in person or by email.</li>
-<li><strong>Charges to run:</strong> every charge on the schedule: due now, waiting for a job to be finished, failed, or charged. It also holds the one-tap &quot;charge card on file&quot; and refund buttons.</li>
-<li><strong>Service log:</strong> every visit a crew completes, which bills only after a manager approves the day.</li>
-<li><strong>Contracts:</strong> every signed agreement, locked so it can never be edited after signing.</li>
-</ul>
-</div>
-<div class="note gcard"><h3>4. Customer signing and payment</h3>
-<p>The page a customer opens from the quote email. They read the quote and the full agreement, sign by typing their name, and save a card. The card number goes straight to Intuit, the payment processor, which hands back a one-time token. The amount due at signing is charged on the spot and a receipt is emailed.</p>
-<ul>
-<li><strong>Emailed quote:</strong> a clear table of services, the total and what is charged today, with one button.</li>
-<li><strong>Signature:</strong> a consent box and a typed signature, stamped with the time, device and a digital fingerprint of the exact text signed.</li>
-<li><strong>Card step:</strong> the card goes to Intuit only. It is protected by Google reCAPTCHA against bots, closes after three declines, and has a hard cap per charge.</li>
-<li><strong>Signed copy:</strong> a PDF of the agreement and the cancellation notice is saved to company Drive and emailed to the customer.</li>
-<li><strong>$1 test agreement:</strong> a safe way to test the whole path end to end with $1 charges that are then refunded.</li>
-</ul>
-</div>
-<div class="note gcard"><h3>5. The signing service (automation engine)</h3>
-<p>An automated service that runs inside the company&#x27;s Google account and does the jobs no person should have to remember. It runs on demand and on a schedule every five minutes.</p>
-<ul>
-<li><strong>Email:</strong> sends quotes, signed copies, receipts, refunds, paperwork links and reminders from the company address.</li>
-<li><strong>Documents:</strong> saves signed agreements, employee reports and personnel files as PDFs in organized Drive folders.</li>
-<li><strong>Payments:</strong> connects to QuickBooks Payments to save cards, charge, refund and void. It has built-in limits, and a charge can never run twice.</li>
-<li><strong>Billing:</strong> charges approved work automatically, such as snow visits past the season limit, light installs and landscaping balances, with a receipt each time.</li>
-<li><strong>Hiring:</strong> imports job applications from Indeed emails onto the hiring board and numbers employee reports.</li>
-<li><strong>Paperwork and training:</strong> sends new-hire paperwork links, stores sealed forms, and files training material in Drive.</li>
-</ul>
-</div>
-<div class="note gcard"><h3>6. Crews (routes and schedules)</h3>
-<p>The page crews work from on their phones. The office sees every crew; a manager sees his crew; a member sees himself.</p>
-<ul>
-<li><strong>Day and week boards (office):</strong> every crew&#x27;s routes and progress on one screen.</li>
-<li><strong>Routes and map:</strong> numbered stops on a street map, with directions, check-offs, photos and notes. Snow routes start when a storm is called.</li>
-<li><strong>Clock in and out:</strong> time records for every shift.</li>
-<li><strong>Crew log and day approval (manager):</strong> the manager reviews the day, fixes missed clock-outs and approves it. Approval unlocks billing and approves the hours.</li>
-<li><strong>Schedule:</strong> each person&#x27;s next month of shifts, storm call-outs and meetings.</li>
-<li><strong>Hours and pay log:</strong> past hours by pay period and what payroll paid.</li>
-<li><strong>Training tab:</strong> training for his role, and any paperwork still to sign.</li>
-<li><strong>See as:</strong> the office can look at the page exactly as any crew member sees it.</li>
-</ul>
-</div>
-<div class="note gcard"><h3>7. Team Manager (people operations)</h3>
-<p>The office&#x27;s workforce system: hiring, personnel files, crew assignments, paperwork, training, employee reports and payroll inputs.</p>
-<ul>
-<li><strong>Onboarding board:</strong> applicants move by drag and drop through Applied, Phone screen, Interview, Offer, Hired, Backup and Not hired. Indeed applications arrive automatically. Moving someone to Hired asks first, then creates his employee profile and sends his paperwork.</li>
-<li><strong>Personnel:</strong> each employee&#x27;s profile, contact and emergency information, files, shifts, pay log and a running personnel file of calls, interviews, notes and reports.</li>
-<li><strong>Crews:</strong> who is on each crew and who manages it.</li>
-<li><strong>Paperwork:</strong> every person grouped by position and legal status (W-2 employee or 1099 contractor), with each form&#x27;s status and an Email button per form.</li>
-<li><strong>Training:</strong> the library of slide decks, how-to procedures (SOPs), videos and documents, assigned by role (crew managers, crew members, door hangers, everyone) or by person, with each person&#x27;s progress.</li>
-<li><strong>Reports:</strong> every employee report by reference number, filed by crew managers from their daily log.</li>
-<li><strong>Payroll:</strong> pay rates by job and role, pay periods and what was paid.</li>
-<li><strong>Past:</strong> former employees, with their whole record archived and restorable.</li>
-</ul>
-</div>
-<div class="note gcard"><h3>8. Employee paperwork and the vault</h3>
-<p>A new hire signs everything online from his phone: his offer, the company&#x27;s privacy policy, and the official federal and Michigan tax forms (W-4, MI-W4), the I-9 and direct deposit. Contractors sign the W-9 instead. The page fills in the real government PDFs and places his drawn signature on them.</p>
-<ul>
-<li><strong>Packet by position:</strong> the system knows which forms each role and legal status needs.</li>
-<li><strong>Offer first:</strong> signing the offer is what opens his crew pages. Until then he sees only his paperwork and training.</li>
-<li><strong>The vault:</strong> tax, I-9 and bank forms are encrypted on his phone before they are sent. Opening one takes a separate paperwork password, and only the owner and admins he names can try it. Everyone in the office can see that a form is signed; almost no one can read it.</li>
-<li><strong>I-9 Section 2:</strong> the office checks his original documents in person and completes the employer section, with a paper I-9 kept as a backup.</li>
-<li><strong>Privacy policy:</strong> the written policy Michigan law requires for Social Security numbers, extended to all worker information. Every worker signs that he received it.</li>
-</ul>
-</div>
-<div class="note gcard"><h3>9. Routes (door-hanger distribution)</h3>
-<p>The page for door-hanger distributors, the company&#x27;s main way of finding new customers. The office sees every route, walker and count.</p>
-<ul>
-<li><strong>Routes and map:</strong> each walker sees his assigned routes on a street map and checks off streets with a photo as proof.</li>
-<li><strong>Daily count:</strong> he logs the doors he hung each day, which drives his pay and the office&#x27;s view of who is ahead or behind.</li>
-<li><strong>Training tab:</strong> the how-tos and videos assigned to door hangers, plus any paperwork he still has to sign. Until he signs his distributor agreement, it is the only tab he sees.</li>
-<li><strong>Practice route (office):</strong> a training route the owner can walk as a new hire would, with real check-offs and reports.</li>
-</ul>
-</div>
-<div class="note gcard"><h3>10. Previews</h3>
-<p>An admin page showing every customer-facing and employee-facing screen with sample data, built from the live pages. It is used to review changes with the admin team and to demonstrate the system to outside audiences without exposing real customers or employees.</p>
-</div>
-<div class="note gcard"><h3>11. Public website</h3>
-<p>mangbrothers.com, the marketing site customers find. It is hosted separately from the internal system and carries the company&#x27;s privacy policy and terms of service.</p>
-</div>
-<h3 class="gh">The supporting services (cards on the map)</h3>
-<ul>
-<li><strong>Firebase Realtime Database:</strong> the system&#x27;s database, where records live and update live on every screen. A set of access rules, tested automatically, decides exactly who may read or change each kind of record.</li>
-<li><strong>Google Workspace:</strong> company email (admin@mangbrothers.com) and Drive, where signed agreements, personnel folders, paperwork and training files are stored.</li>
-<li><strong>QuickBooks:</strong> the books, invoices, payments (through QuickBooks Payments, approved by Intuit) and payroll. QuickBooks is the system of record for money.</li>
-<li><strong>Intuit Payments:</strong> the card processor. Card numbers go to Intuit only.</li>
-<li><strong>Quo:</strong> the company&#x27;s phone system for calls, texts, voicemail and transcripts.</li>
-<li><strong>GitHub:</strong> where the application&#x27;s code lives and is published to the web. Every change is recorded and can be rolled back.</li>
-<li><strong>Claude (AI assistant):</strong> builds and maintains the system, and carries data between systems that have no direct link yet (for example the phone system and the CRM). By design, it cannot open the employee paperwork vault on its own.</li>
-</ul>
+<div id="guide-parts" class="guide"></div>
 <h3 class="gh">Why it matters</h3>
 <ul>
 <li><strong>One source of truth.</strong> Every customer, worker, job and payment has exactly one home, so the numbers agree.</li>
@@ -450,6 +237,7 @@ td strong{font-weight:650}
   <div class="tw"><table>
     <thead><tr><th>Date</th><th>Change</th><th>State</th></tr></thead>
     <tbody>
+    <tr><td><strong>Oct 17, night</strong></td><td><strong>System map animated into a zoom web.</strong> Every card on the map zooms in to its parts, and each part zooms in again down to a single piece with its description, status, notes and connections. Moving dots show live data flow. The plain-language guide is now drawn from the same source as the map, so the two cannot drift apart. Deep links work: add #crm or #team to the link to open that part.</td><td><span class="pill live">Live</span></td></tr>
     <tr><td><strong>Oct 17, night</strong></td><td><strong>Training for door hangers.</strong> The Routes page has a Training tab for walkers: material assigned to door hangers or to everyone, his unsigned paperwork as cards (same link as the email), and Mark done. Until his distributor agreement is signed, it is the only tab he sees. In Team Manager, Training, door hangers are a role to assign to, they appear in Progress, and each one's row opens his own assignments. The office's practice route on Routes is now labeled Practice route. Rules: door hangers read the library and their own assignments and mark their own items done (230 tests).</td><td><span class="pill part">Pushed, deploy rules</span></td></tr>
     <tr><td><strong>Oct 17, night</strong></td><td><strong>Employee paperwork, the vault and Training, pushed (9d92d84, 8aefb35).</strong> New hires sign online from a private link: the offer, the Employee Information Privacy Policy, the official W-4, MI-W4 and I-9 (with the documents they will show), or the W-9 for contractors, and direct deposit. The page fills the real government PDFs and places the drawn signature. Tax, I-9 and bank forms are encrypted on the phone before they leave it; opening them takes the paperwork password, and the rules let only Russel and admins he names read them. Claude's own sign-in is shut out. Team Manager's Paperwork tab groups people by position and W-2 or 1099, with an Email button per form, I-9 Section 2 and paper I-9 tracking. Training: a library of decks, SOPs, videos and documents, assigned by role or person; the crew Training tab shows paperwork cards until signed, and a new hire sees only Training until his offer is signed. Hiring someone now sends his paperwork automatically. Tests: 223 rules, 13 service, 34 page, 40 tab, 32 training.</td><td><span class="pill part">Pushed, deploy rules and Code.gs</span></td></tr>
     <tr><td><strong>Oct 17, night</strong></td><td><strong>Previews page and menu, live (7537438).</strong> previews.html (admins) shows every outside page on sample data, built from the live pages: customer signing and emails, the CRM phone sale, the sale process map, the front door, new-hire paperwork and emails, a new hire's first sign-in, crew member, crew manager, door hanger routes, Team Manager and the Crews office view, and this map. Every page menu lists Admin pages first and Employee pages at the bottom.</td><td><span class="pill live">Live</span></td></tr>
@@ -574,19 +362,473 @@ td strong{font-weight:650}
 </div>
 
 <script>
-(function(){
-  var root=document.getElementById('root'),map=document.getElementById('map'),
-      bc=document.getElementById('b-central'),bf=document.getElementById('b-future');
-  function set(future){
-    root.classList.toggle('central',!future);
-    map.setAttribute('viewBox',future?'0 0 1180 866':'0 0 1180 730');
-    bc.setAttribute('aria-pressed',String(!future));
-    bf.setAttribute('aria-pressed',String(future));
-  }
-  bc.addEventListener('click',function(){set(false)});
-  bf.addEventListener('click',function(){set(true)});
-  if(location.hash==='#future')set(true);
-})();
-</script>
+/* One source for the zoom web and the plain-language guide. Edit text here, not in the guide. */
+var N={
+clients:{t:'Clients and leads',k:'People',st:'live',web:[20,16,210,50],s:['phone, text, in person. No login.'],
+ d:['Customers and prospects reach the company by phone, text or in person. They never sign in to the internal system.','What they see is small on purpose: an emailed quote with one button, the signing page where they read, sign and save a card, the signed agreement as a PDF, and a receipt for every charge.'],
+ facts:['Every call and text lands in Quo first, which keeps the raw record of every contact.','Their record in the CRM is the master copy of who they are and what they bought.','Their card number goes from their own browser to Intuit. The company never receives it.'],rel:['sign']},
+admin:{t:'Admin team',k:'People',st:'live',web:[340,16,180,50],s:['sees every page'],
+ d:['Russel plus one or two trusted admins. They sign in with Google at the portal, land on Projects, and can open every page in the system.','Admins manage the team list and each person’s access level, and run the CRM, Crews and Team Manager from the office side.'],
+ facts:['Each admin has a company-paid Claude account for task-specific work.','Two-step verification is required for everyone on the team list.','Only the owner and the admins he names can open the employee paperwork vault.']},
+walkers:{t:'Door hanger walkers',k:'People',st:'live',web:[540,16,160,50],s:['see own routes only'],
+ d:['Door hanger distributors, the company’s main way of finding new customers. They sign in with Google and land on the Routes page, where they see only their own routes.','Until a walker signs his distributor agreement, the Training tab is the only tab he sees.'],
+ facts:['Checks off streets on a map with a photo as proof.','Logs the doors he hung each day, which drives his pay.','Reads the training assigned to door hangers and marks it done.'],rel:['routes']},
+crewsPeople:{t:'Crews and new hires',k:'People',st:'live',web:[720,16,180,50],s:['routes, schedule, paperwork, training'],
+ d:['Crew managers, crew members and people just hired. All of them sign in at the portal and work from the Crews page on their phones.','A crew manager lands on his crew’s route and approves his crew’s day. A crew member lands on his schedule. A new hire sees only his paperwork and training until he signs his offer.'],
+ facts:['Pay is mostly piece rate by job. Time is tracked so the weekly floor can be paid when piece pay falls short.','Crews never see client prices or payment details.','Crew managers do not set their own crew’s shifts.'],rel:['crews','paper']},
+accountant:{t:'Accountant and CFO',k:'People',st:'live',web:[970,16,190,50],s:['read the books'],
+ d:['The people who keep the books honest. They read QuickBooks directly and never work inside the internal system.','The signing service and Claude write to QuickBooks so the books they read are complete and authoritative.'],
+ facts:['QuickBooks is the system of record for money.','Nobody edits the books from the internal system.']},
 
+quo:{t:'Quo (VoIP phone system)',gt:'Quo',k:'Outside service',st:'live',web:[20,150,210,90],s:['calls, texts, voicemail','transcripts and summaries','raw record of every contact'],
+ g:'the company’s phone system for calls, texts, voicemail and transcripts.',
+ d:['The company phone system for calls, texts, voicemail and transcripts. Every conversation with a client or lead starts here, which makes Quo the raw record of every contact.','The admin team reaches the company number through Quo. It is also the number used for two-step verification on the company Google account.'],
+ kids:['quoCalls','quoTx','quoCrm']},
+quoCalls:{t:'Calls, texts and voicemail',st:'live',d:'Every call and text on the company number, shared by the admin team.'},
+quoTx:{t:'Transcripts and summaries',st:'live',d:'Quo transcribes each call and writes a summary. These are what Claude reads to create and update client and lead records.'},
+quoCrm:{t:'Quo to CRM transfer',st:'plan',d:'Claude reads transcripts through the Quo connector and writes new leads and the contact log into the CRM. Today it happens only when someone asks in a session. A scheduled transfer is planned.'},
+
+email:{t:'Email inbox',k:'Planned',st:'plan',web:[20,290,210,70],s:['second copy of each call summary','none arriving yet'],
+ d:['A planned second copy of every Quo call summary, sent to email, so Claude can cross-check that no call was missed.','No summaries arrive yet. The email copy has to be switched on in Quo before it can serve as a cross-check.']},
+
+internal:{t:'Internal system',k:'System',st:'live',
+ d:['One web app at apps.mangbrothers.com with one sign-in list. Owners, office staff, crew managers, crew members and door hanger distributors all come through the same front door, and each sees only the pages their role needs.','Behind the pages sit the database, which holds the records, and the signing service, which sends mail, files documents and charges cards.'],
+ kids:['frontdoor','projects','crm','team','crews','routes','previews','firebase','signing']},
+
+frontdoor:{t:'Front door: sign-in and access tiers',gt:'Front door (the portal)',st:'live',web:[320,144,580,42],s:['Google sign-in · admin: all pages · manager: his crew · member: himself · walker: own routes'],
+ d:['The single sign-in page for everyone who works for the company. A person signs in with Google once, and the system checks the company’s team list to decide where he lands. Owners and office staff land on Projects, crew managers on their crew’s route, crew members on their schedule, and door-hanger distributors on their routes. Someone not on the list is turned away with a plain explanation.'],
+ kids:['fdGoogle','fdTeam','fdReturn']},
+fdGoogle:{t:'Google sign-in',st:'live',d:'No new passwords for staff to remember or lose. Google’s security, including two-step verification, protects every account.'},
+fdTeam:{t:'Team list and access levels',st:'live',d:'One list decides who may enter and at what level: admin, crew (manager or member), or walker (door hanger).'},
+fdReturn:{t:'Return-to-page',st:'live',d:'Someone who follows a link while signed out is sent back to that exact page after signing in.'},
+
+projects:{t:'Projects',gt:'Projects (the admin dashboard)',st:'live',web:[320,200,90,90],s:['admin tasks,','passwords','and links'],
+ d:['The owners’ task manager: every company initiative, from the fall marketing order to securing a second crew truck, broken into tasks with owners, due dates and categories.'],
+ kids:['pjTasks','pjTime','pjTeam','pjPw','pjFiles']},
+pjTasks:{t:'Projects and tasks',st:'live',d:'Each initiative with its tasks, who is responsible and the deadline.'},
+pjTime:{t:'Timeline and deadlines',st:'live',d:'Key dates grouped by week, color-coded by category (hiring, sales, ordering, equipment, service, digital infrastructure, admin and finance).'},
+pjTeam:{t:'Team list',st:'live',d:'Where admins add people and set their access level.'},
+pjPw:{t:'Passwords and links',st:'stop',d:'One-tap links to the company’s outside services (QuickBooks, Canva, the phone system) with the shared sign-in details, for admins only.',facts:['A stopgap. A real password manager with shared vaults by tier is still advised.']},
+pjFiles:{t:'Files',st:'live',d:'Documents attached to projects.'},
+
+crm:{t:'CRM',gt:'CRM (customer relationship management)',st:'live',web:[418,200,90,90],s:['clients, leads,','contracts,','billing'],
+ d:['The system of record for every lead and customer: contact details, where each lead stands, every call and note, the services sold and their prices, signed contracts, and billing status.'],
+ kids:['crmLeads','crmClients','crmQuote','sign','crmCharges','crmLog','crmContracts','crmLawn']},
+crmLeads:{t:'Leads board',st:'live',d:'Each lead is a card that moves across stages (New, Contacted, Quoted, Active) by drag and drop, on a computer, iPad or phone.'},
+crmClients:{t:'Clients',st:'live',d:'The full record for each customer, with services, prices, contracts, payment method on file (brand and last four digits only) and billing status.'},
+crmQuote:{t:'Quote and agreement builder',st:'live',d:'Builds the seasonal services agreement with live pricing by neighborhood and service, ready to sign in person or by email.'},
+crmCharges:{t:'Charges to run',st:'live',d:'Every charge on the schedule: due now, waiting for a job to be finished, failed, or charged. It also holds the one-tap “charge card on file” and refund buttons.'},
+crmLog:{t:'Service log',st:'live',d:'Every visit a crew completes, which bills only after a manager approves the day.'},
+crmContracts:{t:'Contracts',st:'live',d:'Every signed agreement, locked so it can never be edited after signing.'},
+crmLawn:{t:'Lawn billing',st:'plan',d:'Designed, not built, and on hold until the crew side is finished. Billed per cut: the first cut is charged after it is done, then monthly on the 1st by scheduled cuts, with credits for missed cuts and cancel anytime. The service log records a lawn cut today but charges nothing.'},
+
+sign:{t:'Customer signing and payment',st:'live',
+ d:['The page a customer opens from the quote email. They read the quote and the full agreement, sign by typing their name, and save a card. The card number goes straight to Intuit, the payment processor, which hands back a one-time token. The amount due at signing is charged on the spot and a receipt is emailed.'],
+ kids:['sgQuote','sgSig','sgCard','sgCopy','sgTest'],facts:['Testing on Russel and family until the attorney answers on the charge authorization, the typed-name signature and the emailed cancellation notice.']},
+sgQuote:{t:'Emailed quote',st:'live',d:'A clear table of services, the total and what is charged today, with one button.'},
+sgSig:{t:'Signature',st:'live',d:'A consent box and a typed signature, stamped with the time, device and a digital fingerprint of the exact text signed.'},
+sgCard:{t:'Card step',st:'live',d:'The card goes to Intuit only. It is protected by Google reCAPTCHA against bots, closes after three declines, and has a hard cap per charge.'},
+sgCopy:{t:'Signed copy',st:'live',d:'A PDF of the agreement and the cancellation notice is saved to company Drive and emailed to the customer.'},
+sgTest:{t:'$1 test agreement',st:'live',d:'A safe way to test the whole path end to end with $1 charges that are then refunded.'},
+
+team:{t:'Team Manager',gt:'Team Manager (people operations)',st:'push',web:[516,200,90,90],s:['hiring, people,','paperwork,','training, pay'],
+ d:['The office’s workforce system: hiring, personnel files, crew assignments, paperwork, training, employee reports and payroll inputs.'],
+ facts:['Pushed October 17. The new database rules and the latest signing service code still have to be published.'],
+ kids:['tmOnb','tmPers','tmCrews','paper','tmTrain','tmRep','tmPay','tmPast']},
+tmOnb:{t:'Onboarding board',st:'push',d:'Applicants move by drag and drop through Applied, Phone screen, Interview, Offer, Hired, Backup and Not hired. Indeed applications arrive automatically. Moving someone to Hired asks first, then creates his employee profile and sends his paperwork.'},
+tmPers:{t:'Personnel',st:'push',d:'Each employee’s profile, contact and emergency information, files, shifts, pay log and a running personnel file of calls, interviews, notes and reports.'},
+tmCrews:{t:'Crews',st:'push',d:'Who is on each crew and who manages it.'},
+paper:{t:'Paperwork and the vault',gt:'Employee paperwork and the vault',st:'push',
+ b:'Every person grouped by position and legal status (W-2 employee or 1099 contractor), with each form’s status and an Email button per form.',
+ d:['A new hire signs everything online from his phone: his offer, the company’s privacy policy, and the official federal and Michigan tax forms (W-4, MI-W4), the I-9 and direct deposit. Contractors sign the W-9 instead. The page fills in the real government PDFs and places his drawn signature on them.'],
+ kids:['ppPacket','ppOffer','ppVault','ppI9','ppPolicy'],facts:['Set the paperwork password and keep the recovery code on paper before the first packet goes out.']},
+ppPacket:{t:'Packet by position',st:'push',d:'The system knows which forms each role and legal status needs.'},
+ppOffer:{t:'Offer first',st:'push',d:'Signing the offer is what opens his crew pages. Until then he sees only his paperwork and training.'},
+ppVault:{t:'The vault',st:'push',d:'Tax, I-9 and bank forms are encrypted on his phone before they are sent. Opening one takes a separate paperwork password, and only the owner and admins he names can try it. Everyone in the office can see that a form is signed; almost no one can read it.'},
+ppI9:{t:'I-9 Section 2',st:'push',d:'The office checks his original documents in person and completes the employer section, with a paper I-9 kept as a backup.'},
+ppPolicy:{t:'Privacy policy',st:'push',d:'The written policy Michigan law requires for Social Security numbers, extended to all worker information. Every worker signs that he received it.'},
+tmTrain:{t:'Training',st:'push',d:'The library of slide decks, how-to procedures (SOPs), videos and documents, assigned by role (crew managers, crew members, door hangers, everyone) or by person, with each person’s progress.'},
+tmRep:{t:'Reports',st:'push',d:'Every employee report by reference number, filed by crew managers from their daily log.'},
+tmPay:{t:'Payroll',st:'push',d:'Pay rates by job and role, pay periods and what was paid.'},
+tmPast:{t:'Past',st:'push',d:'Former employees, with their whole record archived and restorable.'},
+
+crews:{t:'Crews',gt:'Crews (routes and schedules)',st:'live',web:[614,200,90,90],s:['routes, map,','schedules,','day approval'],
+ d:['The page crews work from on their phones. The office sees every crew; a manager sees his crew; a member sees himself.'],
+ kids:['crDay','crMap','crClock','crLog','crSched','crHours','crTrain','crSee']},
+crDay:{t:'Day and week boards',st:'live',d:'For the office: every crew’s routes and progress on one screen.'},
+crMap:{t:'Routes and map',st:'live',d:'Numbered stops on a street map, with directions, check-offs, photos and notes. Snow routes start when a storm is called.'},
+crClock:{t:'Clock in and out',st:'live',d:'Time records for every shift.'},
+crLog:{t:'Crew log and day approval',st:'live',d:'The manager reviews the day, fixes missed clock-outs and approves it. Approval unlocks billing and approves the hours.'},
+crSched:{t:'Schedule',st:'live',d:'Each person’s next month of shifts, storm call-outs and meetings.'},
+crHours:{t:'Hours and pay log',st:'live',d:'Past hours by pay period and what payroll paid.'},
+crTrain:{t:'Training tab',st:'live',d:'Training for his role, and any paperwork still to sign.'},
+crSee:{t:'See as',st:'live',d:'The office can look at the page exactly as any crew member sees it.'},
+
+routes:{t:'Routes',gt:'Routes (door-hanger distribution)',st:'live',web:[712,200,90,90],s:['door hanger','routes, check-off,','training'],
+ d:['The page for door-hanger distributors, the company’s main way of finding new customers. The office sees every route, walker and count.'],
+ kids:['rtMap','rtCount','rtTrain','rtPractice']},
+rtMap:{t:'Routes and map',st:'live',d:'Each walker sees his assigned routes on a street map and checks off streets with a photo as proof.'},
+rtCount:{t:'Daily count',st:'live',d:'He logs the doors he hung each day, which drives his pay and the office’s view of who is ahead or behind.'},
+rtTrain:{t:'Training tab',st:'push',d:'The how-tos and videos assigned to door hangers, plus any paperwork he still has to sign. Until he signs his distributor agreement, it is the only tab he sees.'},
+rtPractice:{t:'Practice route',st:'live',d:'For the office: a training route the owner can walk as a new hire would, with real check-offs and reports.'},
+
+previews:{t:'Previews',st:'live',web:[810,200,90,90],s:['sample-data','views of every','outside page'],
+ d:['An admin page showing every customer-facing and employee-facing screen with sample data, built from the live pages. It is used to review changes with the admin team and to demonstrate the system to outside audiences without exposing real customers or employees.'],
+ facts:['Customer signing page and its emails','The CRM phone sale and the sale process map','The front door and a new hire’s first sign-in','New-hire paperwork and its emails','Crew member, crew manager and the Crews office view','Door hanger routes and Team Manager','This system map']},
+
+firebase:{t:'Firebase Realtime Database',k:'Supporting service',st:'live',web:[320,306,420,114],
+ s:['System of record for: clients and leads · contact log','signed contracts · billing status · card on file (brand, last 4)','door hanger routes · admin tasks · the access list · crews, shifts, time','workforce profiles, hiring, training · sealed paperwork vault'],
+ fs:'Planned: pay status copied from QuickBooks Payroll',
+ g:'the system’s database, where records live and update live on every screen. A set of access rules, tested automatically, decides exactly who may read or change each kind of record.',
+ d:['The system’s database, where records live and update live on every screen. A set of access rules, tested automatically, decides exactly who may read or change each kind of record.','Drive stores files. Firebase stores the records the pages read and write. Drive cannot replace it.'],
+ facts:['Clients, leads and the contact log','Signed contracts and billing status','Card on file: brand, last four digits and expiration only','Door hanger routes, admin tasks and the access list','Crews, shifts and time records','Workforce profiles, hiring and training','The sealed paperwork vault'],ffact:'Planned: pay status copied from QuickBooks Payroll.'},
+
+signing:{t:'Signing service',gt:'The signing service (automation engine)',k:'Supporting service',st:'live',web:[755,306,145,114],s:['Apps Script on admin@','contract mail and PDFs','card charges, receipts','paperwork, Indeed import','crew-day billing, refunds'],
+ d:['An automated service that runs inside the company’s Google account and does the jobs no person should have to remember. It runs on demand and on a schedule every five minutes.','It is the first piece of the system that runs on its own. Claude is still the bridge for everything else.'],
+ facts:['The latest version of its code still has to be published.'],
+ kids:['svEmail','svDocs','svPay','svBill','svHire','svPaper']},
+svEmail:{t:'Email',st:'live',d:'Sends quotes, signed copies, receipts, refunds, paperwork links and reminders from the company address.'},
+svDocs:{t:'Documents',st:'live',d:'Saves signed agreements, employee reports and personnel files as PDFs in organized Drive folders.'},
+svPay:{t:'Payments',st:'live',d:'Connects to QuickBooks Payments to save cards, charge, refund and void. It has built-in limits, and a charge can never run twice.'},
+svBill:{t:'Billing',st:'live',d:'Charges approved work automatically, such as snow visits past the season limit, light installs and landscaping balances, with a receipt each time.'},
+svHire:{t:'Hiring',st:'push',d:'Imports job applications from Indeed emails onto the hiring board and numbers employee reports.'},
+svPaper:{t:'Paperwork and training',st:'push',d:'Sends new-hire paperwork links, stores sealed forms, and files training material in Drive.'},
+
+qb:{t:'QuickBooks',k:'Outside service',st:'live',
+ g:'the books, invoices, payments (through QuickBooks Payments, approved by Intuit) and payroll. QuickBooks is the system of record for money.',
+ d:['The books, invoices, payments and payroll. QuickBooks is the system of record for money: when the CRM and QuickBooks disagree about a payment, QuickBooks wins.','The signing service talks to it directly through the QuickBooks Payments API, which Intuit approved on October 15. Claude carries the rest.'],
+ kids:['qbPay','qbBooks','qbPayroll']},
+qbPay:{t:'Invoices and payments',st:'live',web:[982,186,166,50],s:['Payments API live Oct 15'],
+ d:'Customers, invoices and money received. Card charges at signing, later charges and refunds run through QuickBooks Payments from the signing service. Checks and bank payments are still recorded by hand and cross-checked.',
+ facts:['Open: the card statement name shows cut off as MANGIAPANE BROTHER. Fix with QuickBooks Payments support.'],kids:['intuit']},
+intuit:{t:'Intuit Payments',k:'Supporting service',st:'live',g:'the card processor. Card numbers go to Intuit only.',
+ d:'The card processor behind QuickBooks Payments. A customer’s card goes from their browser straight to Intuit, which hands back a one-time token. The signing service only ever holds the token, never the number.',
+ facts:['Google reCAPTCHA guards the card step, as Intuit requires.','A hard cap of $3,000 per charge, and no charge can run twice.','A signing link locks after three declines.']},
+qbBooks:{t:'Books',st:'live',web:[982,246,166,50],s:['ledger, financial statements'],d:'The ledger and financial statements the accountant and CFO read. Nobody edits them from the internal system.'},
+qbPayroll:{t:'Payroll',st:'hand',web:[982,306,166,50],s:['wages, taxes, pay stubs'],
+ d:'Wages, tax withholding and pay stubs. QuickBooks Payroll is the system of record for pay. The internal system owns time records and verified jobs. Approved hours get pushed here next, and paid amounts flow back to each worker’s pay log.'},
+
+drive:{t:'Google Drive',gt:'Google Workspace',k:'Outside service',st:'live',web:[970,400,120,62],s:['contracts, staff','training, backups'],
+ g:'company email (admin@mangbrothers.com) and Drive, where signed agreements, personnel folders, paperwork and training files are stored.',
+ d:['Company file storage on admin@mangbrothers.com. Signed agreements, personnel folders, employee reports, paperwork and training files are saved here, filed by the signing service.','Drive holds files. Firebase holds records. Drive cannot replace the database.'],
+ facts:['One folder per employee; ordinary files are shared view-only with him.','Tax and ID forms stay in Drive only and show on the page as on file.','Applicant files live under Potential Hires until someone is hired.','Open: the business folder on Russel’s Mac is not copied yet.']},
+
+claude:{t:'Claude on Russel’s account',gt:'Claude (AI assistant)',k:'Integration layer',st:'hand',web:[380,520,420,100],hub:1,
+ s:['Integration layer: carries data between the systems','Quo connector · QuickBooks connector · Chrome · GitHub'],fs:'At the Team plan: split into a company account and a personal account',
+ g:'builds and maintains the system, and carries data between systems that have no direct link yet (for example the phone system and the CRM). By design, it cannot open the employee paperwork vault on its own.',
+ d:['Claude builds and maintains the system and carries data between systems that have no direct link yet, such as the phone system and the CRM.','Most transfers still run only when someone asks in a session, which makes Claude a single point of failure until the scheduled transfers exist. By design, it cannot open the employee paperwork vault.'],
+ ffact:'At the Team plan: split into a company account and a personal account.',
+ kids:['clQuo','clQb','clDb','clChrome','clGit','clSched']},
+clQuo:{t:'Quo connector',st:'hand',d:'Reads call transcripts and texts. Writes clients, leads and the contact log into the CRM, on request for now.'},
+clQb:{t:'QuickBooks connector',st:'hand',d:'Records customers, invoices and payments in QuickBooks, and brings who paid and when back to the CRM.'},
+clDb:{t:'Own database sign-in',st:'live',d:'Since October 16 Claude has its own admin sign-in to the database. It cannot add sign-ins, remove Russel, edit a signed contract or open the paperwork vault.'},
+clChrome:{t:'Chrome',st:'hand',d:'Works in Russel’s signed-in browser where no connector exists, such as editing records directly in the CRM.'},
+clGit:{t:'GitHub',st:'live',d:'Edits the page code and publishes it from Russel’s Mac.'},
+clSched:{t:'Scheduled QuickBooks push',st:'live',d:'A scheduled task pushes the QuickBooks queue on its own. The Quo transfer and the payroll push are next.'},
+
+github:{t:'GitHub',k:'Supporting service',st:'live',web:[450,660,280,52],s:['account mangbrothers · publishes the pages'],
+ g:'where the application’s code lives and is published to the web. Every change is recorded and can be rolled back.',
+ d:'Where the application’s code lives and is published to the web, under the company account mangbrothers. Every change is recorded and can be rolled back.',
+ facts:['mb-projects: the internal system at apps.mangbrothers.com','mangbrothers-site: the public website at mangbrothers.com','Account email moved to admin@mangbrothers.com on October 13.']},
+
+futPortal:{t:'Portal front page',k:'Add-on',tag:'LIVE SINCE OCTOBER 17',st:'live',fut:1,web:[20,764,216,84],s:['One address for staff. Sign in once,','land on the page your tier allows.'],
+ d:'One address for staff. Sign in once and land on the page your tier allows. Built October 17 as the front door of the internal system, in the logo’s green with mowing stripes.',rel:['frontdoor']},
+futPw:{t:'Passwords and links',k:'Add-on',tag:'STOPGAP LIVE OCTOBER 17',st:'stop',fut:1,web:[251,764,216,84],s:['A tab in Projects for admins today.','A real password manager still advised.'],
+ d:'A tab in Projects with one-tap links and shared sign-ins for outside services, admins only. A home-built page has no audit trail and no encryption the company controls, so a real password manager with shared vaults by tier is still advised.',rel:['pjPw']},
+futWs:{t:'Company email and Drive',k:'Add-on',tag:'LIVE SINCE OCTOBER 9',st:'live',fut:1,web:[482,764,216,84],s:['admin@ on Google Workspace.','File move from the Mac still open.'],
+ d:'admin@mangbrothers.com moved from Microsoft 365 to Google Workspace as one shared company user, with SPF, DKIM and DMARC passing.',
+ facts:['Set up Workspace billing before the trial ends.','Cancel Microsoft 365 after two clean weeks of signing mail from admin@.','Open: copy the business folder from the Mac.'],rel:['drive']},
+futSite:{t:'Public site and client portal',gt:'Public website',k:'Add-on',tag:'SITE MOVED OCTOBER 13',st:'part',fut:1,web:[713,764,216,84],s:['mangbrothers.com on GitHub Pages.','Client view of services comes last.'],
+ d:['mangbrothers.com, the marketing site customers find. It is hosted separately from the internal system and carries the company’s privacy policy and terms of service.','Moved from the GoDaddy site builder to GitHub Pages on October 13 as a clean rebuild, with HTTPS since October 14. The client portal comes last.'],
+ facts:['Open: two service photos are still stock.','No staff sign-in links on the public site.']},
+futOrg:{t:'Claude organization account',k:'Add-on',tag:'LATER',st:'plan',fut:1,web:[944,764,216,84],s:['Team plan. Company account split from','Russel’s personal and school account.'],
+ d:'A Team plan that holds every seat in one company account and splits the company account from Russel’s personal and school account. Today each admin has his own company-paid Claude account.',rel:['claude']}
+};
+
+/* Arrows, copied from the drawn map. a,b = ends; dir: 1 a to b, 2 both; kind: '' live, 'hand' by request, 'plan' */
+var E=[
+ {id:'e1',a:'clients',b:'quo',d:'M125 66V150',dir:2,lb:[[133,112,'calls and texts']]},
+ {id:'e2',a:'admin',b:'frontdoor',d:'M430 66V110',dir:1,lb:[[438,92,'sign in']]},
+ {id:'e3',a:'walkers',b:'frontdoor',d:'M620 66V110',dir:1,lb:[[628,92,'sign in']]},
+ {id:'e4',a:'crewsPeople',b:'frontdoor',d:'M810 66V110',dir:1,lb:[[818,92,'sign in']]},
+ {id:'e5',a:'qb',b:'accountant',d:'M1065 150V66',dir:1,lb:[[1073,112,'reports']]},
+ {id:'e6',a:'quo',b:'email',d:'M125 240V290',dir:1,kind:'plan',lb:[[133,269,'call summaries']]},
+ {id:'e7',a:'email',b:'claude',d:'M230 325H262',dir:0,kind:'plan',lb:[]},
+ {id:'e8',a:'quo',b:'claude',d:'M230 195H262V555H380',dir:1,kind:'hand',lb:[[270,547,'transcripts, texts'],[270,571,'on request today','s']]},
+ {id:'e9',a:'signing',b:'qb',d:'M900 340H970',dir:2,lb:[[935,332,'API','m']]},
+ {id:'e10',a:'signing',b:'drive',d:'M920 430H970',dir:1,lb:[[945,422,'PDFs','m']]},
+ {id:'e11',a:'claude',b:'firebase',d:'M520 520V420',dir:2,kind:'hand',lb:[[532,466,'writes clients, leads, contact log, billing status · reads the QuickBooks queue'],[532,482,'own database sign-in since Oct 16 · shut out of the paperwork vault','s']]},
+ {id:'e12',a:'claude',b:'qb',d:'M800 555H1128V370',dir:2,kind:'hand',lb:[[964,547,'customers, invoices, payments recorded','m'],[964,571,'who paid and when, back to the CRM','m'],[964,589,'approved hours to Payroll (next)','mf']]},
+ {id:'e13',a:'claude',b:'github',d:'M590 620V660',dir:1,lb:[[598,645,'edits page code']]}
+];
+
+/* Guide order: the numbered sections, then the supporting services */
+var GUIDE=['frontdoor','projects','crm','sign','signing','crews','team','paper','routes','previews','futSite'];
+var SUPPORT=['firebase','drive','qb','intuit','quo','github','claude'];
+
+(function(){
+var SVGNS='http://www.w3.org/2000/svg';
+var root=document.getElementById('root'),vp=document.getElementById('vp'),wscroll=document.getElementById('wscroll'),
+    wsize=document.getElementById('wsize'),world=document.getElementById('world'),crumbs=document.getElementById('crumbs'),
+    bc=document.getElementById('b-central'),bf=document.getElementById('b-future');
+var reduce=window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches;
+var DUR=reduce?1:520,EASE='cubic-bezier(.3,.7,.1,1)';
+var future=false;
+var ST={live:['Live','live'],hand:['Works by hand','part'],plan:['Planned','plan'],push:['Pushed, rules to deploy','part'],stop:['Stopgap','part'],part:['Partly done','part']};
+
+/* parents */
+var P={};
+Object.keys(N).forEach(function(id){(N[id].kids||[]).forEach(function(k){P[k]=id;});});
+function anc(id){var a=[];while(P[id]){id=P[id];a.unshift(id);}return a;}
+function paras(d){return d?(Array.isArray(d)?d:[d]):[];}
+function first(d){var t=paras(d)[0]||'';var m=t.match(/^.*?[.!?](\s|$)/);return m?m[0].trim():t;}
+function h(tag,cls,txt){var e=document.createElement(tag);if(cls)e.className=cls;if(txt!=null)e.textContent=txt;return e;}
+
+/* ---------- the web ---------- */
+var webEl={};
+function grp(id,box,cap,sub,big){
+  var g=h('div','grp');g.dataset.id=id;
+  g.style.cssText='left:'+box[0]+'px;top:'+box[1]+'px;width:'+box[2]+'px;height:'+box[3]+'px';
+  var b=h('button','grpcap'+(big?' big':''));b.type='button';b.setAttribute('aria-label','Zoom in on '+N[id].t);
+  b.appendChild(h('b',null,cap));if(sub)b.appendChild(h('span',null,sub));
+  if(big){b.style.left='0';b.style.right='0';b.style.justifyContent='center';}
+  g.appendChild(b);
+  g.addEventListener('click',function(e){if(e.target===g||b.contains(e.target))open(id,g);});
+  world.appendChild(g);webEl[id]=g;
+}
+grp('internal',[300,110,620,330],'INTERNAL SYSTEM','one web app at apps.mangbrothers.com, one sign-in list');
+grp('qb',[970,150,190,220],'QuickBooks',null,true);
+var i=0,fi=0;
+Object.keys(N).forEach(function(id){
+  var n=N[id];if(!n.web)return;
+  var w=n.web,b=h('button','nd '+n.st);b.type='button';b.dataset.id=id;b.style.setProperty('--i',n.fut?fi++:i++);
+  b.style.cssText+=';left:'+w[0]+'px;top:'+w[1]+'px;width:'+w[2]+'px;height:'+w[3]+'px';
+  if(P[id]==='qb')b.classList.add('inner');
+  if(n.hub)b.classList.add('hub');
+  if(n.fut){b.classList.add('future','left');b.appendChild(h('span','tg',n.tag));}
+  if(w[2]<=90)b.classList.add(id==='team'?'xs':'sm');
+  if((n.s||[]).length>=5)b.classList.add('tight');
+  b.appendChild(h('b',null,n.t));
+  if(n.fut)b.appendChild(h('span',null,(n.s||[]).join(' ')));else (n.s||[]).forEach(function(l){b.appendChild(h('span',null,l));});
+  if(n.fs)b.appendChild(h('span','future',n.fs));
+  if(n.kids){var c=h('i','cnt',String(n.kids.length));c.title=n.kids.length+' parts inside';b.appendChild(c);}
+  b.setAttribute('aria-label','Zoom in on '+n.t);
+  b.addEventListener('click',function(){open(id,b);});
+  b.addEventListener('mouseenter',function(){hover(id);});b.addEventListener('mouseleave',unhover);
+  b.addEventListener('focus',function(){hover(id);});b.addEventListener('blur',unhover);
+  world.appendChild(b);webEl[id]=b;
+});
+
+/* arrows */
+var svg=document.createElementNS(SVGNS,'svg');svg.setAttribute('viewBox','0 0 1180 866');svg.setAttribute('aria-hidden','true');
+svg.innerHTML='<defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="ahp"/></marker></defs>'+
+  '<text class="cap future" x="20" y="752">FUTURE ADD-ONS</text>';
+world.insertBefore(svg,world.firstChild);
+E.forEach(function(e){
+  var p=document.createElementNS(SVGNS,'path');p.setAttribute('d',e.d);p.id=e.id;
+  p.setAttribute('class','a'+(e.kind==='plan'?' plan':''));if(e.kind==='hand')p.setAttribute('stroke-dasharray','7 3');
+  if(e.dir>=1)p.setAttribute('marker-end','url(#ah)');if(e.dir===2)p.setAttribute('marker-start','url(#ah)');
+  p.dataset.a=e.a;p.dataset.b=e.b;svg.appendChild(p);
+  e.lb.forEach(function(l){
+    var t=document.createElementNS(SVGNS,'text'),f=l[3]||'';
+    t.setAttribute('x',l[0]);t.setAttribute('y',l[1]);t.textContent=l[2];
+    t.setAttribute('class',(f.indexOf('s')>-1?'s':'l')+' elab'+(f.indexOf('f')>-1?' future':''));
+    if(f.indexOf('m')>-1)t.setAttribute('text-anchor','middle');
+    t.dataset.e=e.id;svg.appendChild(t);
+  });
+  if(e.kind==='plan'||reduce)return;
+  var len=p.getTotalLength?p.getTotalLength():100,dur=Math.max(1.6,len/(e.kind==='hand'?60:90));
+  function pk(rev,off){
+    var c=document.createElementNS(SVGNS,'circle');c.setAttribute('r',e.kind==='hand'?2.6:3.2);
+    c.setAttribute('class','pk'+(e.kind==='hand'?' hand':''));
+    var am=document.createElementNS(SVGNS,'animateMotion');am.setAttribute('dur',dur.toFixed(2)+'s');
+    am.setAttribute('repeatCount','indefinite');am.setAttribute('begin',(-off*dur).toFixed(2)+'s');
+    if(rev){am.setAttribute('keyPoints','1;0');am.setAttribute('keyTimes','0;1');am.setAttribute('calcMode','linear');}
+    var mp=document.createElementNS(SVGNS,'mpath');mp.setAttributeNS('http://www.w3.org/1999/xlink','href','#'+e.id);mp.setAttribute('href','#'+e.id);
+    am.appendChild(mp);c.appendChild(am);svg.appendChild(c);
+  }
+  pk(false,0);if(len>200)pk(false,.5);if(e.dir===2)pk(true,.25);
+});
+
+function hover(id){
+  var ids=[id];if(P[id]==='qb')ids.push('qb');
+  var hot={};hot[id]=1;
+  E.forEach(function(e){if(ids.indexOf(e.a)>-1||ids.indexOf(e.b)>-1){hot[e.a]=hot[e.b]=1;hot[e.id]=1;}});
+  if(Object.keys(hot).length<2)return;
+  vp.classList.add('hov');
+  Object.keys(webEl).forEach(function(k){webEl[k].classList.toggle('hot',!!hot[k]||(P[k]&&hot[P[k]]&&k.indexOf('qb')===0));});
+  svg.querySelectorAll('.a,.elab').forEach(function(el){el.classList.toggle('hot',!!hot[el.id||el.dataset.e]);});
+}
+function unhover(){vp.classList.remove('hov');}
+
+/* ---------- zoom ---------- */
+var stack=[],busy=false;
+function topEl(){return stack.length?stack[stack.length-1].layer:wscroll;}
+function srcRect(src,v){
+  if(src&&src.isConnected){var r=src.getBoundingClientRect();if(r.width)return r;}
+  return {left:v.left+v.width*.4,top:v.top+v.height*.4,width:v.width*.2,height:v.height*.2};
+}
+function geo(src){
+  var v=vp.getBoundingClientRect(),r=srcRect(src,v);
+  var cx=r.left+r.width/2-v.left,cy=r.top+r.height/2-v.top;
+  var s=Math.max(.06,Math.min(1,r.width/v.width));
+  return {v:v,cx:cx,cy:cy,s:s,k:Math.min(3.2,Math.max(1.6,1/s))};
+}
+function small(g){return 'translate('+(g.cx-g.v.width/2)+'px,'+(g.cy-g.v.height/2)+'px) scale('+g.s+')';}
+function big(g){return 'translate('+(g.v.width/2-g.cx)+'px,'+(g.v.height/2-g.cy)+'px) scale('+g.k+')';}
+function hide(el){el.style.visibility='hidden';el.setAttribute('aria-hidden','true');el.inert=true;}
+function show(el){el.style.visibility='';el.removeAttribute('aria-hidden');el.inert=false;}
+
+function open(id,src){
+  if(busy||!N[id])return;busy=true;unhover();
+  var prev=topEl(),g=geo(src),layer=build(id);
+  vp.appendChild(layer);vp.classList.add('zoomed');
+  prev.style.transformOrigin=g.cx+'px '+g.cy+'px';
+  var a1=prev.animate([{transform:'none',opacity:1},{transform:big(g),opacity:0}],{duration:DUR,easing:EASE,fill:'forwards'});
+  layer.animate([{transform:small(g),opacity:0,offset:0},{opacity:1,offset:.45},{transform:'none',opacity:1}],{duration:DUR,easing:EASE});
+  stack.push({id:id,layer:layer,src:src});draw();
+  a1.onfinish=function(){hide(prev);a1.cancel();busy=false;layer.focus({preventScroll:true});};
+}
+function close(cb){
+  if(busy||!stack.length)return;busy=true;
+  var top=stack.pop(),prev=topEl();show(prev);
+  var g=geo(top.src);
+  prev.style.transformOrigin=g.cx+'px '+g.cy+'px';
+  prev.animate([{transform:big(g),opacity:0},{transform:'none',opacity:1}],{duration:DUR,easing:EASE});
+  var a=top.layer.animate([{transform:'none',opacity:1},{opacity:1,offset:.5},{transform:small(g),opacity:0}],{duration:DUR,easing:EASE,fill:'forwards'});
+  draw();
+  a.onfinish=function(){top.layer.remove();busy=false;if(!stack.length)vp.classList.remove('zoomed');
+    if(top.src&&top.src.isConnected&&top.src.focus)top.src.focus({preventScroll:true});if(cb)cb();};
+}
+function closeTo(n){ /* leave n layers open */
+  if(busy)return;
+  while(stack.length>n+1){var t=stack.pop();t.layer.remove();}
+  if(stack.length>n){show(stack[stack.length-1].layer);close();}
+}
+function replace(id){
+  if(busy)return;
+  if(!stack.length){var s=webEl[id];var a=anc(id);for(var j=a.length-1;!s&&j>=0;j--)s=webEl[a[j]];open(id,s);return;}
+  busy=true;var top=stack[stack.length-1],old=top.layer,layer=build(id);vp.appendChild(layer);
+  old.animate([{opacity:1,transform:'none'},{opacity:0,transform:'scale(.98)'}],{duration:reduce?1:260,fill:'forwards'}).onfinish=function(){old.remove();};
+  layer.animate([{opacity:0,transform:'scale(1.02)'},{opacity:1,transform:'none'}],{duration:reduce?1:320,easing:EASE}).onfinish=function(){busy=false;layer.focus({preventScroll:true});};
+  top.id=id;top.layer=layer;draw();
+}
+
+function build(id){
+  var n=N[id],L=h('div','layer');L.tabIndex=-1;L.setAttribute('role','region');L.setAttribute('aria-label',n.t);
+  var In=h('div','lin');L.appendChild(In);
+  L.addEventListener('click',function(e){if(e.target.closest('button,a,input,select,textarea'))return;var sel=window.getSelection&&String(getSelection());if(sel)return;close();});
+  var hd=h('div','lhead'),meta=h('div','lmeta');
+  meta.appendChild(h('span','eyebrow',P[id]?'Part of '+N[P[id]].t:(n.k||'Subproject')));
+  var st=ST[n.st]||ST.live;meta.appendChild(h('span','pill '+st[1],n.tag?n.tag.toLowerCase().replace(/^\w/,function(c){return c.toUpperCase();}):st[0]));
+  hd.appendChild(meta);hd.appendChild(h('h3',null,n.t));
+  paras(n.d).forEach(function(p){hd.appendChild(h('p',null,p));});
+  In.appendChild(hd);
+  if(n.kids){
+    In.appendChild(h('p','secl','Inside '+n.t.replace(/:.*/,'')+' · '+n.kids.length+' parts'));
+    var g=h('div','subs');
+    n.kids.forEach(function(k,j){
+      var c=N[k],b=h('button','sub '+c.st);b.type='button';b.style.setProperty('--i',j);
+      b.appendChild(h('b',null,c.t));b.appendChild(h('p',null,first(c.d)));
+      var f=h('span','foot');var s2=ST[c.st]||ST.live;
+      f.appendChild(h('span',null,c.st==='live'?'':({push:'Rules to deploy',hand:'By hand'}[c.st]||s2[0])));
+      f.appendChild(h('span',null,c.kids?c.kids.length+' parts inside  ⤢':'Details  ⤢'));
+      b.appendChild(f);b.addEventListener('click',function(){open(k,b);});g.appendChild(b);
+    });
+    In.appendChild(g);
+  }
+  var facts=(n.facts||[]).slice();
+  if(facts.length||n.ffact){
+    In.appendChild(h('p','secl','Notes'));var ul=h('ul','facts');
+    facts.forEach(function(f){ul.appendChild(h('li',null,f));});
+    if(n.ffact)ul.appendChild(h('li','future',n.ffact));
+    In.appendChild(ul);
+  }
+  var links=[];
+  E.forEach(function(e){if(e.a===id||e.b===id){var o=e.a===id?e.b:e.a;var lab=e.lb.length?e.lb[0][2]:'';
+    links.push([o,(e.a===id?(e.dir===2?'⇄ ':'→ '):(e.dir===2?'⇄ ':'← '))+N[o].t,lab+(e.kind==='plan'?' (planned)':e.kind==='hand'?' (by hand)':'')]);}});
+  (n.rel||[]).forEach(function(r){links.push([r,N[r].t,'related']);});
+  if(links.length){
+    In.appendChild(h('p','secl','Connects to'));var ch=h('div','chips');
+    links.forEach(function(l){var b=h('button','chip');b.type='button';b.appendChild(document.createTextNode(l[1]+' '));
+      if(l[2])b.appendChild(h('em',null,'· '+l[2]));b.addEventListener('click',function(){replace(l[0]);});ch.appendChild(b);});
+    In.appendChild(ch);
+  }
+  if(P[id]){
+    var sib=N[P[id]].kids.filter(function(k){return k!==id;});
+    In.appendChild(h('p','secl','Other parts of '+N[P[id]].t.replace(/:.*/,'')));
+    var cs=h('div','chips');
+    sib.forEach(function(k){var b=h('button','chip',N[k].t);b.type='button';b.addEventListener('click',function(){replace(k);});cs.appendChild(b);});
+    In.appendChild(cs);
+  }
+  if(!n.kids)In.appendChild(h('p','leafnote','This part has no smaller parts. Click anywhere outside a card to zoom back out.'));
+  return L;
+}
+
+function draw(){
+  crumbs.textContent='';
+  if(!stack.length){crumbs.appendChild(h('span','eyebrow','System map'));return;}
+  var cur=stack[stack.length-1].id,path=anc(cur).concat([cur]);
+  var r=h('button',null,'System map');r.type='button';r.addEventListener('click',function(){closeTo(0);});crumbs.appendChild(r);
+  path.forEach(function(id){
+    crumbs.appendChild(h('span','sep','›'));
+    var b=h('button',null,N[id].t.replace(/:.*/,''));b.type='button';
+    if(id===cur){b.setAttribute('aria-current','true');}
+    else b.addEventListener('click',function(){
+      for(var j=0;j<stack.length;j++)if(stack[j].id===id){closeTo(j+1);return;}
+      replace(id);
+    });
+    crumbs.appendChild(b);
+  });
+}
+document.addEventListener('keydown',function(e){if(e.key==='Escape'&&stack.length){e.preventDefault();close();}});
+
+/* ---------- fit and scope toggle ---------- */
+function fit(){
+  var W=vp.clientWidth,H=future?866:730,s=Math.min(1.15,Math.max(W/1180,.72));
+  world.style.transform='scale('+s+')';
+  wsize.style.width=Math.ceil(1180*s)+'px';wsize.style.height=Math.ceil(H*s)+'px';
+  vp.style.height=Math.max(520,Math.ceil(H*s)+(1180*s>W+1?14:2))+'px';
+}
+function set(f){
+  future=f;root.classList.toggle('central',!f);
+  bc.setAttribute('aria-pressed',String(!f));bf.setAttribute('aria-pressed',String(f));fit();
+}
+bc.addEventListener('click',function(){set(false);});
+bf.addEventListener('click',function(){set(true);});
+window.addEventListener('resize',fit);
+draw();
+var hash=location.hash.slice(1);
+set(hash==='future');
+if(N[hash])setTimeout(function(){replace(hash);},200);
+
+/* ---------- guide, from the same data ---------- */
+var gp=document.getElementById('guide-parts');
+if(gp){
+  gp.appendChild(h('h3','gh','The subprojects'));
+  GUIDE.forEach(function(id,j){
+    var n=N[id],c=h('div','note gcard');
+    c.appendChild(h('h3',null,(j+1)+'. '+(n.gt||n.t)));
+    paras(n.d).slice(0,1).forEach(function(p){c.appendChild(h('p',null,p));});
+    if(n.kids){var ul=h('ul');n.kids.forEach(function(k){var li=h('li');li.appendChild(h('strong',null,N[k].t+':'));
+      li.appendChild(document.createTextNode(' '+(N[k].b||paras(N[k].d)[0])));ul.appendChild(li);});c.appendChild(ul);}
+    var z=h('button','zoomlink','Zoom in on the map');z.type='button';
+    z.addEventListener('click',function(){
+      vp.scrollIntoView({behavior:reduce?'auto':'smooth',block:'center'});
+      setTimeout(function(){
+        if(N[id].fut&&!future)set(true);
+        if(stack.length){while(stack.length>1){stack.pop().layer.remove();}show(stack[0].layer);replace(id);}
+        else replace(id);
+      },reduce?0:420);
+    });
+    c.appendChild(z);gp.appendChild(c);
+  });
+  gp.appendChild(h('h3','gh','The supporting services (cards on the map)'));
+  var su=h('ul');
+  SUPPORT.forEach(function(id){var li=h('li');li.appendChild(h('strong',null,(N[id].gt||N[id].t)+':'));li.appendChild(document.createTextNode(' '+N[id].g));su.appendChild(li);});
+  gp.appendChild(su);
+}
+})();
+
+</script>
 </body></html>
