@@ -1,0 +1,368 @@
+<!doctype html><html><head><meta name="robots" content="noindex, nofollow"><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Sale Process Map</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+/* Layout: one working document in the System Map's family. Swimlane up top, then each sale path as numbered steps
+   (a real sequence), then reference tables: gates, emails, records, QuickBooks, pieces, and what is not built. */
+:root{
+  --bg:#eef1f5; --surface:#ffffff; --tint:#e2e8f1; --ink:#16233a; --muted:#55627a; --line:#c3ccda;
+  --navy:#1f4e8c; --on-navy:#ffffff; --amber:#8f5400; --amber-soft:#fbf1dc; --green:#1d6b45; --green-soft:#e1f0e8; --red:#a63b3b; --red-soft:#f6e3e3;
+  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --bg:#0f1622; --surface:#18212f; --tint:#131b28; --ink:#e6ecf5; --muted:#9aa7bb; --line:#34425b;
+  --navy:#5a8fd6; --on-navy:#0f1622; --amber:#e0a646; --amber-soft:#3a2d14; --green:#62c08f; --green-soft:#16301f; --red:#e07a7a; --red-soft:#3a1c1c; color-scheme:dark } }
+:root[data-theme="dark"]{
+  --bg:#0f1622; --surface:#18212f; --tint:#131b28; --ink:#e6ecf5; --muted:#9aa7bb; --line:#34425b;
+  --navy:#5a8fd6; --on-navy:#0f1622; --amber:#e0a646; --amber-soft:#3a2d14; --green:#62c08f; --green-soft:#16301f; --red:#e07a7a; --red-soft:#3a1c1c; color-scheme:dark }
+
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:15px;line-height:1.5;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.page{max-width:1180px;margin:0 auto;padding-block:28px 64px;display:flex;flex-direction:column;gap:30px}
+h1{font-size:26px;line-height:1.2;margin:0;text-wrap:balance}
+h2{font-size:19px;margin:0;text-wrap:balance}
+h3{font-size:15px;margin:0}
+p{margin:0;max-width:74ch}
+.lede{color:var(--muted)}
+.eyebrow{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:600}
+header,section{display:flex;flex-direction:column;gap:12px}
+code{font-family:var(--mono);font-size:.88em;background:var(--tint);padding:1px 5px;border-radius:4px;overflow-wrap:anywhere}
+
+.legend{display:flex;flex-wrap:wrap;gap:6px 18px;font-size:13px;color:var(--muted)}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.sw{width:22px;height:13px;border-radius:3px;border:1.5px solid var(--ink);background:var(--surface)}
+.sw.auto{background:var(--tint);border-color:var(--line)}.sw.gate{border-color:var(--amber);background:var(--amber-soft)}
+
+.scroll{overflow-x:auto;background:var(--surface);border:1px solid var(--line);border-radius:10px}
+.scroll svg{display:block;min-width:1000px;width:100%;height:auto}
+svg text{font-family:var(--sans);fill:var(--ink)}
+.lane{fill:var(--surface)}.lane.alt{fill:var(--tint)}
+.lname{font-size:12px;font-weight:700}
+.colno{font-size:11px;font-weight:700;fill:var(--muted)}
+.node rect{fill:var(--surface);stroke:var(--ink);stroke-width:1.5}
+.node.auto rect{fill:var(--tint);stroke:var(--line)}
+.node.gate rect{fill:var(--amber-soft);stroke:var(--amber)}
+.nt{font-size:12px;font-weight:700}.ns{font-size:10.5px;fill:var(--muted)}
+.edge{fill:none;stroke:var(--muted);stroke-width:1.4}.ahp{fill:var(--muted)}
+
+.tabs{display:flex;flex-wrap:wrap;gap:8px;position:sticky;top:env(safe-area-inset-top,0px);background:var(--bg);padding-block:10px;z-index:2;border-bottom:1px solid var(--line)}
+.tabs button{font:inherit;font-weight:600;font-size:14px;padding:8px 14px;border-radius:8px;border:1.5px solid var(--navy);background:transparent;color:var(--ink);cursor:pointer;min-height:40px}
+.tabs button[aria-selected="true"]{background:var(--navy);color:var(--on-navy)}
+.tabs button:focus-visible{outline:3px solid var(--amber);outline-offset:2px}
+@media (max-width:700px){.tabs{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}.tabs::-webkit-scrollbar{display:none}.tabs button{flex:none;white-space:nowrap}}
+ol.steps{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px;counter-reset:s}
+ol.steps>li{counter-increment:s;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px 16px 14px 56px;position:relative;display:flex;flex-direction:column;gap:8px;min-width:0}
+ol.steps>li::before{content:counter(s);position:absolute;left:16px;top:13px;width:28px;height:28px;border-radius:50%;background:var(--navy);color:var(--on-navy);font-weight:700;font-size:14px;display:flex;align-items:center;justify-content:center}
+.who{font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.facts{display:grid;grid-template-columns:110px 1fr;gap:4px 12px;font-size:14px}
+.facts dt{color:var(--muted);font-weight:600}.facts dd{margin:0;min-width:0}
+.facts dd.g{color:var(--amber)}
+.facts ul{margin:0;padding-left:18px}
+@media (max-width:560px){.facts{grid-template-columns:1fr}.facts dt{margin-top:4px}ol.steps>li{padding-left:16px;padding-top:50px}}
+
+.tw{overflow-x:auto;border:1px solid var(--line);border-radius:10px;background:var(--surface)}
+table{border-collapse:collapse;width:100%;min-width:760px;font-size:14px}
+th,td{text-align:left;vertical-align:top;padding:9px 12px;border-bottom:1px solid var(--line)}
+th{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:650;background:var(--tint)}
+tr:last-child td{border-bottom:0}
+td strong{font-weight:650}
+.pill{display:inline-block;font-size:12px;font-weight:650;padding:1px 8px;border-radius:99px;border:1.5px solid currentColor;white-space:nowrap}
+.pill.auto{color:var(--green)}.pill.hand{color:var(--amber)}.pill.no{color:var(--red)}.pill.unk{color:var(--muted)}
+.cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:14px}
+.note{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px 16px;display:flex;flex-direction:column;gap:6px;min-width:0}
+.note p,.note li{font-size:14px}.note ul{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:4px}
+.open{border-left:4px solid var(--amber)}
+[role="tabpanel"][hidden]{display:none}
+</style>
+
+<div class="page">
+<header>
+  <span class="eyebrow">Mangiapane Brothers LLC · internal · as built October 15, 2026, before the push</span>
+  <h1>Sale Process Map</h1>
+  <p class="lede">Every step from a lead to money in QuickBooks: who acts, what runs on its own, the checks (gates) that can stop a step, the records written, and the emails sent. Read from the code that is about to go live: Code.gs with card mode on, and CRM and signing page commits c1ba2b4 through af91d5c. Anything not built yet is marked and listed at the end.</p>
+</header>
+
+<section>
+  <h2>The phone sale at a glance</h2>
+  <div class="legend" aria-label="Legend">
+    <span><i class="sw"></i>A person does it</span>
+    <span><i class="sw auto"></i>Runs on its own</span>
+    <span><i class="sw gate"></i>Has a gate that can stop it</span>
+  </div>
+  <div class="scroll"><svg viewBox="0 0 1184 472" role="img" aria-label="Phone sale swimlane: the rep emails the contract from the CRM, the signing service sends it, the customer signs, the contract is locked and saved to Drive, the customer enters a card that goes to Intuit, the service charges today's amount and emails a receipt, and the CRM shows the result.">
+<defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="ahp"/></marker></defs>
+<rect class="lane" x="0" y="34" width="1184" height="86"/>
+<text class="lname" x="12" y="81.0">Customer</text>
+<rect class="lane alt" x="0" y="120" width="1184" height="86"/>
+<text class="lname" x="12" y="167.0">Rep · CRM</text>
+<rect class="lane" x="0" y="206" width="1184" height="86"/>
+<text class="lname" x="12" y="253.0">Signing service</text>
+<rect class="lane alt" x="0" y="292" width="1184" height="86"/>
+<text class="lname" x="12" y="339.0">Intuit · QuickBooks</text>
+<rect class="lane" x="0" y="378" width="1184" height="86"/>
+<text class="lname" x="12" y="425.0">Gmail · Drive</text>
+<text class="colno" x="209.0" y="22" text-anchor="middle">1</text>
+<text class="colno" x="337.0" y="22" text-anchor="middle">2</text>
+<text class="colno" x="465.0" y="22" text-anchor="middle">3</text>
+<text class="colno" x="593.0" y="22" text-anchor="middle">4</text>
+<text class="colno" x="721.0" y="22" text-anchor="middle">5</text>
+<text class="colno" x="849.0" y="22" text-anchor="middle">6</text>
+<text class="colno" x="977.0" y="22" text-anchor="middle">7</text>
+<text class="colno" x="1105.0" y="22" text-anchor="middle">8</text>
+<path class="edge" d="M268.0 163.0H278.0" marker-end="url(#ah)"/>
+<path class="edge" d="M396.0 163.0H398.0V249.0H406.0" marker-end="url(#ah)"/>
+<path class="edge" d="M465.0 278.0V392.0" marker-end="url(#ah)"/>
+<path class="edge" d="M524.0 421.0H526.0V77.0H534.0" marker-end="url(#ah)"/>
+<path class="edge" d="M652.0 77.0H654.0V249.0H662.0" marker-end="url(#ah)"/>
+<path class="edge" d="M721.0 278.0V392.0" marker-end="url(#ah)"/>
+<path class="edge" d="M652.0 77.0H790.0" marker-end="url(#ah)"/>
+<path class="edge" d="M849.0 106.0V306.0" marker-end="url(#ah)"/>
+<path class="edge" d="M908.0 335.0H910.0V249.0H918.0" marker-end="url(#ah)"/>
+<path class="edge" d="M977.0 278.0V306.0" marker-end="url(#ah)"/>
+<path class="edge" d="M977.0 278.0V392.0" marker-end="url(#ah)"/>
+<path class="edge" d="M1036.0 249.0H1038.0V77.0H1046.0" marker-end="url(#ah)"/>
+<path class="edge" d="M1036.0 249.0H1038.0V163.0H1046.0" marker-end="url(#ah)"/>
+<g class="node act"><rect x="150" y="134.0" width="118" height="58" rx="7"/><text class="nt" x="209.0" y="158.0" text-anchor="middle">Add and quote</text><text class="ns" x="209.0" y="175.0" text-anchor="middle">quick add, then setup</text></g>
+<g class="node gate"><rect x="278" y="134.0" width="118" height="58" rx="7"/><text class="nt" x="337.0" y="158.0" text-anchor="middle">Email contract</text><text class="ns" x="337.0" y="175.0" text-anchor="middle">writes the link</text></g>
+<g class="node auto"><rect x="406" y="220.0" width="118" height="58" rx="7"/><text class="nt" x="465.0" y="244.0" text-anchor="middle">Send the link</text><text class="ns" x="465.0" y="261.0" text-anchor="middle">retries every 5 min</text></g>
+<g class="node auto"><rect x="406" y="392.0" width="118" height="58" rx="7"/><text class="nt" x="465.0" y="416.0" text-anchor="middle">Quote email</text><text class="ns" x="465.0" y="433.0" text-anchor="middle">from admin@</text></g>
+<g class="node gate"><rect x="534" y="48.0" width="118" height="58" rx="7"/><text class="nt" x="593.0" y="72.0" text-anchor="middle">Read and sign</text><text class="ns" x="593.0" y="89.0" text-anchor="middle">consent + name</text></g>
+<g class="node auto"><rect x="662" y="220.0" width="118" height="58" rx="7"/><text class="nt" x="721.0" y="244.0" text-anchor="middle">Lock contract</text><text class="ns" x="721.0" y="261.0" text-anchor="middle">client updated</text></g>
+<g class="node auto"><rect x="662" y="392.0" width="118" height="58" rx="7"/><text class="nt" x="721.0" y="416.0" text-anchor="middle">PDF to Drive</text><text class="ns" x="721.0" y="433.0" text-anchor="middle">+ signed copy email</text></g>
+<g class="node gate"><rect x="790" y="48.0" width="118" height="58" rx="7"/><text class="nt" x="849.0" y="72.0" text-anchor="middle">Enter card</text><text class="ns" x="849.0" y="89.0" text-anchor="middle">goes to Intuit only</text></g>
+<g class="node auto"><rect x="790" y="306.0" width="118" height="58" rx="7"/><text class="nt" x="849.0" y="330.0" text-anchor="middle">Card token</text><text class="ns" x="849.0" y="347.0" text-anchor="middle">no card number to us</text></g>
+<g class="node gate"><rect x="918" y="220.0" width="118" height="58" rx="7"/><text class="nt" x="977.0" y="244.0" text-anchor="middle">Save + charge</text><text class="ns" x="977.0" y="261.0" text-anchor="middle">reCAPTCHA, limits</text></g>
+<g class="node auto"><rect x="918" y="306.0" width="118" height="58" rx="7"/><text class="nt" x="977.0" y="330.0" text-anchor="middle">Saved + charged</text><text class="ns" x="977.0" y="347.0" text-anchor="middle">QuickBooks Payments</text></g>
+<g class="node auto"><rect x="918" y="392.0" width="118" height="58" rx="7"/><text class="nt" x="977.0" y="416.0" text-anchor="middle">Receipt email</text><text class="ns" x="977.0" y="433.0" text-anchor="middle">Intuit statement</text></g>
+<g class="node auto"><rect x="1046" y="48.0" width="118" height="58" rx="7"/><text class="nt" x="1105.0" y="72.0" text-anchor="middle">Confirmation</text><text class="ns" x="1105.0" y="89.0" text-anchor="middle">charged / pending</text></g>
+<g class="node auto"><rect x="1046" y="134.0" width="118" height="58" rx="7"/><text class="nt" x="1105.0" y="158.0" text-anchor="middle">Status shows</text><text class="ns" x="1105.0" y="175.0" text-anchor="middle">signed, card shown</text></g>
+</svg></div>
+  <p class="lede">Columns are the order of events. Steps 4 to 7 happen while the customer is on the page, usually inside five minutes. The in-person path and later charges are below.</p>
+</section>
+
+<section>
+  <h2>Each path, step by step</h2>
+  <div class="tabs" role="tablist" aria-label="Sale paths">
+    <button role="tab" id="t-phone" aria-controls="p-phone" aria-selected="true">Phone sale (emailed link)</button>
+    <button role="tab" id="t-ipad" aria-controls="p-ipad" aria-selected="false">In person (iPad)</button>
+    <button role="tab" id="t-later" aria-controls="p-later" aria-selected="false">Later charges and refunds</button>
+    <button role="tab" id="t-test" aria-controls="p-test" aria-selected="false">$1 test agreement</button>
+    <button role="tab" id="t-bg" aria-controls="p-bg" aria-selected="false">Behind the scenes</button>
+  </div>
+
+  <div role="tabpanel" id="p-phone" aria-labelledby="t-phone">
+  <ol class="steps">
+    <li><span class="who">Rep · CRM</span><h3>Quick add the lead, then Add and quote</h3>
+      <dl class="facts"><dt>What happens</dt><dd>Name, phone, address, email, region and source are saved on a new lead (stage New). The Seasonal Services Agreement setup opens with the email filled in and the pricing area taken from the region.</dd>
+      <dt>Gates</dt><dd class="g">A phone number already in the CRM is flagged while typing.</dd>
+      <dt>Writes</dt><dd><code>clients/{id}</code>, <code>phoneIndex</code></dd></dl></li>
+    <li><span class="who">Rep · CRM</span><h3>Build the quote</h3>
+      <dl class="facts"><dt>What happens</dt><dd>Tick Fall Cleanup, Christmas Lights, Snow Removal; add-ons; neighbor credit. Charged today updates live: fall and snow in full, half the lights price. The other half waits until the lights are marked installed.</dd>
+      <dt>Gates</dt><dd class="g"><ul><li>Service property and at least one service</li><li>Westland: no Fall Cleanup and no Showcase</li><li>Lights need a package and a color; snow needs a lot type</li><li>Walked price for turf over 10,000 sq ft</li><li>Neighbor name and address when the credit is ticked</li><li>Valid email addresses</li></ul></dd>
+      <dt>Writes</dt><dd>Draft on the client (<code>ssaDraft</code>) when saved for later.</dd></dl></li>
+    <li><span class="who">Rep · CRM</span><h3>Email contract to sign</h3>
+      <dl class="facts"><dt>What happens</dt><dd>The CRM writes the link: the quote, the agreement text with the signing date left blank, the Notice of Cancellation, and the client changes to apply when signed. An older open link for the same client is cancelled. A lead moves to Quoted. The sent screen shows the phone script and live status.</dd>
+      <dt>Gates</dt><dd class="g"><ul><li>Customer email required</li><li>Signing service set up (More, Contracts, Signing service)</li><li>Rep's countersignature saved once</li></ul></dd>
+      <dt>Writes</dt><dd><code>sync/sign/{token}</code> (expires in 7 days), <code>clients/{id}/signReq</code>, client log</dd>
+      <dt>Sends</dt><dd>Asks the signing service to send now.</dd></dl></li>
+    <li><span class="who">Signing service · Gmail</span><h3>The quote email goes out</h3>
+      <dl class="facts"><dt>What happens</dt><dd>One email from admin@ with the quote table, Total, Charged today, the snow note, and one button: Review, sign, and add your card. Status becomes Sent, then Opened when the customer opens the link.</dd>
+      <dt>Gates</dt><dd class="g">Only a queued link is sent, so a double tap never sends twice. If Gmail refuses, the link shows Email failed and the 5-minute job retries.</dd></dl></li>
+    <li><span class="who">Customer · signing page</span><h3>Read and sign</h3>
+      <dl class="facts"><dt>What happens</dt><dd>Quote, full agreement, Notice of Cancellation. The customer ticks the consent box and types their full name. The date is the day they sign.</dd>
+      <dt>Gates</dt><dd class="g"><ul><li>Link exists, is not cancelled, not expired (7 days), not already signed</li><li>Consent box ticked; typed name of at least 3 characters with a letter</li><li>The client still exists in the CRM</li><li>Test agreement rules hold (see the test tab)</li></ul></dd></dl></li>
+    <li><span class="who">Signing service</span><h3>Contract locked, client updated</h3>
+      <dl class="facts"><dt>What happens</dt><dd>The signed record is written once and can never be edited, only voided. It holds the full text, typed signature, both emails, sent and opened times, device and a SHA-256 fingerprint. The client gets the services at the agreement prices, moves to Active, and is marked payment method missing unless one is already on file. The charges on the schedule are created.</dd>
+      <dt>Writes</dt><dd><code>contracts/{id}/{cid}</code>, <code>clients/{id}</code> (services, status, payOnFile, contracts mirror), charge rows in <code>sync/qb</code>: due at signing (ready) and lights balance (waits until the lights service is ticked Installed), client log</dd>
+      <dt>Sends</dt><dd>PDF saved to admin@'s Drive, folder "Mangiapane Brothers Signed Contracts", one subfolder per client. Signed copy emailed with the PDF attached. If either fails it is queued and retried every 5 minutes.</dd></dl></li>
+    <li><span class="who">Customer · Intuit</span><h3>Enter the card</h3>
+      <dl class="facts"><dt>What happens</dt><dd>Name, number, expiration, security code, ZIP. The browser sends the card straight to Intuit and gets back a one-time token. Only the token comes to us. Bank account and check are under More options.</dd>
+      <dt>Gates</dt><dd class="g"><ul><li>Number passes the card check digit; MM/YY; 3 or 4 digit code; ZIP</li><li>Intuit accepts the card, or the customer sees Intuit's reason and nothing is sent to us</li><li>If the browser cannot reach Intuit, the page offers the emailed QuickBooks page instead</li></ul></dd></dl></li>
+    <li><span class="who">Signing service · QuickBooks Payments</span><h3>Card saved, today's amount charged</h3>
+      <dl class="facts"><dt>What happens</dt><dd>The customer is found or created in QuickBooks, the card is saved on them, and the charge due at signing runs on the spot. The CRM stores the card brand, last 4 and expiration only.</dd>
+      <dt>Gates</dt><dd class="g"><ul><li>Card or bank numbers are refused outright</li><li>A card already saved on this link is never saved or charged again</li><li>3 declines on one link close the card form for that link</li><li>reCAPTCHA must say a person (score 0.5 or higher, our site, the card step), or nothing reaches Intuit</li><li>Charge limits: above $0, at most $3,000 per charge, a saved card for this QuickBooks company, once per charge</li></ul></dd>
+      <dt>Writes</dt><dd><code>payOnFile</code> (on file, brand, last 4, QuickBooks card id), charge row done with the transaction id, <code>payStatus</code> paid or open, client log</dd>
+      <dt>Sends</dt><dd>Payment receipt from admin@ with the Intuit statement. On a decline: the card is removed, the customer is told nothing was charged, and can try another card.</dd></dl></li>
+    <li><span class="who">Customer · Rep</span><h3>Confirmation, and the CRM shows it</h3>
+      <dl class="facts"><dt>What happens</dt><dd>The page says plainly whether today's amount was charged or is still processing, with the cancel-by date. If the reply was lost, the page waits up to 45 seconds and reads the real result back. It never asks for the card again. The rep's sent screen and the lead card show Signed, the card on file, and today's charge.</dd>
+      <dt>Gates</dt><dd class="g">Once a card is saved, or while one is being confirmed, no other payment method can be chosen on that link.</dd></dl></li>
+  </ol>
+  </div>
+
+  <div role="tabpanel" id="p-ipad" aria-labelledby="t-ipad" hidden>
+  <ol class="steps">
+    <li><span class="who">Rep · CRM</span><h3>Build the quote, then Sign here on this device</h3>
+      <dl class="facts"><dt>What happens</dt><dd>Same setup and gates as the phone sale. The agreement shows on the iPad with a signature box.</dd></dl></li>
+    <li><span class="who">Customer · Rep</span><h3>Customer draws a signature; rep taps Sign and lock</h3>
+      <dl class="facts"><dt>Gates</dt><dd class="g">Signature box not empty; the client has a name; company signature drawn once (then automatic).</dd>
+      <dt>What happens</dt><dd>Contract locked with a fingerprint, client updated and charges created, the same as the emailed path. A QuickBooks customer row is queued for Claude. An open emailed link for that client is cancelled.</dd>
+      <dt>Sends</dt><dd>The signing service saves the PDF to Drive and emails the signed copy.</dd></dl></li>
+    <li><span class="who">Rep · CRM</span><h3>Payment on file sheet</h3>
+      <dl class="facts"><dt>What happens</dt><dd>Four choices:<ul>
+        <li><b>Scan the card now (GoPayment).</b> Charge in GoPayment, then record brand and last 4 and tick "charged". The signing charge is marked done and a GoPayment match is queued for Claude.</li>
+        <li><b>Email a QuickBooks card link.</b> A pasted link is emailed from admin@ at once; with no link pasted, a payment-link row is queued for Claude to make and send.</li>
+        <li><b>Bank account (ACH)</b>, under More options: same as the link.</li>
+        <li><b>Prepay everything by check</b>, under More options: every charge waits for the check; "I have the check now" marks them paid and queues the payment to record.</li></ul></dd>
+      <dt>Gates</dt><dd class="g">Last 4 digits only (the box cuts anything longer); brand required; a link must start with https://; email required for a link.</dd></dl></li>
+  </ol>
+  </div>
+
+  <div role="tabpanel" id="p-later" aria-labelledby="t-later" hidden>
+  <ol class="steps">
+    <li><span class="who">CRM · Tools · Charges to run</span><h3>Every charge on the schedule is listed</h3>
+      <dl class="facts"><dt>Sections</dt><dd><ul><li><b>Needs attention</b>: a charge that failed, was held, or is running, with the reason</li><li><b>Due now</b>: ready to charge, or declined</li><li><b>Waiting for the job to be done</b>: the lights balance, the landscaping balance, the second test $1. Each says what opens it; <b>Open now</b> is the override when the work is done and nobody marked it</li><li><b>Waiting for a prepay check</b></li><li><b>Charged through QuickBooks Payments</b>, last 45 days</li></ul></dd>
+      <dt>Totals</dt><dd>Due-now totals leave out test charges.</dd></dl></li>
+    <li><span class="who">Rep · Signing service</span><h3>Charge card on file (card saved on the signing page)</h3>
+      <dl class="facts"><dt>What happens</dt><dd>Two taps. The CRM writes a one-time request on the charge and the service charges the saved card once, then emails the receipt. Rows waiting for the job to be done are not charged from here until their gate opens.</dd>
+      <dt>Gates</dt><dd class="g"><ul><li>Only signed-in admins can write the request; it works once, within 10 minutes</li><li>The same charge limits as at signing</li><li>Unknown outcome (Intuit down): marked Needs attention; Try again reuses the same request id, so it cannot charge twice</li><li>Declined: the client is past due as of today</li></ul></dd></dl></li>
+    <li><span class="who">Rep</span><h3>GoPayment cards: charge by hand</h3>
+      <dl class="facts"><dt>What happens</dt><dd>Charge in QuickBooks (Customers, the client, Receive payment), then tap Charged or Declined. The first successful one sends the customer "your payment method is confirmed".</dd></dl></li>
+    <li><span class="who">Rep · Signing service</span><h3>Refund</h3>
+      <dl class="facts"><dt>What happens</dt><dd>Two taps on any charge made through QuickBooks Payments in the last 45 days. Same day and nothing refunded yet: the charge is voided and never posts. Otherwise: everything left on the charge is refunded. Partial refunds are done in QuickBooks.</dd>
+      <dt>Sends</dt><dd>"Charge cancelled" or "Refund receipt" from admin@.</dd></dl></li>
+    <li><span class="who">Rep · CRM · the client</span><h3>The job-done gate: lights installed, landscaping done</h3>
+      <dl class="facts"><dt>What happens</dt><dd>Tick <b>Installed, all lit</b> on the client's lights service and save: the install-day balance moves to Due now (the install date fills in if blank). Set a landscaping job's Status to <b>Done</b> and save: its balance moves to Due now. Then Charge card on file, or Charged in QuickBooks for a GoPayment card.</dd>
+      <dt>Gates</dt><dd class="g"><ul><li>Only the change to Installed or Done opens it, once</li><li>Kept off Undo, so an undo can never put a charged balance back to waiting</li><li>The employee portal will set the same Installed and Done fields when it is built; the signing service will then open the gate on its 5-minute run, so it works with the CRM closed</li></ul></dd></dl></li>
+    <li><span class="who">Rep · CRM · the client</span><h3>Landscaping 50/50</h3>
+      <dl class="facts"><dt>What happens</dt><dd>On a saved landscaping job with a price, <b>Bill 50/50</b> (two taps) adds half as a deposit, due now, and the balance, waiting for Done. The job card shows both and their state.</dd>
+      <dt>Open</dt><dd class="g">There is no landscaping agreement yet. A deposit is charged with no signed contract until one is written.</dd></dl></li>
+    <li><span class="who">Rep · CRM · the client</span><h3>Add a charge</h3>
+      <dl class="facts"><dt>What happens</dt><dd>On any client: <b>Snow visit past 16</b> (number of visits; the signed per-visit price fills in), <b>Lights service call</b> ($40 no ladder, $65 ladder), or <b>Something else</b> (what it is for is required). The receipt line is shown before saving. <b>Add to Charges to run</b>, or <b>Add and charge</b> the saved card (two taps).</dd>
+      <dt>Gates</dt><dd class="g"><ul><li>Amount above zero and at most $3,000 (the signing service also holds anything over its cap)</li><li>Date of the work required</li><li>The CRM does not count snow visits: the rep decides a visit is past 16</li></ul></dd></dl></li>
+  </ol>
+  </div>
+
+  <div role="tabpanel" id="p-test" aria-labelledby="t-test" hidden>
+  <ol class="steps">
+    <li><span class="who">Rep · CRM</span><h3>Tick Test agreement in the setup</h3>
+      <dl class="facts"><dt>What happens</dt><dd>Services, property fields and Sign here are hidden. Charged today shows $1. Email contract sends a TEST- agreement: $1 at signing, a second $1 later, no service. The client's services and status are not touched. The box is never saved in a draft.</dd></dl></li>
+    <li><span class="who">Customer</span><h3>The same email, page, card form, PDF and receipts</h3>
+      <dl class="facts"><dt>What happens</dt><dd>A red TEST AGREEMENT banner on every step, "TEST:" on every email subject, a red bar on the PDF, a TEST tag in Charges to run.</dd></dl></li>
+    <li><span class="who">Signing service</span><h3>Test guards</h3>
+      <dl class="facts"><dt>Gates</dt><dd class="g"><ul><li>The test flag and the TEST- number must agree</li><li>At most $1 per charge and $2 per agreement; every charge flagged test</li><li>Cannot change the client's services or status</li><li>A real agreement carrying a test line is refused</li><li>A test charge over $1 is held before it reaches Intuit</li></ul></dd></dl></li>
+    <li><span class="who">Rep</span><h3>Charge the second $1, then Refund both</h3>
+      <dl class="facts"><dt>What happens</dt><dd>Charges to run, Charge the second $1 now. Then Refund on each: same day, both are voided.</dd></dl></li>
+  </ol>
+  </div>
+
+  <div role="tabpanel" id="p-bg" aria-labelledby="t-bg" hidden>
+  <ol class="steps">
+    <li><span class="who">Every 5 minutes</span><h3>Queue job</h3>
+      <dl class="facts"><dt>What happens</dt><dd>Sends any link still queued, retries queued emails and Drive saves (up to 5 tries, then marked error), expires links older than 7 days, clears sent-email records after 30 days.</dd></dl></li>
+    <li><span class="who">Every day, 3 a.m.</span><h3>QuickBooks connection refresh</h3>
+      <dl class="facts"><dt>What happens</dt><dd>Renews the connection so it never ages out. Tokens are encrypted and never leave the script.</dd>
+      <dt>Gates</dt><dd class="g">If QuickBooks refuses, charges stop, the CRM status shows reconnect needed, and admin@ gets an email, at most every 12 hours. Reconnect from the script editor (qbConnectLink). Only the Mangiapane Brothers company can connect.</dd></dl></li>
+    <li><span class="who">On request</span><h3>QuickBooks queue for Claude</h3>
+      <dl class="facts"><dt>What happens</dt><dd>Tools, Copy queue for Claude. Claude works it with the QuickBooks connector and the results are pasted back. Nothing runs it on a schedule yet.</dd></dl></li>
+  </ol>
+  </div>
+</section>
+
+<section>
+  <h2>Every gate in one place</h2>
+  <div class="tw"><table>
+    <thead><tr><th>Gate</th><th>Checked by</th><th>If it fails</th></tr></thead>
+    <tbody>
+    <tr><td><strong>Quote complete</strong>: property, a service, Westland rules, lights package and color, snow lot, walked price, neighbor details, valid emails</td><td>CRM</td><td>"Still needed: …" and nothing is sent</td></tr>
+    <tr><td><strong>Ready to email</strong>: customer email, signing service set up, countersignature saved</td><td>CRM</td><td>Message; nothing is sent</td></tr>
+    <tr><td><strong>Link usable</strong>: exists, not cancelled, under 7 days, not signed</td><td>Signing service</td><td>Page explains (newer link sent, expired, call us)</td></tr>
+    <tr><td><strong>Signature</strong>: consent ticked, full name typed, client still exists</td><td>Signing page and service</td><td>Not signed; customer told what is missing</td></tr>
+    <tr><td><strong>Test agreement rules</strong></td><td>Signing service</td><td>Not signed; test charge over $1 held</td></tr>
+    <tr><td><strong>Card details valid</strong> and accepted by Intuit</td><td>Signing page, Intuit</td><td>Intuit's reason shown; nothing reaches us</td></tr>
+    <tr><td><strong>No card numbers</strong> ever accepted by the service</td><td>Signing service</td><td>Refused outright</td></tr>
+    <tr><td><strong>Person, not a bot</strong>: reCAPTCHA 0.5 or higher, our site, card step; fails closed</td><td>Signing service, Google</td><td>Nothing saved or charged; emailed QuickBooks page offered</td></tr>
+    <tr><td><strong>3 declines per link</strong></td><td>Signing service</td><td>Card form closed for that link; emailed page or call</td></tr>
+    <tr><td><strong>Charge limits</strong>: above $0, at most $3,000, test at most $1, saved card for this company</td><td>Signing service</td><td>Held under Needs attention</td></tr>
+    <tr><td><strong>Never twice</strong>: one charge per row, same request id on retry</td><td>Signing service, Intuit</td><td>Second try returns the first result</td></tr>
+    <tr><td><strong>One way to pay</strong>: nothing else once a card is saved or being confirmed</td><td>Signing page and service</td><td>Refused; customer told to wait and reload</td></tr>
+    <tr><td><strong>Admin request</strong> for Charge and Refund: signed-in admin, once, 10 minutes</td><td>Database rules, signing service</td><td>"Tap the button again"</td></tr>
+    <tr><td><strong>Refund</strong>: only QuickBooks Payments charges; void same day, refund after</td><td>Signing service</td><td>"Refund it in QuickBooks"</td></tr>
+    <tr><td><strong>Right QuickBooks company</strong> and a valid connection</td><td>Signing service</td><td>Not connected; reconnect email to admin@</td></tr>
+    <tr><td><strong>Three-day cancel window</strong>: three business days, Sundays and federal holidays not counted</td><td>CRM and signing service</td><td>Date shown on the page, PDF and email; refunds by the Refund button</td></tr>
+    </tbody></table></div>
+</section>
+
+<section>
+  <h2>Emails</h2>
+  <p class="lede">All from admin@mangbrothers.com as "Mangiapane Brothers", replies to admin@. A test agreement puts "TEST:" in front of every subject and a red banner on top.</p>
+  <div class="tw"><table>
+    <thead><tr><th>Email</th><th>Sent when</th><th>Contains</th><th>How</th></tr></thead>
+    <tbody>
+    <tr><td><strong>Your quote and agreement</strong></td><td>Rep taps Email contract to sign</td><td>Quote, Total, Charged today, snow note, one button</td><td><span class="pill auto">Automatic</span></td></tr>
+    <tr><td><strong>Your signed agreement</strong></td><td>Right after signing (link or iPad), before any charge</td><td>PDF attached; cancel-by date. Kept separate from the receipt on purpose (Russel, October 15)</td><td><span class="pill auto">Automatic</span></td></tr>
+    <tr><td><strong>Payment receipt</strong></td><td>Every charge the service makes</td><td>Amount, fees $0.00, total, card ending, date, transaction id, Intuit statement</td><td><span class="pill auto">Automatic</span></td></tr>
+    <tr><td><strong>Payment method confirmed</strong></td><td>First charge marked Charged by hand (GoPayment cards)</td><td>Amount, what for, date</td><td><span class="pill auto">Automatic</span></td></tr>
+    <tr><td><strong>Charge cancelled</strong></td><td>Refund on the same day (void)</td><td>Amount, card, transaction id</td><td><span class="pill auto">Automatic</span></td></tr>
+    <tr><td><strong>Refund receipt</strong></td><td>Refund after the charge settled</td><td>Amount refunded, card, refund id</td><td><span class="pill auto">Automatic</span></td></tr>
+    <tr><td><strong>Add your payment method</strong> (QuickBooks page)</td><td>Rep pastes a QuickBooks link on the payment sheet</td><td>One button to the QuickBooks page</td><td><span class="pill auto">Automatic</span></td></tr>
+    <tr><td><strong>QuickBooks payment link made by Claude</strong></td><td>Customer chose bank account or the emailed page, with no link pasted</td><td>QuickBooks' own email</td><td><span class="pill hand">Claude, on request</span></td></tr>
+    <tr><td><strong>Reconnect QuickBooks</strong> (to admin@ only)</td><td>The QuickBooks connection stops working</td><td>Reason and how to reconnect</td><td><span class="pill auto">Automatic</span></td></tr>
+    </tbody></table></div>
+</section>
+
+<section>
+  <h2>CRM records</h2>
+  <div class="tw"><table>
+    <thead><tr><th>Record</th><th>Holds</th><th>Written by</th></tr></thead>
+    <tbody>
+    <tr><td><code>clients/{id}</code></td><td>Contact details, stage (New, Contacted, Quoted, then Active), services and prices, payment method on file (brand and last 4 only), billing status (open, paid, past due), the open link's status, contract summaries with the Drive link</td><td>CRM and signing service</td></tr>
+    <tr><td><code>contracts/{id}/{cid}</code></td><td>The locked signed agreement: full text, signatures, device, times, fingerprint. Only voiding is allowed after signing.</td><td>CRM (iPad) or signing service (link)</td></tr>
+    <tr><td><code>clientLog/{id}</code></td><td>One dated line for every step: emailed, opened, signed, card saved, charged, declined, refunded</td><td>Both</td></tr>
+    <tr><td><code>sync/sign/{token}</code></td><td>The emailed link: quote, text, status, payment step</td><td>CRM, then the service</td></tr>
+    <tr><td><code>sync/qb</code></td><td>Charge rows (due at signing, install day, test, snow overage, service call, landscaping deposit and completion, other) and the QuickBooks queue for Claude</td><td>Both</td></tr>
+    <tr><td><code>sync/mail</code></td><td>Emails and Drive saves waiting to be retried</td><td>Both</td></tr>
+    <tr><td><code>system/qbConnection</code></td><td>QuickBooks connection status for the CRM. Never a token.</td><td>Signing service</td></tr>
+    </tbody></table></div>
+</section>
+
+<section>
+  <h2>QuickBooks: what is automatic and what is not</h2>
+  <div class="tw"><table>
+    <thead><tr><th>Work</th><th>How it happens today</th><th>State</th></tr></thead>
+    <tbody>
+    <tr><td>Create or find the customer when a card is saved</td><td>Signing service, by name</td><td><span class="pill auto">Automatic</span></td></tr>
+    <tr><td>Save the card, charge, void, refund</td><td>Signing service, QuickBooks Payments</td><td><span class="pill auto">Automatic</span></td></tr>
+    <tr><td>Customer for every signed client (queue row)</td><td>Claude with the connector, when the queue is pasted</td><td><span class="pill hand">By hand</span></td></tr>
+    <tr><td>Invoices, GoPayment sale matching, recording checks, payment links</td><td>Claude with the connector, when the queue is pasted</td><td><span class="pill hand">By hand</span></td></tr>
+    <tr><td>Card charges recorded as income in the books</td><td>Not confirmed. Check in QuickBooks right after the $1 test.</td><td><span class="pill unk">To verify</span></td></tr>
+    <tr><td>The queue pushed to QuickBooks on a schedule</td><td>A scheduled task that runs the queue with the QuickBooks connector. Waits on Claude's own database sign-in, which does not exist yet: the rules allow for it, the account was never created. Rules tightened first so that sign-in can never charge, refund or send mail.</td><td><span class="pill no">Not built</span></td></tr>
+    </tbody></table></div>
+</section>
+
+<section>
+  <h2>Parties and pieces</h2>
+  <div class="cols">
+    <div class="note"><h3>People</h3><ul><li><b>Customer</b>: no login. Email, signing page, receipts.</li><li><b>Rep or admin</b>: the CRM on iPad, phone or computer. Only admins on the Team list see it.</li><li><b>Accountant</b>: reads QuickBooks.</li><li><b>Claude</b>: works the QuickBooks queue on request. Never charges a card; the new rules make that impossible for its own sign-in.</li></ul></div>
+    <div class="note"><h3>Our pieces</h3><ul><li><b>CRM</b>: apps.mangbrothers.com/crm.html, data in Firebase.</li><li><b>Signing page</b>: apps.mangbrothers.com/sign.html, opened from the email.</li><li><b>Signing service</b>: Apps Script "MB Signing" running as admin@. Sends mail, saves PDFs, charges cards.</li></ul></div>
+    <div class="note"><h3>Outside services</h3><ul><li><b>Intuit, QuickBooks Payments</b>: card tokens, saved cards, charges, refunds.</li><li><b>QuickBooks Online</b>: customers and the books.</li><li><b>Google</b>: Gmail and Drive on admin@, reCAPTCHA on the card step.</li><li><b>GoPayment</b>: in-person cards.</li></ul></div>
+  </div>
+</section>
+
+<section>
+  <h2>Not built yet, and open items</h2>
+  <div class="cols">
+    <div class="note open"><h3>Tasks</h3><ul>
+      <li><b>Claude's own database sign-in.</b> Publish the tightened rules, create the account, then the scheduled QuickBooks task.</li>
+      <li><b>Scheduled task to push new info to QuickBooks.</b> Runs the queue with the connector on a schedule, with the Mac closed.</li>
+      <li><b>Employee portal</b>: crews mark Installed and Done; the signing service opens the gate on its 5-minute run.</li>
+      <li><b>Landscaping agreement</b>: none exists yet for 50/50 jobs.</li>
+      <li><b>Verify the books</b>: after the $1 test, check whether the charge shows in QuickBooks as income.</li></ul></div>
+    <div class="note open"><h3>Before real customers</h3><ul>
+      <li>Paste the new Code.gs and deploy a New version, then push the five page commits.</li>
+      <li>Run the $1 test agreement end to end, including the second $1 and both refunds.</li>
+      <li>Run pdfSample and look at Google's real PDF.</li>
+      <li>Attorney answers on the authorization to charge, the typed signature, and the emailed cancellation notice.</li></ul></div>
+  </div>
+</section>
+</div>
+
+<script>
+(function(){
+  var tabs=[].slice.call(document.querySelectorAll('[role="tab"]'));
+  function pick(t){ tabs.forEach(function(x){ var on=x===t; x.setAttribute('aria-selected',String(on)); x.tabIndex=on?0:-1; document.getElementById(x.getAttribute('aria-controls')).hidden=!on; }); }
+  tabs.forEach(function(t,i){ t.addEventListener('click',function(){pick(t)}); t.addEventListener('keydown',function(e){ var d=e.key==='ArrowRight'?1:e.key==='ArrowLeft'?-1:0; if(d){ var n=tabs[(i+d+tabs.length)%tabs.length]; pick(n); n.focus(); e.preventDefault(); } }); });
+  var h=(location.hash||'').slice(1), t=document.getElementById('t-'+h); if(t) pick(t);
+})();
+</script>
+
+</body></html>

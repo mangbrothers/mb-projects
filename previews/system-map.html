@@ -1,0 +1,433 @@
+<!doctype html><html><head><meta name="robots" content="noindex, nofollow"><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Mangiapane Brothers System Map</title>
+<style>
+/* Layout: one working document. Toggle on top, the flow diagram, then ownership table, terms, weak points. Colors follow the internal tool (navy on cool grey, system fonts). */
+:root{
+  --bg:#eef1f5; --surface:#ffffff; --tint:#e2e8f1; --ink:#16233a; --muted:#55627a; --line:#c3ccda;
+  --navy:#1f4e8c; --on-navy:#ffffff; --amber:#8f5400; --green:#1d6b45;
+  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --bg:#0f1622; --surface:#18212f; --tint:#131b28; --ink:#e6ecf5; --muted:#9aa7bb; --line:#34425b;
+  --navy:#2f66b0; --on-navy:#ffffff; --amber:#e0a646; --green:#62c08f; color-scheme:dark } }
+:root[data-theme="dark"]{
+  --bg:#0f1622; --surface:#18212f; --tint:#131b28; --ink:#e6ecf5; --muted:#9aa7bb; --line:#34425b;
+  --navy:#2f66b0; --on-navy:#ffffff; --amber:#e0a646; --green:#62c08f; color-scheme:dark }
+
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:15px;line-height:1.5}
+.page{max-width:1220px;margin:0 auto;padding-inline:20px;padding-block:28px 56px;display:flex;flex-direction:column;gap:28px}
+h1{font-size:26px;line-height:1.2;margin:0;text-wrap:balance}
+h2{font-size:18px;margin:0 0 4px;text-wrap:balance}
+p{margin:0;max-width:72ch}
+.lede{color:var(--muted)}
+.eyebrow{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:600}
+header{display:flex;flex-direction:column;gap:8px}
+section{display:flex;flex-direction:column;gap:12px}
+
+.bar{display:flex;flex-wrap:wrap;gap:14px 24px;align-items:center;position:sticky;top:env(safe-area-inset-top,0px);background:var(--bg);padding-block:10px;z-index:2;border-bottom:1px solid var(--line)}
+.seg{display:inline-flex;border:1.5px solid var(--navy);border-radius:8px;overflow:hidden}
+.seg button{font:inherit;font-weight:600;padding:8px 14px;border:0;background:transparent;color:var(--ink);cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--navy);color:var(--on-navy)}
+.seg button:focus-visible{outline:3px solid var(--amber);outline-offset:-3px}
+.legend{display:flex;flex-wrap:wrap;gap:6px 18px;font-size:13px;color:var(--muted)}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.sw{width:26px;height:14px;border:1.5px solid var(--ink);border-radius:3px;background:var(--surface)}
+.sw.part{border-style:dashed}.sw.plan{border-style:dotted;border-color:var(--muted)}
+
+.scroll{overflow-x:auto;background:var(--surface);border:1px solid var(--line);border-radius:10px}
+.scroll svg{display:block;min-width:1000px;width:100%;height:auto}
+figure{margin:0;display:flex;flex-direction:column;gap:8px}
+figcaption{font-size:13px;color:var(--muted);max-width:90ch}
+
+/* diagram */
+svg text{font-family:var(--sans);fill:var(--ink)}
+.t{font-size:13px;font-weight:650}
+.s{font-size:11px;fill:var(--muted)}
+.l{font-size:11px}
+.cap{font-size:11px;font-weight:650;letter-spacing:.08em;fill:var(--muted)}
+.n{fill:var(--surface);stroke:var(--ink);stroke-width:1.5}
+.n.in{fill:var(--bg)}
+.n.part{stroke-dasharray:7 3}
+.n.plan{stroke-dasharray:2 4;stroke:var(--muted)}
+.box{fill:var(--tint);stroke:var(--line);stroke-width:1.5}
+.hub{fill:var(--navy);stroke:var(--navy)}
+.hubt{fill:var(--on-navy)}
+.a{fill:none;stroke:var(--ink);stroke-width:1.5}
+.a.plan{stroke-dasharray:4 4;stroke:var(--muted)}
+.ahp{fill:var(--ink)}
+.tag{font-size:10px;font-weight:700;letter-spacing:.08em;fill:var(--amber)}
+.central .future{display:none}
+
+/* tables */
+.tw{overflow-x:auto;border:1px solid var(--line);border-radius:10px;background:var(--surface)}
+table{border-collapse:collapse;width:100%;min-width:760px;font-size:14px}
+th,td{text-align:left;vertical-align:top;padding:9px 12px;border-bottom:1px solid var(--line)}
+th{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:650;background:var(--tint)}
+tr:last-child td{border-bottom:0}
+td strong{font-weight:650}
+.pill{display:inline-block;font-size:12px;font-weight:650;padding:1px 8px;border-radius:99px;border:1.5px solid currentColor;white-space:nowrap}
+.pill.live{color:var(--green)}.pill.part{color:var(--amber)}.pill.plan{color:var(--muted)}
+.not{color:var(--muted);text-decoration:line-through;text-decoration-thickness:1px}
+
+.cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px}
+.note{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px 16px;display:flex;flex-direction:column;gap:6px;min-width:0}
+.note h3{font-size:15px;margin:0}
+.note p{font-size:14px}
+.note .rec{color:var(--ink);font-weight:600}
+.found{border-left:4px solid var(--amber)}
+</style>
+
+<div class="page central" id="root">
+<header>
+  <span class="eyebrow">Mangiapane Brothers LLC · internal · drawn October 7, 2026 · last updated October 17, 2026</span>
+  <h1>System Map</h1>
+  <p class="lede">Where each kind of company data lives, which system owns it, and which tool carries it from one system to the next. The first view is the central system for the next month. The second view adds everything planned after it.</p>
+</header>
+
+<div class="bar">
+  <div class="seg" role="group" aria-label="Scope shown">
+    <button id="b-central" type="button" aria-pressed="true">Central system</button>
+    <button id="b-future" type="button" aria-pressed="false">With future add-ons</button>
+  </div>
+  <div class="legend" aria-label="Legend">
+    <span><i class="sw"></i>Live</span>
+    <span><i class="sw part"></i>Works by hand, not on a schedule</span>
+    <span><i class="sw plan"></i>Planned, not built</span>
+  </div>
+</div>
+
+<figure>
+<div class="scroll">
+<svg id="map" viewBox="0 0 1180 730" role="img" aria-label="Flow of data between clients, Quo, the internal system, the signing service, Claude, QuickBooks, Google Drive and GitHub. The signing service connects to QuickBooks directly for card charges. Claude carries the rest between Quo, the CRM database and QuickBooks.">
+<defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="ahp"/></marker></defs>
+
+<!-- people -->
+<rect class="n" x="20" y="16" width="210" height="50" rx="6"/>
+<text class="t" x="125" y="37" text-anchor="middle">Clients and leads</text>
+<text class="s" x="125" y="54" text-anchor="middle">phone, text, in person. No login.</text>
+
+<rect class="n" x="340" y="16" width="180" height="50" rx="6"/>
+<text class="t" x="430" y="37" text-anchor="middle">Admin team</text>
+<text class="s" x="430" y="54" text-anchor="middle">sees every page</text>
+
+<rect class="n" x="540" y="16" width="160" height="50" rx="6"/>
+<text class="t" x="620" y="37" text-anchor="middle">Door hanger walkers</text>
+<text class="s" x="620" y="54" text-anchor="middle">see own routes only</text>
+
+<g class="future">
+<rect class="n part" x="720" y="16" width="180" height="50" rx="6"/>
+<text class="t" x="810" y="37" text-anchor="middle">Crews</text>
+<text class="s" x="810" y="54" text-anchor="middle">own routes, check-offs, hours</text>
+<path class="a" d="M810 66V110" marker-end="url(#ah)" stroke-dasharray="7 3"/>
+</g>
+
+<rect class="n" x="970" y="16" width="190" height="50" rx="6"/>
+<text class="t" x="1065" y="37" text-anchor="middle">Accountant and CFO</text>
+<text class="s" x="1065" y="54" text-anchor="middle">read the books</text>
+
+<path class="a" d="M125 66V150" marker-start="url(#ah)" marker-end="url(#ah)"/>
+<text class="l" x="133" y="112">calls and texts</text>
+<path class="a" d="M430 66V110" marker-end="url(#ah)"/>
+<text class="l" x="438" y="92">sign in</text>
+<path class="a" d="M620 66V110" marker-end="url(#ah)"/>
+<text class="l" x="628" y="92">sign in</text>
+<path class="a" d="M1065 150V66" marker-end="url(#ah)"/>
+<text class="l" x="1073" y="112">reports</text>
+
+<!-- left column -->
+<rect class="n" x="20" y="150" width="210" height="90" rx="6"/>
+<text class="t" x="125" y="176" text-anchor="middle">Quo (VoIP phone system)</text>
+<text class="s" x="125" y="196" text-anchor="middle">calls, texts, voicemail</text>
+<text class="s" x="125" y="212" text-anchor="middle">transcripts and summaries</text>
+<text class="s" x="125" y="228" text-anchor="middle">raw record of every contact</text>
+
+<path class="a plan" d="M125 240V290" marker-end="url(#ah)"/>
+<text class="l" x="133" y="269">call summaries</text>
+<rect class="n plan" x="20" y="290" width="210" height="70" rx="6"/>
+<text class="t" x="125" y="315" text-anchor="middle">Email inbox</text>
+<text class="s" x="125" y="333" text-anchor="middle">second copy of each call summary</text>
+<text class="s" x="125" y="348" text-anchor="middle">none arriving yet</text>
+<path class="a plan" d="M230 325H262"/>
+
+<path class="a part" d="M230 195H262V555H380" marker-end="url(#ah)" stroke-dasharray="7 3"/>
+<text class="l" x="270" y="547">transcripts, texts</text>
+<text class="s" x="270" y="571">on request today</text>
+
+<!-- internal system -->
+<rect class="box" x="300" y="110" width="620" height="330" rx="10"/>
+<text class="cap" x="320" y="133">INTERNAL SYSTEM</text>
+<text class="s" x="440" y="133">one web app at apps.mangbrothers.com, one sign-in list</text>
+
+<rect class="n" x="320" y="144" width="580" height="42" rx="6"/>
+<text class="t" x="610" y="161" text-anchor="middle">Sign-in and access tiers</text>
+<text class="s" x="610" y="177" text-anchor="middle">Firebase Authentication · admin: everything · walker: own routes · crew: own crew's routes, managers approve their crew (built Oct 16, not live)</text>
+
+<rect class="n" x="320" y="200" width="104" height="90" rx="6"/>
+<text class="t" x="372" y="222" text-anchor="middle">Projects</text>
+<text class="s" x="372" y="242" text-anchor="middle">admin tasks,</text>
+<text class="s" x="372" y="257" text-anchor="middle">projects,</text>
+<text class="s" x="372" y="272" text-anchor="middle">timelines</text>
+
+<rect class="n" x="439" y="200" width="104" height="90" rx="6"/>
+<text class="t" x="491" y="222" text-anchor="middle">CRM</text>
+<text class="s" x="491" y="242" text-anchor="middle">clients, leads,</text>
+<text class="s" x="491" y="257" text-anchor="middle">contact log,</text>
+<text class="s" x="491" y="272" text-anchor="middle">contracts, billing</text>
+
+<rect class="n" x="558" y="200" width="104" height="90" rx="6"/>
+<text class="t" x="610" y="222" text-anchor="middle">Routes</text>
+<text class="s" x="610" y="242" text-anchor="middle">door hanger</text>
+<text class="s" x="610" y="257" text-anchor="middle">routes and</text>
+<text class="s" x="610" y="272" text-anchor="middle">verification</text>
+
+<g class="future">
+<rect class="n plan" x="677" y="200" width="104" height="90" rx="6"/>
+<text class="t" x="729" y="222" text-anchor="middle">Team manager</text>
+<text class="s" x="729" y="242" text-anchor="middle">workforce</text>
+<text class="s" x="729" y="257" text-anchor="middle">pipeline, docs,</text>
+<text class="s" x="729" y="272" text-anchor="middle">pay status</text>
+<rect class="n part" x="796" y="200" width="104" height="90" rx="6"/>
+<text class="t" x="848" y="222" text-anchor="middle">Crews</text>
+<text class="s" x="848" y="242" text-anchor="middle">routes, map,</text>
+<text class="s" x="848" y="257" text-anchor="middle">check-off, crew</text>
+<text class="s" x="848" y="272" text-anchor="middle">day approval</text>
+</g>
+
+<rect class="n" x="320" y="306" width="420" height="114" rx="6"/>
+<text class="t" x="530" y="330" text-anchor="middle">Firebase Realtime Database</text>
+<text class="s" x="530" y="348" text-anchor="middle">System of record for: clients and leads · contact log</text>
+<text class="s" x="530" y="363" text-anchor="middle">signed contracts · billing status · card on file (brand, last 4)</text>
+<text class="s" x="530" y="378" text-anchor="middle">door hanger routes · admin tasks · the access list</text>
+<text class="s future" x="530" y="396" text-anchor="middle">Planned: jobs, time records, workforce profiles,</text>
+<text class="s future" x="530" y="410" text-anchor="middle">pay status copied from QuickBooks Payroll</text>
+
+<rect class="n" x="755" y="306" width="145" height="114" rx="6"/>
+<text class="t" x="827" y="328" text-anchor="middle">Signing service</text>
+<text class="s" x="827" y="346" text-anchor="middle">Apps Script on admin@</text>
+<text class="s" x="827" y="361" text-anchor="middle">contract mail and PDFs</text>
+<text class="s" x="827" y="376" text-anchor="middle">card charges, receipts</text>
+<text class="s" x="827" y="391" text-anchor="middle">reCAPTCHA on card step</text>
+<text class="s" x="827" y="406" text-anchor="middle">CRM charge and refund</text>
+<path class="a" d="M900 340H970" marker-start="url(#ah)" marker-end="url(#ah)"/>
+<text class="l" x="935" y="332" text-anchor="middle">API</text>
+
+<!-- right column -->
+<rect class="n" x="970" y="150" width="190" height="220" rx="6"/>
+<text class="t" x="1065" y="174" text-anchor="middle">QuickBooks</text>
+<rect class="n in" x="982" y="186" width="166" height="50" rx="4"/>
+<text class="l" x="1065" y="207" text-anchor="middle" font-weight="650">Invoices and payments</text>
+<text class="s" x="1065" y="224" text-anchor="middle">Payments API approved Oct 15</text>
+<rect class="n in" x="982" y="246" width="166" height="50" rx="4"/>
+<text class="l" x="1065" y="267" text-anchor="middle" font-weight="650">Books</text>
+<text class="s" x="1065" y="284" text-anchor="middle">ledger, financial statements</text>
+<rect class="n in" x="982" y="306" width="166" height="50" rx="4"/>
+<text class="l" x="1065" y="327" text-anchor="middle" font-weight="650">Payroll</text>
+<text class="s" x="1065" y="344" text-anchor="middle">wages, taxes, pay stubs</text>
+
+<path class="a" d="M920 430H970" marker-end="url(#ah)"/>
+<text class="l" x="945" y="422" text-anchor="middle">PDFs</text>
+<rect class="n" x="970" y="400" width="120" height="62" rx="6"/>
+<text class="t" x="1030" y="424" text-anchor="middle">Google Drive</text>
+<text class="s" x="1030" y="441" text-anchor="middle">signed agreements</text>
+<text class="s" x="1030" y="455" text-anchor="middle">moving to company Drive</text>
+
+<!-- Claude -->
+<path class="a" d="M520 520V420" marker-start="url(#ah)" marker-end="url(#ah)" stroke-dasharray="7 3"/>
+<text class="l" x="532" y="466">writes clients, leads, contact log, billing status · reads the QuickBooks queue</text>
+<text class="s" x="532" y="482">today through Russel's signed-in Chrome, by hand</text>
+
+<rect class="hub" x="380" y="520" width="420" height="100" rx="8"/>
+<text class="t hubt" x="590" y="547" text-anchor="middle">Claude on Russel's account</text>
+<text class="l hubt" x="590" y="567" text-anchor="middle">Integration layer: carries data between the systems</text>
+<text class="l hubt" x="590" y="585" text-anchor="middle">Quo connector · QuickBooks connector · Chrome · GitHub</text>
+<text class="l hubt future" x="590" y="605" text-anchor="middle">At the Team plan: split into a company account and a personal account</text>
+
+<path class="a" d="M800 555H1128V370" marker-start="url(#ah)" marker-end="url(#ah)" stroke-dasharray="7 3"/>
+<text class="l" x="964" y="547" text-anchor="middle">customers, invoices, payments recorded</text>
+<text class="l" x="964" y="571" text-anchor="middle">who paid and when, back to the CRM</text>
+<text class="l future" x="964" y="589" text-anchor="middle">approved hours to Payroll (next)</text>
+
+<path class="a" d="M590 620V660" marker-end="url(#ah)"/>
+<text class="l" x="598" y="645">edits page code</text>
+<rect class="n" x="450" y="660" width="280" height="52" rx="6"/>
+<text class="t" x="590" y="682" text-anchor="middle">GitHub</text>
+<text class="s" x="590" y="699" text-anchor="middle">account mangbrothers · publishes the pages</text>
+
+<!-- future add-ons -->
+<g class="future">
+<text class="cap" x="20" y="752">FUTURE ADD-ONS</text>
+<rect class="n plan" x="20" y="764" width="216" height="84" rx="6"/>
+<text class="tag" x="32" y="782">NEXT</text>
+<text class="t" x="32" y="800">Portal front page</text>
+<text class="s" x="32" y="818">One address for staff. Sign in once,</text>
+<text class="s" x="32" y="833">land on the page your tier allows.</text>
+
+<rect class="n plan" x="251" y="764" width="216" height="84" rx="6"/>
+<text class="tag" x="263" y="782">NEXT</text>
+<text class="t" x="263" y="800">Password manager</text>
+<text class="s" x="263" y="818">A purchased tool with vaults by tier.</text>
+<text class="s" x="263" y="833">Linked from the portal, never in it.</text>
+
+<rect class="n" x="482" y="764" width="216" height="84" rx="6"/>
+<text class="tag" x="494" y="782">LIVE SINCE OCTOBER 9</text>
+<text class="t" x="494" y="800">Company email and Drive</text>
+<text class="s" x="494" y="818">admin@ on Google Workspace.</text>
+<text class="s" x="494" y="833">File move from the Mac still open.</text>
+
+<rect class="n part" x="713" y="764" width="216" height="84" rx="6"/>
+<text class="tag" x="725" y="782">SITE MOVED OCTOBER 13</text>
+<text class="t" x="725" y="800">Public site and client portal</text>
+<text class="s" x="725" y="818">mangbrothers.com on GitHub Pages.</text>
+<text class="s" x="725" y="833">Client view of services comes last.</text>
+
+<rect class="n plan" x="944" y="764" width="216" height="84" rx="6"/>
+<text class="tag" x="956" y="782">LATER</text>
+<text class="t" x="956" y="800">Claude organization account</text>
+<text class="s" x="956" y="818">Team plan. Company account split from</text>
+<text class="s" x="956" y="833">Russel's personal and school account.</text>
+</g>
+</svg>
+</div>
+<figcaption>The signing service is the first piece that runs on its own: it sends contract mail, retries failed sends every 5 minutes, refreshes the QuickBooks connection every day, charges cards at signing straight through the QuickBooks API (card mode on since October 15), and runs later charges and refunds when an admin taps them in the CRM. A card number goes from the customer's browser to Intuit only; the service receives a one-time token. Claude is still the only bridge for everything else between Quo, the CRM and QuickBooks. Dashed lines work only when someone asks Claude to do the transfer in a session. Statuses come from the project build notes and from live checks. The build log below records each change since October 7. Correct any that are wrong.</figcaption>
+</figure>
+
+<section>
+  <h2>Build log</h2>
+  <p class="lede">Every change to the company's digital infrastructure since this map was drawn, newest first. This section is updated as the work moves.</p>
+  <div class="tw"><table>
+    <thead><tr><th>Date</th><th>Change</th><th>State</th></tr></thead>
+    <tbody>
+    <tr><td><strong>Oct 17, late</strong></td><td><strong>Team Manager is its own page, live (95eb68c).</strong> <em>Crews</em> (crews.html) is routes and schedules: Day, Week, Routes, Schedules (everyone's shifts for two weeks, by crew), Log, Meetings, and See as. <em>Team Manager</em> (team.html, admins only) is Onboarding, Personnel, Crews (who is on each crew and who manages it), Paperwork (who is missing, expired or expiring what), Reports and Payroll. Crew managers and employees still use only the Crews page. Both pages are in every menu and on the portal.</td><td><span class="pill live">Live</span></td></tr>
+    <tr><td><strong>Oct 17, late</strong></td><td><strong>Front portal, live (e95db06).</strong> apps.mangbrothers.com is now one sign-in page in the logo's green, with mowing stripes. Sign in with Google and the team list decides where you land: admins on Projects, crew managers on their crew's route, crew members on their schedule, walkers on the door hanger routes. Someone not on the list, not active, or not yet on a crew is told why. Projects moved to projects.html. Any page opened while signed out sends you to the portal and back to that page. Admins can open the portal with <code>?pick</code> to choose a page.</td><td><span class="pill live">Live</span></td></tr>
+    <tr><td><strong>Oct 17, night</strong></td><td><strong>Team Manager, pushed live (64b4510); new rules and Code.gs to deploy.</strong> On the Crews page, office side. <em>Onboarding:</em> the hiring board, built like the CRM's Leads board: Applied, Phone screen, Interview, Offer, Hired, Backup, Not hired, Past. Cards drag by mouse, and by finger on the iPad and iPhone (hold, then drag). Applicants keep their own profile (details, hiring steps, Indeed profile, applicant file, files in Drive under Potential Hires) and get no employee record. Dragging to <em>Hired</em> asks first, then makes the Personnel profile and Team entry and carries the file, notes, Indeed profile and files over. Dragging to <em>Past</em> asks first (and shows any unpaid pay), then moves the profile, files, shifts, hours and pay log to the archive and takes away sign-in; Past to Hired brings it all back. <em>Personnel:</em> the employee list (was People), each with a personnel file: Indeed profile, calls, interviews, reference checks, notes, stage changes and reports, kept as one PDF in his Drive folder. <em>Reports:</em> every employee report by number. Crew managers can add an optional employee report in the crew log; the signing service numbers it (ER-date-number), saves a PDF to his Drive folder and adds it to his personnel file. New Indeed application emails in admin@ load onto Applied every 5 minutes. The Fall 2026 round (29 people, call and interview notes) loads on the first run. Also: drag on the CRM Leads board now works on iPad and iPhone; a Passwords tab on Projects for the admins' outside logins.</td><td><span class="pill part">Pushed, deploy rules and Code.gs</span></td></tr>
+    <tr><td><strong>Oct 17, evening</strong></td><td><strong>Pay from the 2026-27 pay overviews, live (cf465cc).</strong> Manager and crew rates by the job: snow by depth (ATV for managers at 2 inches and over), route bonuses lost on a second callback, $100 call-out minimum; fall by section and visit with clean-window bonuses; lights by package and section; takedown split across the crew; lawn per house. $18 an hour weekly floor and the overtime premium past 40. Winter card with the season bonus, the $3,750 guarantee and missed storms. No photo, no pay. No deploy needed.</td><td><span class="pill live">Live</span></td></tr>
+    <tr><td><strong>Oct 17</strong></td><td><strong>Crews page in three views, pushed live (rules and Code.gs still to deploy).</strong> <em>Office:</em> crews, routes, the day board, each crew's log, People (the staff database: contact and emergency info, start date, W-2 or 1099, pay share and rate overrides, files with what is missing or expiring, shifts, pay log) and Pay (one piece rate per service, default share, Michigan minimum wage $13.73, pay periods every two weeks, paid amounts). <em>Crew managers:</em> the full mirror of the door hanger Routes page (map, check-offs, crew log, day approval), plus their crew's phone, address and emergency contact and their shifts, and their own employee pages. <em>Employees:</em> the next month's schedule (shifts, storm call-outs, meetings), clock in and out, past hours, the pay log (piece pay at their share, minimum wage make-up, what payroll paid), their files with the company, and their own contact info. Files go to the company Drive, one folder per person: ordinary files are shared view-only with the employee; tax and ID forms stay in Drive and show only as on file. The crew-day billing from October 16 is unchanged. Tests: 110 page, 20 service, 142 rules, 139 CRM.</td><td><span class="pill part">Pushed, deploy rules and Code.gs</span></td></tr>
+    <tr><td><strong>Oct 16, night</strong></td><td><strong>Crews and Crew View built, not live.</strong> One page, crews.html, the way the door hanger Routes page serves walkers and the office. Crews see their own routes on the same street map as the walkers: numbered stops, red until done and green after, Directions, check off from the map or the list, photos, notes, and Skip with a reason. Snow routes are standing routes per crew and run when a storm is started (by an admin for every crew, or by a crew's manager for his own). Lights stops ask once: installed, or a service call with or without a ladder. Members clock in and out. Each crew's manager sees Crew log, fixes missing clock-outs and approves his own crew's day, which locks it and approves the hours. The signing service now bills approved crew days itself every 5 minutes, with the same rules as before, so the CRM's Service log tab approves per crew too and no longer bills in the page. Crews never read client records, prices or payment details. Team tab in Projects now points to the Crews page for crew and manager. Tests: 77 page, 15 billing, 114 rules, CRM 137 (two older failures on the signing-service message, unchanged). Waiting for: rules publish, Code.gs paste and New version, then the push.</td><td><span class="pill part">Ready to deploy</span></td></tr>
+    <tr><td><strong>Oct 16</strong></td><td><strong>Lawn: not built, on hold.</strong> What exists: the lawn billing design (per cut, first cut charged after it is done, then monthly on the 1st by scheduled cuts, credits for missed cuts, cancel anytime), a draft lawn agreement in the October 13 contract rework, and the lawn fields on each client in the CRM (day, frequency, price per cut, season). The service log records a lawn cut but charges nothing. Not built: lawn contract signing, lawn charges and gates, monthly billing, the crew side. Picked up after Crew View.</td><td><span class="pill">Open</span></td></tr>
+    <tr><td><strong>Oct 16</strong></td><td><strong>Refund? pop-up.</strong> A hidden menu on each service log entry (and Refund? in Charges to run) opens a form over the page: charge, amount, a reason from a list, and details. The Refund button stays grey until everything is filled; the X closes it and saves nothing. The signing service refunds the same card through QuickBooks Payments, cancels instead if it is the whole charge on the same day, and emails a receipt that states the reason and says refunds show within 5 to 10 business days. GoPayment, bank transfer and check payments are refunded in QuickBooks for now.</td><td><span class="pill live">Live</span></td></tr>
+    <tr><td><strong>Oct 16</strong></td><td><strong>Service log and approval-first billing.</strong> Every visit is logged by crew report or by hand. Nothing charges until a manager approves the day. Approved snow visits past 16 in a season charge at the contract's per-push rate; lights and landscaping completions release the second charge; service calls are $40, or $65 with a ladder. Approved charges run themselves on the next 5-minute pass to the card saved in QuickBooks Payments, with a receipt. Each client record shows the snow count, charges, refunds and prepaid service. Charge-affecting edits show one Save and charge button.</td><td><span class="pill live">Live</span></td></tr>
+    <tr><td><strong>Oct 16</strong></td><td>Claude has its own database sign-in with admin access (it cannot add sign-ins, remove Russel, or edit a signed contract). A scheduled task pushes the QuickBooks queue; the signing service now creates QuickBooks customers itself. Generic Add a charge, 50/50 landscaping with the second half gated like lights, and a Landscaping Services Agreement in the format of the other contracts (Wayne, Oakland and Washtenaw).</td><td><span class="pill live">Done</span></td></tr>
+    <tr><td><strong>Oct 15, evening</strong></td><td>Full review of the path from CRM to emailed link to signing to payment, with previews of every screen and email. Built: <strong>Charge card on file</strong> in the CRM's Charges to run (the signing service charges a saved card once, two taps, receipt emailed), so the lights install-day balance, snow overage and service calls no longer need QuickBooks by hand; <strong>Refund</strong> on every charge made through QuickBooks Payments (voids the same day, refunds after, customer emailed); a <strong>Needs attention</strong> list for charges that failed or were held, which used to disappear from view; a <strong>$1 test agreement</strong> ($1 at signing, $1 later, no service, TEST on every page, email, PDF and receipt, refused by the service unless every limit holds). Fixed: a customer whose reply was lost could pick a second way to pay while the card was being confirmed; the confirmation now says whether today's charge went through. Old Drive-file code removed from the CRM. Tests: 66 service, 24 signing page, 97 CRM. Page commit c1ba2b4 on the Mac, not pushed; Code.gs to paste first.</td><td><span class="pill part">Ready to deploy</span></td></tr>
+    <tr><td><strong>Oct 15</strong></td><td>Signing service connected to the real Mangiapane Brothers QuickBooks company (production). Live test passed: $1.00 charged on Russel's own card, voided at once, saved card removed. Test page removed after the test. Built the same day: if a customer's reply is lost after they submit a card, the signing page reads the real result back, so a charged customer never sees an error and is never invited to pay twice. Open: statement name shows as "MANGIAPANE BROTHER" (cut off), to fix with QuickBooks Payments support.</td><td><span class="pill part">Live tested</span></td></tr>
+    <tr><td><strong>Oct 15</strong></td><td>Card payments switched on for testing: the signing page now takes a card, charges what is due at signing on the spot, and keeps the card on file in QuickBooks Payments. If a reply is lost, the page reads the real result back. Testing on Russel and family until the attorney answers on the authorization to charge, the typed-name signature, and the emailed cancellation notice. Team brief now carries a six-step onboarding checklist, with 2-Step Verification required for the Team list.</td><td><span class="pill part">Live, testing</span></td></tr>
+    <tr><td><strong>Oct 15</strong></td><td>Intuit approved the MB Billing app (compliance questionnaire Completed, result Approved). Production keys unlocked.</td><td><span class="pill live">Done</span></td></tr>
+    <tr><td><strong>Oct 15</strong></td><td>Google reCAPTCHA v3 added to the card step, as Intuit requires. Live test passed: score 0.9, test card saved, $1.00 sandbox charge captured, a fake reCAPTCHA token refused. Privacy policy discloses reCAPTCHA. The test page was removed after the test.</td><td><span class="pill live">Done</span></td></tr>
+    <tr><td><strong>Oct 14</strong></td><td>QuickBooks connection built into the signing service: tokens encrypted at rest, daily refresh, reconnect alert email to admin@, charges, refunds and voids that cannot double-charge, a $3,000 per-charge cap, emailed receipts with the Intuit disclosure. Every sandbox check passed, including disconnect and reconnect.</td><td><span class="pill live">Done</span></td></tr>
+    <tr><td><strong>Oct 14</strong></td><td>Contract signing service moved to admin@mangbrothers.com as the Apps Script "MB Signing". It sends as admin@ through Google, with a 5-minute retry. Version 2 signing page: the card goes from the customer's browser straight to Intuit for a token, bank accounts go through an emailed QuickBooks page, and a customer whose browser cannot reach Intuit gets the emailed page instead. Locked after 3 declines per link.</td><td><span class="pill live">Done</span></td></tr>
+    <tr><td><strong>Oct 14</strong></td><td>HTTPS enforced on mangbrothers.com. Privacy and terms pages name Intuit Payments Inc. as the payment processor.</td><td><span class="pill live">Done</span></td></tr>
+    <tr><td><strong>Oct 13</strong></td><td>mangbrothers.com moved from the GoDaddy site builder to GitHub Pages. Clean rebuild of the site is in the repo <code>mangbrothers-site</code>. HTTPS finished October 14. Open: two service photos are still stock.</td><td><span class="pill part">Finishing</span></td></tr>
+    <tr><td><strong>Oct 13</strong></td><td>GitHub account renamed from legolord00 to <strong>mangbrothers</strong>, primary email admin@mangbrothers.com. Old legolord00.github.io links are dead. Everyone uses apps.mangbrothers.com.</td><td><span class="pill live">Done</span></td></tr>
+    <tr><td><strong>Oct 12</strong></td><td>Company Drive folder "Mangiapane Brothers" created on admin@. Business files shared from Russel's personal Drive copied in. Open: the business folder on Russel's Mac, waiting on Google Drive for desktop.</td><td><span class="pill part">Partly done</span></td></tr>
+    <tr><td><strong>Oct 9 to 10</strong></td><td>Claude's Gmail and Drive connectors switched to admin@. Four personal scheduled tasks paused. Decision: split into a company and a personal Claude account at the Team plan.</td><td><span class="pill live">Done</span></td></tr>
+    <tr><td><strong>Oct 8 to 9</strong></td><td>Company email moved from Microsoft 365 to Google Workspace, one shared user admin@mangbrothers.com. Old mail imported. SPF, DKIM and DMARC pass.</td><td><span class="pill live">Done</span></td></tr>
+    <tr><td><strong>Oct 8</strong></td><td>Internal system given its own address, apps.mangbrothers.com.</td><td><span class="pill live">Done</span></td></tr>
+    </tbody>
+  </table></div>
+  <p class="lede"><strong>Done October 15:</strong> QuickBooks production connected and live tested; Google Workspace billing set up with a backup card; legal context sent to the accountant for attorney review. <strong>Done October 16:</strong> service log with approval-first billing, one-tap Save and charge, Claude sign-in and scheduled QuickBooks push, landscaping agreement, Refund? pop-up live. <strong>Open:</strong> lawn (contract, charges, monthly billing, crew side) is on hold until after Crew View. <strong>Next, in order:</strong> publish the October 17 night rules and paste the October 17 night Code.gs (Team Manager is already pushed). Point Indeed's application emails at admin@. Set up crews, people and files. Then schedules (with Russel), agreements signed on the page and schedules. Finish the $1 test. Then, from before: paste the new Code.gs and deploy a New version, then push the CRM and signing page (c1ba2b4). Run the $1 test agreement on yourself, end to end, including the second $1 and a Refund. Attorney answers on the authorization to charge, the typed-name signature, and the emailed cancellation notice; card mode is already on, and contracts go to real customers only after those answers. Check that contract PDFs land in the company Drive folder. Copy the Mac business folder to the company Drive. Give Claude its own database sign-in and put the Quo and QuickBooks transfers on a schedule. Cancel the GoDaddy site builder, then Microsoft 365 after the old-mailbox pull and two clean weeks.</p>
+</section>
+
+<section>
+  <h2>Checked October 7</h2>
+  <div class="cols">
+    <div class="note found"><h3>Call summaries are not reaching email</h3><p>Quo account mail goes to admin@mangbrothers.com (on Outlook when checked, on Gmail since October 9). That inbox holds only Quo account and support mail. No call summary has arrived there or in Gmail in the last three weeks. The email copy has to be switched on in Quo before it can serve as a cross-check.</p></div>
+    <div class="note found"><h3>Transcripts do reach Claude</h3><p>The Quo connector returned full transcripts for calls on October 5 and 6. The Quo to CRM leg is ready to build. It is not running: nothing has been logged to the CRM from those calls automatically.</p></div>
+    <div class="note found"><h3>The 2400 number is not in Quo</h3><p>Quo holds one number, (947) 207-4963. Quo cancelled the port of 734-450-2400 on October 5 and sent an update on October 6 that is still unread. Any call that reaches 2400 without forwarding to Quo never enters this system.</p></div>
+  </div>
+</section>
+
+<section>
+  <h2>Which system owns what</h2>
+  <p class="lede">One owner per kind of data. Every other system holds a copy and never gets edited directly for that data.</p>
+  <div class="tw"><table>
+    <thead><tr><th>Data</th><th>System of record</th><th>Copies go to</th><th>Carried by</th><th>State</th></tr></thead>
+    <tbody>
+    <tr><td><strong>Client and lead profiles</strong></td><td>CRM</td><td>QuickBooks customer, Quo contact name</td><td>Claude</td><td><span class="pill part">By hand</span></td></tr>
+    <tr><td><strong>Calls, texts, transcripts</strong></td><td>Quo</td><td>CRM contact log (summary per contact)</td><td>Claude, Quo connector</td><td><span class="pill plan">Planned</span></td></tr>
+    <tr><td><strong>Services sold and prices</strong></td><td>CRM</td><td>QuickBooks invoice lines</td><td>Claude</td><td><span class="pill part">By hand</span></td></tr>
+    <tr><td><strong>Signed agreements</strong></td><td>CRM, locked record</td><td>PDF in Google Drive, PDF emailed to the client</td><td>The CRM page itself</td><td><span class="pill live">Live</span></td></tr>
+    <tr><td><strong>Invoices and money received</strong></td><td>QuickBooks</td><td>CRM billing status: billed, paid, past due, date</td><td>Card charges: the signing service, at signing and from the CRM. Everything else: Claude</td><td><span class="pill part">By hand</span></td></tr>
+    <tr><td><strong>Card and bank details</strong></td><td>QuickBooks only</td><td>Nowhere. The CRM keeps card brand, last 4 and expiration only</td><td>The customer's browser, straight to Intuit</td><td><span class="pill live">Live</span></td></tr>
+    <tr><td><strong>Books and financial statements</strong></td><td>QuickBooks</td><td>Accountant and CFO read them there</td><td>Nobody</td><td><span class="pill live">Live</span></td></tr>
+    <tr><td><strong>Admin tasks, projects, timelines</strong></td><td>Projects page</td><td>None</td><td>Nobody</td><td><span class="pill live">Live</span></td></tr>
+    <tr><td><strong>Door hanger routes and verification</strong></td><td>Routes page</td><td>None</td><td>Nobody</td><td><span class="pill live">Live</span></td></tr>
+    <tr><td><strong>Who can sign in and at what tier</strong></td><td>Team list in the internal system</td><td>None</td><td>Admins only</td><td><span class="pill live">Live</span></td></tr>
+    <tr class="future"><td><strong>Workforce profiles and files</strong></td><td>Crews page, People tab (files in the company Drive)</td><td>QuickBooks Payroll employee setup</td><td>Claude</td><td><span class="pill part">Built, pipeline planned</span></td></tr>
+    <tr class="future"><td><strong>Jobs verified and hours worked</strong></td><td>Internal system, from crew check-offs and clock times, approved by each crew's manager</td><td>QuickBooks Payroll, after approval</td><td>Claude</td><td><span class="pill part">Built, payroll push planned</span></td></tr>
+    <tr class="future"><td><strong>Wages, taxes, pay stubs</strong></td><td>QuickBooks Payroll</td><td>Pay status shown on each worker profile</td><td>Claude</td><td><span class="pill plan">Planned</span></td></tr>
+    <tr class="future"><td><strong>Worker documents and terms</strong></td><td>Company shared Drive</td><td>Link on the worker profile</td><td>Nobody</td><td><span class="pill plan">Planned</span></td></tr>
+    <tr class="future"><td><strong>Passwords, door codes, bank logins</strong></td><td>Password manager</td><td>Nowhere</td><td>Nobody</td><td><span class="pill plan">Planned</span></td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section>
+  <h2>Terms to use with the admin team</h2>
+  <div class="tw"><table>
+    <thead><tr><th>Say</th><th>Not</th><th>What it means here</th></tr></thead>
+    <tbody>
+    <tr><td><strong>Internal system</strong></td><td><span class="not">the backend</span></td><td>Everything staff sign in to: Projects, CRM, Routes, and later the crew pages.</td></tr>
+    <tr><td><strong>Frontend / backend</strong></td><td><span class="not">public side / staff side</span></td><td>Frontend is any page a person looks at, staff pages included. Backend is what nobody sees: the database, sign-in and access rules. The admin CRM page is frontend.</td></tr>
+    <tr><td><strong>Public site</strong></td><td><span class="not">front end</span></td><td>The marketing site customers find. Separate from the internal system.</td></tr>
+    <tr><td><strong>Web app, three pages</strong></td><td><span class="not">website</span></td><td>The internal system is an application with pages. "Website" means the public site.</td></tr>
+    <tr><td><strong>System of record</strong></td><td><span class="not">authoritative</span></td><td>The one system that owns a kind of data. When two systems disagree, it wins and the other is corrected.</td></tr>
+    <tr><td><strong>Database</strong> vs <strong>file storage</strong></td><td><span class="not">data storage</span></td><td>Firebase is the database: structured records the pages read and write. Drive is file storage: PDFs and documents. Drive cannot replace Firebase.</td></tr>
+    <tr><td><strong>Sign-in</strong> and <strong>access tier</strong></td><td><span class="not">authentication levels</span></td><td>Authentication proves who a person is. Authorization decides what that person may see. The tiers are admin, crew and walker.</td></tr>
+    <tr><td><strong>Admin view, crew view, walker view</strong></td><td><span class="not">our side, employee side</span></td><td>What each tier sees. An admin switching to see what a walker sees is using "view as".</td></tr>
+    <tr><td><strong>Portal</strong></td><td><span class="not">access point</span></td><td>The single sign-in page that sends each person to the pages their tier allows.</td></tr>
+    <tr><td><strong>VoIP</strong>, <strong>Quo</strong></td><td><span class="not">VIoP, QUO</span></td><td>Voice over Internet Protocol. Quo is the provider.</td></tr>
+    <tr><td><strong>Connector</strong></td><td><span class="not">native connector</span></td><td>A direct link that lets Claude read and write another system without a browser. Quo and QuickBooks have one. The CRM does not.</td></tr>
+    <tr><td><strong>Integration layer</strong></td><td><span class="not">middle point</span></td><td>Whatever carries data between systems. Today that is Claude on Russel's account.</td></tr>
+    <tr><td><strong>Sync</strong>, one-way or two-way</td><td><span class="not">pushed, linked</span></td><td>A copy of data moving from the system of record to another system. Always say which direction.</td></tr>
+    <tr><td><strong>Queue</strong></td><td><span class="not">list of stuff to send</span></td><td>Changes waiting to be carried to another system. Each one gets a receipt when done, so nothing is sent twice or lost.</td></tr>
+    <tr><td><strong>Reconciliation</strong></td><td><span class="not">double-checking</span></td><td>Comparing two systems on a schedule and listing every mismatch.</td></tr>
+    <tr><td><strong>Lead, client, former client</strong></td><td><span class="not">customer data</span></td><td>One record that moves through stages. The lead stages together are the pipeline.</td></tr>
+    <tr><td><strong>Contact log</strong></td><td><span class="not">communication log</span></td><td>The dated history of calls, texts and notes on one client record.</td></tr>
+    <tr><td><strong>Billing status</strong></td><td><span class="not">payment information</span></td><td>Billed, paid or past due, with a date. Lives in the CRM. "Payment details" means card and bank numbers and lives only in QuickBooks.</td></tr>
+    <tr><td><strong>Card token</strong></td><td><span class="not">card info</span></td><td>A one-time stand-in for a card number that Intuit gives the customer's browser. The signing service only ever holds the token, never the number.</td></tr>
+    <tr><td><strong>Sandbox</strong> vs <strong>production</strong></td><td><span class="not">test mode, real mode</span></td><td>Sandbox is Intuit's practice company with fake money. Production is the real Mangiapane Brothers company. The <code>QB_ENV</code> setting decides which one the signing service talks to.</td></tr>
+    <tr><td><strong>Accounts receivable</strong></td><td><span class="not">who owes us</span></td><td>Money invoiced and not yet collected. QuickBooks reports it.</td></tr>
+    <tr><td><strong>Time records</strong> vs <strong>payroll</strong></td><td><span class="not">payroll for both</span></td><td>Time records are hours and verified jobs. Payroll is wages, tax withholding and pay stubs. The internal system owns the first. QuickBooks owns the second.</td></tr>
+    <tr><td><strong>Pay status</strong></td><td><span class="not">billing status (for workers)</span></td><td>Whether a worker has been paid for a period. Billing is for clients.</td></tr>
+    <tr><td><strong>Roster</strong> and <strong>workforce pipeline</strong></td><td><span class="not">employee leads page</span></td><td>Stages: applicant, onboarding, active, backup, former.</td></tr>
+    <tr><td><strong>Employee (W-2)</strong> vs <strong>contractor (1099)</strong></td><td><span class="not">employee for everyone</span></td><td>A legal classification that changes taxes and paperwork. Use "worker" when the group includes both.</td></tr>
+    <tr><td><strong>Password manager</strong>, <strong>vault</strong></td><td><span class="not">password page</span></td><td>A dedicated tool that encrypts credentials and shares each vault with a chosen group.</td></tr>
+    <tr><td><strong>Claude organization account</strong></td><td><span class="not">enterprise account</span></td><td>One company account that holds every seat. "Enterprise" is the name of one plan, not the idea.</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section>
+  <h2>Weak points in the plan, with a recommendation for each</h2>
+  <div class="cols">
+    <div class="note"><h3>Payroll authority is assigned to the wrong system</h3><p>The site cannot be the system of record for payroll. It does not calculate withholding, file taxes or issue pay stubs.</p><p class="rec">Make the site the system of record for time records. QuickBooks Payroll stays the system of record for pay. An admin approves hours before they leave the site.</p></div>
+    <div class="note"><h3>Claude is a single point of failure</h3><p>Every transfer depends on one personal account, one Mac and a Chrome window that must be open. Nothing runs unless someone asks. A missed session means a missed client record.</p><p class="rec">Give Claude its own limited sign-in to the database, which the access rules already allow for. Run the Quo and QuickBooks transfers as scheduled tasks. Keep a queue with receipts and a daily reconciliation count.</p></div>
+    <div class="note"><h3>Money received has two entry points</h3><p>An admin records a payment in the CRM at signing. QuickBooks records the same payment when the card clears or the deposit lands. The two will drift.</p><p class="rec">QuickBooks owns money received. The CRM entry at signing is a claim. Claude confirms it against QuickBooks and flags every mismatch.</p><p>Update October 15: once card mode is on, the card charge at signing is recorded in QuickBooks by the signing service itself, which closes this gap for card payments. Checks and bank payments still need the cross-check.</p></div>
+    <div class="note"><h3>A password page on the site is a liability</h3><p>A home-built page in Firebase has no encryption at rest that you control, no audit trail and no safe way to rotate access. One rules mistake exposes bank logins.</p><p class="rec">Buy a password manager with shared vaults by tier. Link to it from the portal. Client door codes that crews need belong on the job record, not in the vault.</p></div>
+    <div class="note"><h3>Drive cannot replace Firebase</h3><p>Drive stores files. The pages need a database. Moving "all data" to Drive would break every page.</p><p class="rec">Keep Firebase as the database. Move only documents to a company shared Drive: signed agreements, worker paperwork, templates.</p></div>
+    <div class="note"><h3>The domain email decision is made</h3><p>Resolved October 9. admin@mangbrothers.com moved from Microsoft 365 to Google Workspace as one shared user. The signing service moved to admin@ on October 14 and now sends through Google. Microsoft 365 is still paid for.</p><p class="rec">Cancel Microsoft 365 after the old-mailbox pull and two clean weeks of signing mail from admin@.</p></div>
+    <div class="note"><h3>Card payments now depend on one QuickBooks connection</h3><p>If the connection to QuickBooks lapses or is revoked, card charges at signing stop. The signing service refreshes it daily and emails admin@ at most every 12 hours when it needs a reconnect, but someone has to act on that email.</p><p class="rec">Keep admin@ a QuickBooks company admin. Treat a reconnect email as same-day work. Card charges that fail are held for a person, never retried blind.</p></div>
+    <div class="note"><h3>admin@ carries the whole money path</h3><p>The signing service, contract mail, the QuickBooks connection and the reCAPTCHA keys all live under admin@mangbrothers.com. The Google Workspace trial ends October 21.</p><p class="rec">Set up Workspace billing before October 21. Keep 2-step verification on every account that can sign in to admin@ or the CRM.</p></div>
+    <div class="note"><h3>The public site should not be the door</h3><p>Staff login links on a marketing site invite attack and clutter the page customers see.</p><p class="rec">Put the portal on its own address, such as portal.mangbrothers.com, with no link from the public site. Build the client portal last. QuickBooks invoices already carry a pay link.</p></div>
+    <div class="note"><h3>Decided October 9: how Claude connects, now and later</h3><p><strong>Now.</strong> The Google connection on Russel's Claude account points at admin@mangbrothers.com. The business is primary on this account. Personal and school tasks are secondary and get revised separately. No personal or school mail is forwarded into admin@, because that login is shared by the admin team.</p><p><strong>At the move to a Team plan.</strong> Split into two Claude accounts: a company account connected to admin@ Google, Quo and QuickBooks, and a personal account connected to Russel's own Gmail for school and personal tasks.</p><p><strong>Laptop out of the loop.</strong> Claude gets its own limited sign-in to the database so scheduled tasks run with the Mac closed. Updates arrive hourly at best.</p><p><strong>Long-term option, not planned.</strong> For real-time updates: Quo notifies a small hosted program when a call ends, that program calls Claude through the API and writes to the CRM. It needs paid hosting and upkeep, so it waits until hourly is too slow.</p></div>
+    <div class="note"><h3>Scope for the next month is still too wide</h3><p>The workforce side is a second product: routes, maps, verification, profiles, documents and pay status. Starting it before the client loop runs unattended splits attention during the busiest sales window.</p><p class="rec">Next month is the client loop only: Quo to CRM, CRM to QuickBooks, payment status back. Start the workforce pages after that loop has run on a schedule for two clean weeks.</p></div>
+  </div>
+</section>
+</div>
+
+<script>
+(function(){
+  var root=document.getElementById('root'),map=document.getElementById('map'),
+      bc=document.getElementById('b-central'),bf=document.getElementById('b-future');
+  function set(future){
+    root.classList.toggle('central',!future);
+    map.setAttribute('viewBox',future?'0 0 1180 866':'0 0 1180 730');
+    bc.setAttribute('aria-pressed',String(!future));
+    bf.setAttribute('aria-pressed',String(future));
+  }
+  bc.addEventListener('click',function(){set(false)});
+  bf.addEventListener('click',function(){set(true)});
+  if(location.hash==='#future')set(true);
+})();
+</script>
+
+</body></html>

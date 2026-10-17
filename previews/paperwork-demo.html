@@ -1,0 +1,565 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="referrer" content="no-referrer">
+<title>Paperwork preview</title>
+<!--
+  Employee page for new-hire paperwork (October 17, 2026). One private link per person, emailed by the office and
+  repeated on his Training tab: paperwork.html?t={token}&s={signing service}. He fills in each form here; the page
+  fills the official PDF (IRS W-4 and W-9, Michigan MI-W4, USCIS I-9, the company's agreement and a direct deposit form),
+  adds his drawn signature, and for every form except the agreement seals the finished PDF with the office's public key
+  before it leaves his phone. Nothing he types is kept in this browser. Only the owner, with the paperwork password,
+  can open the sealed forms.
+-->
+<style>
+  :root{color-scheme:light dark;
+    --bg:#f3f5f2;--card:#ffffff;--line:#d5dbd3;--ink:#16233a;--ink2:#4a5a62;--muted:#768276;
+    --brand:#1f6b33;--brand-ink:#ffffff;--brand-soft:#e3f0e5;--red:#a63b3b;--amber:#7a4f0e;--amber-soft:#fbf1dc;--amber-line:#d9a441}
+  @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+    --bg:#101612;--card:#18211b;--line:#2d3a30;--ink:#e8efe9;--ink2:#b4c2b6;--muted:#82907f;
+    --brand:#5fbf78;--brand-ink:#0f1511;--brand-soft:#173322;--red:#e07a7a;--amber:#f0c674;--amber-soft:#3a2d14;--amber-line:#8a6a2a}}
+  :root[data-theme="dark"]{
+    --bg:#101612;--card:#18211b;--line:#2d3a30;--ink:#e8efe9;--ink2:#b4c2b6;--muted:#82907f;
+    --brand:#5fbf78;--brand-ink:#0f1511;--brand-soft:#173322;--red:#e07a7a;--amber:#f0c674;--amber-soft:#3a2d14;--amber-line:#8a6a2a}
+  *{box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%}
+  body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;overflow-x:hidden}
+  a{color:var(--brand)}
+  header{background:var(--card);border-bottom:1px solid var(--line);padding:12px 16px}
+  header .in{max-width:720px;margin:0 auto;display:flex;align-items:center;gap:12px}
+  header img{height:42px;width:auto;background:#fff;border-radius:4px}
+  header .tag{margin-left:auto;text-align:right;color:var(--ink2);font-size:13px;line-height:1.3}
+  main{max-width:720px;margin:0 auto;padding:16px 16px 60px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px;margin:0 0 14px}
+  h1{font-size:22px;margin:0 0 6px} h2{font-size:19px;margin:0 0 6px} h3{font-size:16px;margin:16px 0 6px}
+  .meta{color:var(--ink2);font-size:14px;margin:0}
+  .formrow{display:flex;align-items:center;gap:12px;padding:12px 0;border-top:1px solid var(--line)}
+  .formrow:first-of-type{border-top:0}
+  .formrow .t{flex:1;min-width:0} .formrow .t b{display:block} .formrow .t span{font-size:13px;color:var(--ink2)}
+  .pill{font-size:13px;border-radius:999px;padding:3px 10px;border:1px solid var(--line);white-space:nowrap}
+  .pill.ok{background:var(--brand-soft);color:var(--brand);border-color:var(--brand);font-weight:700}
+  .pill.todo{background:var(--amber-soft);color:var(--amber);border-color:var(--amber-line)}
+  .f{margin:0 0 12px} .f>label,.lab{display:block;font-size:14px;color:var(--ink2);margin:0 0 4px}
+  .f input,.f select{width:100%;font-size:16px;padding:11px 12px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink);min-height:46px}
+  .f input[aria-invalid="true"]{border-color:var(--red)}
+  .help{font-size:13px;color:var(--ink2);margin:4px 0 0}
+  .g2{display:grid;grid-template-columns:1fr 1fr;gap:10px} .g3{display:grid;grid-template-columns:2fr 1fr 1fr;gap:10px}
+  .g4{display:grid;grid-template-columns:1fr 64px;gap:10px}
+  .ck{display:flex;gap:12px;align-items:flex-start;margin:8px 0 12px;font-size:15px;cursor:pointer}
+  .ck input{width:24px;height:24px;flex:none;margin:1px 0 0;accent-color:var(--brand)}
+  .radio{display:flex;flex-direction:column;gap:2px;margin:0 0 12px}
+  button,.btn{font:inherit;font-size:16px;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--ink);padding:9px 14px;min-height:44px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;text-decoration:none;gap:6px}
+  .primary{background:var(--brand);color:var(--brand-ink);border-color:var(--brand);font-weight:700;font-size:17px;padding:12px 20px}
+  .wide{width:100%} button:disabled{opacity:.55;cursor:default}
+  .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  .err{color:var(--red);font-weight:600;margin:10px 0 0}
+  .banner{background:var(--amber-soft);color:var(--amber);border:1px solid var(--amber-line);border-radius:10px;padding:12px 14px;margin:0 0 12px;font-size:15px}
+  .lock{background:var(--brand-soft);border:1px solid var(--brand);border-radius:10px;padding:10px 14px;font-size:14px;margin:0 0 14px}
+  .sigwrap{border:1px solid var(--line);border-bottom:2px solid var(--ink);border-radius:8px 8px 0 0;background:#fff;position:relative;touch-action:none}
+  .sigwrap canvas{display:block;width:100%;height:150px;touch-action:none}
+  .sigwrap .x{position:absolute;left:12px;bottom:10px;color:#9aa39a;font-size:20px;pointer-events:none}
+  .center{text-align:center;padding:40px 16px;color:var(--ink2)}
+  .back{background:none;border:0;color:var(--brand);font-weight:600;padding:0;min-height:36px}
+  .done{border-color:var(--brand);background:var(--brand-soft)}
+  .tick{display:inline-flex;width:34px;height:34px;border-radius:50%;background:var(--brand);color:var(--brand-ink);align-items:center;justify-content:center;font-weight:700;margin-right:8px;vertical-align:-6px}
+  .hide{display:none!important}
+  .sec{border-top:1px solid var(--line);margin-top:14px;padding-top:4px}
+  @media(max-width:520px){header .tag{display:none}.g3{grid-template-columns:1fr 1fr}.g3>:first-child{grid-column:1/-1}}
+</style>
+</head>
+<body>
+<header><div class="in"><img src="mb-logo.png" alt="Mangiapane Brothers Lawn &amp; Snow"><div class="tag">Reliable Service. Uncompromising Standards.</div></div></header>
+<main id="main"><div class="center">Loading your paperwork…</div></main>
+<script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+<script>
+// ===== Employee paperwork: shared by the employee signing page (paperwork.html) and Team Manager (team.html) =====
+// October 17, 2026. The forms are the official blank PDFs (IRS W-4 2026 and W-9, Michigan MI-W4, USCIS I-9 edition
+// 01/20/25) kept in /forms, and the company's own agreements served by the signing service. The employee types his
+// answers on our page; this file fills the official form with them, flattens it, adds his drawn signature, then seals
+// the finished PDF and his answers for the office's public key before anything leaves his phone. Only someone with the
+// paperwork password can open them: the password unlocks the office's private key in the browser. The database and
+// Drive only ever hold sealed copies.
+const PAPER = (() => {
+  const FORMS = {
+    agreement: { title:"Employment or contractor agreement", short:"Agreement", gov:false },
+    w4:        { title:"Form W-4, federal tax withholding", short:"W-4", file:"forms/fw4.pdf", gov:true },
+    miw4:      { title:"Form MI-W4, Michigan tax withholding", short:"MI-W4", file:"forms/mi-w4.pdf", gov:true },
+    i9:        { title:"Form I-9, employment eligibility", short:"I-9", file:"forms/i-9.pdf", gov:true },
+    w9:        { title:"Form W-9, taxpayer ID for contractors", short:"W-9", file:"forms/fw9.pdf", gov:true },
+    deposit:   { title:"Direct deposit authorization", short:"Direct deposit", gov:false, optional:true }
+  };
+  const POSITIONS = { manager:"Crew manager", member:"Crew member", walker:"Door hanger distributor", walkerpt:"Door hanger (part-time)", office:"Office" };
+  // Legal status that goes with each position by default (the office can change it per person).
+  const STATUS_FOR = { manager:"w2", member:"w2", walker:"1099", walkerpt:"1099", office:"w2" };
+  // Which agreement each position signs (the signing service holds the Drive copy of each).
+  const AGREEMENT_FOR = { manager:"manager", member:"member", walker:"walker", walkerpt:"walkerpt" };
+  // The packet for a position and legal status. Direct deposit is optional (a check is paid otherwise).
+  function packet(position, type){
+    const f = [];
+    if(AGREEMENT_FOR[position]) f.push("agreement");
+    if(type === "1099") f.push("w9"); else f.push("w4","miw4","i9");
+    f.push("deposit");
+    return f;
+  }
+  const COMPANY = { name:"Mangiapane Brothers Lawn and Snow LLC", short:"Mangiapane Brothers", address:"3540 Thorn Tree Ct.", city:"Ann Arbor", state:"MI", zip:"48105",
+    phone:"734-450-2400", rep:"Russel Mangiapane III", repTitle:"Owner" };
+
+  // ---------- encoding ----------
+  const b64 = buf => { const u = buf instanceof Uint8Array ? buf : new Uint8Array(buf); let s=""; for(let i=0;i<u.length;i+=0x8000) s+=String.fromCharCode.apply(null, u.subarray(i,i+0x8000)); return btoa(s); };
+  const unb64 = s => { const bin=atob(s); const u=new Uint8Array(bin.length); for(let i=0;i<bin.length;i++) u[i]=bin.charCodeAt(i); return u; };
+  const subtle = () => crypto.subtle;
+  const ITER = 600000;
+
+  // ---------- the vault ----------
+  async function pwKey(pw, salt, iter){ const base=await subtle().importKey("raw", new TextEncoder().encode(pw), "PBKDF2", false, ["deriveKey"]);
+    return subtle().deriveKey({ name:"PBKDF2", salt, iterations:iter, hash:"SHA-256" }, base, { name:"AES-GCM", length:256 }, false, ["encrypt","decrypt"]); }
+  async function seal(key, bytes){ const iv=crypto.getRandomValues(new Uint8Array(12)); return { iv:b64(iv), ct:b64(await subtle().encrypt({ name:"AES-GCM", iv }, key, bytes)) }; }
+  async function unseal(key, o){ return new Uint8Array(await subtle().decrypt({ name:"AES-GCM", iv:unb64(o.iv) }, key, unb64(o.ct))); }
+  const normCode = c => String(c||"").replace(/[^A-Za-z0-9]/g,"").toUpperCase();
+  function recoveryCode(){ const A="ABCDEFGHJKLMNPQRSTUVWXYZ23456789", r=crypto.getRandomValues(new Uint8Array(24)); let s="";
+    r.forEach((x,i)=>{ s+=A[x%32]; if(i%4===3 && i<23) s+="-"; }); return s; }
+  // A new vault: a key pair, the private half locked by the password and, separately, by a one-time recovery code.
+  async function create(password){
+    const kp=await subtle().generateKey({ name:"RSA-OAEP", modulusLength:3072, publicExponent:new Uint8Array([1,0,1]), hash:"SHA-256" }, true, ["encrypt","decrypt"]);
+    const pub=b64(await subtle().exportKey("spki", kp.publicKey)), priv=new Uint8Array(await subtle().exportKey("pkcs8", kp.privateKey));
+    const salt=crypto.getRandomValues(new Uint8Array(16)), rsalt=crypto.getRandomValues(new Uint8Array(16)), code=recoveryCode();
+    const a=await seal(await pwKey(password, salt, ITER), priv), r=await seal(await pwKey(normCode(code), rsalt, ITER), priv);
+    priv.fill(0);
+    return { pub, key:{ v:1, iter:ITER, salt:b64(salt), iv:a.iv, priv:a.ct, rsalt:b64(rsalt), riv:r.iv, rpriv:r.ct }, code };
+  }
+  // Unlock with the password (or the recovery code). A wrong one fails the AES-GCM check and throws.
+  async function unlock(key, secret, recovery){
+    const k = recovery ? await pwKey(normCode(secret), unb64(key.rsalt), key.iter) : await pwKey(secret, unb64(key.salt), key.iter);
+    let priv; try { priv = await unseal(k, recovery ? { iv:key.riv, ct:key.rpriv } : { iv:key.iv, ct:key.priv }); }
+    catch(e){ throw new Error(recovery ? "That recovery code is not right." : "That password is not right."); }
+    const privateKey = await subtle().importKey("pkcs8", priv, { name:"RSA-OAEP", hash:"SHA-256" }, false, ["decrypt"]);
+    return { privateKey, priv };
+  }
+  // A new password for the same key pair (after unlocking with the old password or the recovery code).
+  async function rewrap(key, priv, newPassword){ const salt=crypto.getRandomValues(new Uint8Array(16)); const a=await seal(await pwKey(newPassword, salt, key.iter), priv);
+    return Object.assign({}, key, { salt:b64(salt), iv:a.iv, priv:a.ct }); }
+  // Seal answers and a file for the office: a fresh AES key per item, itself sealed with the office's public key.
+  async function sealFor(pubB64, fields, fileBytes){
+    const pub=await subtle().importKey("spki", unb64(pubB64), { name:"RSA-OAEP", hash:"SHA-256" }, false, ["encrypt"]);
+    const dk=await subtle().generateKey({ name:"AES-GCM", length:256 }, true, ["encrypt"]), raw=await subtle().exportKey("raw", dk);
+    const j=new TextEncoder().encode(JSON.stringify(fields||{})), f=fileBytes||new Uint8Array(0), buf=new Uint8Array(4+j.length+f.length);
+    new DataView(buf.buffer).setUint32(0, j.length); buf.set(j,4); buf.set(f,4+j.length);
+    const s=await seal(dk, buf);
+    return { v:1, alg:"RSA-OAEP-3072/AES-GCM-256", k:b64(await subtle().encrypt({ name:"RSA-OAEP" }, pub, raw)), iv:s.iv, ct:s.ct };
+  }
+  async function openFor(privateKey, env){
+    const raw=await subtle().decrypt({ name:"RSA-OAEP" }, privateKey, unb64(env.k));
+    const dk=await subtle().importKey("raw", raw, "AES-GCM", false, ["decrypt"]);
+    const buf=await unseal(dk, env), n=new DataView(buf.buffer, buf.byteOffset).getUint32(0);
+    return { fields:JSON.parse(new TextDecoder().decode(buf.subarray(4,4+n))), file:buf.slice(4+n) };
+  }
+
+  // ---------- checks ----------
+  const digits = s => String(s||"").replace(/\D/g,"");
+  const fmtSSN = s => { const d=digits(s); return d.length===9 ? `${d.slice(0,3)}-${d.slice(3,5)}-${d.slice(5)}` : d; };
+  const validSSN = s => { const d=digits(s); return d.length===9 && !/^(000|666|9)/.test(d) && d.slice(3,5)!=="00" && d.slice(5)!=="0000"; };
+  const validRouting = s => { const d=digits(s); if(d.length!==9) return false; const w=[3,7,1,3,7,1,3,7,1]; return d.split("").reduce((n,c,i)=>n+(+c)*w[i],0)%10===0; };
+  const mdY = iso => { if(!iso) return ""; const [y,m,d]=String(iso).split("-"); return y&&m&&d ? `${m}/${d}/${y}` : String(iso); };
+  const mdYdigits = iso => mdY(iso).replace(/\//g,"");
+  const nowStamp = ms => new Date(ms||Date.now()).toLocaleString("en-US",{ timeZone:"America/Detroit", month:"short", day:"numeric", year:"numeric", hour:"numeric", minute:"2-digit" })+" ET";
+  const todayIso = () => new Intl.DateTimeFormat("en-CA",{ timeZone:"America/Detroit", year:"numeric", month:"2-digit", day:"2-digit" }).format(new Date());
+  const money0 = v => { const n=Math.round(+v||0); return n ? n.toLocaleString("en-US") : ""; };
+
+  // ---------- PDF helpers (pdf-lib) ----------
+  const L = () => (typeof window!=="undefined" && window.PDFLib) || globalThis.PDFLib;
+  async function loadForm(bytes){ const { PDFDocument, PDFName } = L();
+    const doc = await PDFDocument.load(bytes, { ignoreEncryption:true });
+    const af = doc.catalog.lookup(PDFName.of("AcroForm")); if(af && af.has && af.has(PDFName.of("XFA"))) af.delete(PDFName.of("XFA"));
+    return doc; }
+  function fieldBox(doc, name){ const f=doc.getForm().getField(name), w=f.acroField.getWidgets()[0], r=w.getRectangle();
+    const pref=w.P(); let page=doc.getPages().findIndex(p=>p.ref===pref); if(page<0) page=0; return { page, x:r.x, y:r.y, w:r.width, h:r.height }; }
+  const setT = (form, name, v) => { if(v==null || v==="") return; const f=form.getTextField(name); try{ f.setMaxLength(undefined); }catch(e){} f.setText(String(v)); };
+  const check = (form, name, on) => { if(on) form.getCheckBox(name).check(); };
+  async function drawSig(doc, dataUrl, box){ if(!dataUrl) return; const png=await doc.embedPng(dataUrl); const page=doc.getPages()[box.page];
+    let h=Math.min(box.h+4, 26), w=png.width*(h/png.height); if(w>box.w-4){ w=box.w-4; h=w*(png.height/png.width); }
+    page.drawImage(png, { x:box.x+2, y:box.y+1, width:w, height:h }); }
+  async function drawText(doc, page, x, y, text, size){ const font=await doc.embedFont(L().StandardFonts.Helvetica); doc.getPages()[page].drawText(String(text), { x, y, size:size||9, font, color:L().rgb(0,0,0) }); }
+  async function audit(doc, page, a){ const font=await doc.embedFont(L().StandardFonts.Helvetica), p=doc.getPages()[page];
+    const t=`Signed electronically by ${a.name} on ${nowStamp(a.at)} through a private ${COMPANY.short} paperwork link sent to ${a.email||"the employee"}. Document ${a.id||""}`;
+    p.drawText(t.slice(0,190), { x:24, y:8, size:6.2, font, color:L().rgb(0.25,0.25,0.25) }); }
+  async function finish(doc){ try { doc.getForm().flatten(); } catch(e){} return await doc.save(); }
+
+  // ---------- the forms ----------
+  // f: the employee's answers; a: { name, email, at, id } for the signature line and audit footer.
+  async function buildW4(bytes, f, a){
+    const doc=await loadForm(bytes), form=doc.getForm(), P="topmostSubform[0].Page1[0].";
+    setT(form, P+"Step1a[0].f1_01[0]", [f.first, f.mi].filter(Boolean).join(" ")); setT(form, P+"Step1a[0].f1_02[0]", f.last);
+    setT(form, P+"Step1a[0].f1_03[0]", [f.street, f.apt].filter(Boolean).join(" ")); setT(form, P+"Step1a[0].f1_04[0]", `${f.city}, ${f.state} ${f.zip}`);
+    setT(form, P+"f1_05[0]", fmtSSN(f.ssn));
+    check(form, P+"c1_1[0]", f.filing==="single"); check(form, P+"c1_1[1]", f.filing==="mfj"); check(form, P+"c1_1[2]", f.filing==="hoh");
+    check(form, P+"c1_2[0]", !!f.twoJobs);
+    const kids=(+f.kids||0)*2200, others=(+f.otherDeps||0)*500, credits=+f.otherCredits||0;
+    if(kids) setT(form, P+"Step3_ReadOrder[0].f1_06[0]", money0(kids)); if(others) setT(form, P+"Step3_ReadOrder[0].f1_07[0]", money0(others));
+    if(kids+others+credits) setT(form, P+"f1_08[0]", money0(kids+others+credits));
+    setT(form, P+"f1_09[0]", money0(f.otherIncome)); setT(form, P+"f1_10[0]", money0(f.deductions)); setT(form, P+"f1_11[0]", f.extra ? (+f.extra).toFixed(2) : "");
+    check(form, P+"c1_3[0]", !!f.exempt);
+    setT(form, P+"f1_12[0]", `${COMPANY.name}\n${COMPANY.address}, ${COMPANY.city}, ${COMPANY.state} ${COMPANY.zip}`);
+    if(f.startDate) setT(form, P+"f1_13[0]", mdY(f.startDate));
+    const out=await finish(doc), d2=await L().PDFDocument.load(out);
+    await drawSig(d2, f.sig, { page:0, x:102, y:91, w:250, h:14 }); await drawText(d2, 0, 464, 94, mdY(a.date||todayIso()), 10); await audit(d2, 0, a);
+    return await d2.save();
+  }
+  async function buildMIW4(bytes, f, a){
+    const doc=await loadForm(bytes), form=doc.getForm();
+    try{ form.removeField(form.getField("Reset")); }catch(e){}
+    setT(form, "1 Full Social Security Number", fmtSSN(f.ssn)); setT(form, "2 Date of Birth", mdY(f.dob));
+    setT(form, "3 Name First Middle Initial Last", [f.first, f.mi, f.last].filter(Boolean).join(" ")); setT(form, "4 Drivers License Number or State ID", f.dl);
+    setT(form, "Home Address No Street PO Box or Rural Route", [f.street, f.apt].filter(Boolean).join(" ")); setT(form, "City or Town", f.city); setT(form, "State", f.state); setT(form, "ZIP Code", f.zip);
+    try { const r=form.getRadioGroup("5 Are you a new employee"); r.select(f.newEmployee===false?"No":"Yes"); } catch(e){}
+    if(f.newEmployee!==false && f.startDate) setT(form, "mmddyyyy", mdY(f.startDate));
+    setT(form, "Enter the number of personal and dependent exemptions", f.exempt8 ? "" : String(f.exemptions ?? ""));
+    if(+f.miExtra) setT(form, "Additional amount you want deducted from each pay", (+f.miExtra).toFixed(2));
+    check(form, "A Michigan income tax liability is not expected this year", f.exempt8==="a");
+    check(form, "b Wages are exempt from withholding", f.exempt8==="b"); if(f.exempt8==="b") setT(form, "Explain Wages are exempt from withholding", f.exemptWhy);
+    check(form, "C  Permanent home domicile is located in the following Renaissance Zone", f.exempt8==="c"); if(f.exempt8==="c") setT(form, "Permanent home domicile is located in the following Renaissance Zone", f.zone);
+    setT(form, "Date", mdY(a.date||todayIso()));
+    setT(form, "10 Employers Name", COMPANY.name); setT(form, "Address", COMPANY.address); setT(form, "City", COMPANY.city); setT(form, "State_2", COMPANY.state); setT(form, "ZIP Code_2", COMPANY.zip);
+    setT(form, "Name of Contact Person", COMPANY.rep); setT(form, "Contact Phone Number", COMPANY.phone);
+    const out=await finish(doc), d2=await L().PDFDocument.load(out);
+    await drawSig(d2, f.sig, { page:0, x:44, y:334, w:400, h:22 }); await audit(d2, 0, a);
+    return await d2.save();
+  }
+  const I9 = { s1:["Last Name (Family Name)","First Name Given Name","Employee Middle Initial (if any)","Employee Other Last Names Used (if any)"] };
+  // The I-9: Section 1 from the employee; Section 2 (s2) added later by the office after seeing his documents in person.
+  async function buildI9(bytes, f, a, s2){
+    const doc=await loadForm(bytes), form=doc.getForm();
+    setT(form, "Last Name (Family Name)", f.last); setT(form, "First Name Given Name", f.first); setT(form, "Employee Middle Initial (if any)", (f.mi||"").slice(0,1));
+    setT(form, "Employee Other Last Names Used (if any)", f.otherLast || "N/A");
+    setT(form, "Address Street Number and Name", f.street); setT(form, "Apt Number (if any)", f.apt || "N/A"); setT(form, "City or Town", f.city);
+    try { form.getDropdown("State").select(f.state); } catch(e){ }
+    setT(form, "ZIP Code", digits(f.zip).slice(0,5)); setT(form, "Date of Birth mmddyyyy", mdY(f.dob));
+    setT(form, "US Social Security Number", digits(f.ssn)); setT(form, "Employees E-mail Address", f.email); setT(form, "Telephone Number", f.phone);
+    check(form, "CB_1", f.status==="1"); check(form, "CB_2", f.status==="2"); check(form, "CB_3", f.status==="3"); check(form, "CB_4", f.status==="4");
+    if(f.status==="3") setT(form, "3 A lawful permanent resident Enter USCIS or ANumber", f.aNumber);
+    if(f.status==="4"){ setT(form, "Exp Date mmddyyyy", f.workUntil ? mdY(f.workUntil) : "N/A"); setT(form, "USCIS ANumber", f.aNumber); setT(form, "Form I94 Admission Number", f.i94); setT(form, "Foreign Passport Number and Country of IssuanceRow1", [f.passport, f.passportCountry].filter(Boolean).join(", ")); }
+    setT(form, "Today's Date mmddyyy", mdY(a.date||todayIso()));
+    const sigBox=fieldBox(doc, "Signature of Employee"); let s2Box=null;
+    if(s2){
+      const A=s2.listA||{}, B=s2.listB||{}, C=s2.listC||{};
+      setT(form, "Issuing Authority 1", A.authority); setT(form, "Document Number 0 (if any)", A.number); setT(form, "Expiration Date if any", A.expires ? mdY(A.expires) : (A.title ? "N/A" : ""));
+      setT(form, "List B Document 1 Title", B.title); setT(form, "List B Issuing Authority 1", B.authority); setT(form, "List B Document Number 1", B.number); setT(form, "List B Expiration Date 1", B.expires ? mdY(B.expires) : (B.title ? "N/A" : ""));
+      setT(form, "List C Document Title 1", C.title); setT(form, "List C Issuing Authority 1", C.authority); setT(form, "List C Document Number 1", C.number); setT(form, "List C Expiration Date 1", C.expires ? mdY(C.expires) : (C.title ? "N/A" : ""));
+      setT(form, "Additional Information", s2.note); setT(form, "FirstDayEmployed mmddyyyy", mdY(s2.firstDay));
+      setT(form, "Last Name First Name and Title of Employer or Authorized Representative", s2.repName); setT(form, "S2 Todays Date mmddyyyy", mdY(s2.date));
+      setT(form, "Employers Business or Org Name", COMPANY.name); setT(form, "Employers Business or Org Address", `${COMPANY.address}, ${COMPANY.city}, ${COMPANY.state} ${COMPANY.zip}`);
+      s2Box=fieldBox(doc, "Signature of Employer or AR");
+    }
+    const out=await finish(doc), d2=await L().PDFDocument.load(out);
+    await drawSig(d2, f.sig, sigBox); if(s2){ await drawSig(d2, s2.sig, s2Box); if((s2.listA||{}).title) await drawText(d2, 0, 130, 347, s2.listA.title, 8); } // "Document Title 1" is shared with Supplement B, so it is drawn
+    await audit(d2, 0, a);
+    return await d2.save();
+  }
+  async function buildW9(bytes, f, a){
+    const doc=await loadForm(bytes), form=doc.getForm(), P="topmostSubform[0].Page1[0].", B=P+"Boxes3a-b_ReadOrder[0].";
+    setT(form, P+"f1_01[0]", f.legalName || [f.first, f.mi, f.last].filter(Boolean).join(" ")); setT(form, P+"f1_02[0]", f.business);
+    const cls={ individual:0, ccorp:1, scorp:2, partnership:3, trust:4, llc:5, other:6 }[f.taxClass||"individual"];
+    check(form, B+`c1_1[${cls}]`, true); if(f.taxClass==="llc") setT(form, B+"f1_03[0]", f.llcCode); if(f.taxClass==="other") setT(form, B+"f1_04[0]", f.otherClass);
+    setT(form, P+"Address_ReadOrder[0].f1_07[0]", [f.street, f.apt].filter(Boolean).join(" ")); setT(form, P+"Address_ReadOrder[0].f1_08[0]", `${f.city}, ${f.state} ${f.zip}`);
+    setT(form, P+"f1_09[0]", `${COMPANY.name}\n${COMPANY.address}, ${COMPANY.city}, ${COMPANY.state} ${COMPANY.zip}`);
+    if(f.tinType==="ein"){ const e=digits(f.ein); setT(form, P+"f1_14[0]", e.slice(0,2)); setT(form, P+"f1_15[0]", e.slice(2)); }
+    else { const s=digits(f.ssn); setT(form, P+"f1_11[0]", s.slice(0,3)); setT(form, P+"f1_12[0]", s.slice(3,5)); setT(form, P+"f1_13[0]", s.slice(5)); }
+    const out=await finish(doc), d2=await L().PDFDocument.load(out);
+    await drawSig(d2, f.sig, { page:0, x:120, y:194, w:250, h:14 }); await drawText(d2, 0, 406, 196, mdY(a.date||todayIso()), 10); await audit(d2, 0, a);
+    return await d2.save();
+  }
+  // Direct deposit: our own one-page form.
+  async function buildDeposit(f, a){
+    const { PDFDocument, StandardFonts, rgb } = L();
+    const doc=await PDFDocument.create(), page=doc.addPage([612,792]), font=await doc.embedFont(StandardFonts.Helvetica), bold=await doc.embedFont(StandardFonts.HelveticaBold);
+    let y=740; const line=(t,o)=>{ o=o||{}; page.drawText(String(t), { x:o.x||54, y, size:o.size||11, font:o.bold?bold:font, color:rgb(0,0,0) }); y-=o.gap||18; };
+    line(COMPANY.name, { bold:true, size:13, gap:16 }); line(`${COMPANY.address}, ${COMPANY.city}, ${COMPANY.state} ${COMPANY.zip} · ${COMPANY.phone}`, { size:9, gap:30 });
+    line("Direct Deposit Authorization", { bold:true, size:18, gap:28 });
+    const row=(k,v)=>{ page.drawText(k, { x:54, y, size:10, font:bold }); page.drawText(String(v||""), { x:210, y, size:11, font }); y-=20; };
+    row("Employee", [f.first, f.mi, f.last].filter(Boolean).join(" ")); row("Address", `${[f.street,f.apt].filter(Boolean).join(" ")}, ${f.city}, ${f.state} ${f.zip}`);
+    row("Bank", f.bankName); row("Routing number", digits(f.routing)); row("Account number", digits(f.account)); row("Account type", f.acctType==="savings"?"Savings":"Checking");
+    row("Amount", "Entire net pay"); y-=10;
+    const para = `I authorize ${COMPANY.name} to deposit my pay into the account above and, if an amount is deposited in error, to make a correcting entry to that account for the amount of the error. This authorization stays in effect until the Company receives written notice from me to change or end it, in time for the Company to act on it. Until direct deposit starts, or if a deposit is returned, I will be paid by check.`;
+    const words=para.split(" "); let ln=""; for(const w of words){ const t=ln?ln+" "+w:w; if(font.widthOfTextAtSize(t,10.5)>500){ page.drawText(ln,{x:54,y,size:10.5,font}); y-=15; ln=w; } else ln=t; } if(ln){ page.drawText(ln,{x:54,y,size:10.5,font}); y-=30; }
+    page.drawLine({ start:{x:54,y}, end:{x:330,y}, thickness:0.8 }); page.drawLine({ start:{x:380,y}, end:{x:540,y}, thickness:0.8 });
+    if(f.sig){ const png=await doc.embedPng(f.sig), h=28, w=Math.min(260, png.width*(h/png.height)); page.drawImage(png, { x:58, y:y+2, width:w, height:h }); }
+    page.drawText(mdY(a.date||todayIso()), { x:384, y:y+5, size:11, font });
+    y-=14; page.drawText("Employee signature", { x:54, y, size:9, font }); page.drawText("Date", { x:380, y, size:9, font });
+    await audit(doc, 0, a);
+    return await doc.save();
+  }
+  // The company's agreement for the position, from the signing service, with the employee's signature and the owner's.
+  async function buildAgreement(bytes, f, a, companySig){
+    const doc=await loadForm(bytes), form=doc.getForm(), names=form.getFields().map(x=>x.getName()), has=n=>names.includes(n);
+    const date=mdY(a.date||todayIso()), name=[f.first, f.mi, f.last].filter(Boolean).join(" ");
+    let sigBox=null, coBox=null;
+    if(has("f0_0")){ // crew agreements: name | date, signature | phone, email | start date, company | date
+      setT(form,"f0_0",name); setT(form,"f0_1",date); setT(form,"f1_1",f.phone); setT(form,"f2_0",f.email); setT(form,"f2_1",mdY(f.startDate)); setT(form,"f3_1",date);
+      sigBox=fieldBox(doc,"f1_0"); coBox=fieldBox(doc,"f3_0");
+    } else if(has("distributor_name")){ // door hanger agreement
+      setT(form,"distributor_name",name); setT(form,"distributor_date",date); setT(form,"distributor_phone",f.phone); setT(form,"google_email",f.email); setT(form,"strava_username",f.strava); setT(form,"company_date",date);
+      sigBox=fieldBox(doc,"distributor_signature"); coBox=fieldBox(doc,"company_signature");
+    }
+    const out=await finish(doc), d2=await L().PDFDocument.load(out);
+    if(sigBox){ await drawSig(d2, f.sig, sigBox); if(companySig) await drawSig(d2, companySig, coBox); else await drawText(d2, coBox.page, coBox.x+2, coBox.y+3, COMPANY.rep+" (for the Company)", 9); }
+    await audit(d2, sigBox?sigBox.page:d2.getPageCount()-1, a);
+    return await d2.save();
+  }
+  async function build(form, bytes, f, a, extra){
+    if(form==="w4") return buildW4(bytes, f, a);
+    if(form==="miw4") return buildMIW4(bytes, f, a);
+    if(form==="i9") return buildI9(bytes, f, a, extra && extra.s2);
+    if(form==="w9") return buildW9(bytes, f, a);
+    if(form==="deposit") return buildDeposit(f, a);
+    if(form==="agreement") return buildAgreement(bytes, f, a, extra && extra.companySig);
+    throw new Error("Unknown form "+form);
+  }
+  // What each form keeps from the answers (sealed with the PDF), for payroll and for redoing the I-9 with Section 2.
+  const KEEP = {
+    w4:["first","mi","last","street","apt","city","state","zip","ssn","filing","twoJobs","kids","otherDeps","otherCredits","otherIncome","deductions","extra","exempt","startDate","sig"],
+    miw4:["first","mi","last","street","apt","city","state","zip","ssn","dob","dl","newEmployee","startDate","exemptions","miExtra","exempt8","exemptWhy","zone","sig"],
+    i9:["first","mi","last","otherLast","street","apt","city","state","zip","dob","ssn","email","phone","status","aNumber","workUntil","i94","passport","passportCountry","sig"],
+    w9:["legalName","business","taxClass","llcCode","otherClass","first","mi","last","street","apt","city","state","zip","tinType","ssn","ein","sig"],
+    deposit:["first","mi","last","street","apt","city","state","zip","bankName","routing","account","acctType","sig"],
+    agreement:["first","mi","last","phone","email","startDate","strava","sig"]
+  };
+  const keep = (form, f) => { const o={}; (KEEP[form]||[]).forEach(k=>{ if(f[k]!==undefined && f[k]!=="") o[k]=f[k]; }); return o; };
+  return { FORMS, POSITIONS, STATUS_FOR, AGREEMENT_FOR, packet, COMPANY, b64, unb64, create, unlock, rewrap, sealFor, openFor, build, keep,
+    digits, fmtSSN, validSSN, validRouting, mdY, todayIso, nowStamp };
+})();
+if(typeof module!=="undefined") module.exports = PAPER;
+
+</script>
+<script>
+// Preview only: a sample packet for a new crew member. Signing works end to end in this page: the forms fill, the
+// signature lands, and tax and bank forms are sealed with a vault made here. Nothing leaves the page.
+window.__paperTest = (() => { let vault=null, agr=null; const done={};
+  async function sampleAgreement(){ const { PDFDocument, StandardFonts, rgb } = PDFLib; const d=await PDFDocument.create(), f=await d.embedFont(StandardFonts.Helvetica), b=await d.embedFont(StandardFonts.HelveticaBold);
+    const p1=d.addPage([612,792]); let y=730; const t=(s,o)=>{ o=o||{}; p1.drawText(s,{x:54,y,size:o.size||11,font:o.bold?b:f,color:rgb(0.09,0.14,0.23)}); y-=o.gap||18; };
+    t("SAMPLE: Crew Member Employment Agreement",{bold:true,size:18,gap:26}); t("Mangiapane Brothers Lawn and Snow LLC · preview copy, not a real agreement",{size:10,gap:28});
+    ["1. Position. Crew member on a lawn, fall, lights and snow crew.","2. Pay. Piece rates by job with an hourly floor, as set out in Schedule A.","3. Schedule. Shifts are set by the office. Storm call-outs as they come.","4. Equipment. The Company supplies equipment, vehicles, fuel and salt.","5. Ending the agreement. Either side may end it at any time."].forEach(s=>t(s,{gap:22}));
+    const p2=d.addPage([612,792]); p2.drawText("Signatures",{x:54,y:720,size:16,font:b}); const form=d.getForm();
+    const fld=(n,x,yy,w)=>{ const tf=form.createTextField(n); tf.addToPage(p2,{x,y:yy,width:w,height:18,borderWidth:0}); p2.drawLine({start:{x,y:yy-1},end:{x:x+w,y:yy-1},thickness:.7}); };
+    const lab=(s,x,yy)=>p2.drawText(s,{x,y:yy-12,size:8,font:f,color:rgb(.35,.4,.45)});
+    [["f0_0",54,660,280,"Employee (print name)"],["f0_1",360,660,180,"Date"],["f1_0",54,610,280,"Employee signature"],["f1_1",360,610,180,"Phone"],["f2_0",54,560,280,"Email"],["f2_1",360,560,180,"Start date"],["f3_0",54,510,280,"For the Company"],["f3_1",360,510,180,"Date"]].forEach(([n,x,yy,w,l])=>{ fld(n,x,yy,w); lab(l,x,yy); });
+    return PAPER.b64(await d.save()); }
+  return async (action, body) => {
+    if(!vault){ vault=await PAPER.create("preview-only"); Object.values(PAPER.FORMS).forEach(F=>{ if(F.file && !F.file.startsWith("../")) F.file="../"+F.file; }); agr=await sampleAgreement(); }
+    if(action==="paperget") return { ok:true, name:"Jordan Hale", email:"jordan.hale@example.com", phone:"734-555-0201", position:"member", type:"w2", startDate:"2026-10-20",
+      forms:["agreement","w4","miw4","i9","deposit"].map(id=>({ id, done:!!done[id], at:done[id]||null })), pub:vault.pub, agreement:agr, companySig:null };
+    if(action==="papersubmit"){ await new Promise(r=>setTimeout(r,600)); done[body.form]=Date.now(); return { ok:true, status:"done" }; }
+    return { ok:false, error:"Preview" }; }; })();
+</script>
+<script>
+"use strict";
+const PHONE = "734-450-2400", EMAIL = "admin@mangbrothers.com";
+const q = new URLSearchParams(location.search);
+const TOKEN = (q.get("t")||"").replace(/[^\w-]/g,""), DEPLOY = (q.get("s")||"").replace(/[^\w-]/g,"");
+const SVC = DEPLOY ? `https://script.google.com/macros/s/${DEPLOY}/exec` : "";
+const main = document.getElementById("main");
+const esc = s => String(s==null?"":s).replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
+const $ = id => document.getElementById(id);
+async function call(action, body){
+  if(window.__paperTest) return window.__paperTest(action, body);
+  if(!SVC) throw new Error("This link is missing part of its address. Open it again from the email.");
+  const r = body ? await fetch(SVC, { method:"POST", headers:{ "Content-Type":"text/plain;charset=utf-8" }, body:JSON.stringify(Object.assign({ action, t:TOKEN }, body)) })
+                 : await fetch(`${SVC}?action=${action}&t=${encodeURIComponent(TOKEN)}`);
+  return r.json();
+}
+// What he types, kept only in this page's memory and shared across forms so he types his name and address once.
+const me = {}; let pkt = null, copies = {};
+const STATES = "AL AK AZ AR CA CO CT DE DC FL GA HI ID IL IN IA KS KY LA ME MD MA MI MN MS MO MT NE NV NH NJ NM NY NC ND OH OK OR PA RI SC SD TN TX UT VT VA WA WV WI WY".split(" ");
+const isSealed = id => id !== "agreement";
+
+async function load(){
+  try { pkt = await call("paperget"); } catch(e){ pkt = { ok:false, error:e.message }; }
+  if(!pkt || !pkt.ok){ main.innerHTML = `<div class="card"><h1>This link did not open</h1><p>${esc(pkt && pkt.error || "Try again in a minute.")}</p><p class="meta">Call ${PHONE} or email ${EMAIL}.</p></div>`; return; }
+  const parts = String(pkt.name||"").trim().split(/\s+/);
+  me.first = parts[0]||""; me.last = parts.length>1 ? parts[parts.length-1] : ""; me.mi = parts.length>2 ? parts[1].slice(0,1) : "";
+  me.email = pkt.email||""; me.phone = pkt.phone||""; me.startDate = pkt.startDate||""; me.state = "MI";
+  list();
+}
+function list(){
+  const forms = pkt.forms, left = forms.filter(f=>!f.done);
+  const off = PAPER.FORMS;
+  main.innerHTML = `<div class="card ${left.length?"":"done"}">
+      <h1>${left.length ? "Your new-hire paperwork" : `<span class="tick">✓</span>All signed`}</h1>
+      <p class="meta">${esc(pkt.name)} · ${esc(PAPER.POSITIONS[pkt.position]||"")}${pkt.type==="1099"?" · independent contractor":""}</p>
+      ${left.length ? `<p style="margin:10px 0 0">${left.length} of ${forms.length} left. Do them in any order. Your <b>agreement</b> is the one that opens your crew pages; the rest are needed before your first paycheck.</p>` : `<p style="margin:10px 0 0">Thank you. The office has everything it needs. Bring your I-9 documents on your first day if you have not shown them yet.</p>`}
+    </div>
+    ${pkt.vaultNotSet ? `<div class="banner">The office is still setting up secure storage for tax and bank forms. You can sign your agreement now; the other forms open as soon as that is done.</div>` : ""}
+    <div class="lock">🔒 Tax, I-9 and bank forms are locked on this phone before they are sent. Only the owner can open them. Nothing you type is saved in this browser.</div>
+    <div class="card">${forms.map(f=>`<div class="formrow"><div class="t"><b>${esc(off[f.id].title)}</b><span>${f.done?"Signed"+(f.at?" "+new Date(f.at).toLocaleDateString():""):(off[f.id].optional?"Optional. Without it you are paid by check.":"To sign")}</span></div>
+      ${f.done ? (copies[f.id] ? `<a class="btn" href="${copies[f.id]}" download="${esc(off[f.id].short)}.pdf">Your copy</a>` : `<span class="pill ok">Done</span>`)
+               : `<button class="primary" data-open="${f.id}" ${pkt.vaultNotSet && isSealed(f.id) ? "disabled" : ""}>Start</button>`}</div>`).join("")}</div>
+    <p class="meta">Questions: call ${PHONE} or reply to the email.</p>`;
+  main.querySelectorAll("[data-open]").forEach(b=>b.onclick=()=>openForm(b.dataset.open));
+  scrollTo(0,0);
+}
+
+// ---------- inputs ----------
+const inp = (k, label, o) => { o=o||{}; const v = me[k]!=null ? me[k] : "";
+  return `<div class="f ${o.cls||""}"><label for="i_${k}">${esc(label)}</label><input id="i_${k}" data-k="${k}" value="${esc(v)}" ${o.type?`type="${o.type}"`:""} ${o.mode?`inputmode="${o.mode}"`:""} ${o.ac?`autocomplete="${o.ac}"`:""} ${o.ph?`placeholder="${esc(o.ph)}"`:""} ${o.req===false?"":"data-req"} ${o.max?`maxlength="${o.max}"`:""}>${o.help?`<p class="help">${o.help}</p>`:""}</div>`; };
+const sel = (k, label, opts, o) => { o=o||{}; const v = me[k]!=null ? me[k] : "";
+  return `<div class="f"><label for="i_${k}">${esc(label)}</label><select id="i_${k}" data-k="${k}" ${o.req===false?"":"data-req"}>${opts.map(([a,b])=>`<option value="${esc(a)}" ${String(v)===String(a)?"selected":""}>${esc(b)}</option>`).join("")}</select>${o.help?`<p class="help">${o.help}</p>`:""}</div>`; };
+const radios = (k, opts) => `<div class="radio">${opts.map(([a,b])=>`<label class="ck"><input type="radio" name="r_${k}" data-k="${k}" value="${esc(a)}" ${String(me[k])===String(a)?"checked":""}><span>${b}</span></label>`).join("")}</div>`;
+const cbox = (k, text) => `<label class="ck"><input type="checkbox" data-k="${k}" ${me[k]?"checked":""}><span>${text}</span></label>`;
+const nameBlock = () => `<div class="g3">${inp("first","First name",{ac:"given-name"})}${inp("mi","Middle initial",{req:false,max:1})}${inp("last","Last name",{ac:"family-name"})}</div>`;
+const addrBlock = () => `${inp("street","Street address",{ac:"address-line1"})}<div class="g3">${inp("city","City",{ac:"address-level2"})}${sel("state","State",STATES.map(s=>[s,s]))}${inp("zip","ZIP",{mode:"numeric",ac:"postal-code",max:10})}</div>${inp("apt","Apartment (if any)",{req:false})}`;
+const ssnInp = () => `<div class="g2">${inp("ssn","Social Security number",{mode:"numeric",ac:"off",ph:"123-45-6789",max:11})}${inp("ssn2","Type it again",{mode:"numeric",ac:"off",max:11})}</div>`;
+const dobInp = () => inp("dob","Date of birth",{type:"date"});
+
+// ---------- the forms ----------
+const SPEC = {
+  agreement: () => `
+    <p>Read the whole agreement before you sign. It covers your pay (Schedule A), your hours and the rules of the job.</p>
+    <p><button id="readAgr" type="button">📄 Read the agreement</button> <span class="meta" id="readNote"></span></p>
+    ${nameBlock()}<div class="g2">${inp("phone","Phone",{type:"tel",ac:"tel"})}${inp("email","Email",{type:"email",ac:"email"})}</div>
+    ${["walker","walkerpt"].includes(pkt.position) ? inp("strava","Strava username",{help:"You add the company as a follower so finished routes show up."}) : inp("startDate","Start date",{type:"date"})}
+    ${cbox("read","I have read the whole agreement, including Schedule A, and agree to it.")}`,
+  w4: () => `
+    <p class="meta">Federal income tax withholding. If you are unsure, the IRS estimator at <a href="https://www.irs.gov/w4app" target="_blank" rel="noopener">irs.gov/w4app</a> helps. Most people with one job and no kids pick their filing status and stop there.</p>
+    <h3>Step 1: You</h3>${nameBlock()}${addrBlock()}${ssnInp()}
+    <div class="lab">Filing status</div>${radios("filing",[["single","Single or married filing separately"],["mfj","Married filing jointly (or qualifying surviving spouse)"],["hoh","Head of household (unmarried and paying more than half the costs of a home for yourself and a qualifying person)"]])}
+    <div class="sec"><h3>Step 2: More than one job</h3>${cbox("twoJobs","Check only if you hold more than one job at a time, or are married filing jointly and your spouse also works, and the two jobs pay about the same. Otherwise leave it.")}</div>
+    <div class="sec"><h3>Step 3: Dependents</h3><p class="help">Only if your total income will be $200,000 or less ($400,000 married filing jointly).</p>
+    <div class="g2">${inp("kids","Children under 17",{mode:"numeric",req:false,ph:"0"})}${inp("otherDeps","Other dependents",{mode:"numeric",req:false,ph:"0"})}</div></div>
+    <div class="sec"><h3>Step 4: Other adjustments (optional)</h3>
+    <div class="g2">${inp("otherIncome","(a) Other income, per year",{mode:"decimal",req:false,ph:"0"})}${inp("deductions","(b) Deductions beyond the standard",{mode:"decimal",req:false,ph:"0"})}</div>
+    ${inp("extra","(c) Extra withholding each paycheck",{mode:"decimal",req:false,ph:"0.00"})}
+    ${cbox("exempt","I claim exemption from withholding for 2026: I had no federal income tax liability last year and expect none this year.")}</div>`,
+  miw4: () => `
+    <p class="meta">Michigan income tax withholding.</p>
+    ${nameBlock()}${addrBlock()}${ssnInp()}<div class="g2">${dobInp()}${inp("dl","Driver's license or state ID number")}</div>
+    ${inp("exemptions","Personal and dependent exemptions",{mode:"numeric",help:"Usually 1 for yourself, plus 1 for each dependent. Enter 0 if someone else claims you."})}
+    ${inp("miExtra","Extra Michigan tax each paycheck (optional)",{mode:"decimal",req:false,ph:"0.00"})}
+    <div class="lab">Exemption from Michigan withholding (most people: none)</div>
+    ${radios("exempt8",[["","None"],["a","I expect no Michigan income tax liability this year"],["b","My wages are exempt from withholding"],["c","My permanent home is in a Renaissance Zone"]])}
+    <div id="ex8" class="${["b","c"].includes(me.exempt8)?"":"hide"}">${inp("exemptWhy","Explain, or name the Renaissance Zone",{req:false})}</div>`,
+  i9: () => `
+    <p class="meta">Federal proof that you can work in the United States. You fill in Section 1 here. On or before your first day you must show the office your original documents in person: for example a U.S. passport, <b>or</b> a driver's license plus a Social Security card or birth certificate. The office fills in Section 2.</p>
+    ${nameBlock()}${inp("otherLast","Other last names used (if any)",{req:false})}${addrBlock()}
+    <div class="g2">${dobInp()}${inp("ssn","Social Security number",{mode:"numeric",ac:"off",ph:"123-45-6789",max:11})}</div>
+    <div class="g2">${inp("email","Email",{type:"email",req:false})}${inp("phone","Phone",{type:"tel",req:false})}</div>
+    <div class="lab">I attest, under penalty of perjury, that I am (check one):</div>
+    ${radios("status",[["1","A citizen of the United States"],["2","A noncitizen national of the United States"],["3","A lawful permanent resident"],["4","A noncitizen (other than item 2 and 3) authorized to work"]])}
+    <div id="st3" class="${me.status==="3"||me.status==="4"?"":"hide"}">${inp("aNumber","USCIS A-Number",{req:false})}</div>
+    <div id="st4" class="${me.status==="4"?"":"hide"}">${inp("workUntil","Authorized to work until (blank if no end date)",{type:"date",req:false})}
+      <p class="help">Give one of: the A-Number above, a Form I-94 admission number, or a foreign passport number and country.</p>
+      ${inp("i94","Form I-94 admission number",{req:false})}<div class="g2">${inp("passport","Foreign passport number",{req:false})}${inp("passportCountry","Country of issuance",{req:false})}</div></div>
+    ${cbox("perjury","I am aware that federal law provides for imprisonment and/or fines for false statements, or the use of false documents, in connection with the completion of this form.")}`,
+  w9: () => `
+    <p class="meta">For independent contractors: your taxpayer number for the 1099 the company files for you. No tax is taken out of your pay.</p>
+    ${nameBlock()}${inp("legalName","Name as shown on your tax return",{req:false,help:"Leave blank if it is your name above."})}${inp("business","Business name (if different)",{req:false})}
+    ${sel("taxClass","Federal tax classification",[["individual","Individual or sole proprietor"],["llc","Single-member LLC"],["ccorp","C corporation"],["scorp","S corporation"],["partnership","Partnership"]])}
+    ${addrBlock()}
+    ${sel("tinType","Taxpayer number",[["ssn","Social Security number"],["ein","Employer identification number (EIN)"]])}
+    <div id="tSsn" class="${me.tinType==="ein"?"hide":""}">${ssnInp()}</div><div id="tEin" class="${me.tinType==="ein"?"":"hide"}">${inp("ein","EIN",{mode:"numeric",req:false,ph:"12-3456789",max:10})}</div>
+    ${cbox("cert","Under penalties of perjury, I certify that the number shown is my correct taxpayer identification number, I am not subject to backup withholding, I am a U.S. citizen or other U.S. person, and the FATCA code entered (if any) is correct.")}`,
+  deposit: () => `
+    <p class="meta">Optional. Without it you are paid by check. Find both numbers at the bottom of a check or in your bank's app.</p>
+    ${nameBlock()}${addrBlock()}
+    ${inp("bankName","Bank name")}
+    ${inp("routing","Routing number (9 digits)",{mode:"numeric",ac:"off",max:9})}
+    <div class="g2">${inp("account","Account number",{mode:"numeric",ac:"off"})}${inp("account2","Type it again",{mode:"numeric",ac:"off"})}</div>
+    ${sel("acctType","Account type",[["checking","Checking"],["savings","Savings"]])}`
+};
+// Checks per form, after the required fields: returns an error or "".
+function extraCheck(id){
+  const D = PAPER.digits;
+  if(["w4","miw4","w9"].includes(id) && !(id==="w9" && me.tinType==="ein")){ if(D(me.ssn)!==D(me.ssn2)) return "The two Social Security numbers do not match."; }
+  if(["w4","miw4","i9"].includes(id) || (id==="w9" && me.tinType!=="ein")){ if(!PAPER.validSSN(me.ssn)) return "That Social Security number is not valid. It is 9 digits."; }
+  if(id==="w9" && me.tinType==="ein" && D(me.ein).length!==9) return "An EIN is 9 digits.";
+  if(["w4","miw4","i9","w9","deposit"].includes(id) && !/^\d{5}(-?\d{4})?$/.test(String(me.zip||"").trim())) return "Check the ZIP code.";
+  if(id==="w4" && !me.filing) return "Pick a filing status.";
+  if(id==="i9"){ if(!me.status) return "Check one box for your status."; if(!me.perjury) return "Check the box that you are aware of the penalties.";
+    if(me.status==="3" && !me.aNumber) return "Enter your USCIS A-Number.";
+    if(me.status==="4" && !me.aNumber && !me.i94 && !(me.passport && me.passportCountry)) return "Enter an A-Number, an I-94 number, or a foreign passport number and country."; }
+  if(id==="w9" && !me.cert) return "Check the certification box.";
+  if(id==="deposit"){ if(!PAPER.validRouting(me.routing)) return "That routing number is not valid. It is the 9 digits at the bottom left of a check.";
+    if(D(me.account).length<4 || D(me.account)!==D(me.account2)) return "The two account numbers do not match."; }
+  if(id==="agreement" && !me.read) return "Check the box that you have read the agreement.";
+  if(id==="miw4" && me.exempt8==="" && !/^\d+$/.test(String(me.exemptions||"").trim())) return "Enter the number of exemptions (a number, 0 or more).";
+  if(id==="miw4" && me.dob && me.dob > PAPER.todayIso()) return "Check your date of birth.";
+  return "";
+}
+let pad = null, agrUrl = null;
+function openForm(id){
+  const F = PAPER.FORMS[id];
+  main.innerHTML = `<p><button class="back" id="back">‹ All forms</button></p>
+    <div class="card"><h1>${esc(F.title)}</h1><div id="fields">${SPEC[id]()}</div>
+      <div class="sec"><h3>Sign</h3>
+      <p class="help" style="margin-bottom:8px">Sign with your finger or mouse. By signing you agree to sign this form electronically, and that your electronic signature is the same as your handwritten one.</p>
+      <div class="sigwrap"><canvas id="sig"></canvas><span class="x">✕</span></div>
+      <div class="row" style="margin-top:6px;justify-content:space-between"><span class="meta">${esc(new Date().toLocaleDateString())}</span><button id="clear" type="button">Clear</button></div></div>
+      <p class="err" id="err"></p>
+      <button class="primary wide" id="go" style="margin-top:12px">${isSealed(id)?"🔒 Sign, lock, and send":"Sign and send"}</button>
+    </div>`;
+  $("back").onclick = list;
+  const fields = $("fields");
+  fields.addEventListener("input", e=>{ const el=e.target, k=el.dataset.k; if(!k) return; me[k] = el.type==="checkbox" ? el.checked : el.value; el.removeAttribute("aria-invalid"); toggles(); });
+  fields.addEventListener("change", e=>{ const el=e.target, k=el.dataset.k; if(!k) return; me[k] = el.type==="checkbox" ? el.checked : el.value; toggles(); });
+  // Fields whose defaults show as selected count as answered.
+  fields.querySelectorAll("select[data-k]").forEach(s=>{ if(me[s.dataset.k]==null || me[s.dataset.k]==="") me[s.dataset.k]=s.value; });
+  pad = sigPad($("sig")); $("clear").onclick = ()=>pad.clear();
+  if(id==="agreement"){ $("readAgr").onclick = ()=>{ if(!pkt.agreement){ $("readNote").textContent = pkt.agreementError || "The agreement is not attached to this link. Call the office."; return; }
+      if(!agrUrl) agrUrl = URL.createObjectURL(new Blob([PAPER.unb64(pkt.agreement)], { type:"application/pdf" }));
+      window.open(agrUrl, "_blank"); $("readNote").textContent = "Opened in a new tab."; }; }
+  $("go").onclick = ()=>submit(id);
+  scrollTo(0,0);
+}
+function toggles(){
+  const t = (id, on) => { const el=$(id); if(el) el.classList.toggle("hide", !on); };
+  t("ex8", ["b","c"].includes(me.exempt8)); t("st3", me.status==="3"||me.status==="4"); t("st4", me.status==="4");
+  t("tSsn", me.tinType!=="ein"); t("tEin", me.tinType==="ein");
+}
+function sigPad(cv){
+  const ctx = cv.getContext("2d"); let drawing=false, last=null, marks=0;
+  const fit = ()=>{ const r=cv.getBoundingClientRect(), d=window.devicePixelRatio||1; cv.width=Math.round(r.width*d); cv.height=Math.round(r.height*d); ctx.setTransform(d,0,0,d,0,0); ctx.lineWidth=2.4; ctx.lineCap="round"; ctx.lineJoin="round"; ctx.strokeStyle="#0b1a4a"; };
+  fit();
+  const pt = e => { const r=cv.getBoundingClientRect(); return { x:e.clientX-r.left, y:e.clientY-r.top }; };
+  cv.addEventListener("pointerdown", e=>{ e.preventDefault(); cv.setPointerCapture(e.pointerId); drawing=true; last=pt(e); ctx.beginPath(); ctx.arc(last.x,last.y,1.1,0,7); ctx.fillStyle="#0b1a4a"; ctx.fill(); marks++; });
+  cv.addEventListener("pointermove", e=>{ if(!drawing) return; e.preventDefault(); const p=pt(e); ctx.beginPath(); ctx.moveTo(last.x,last.y); ctx.lineTo(p.x,p.y); ctx.stroke(); last=p; marks++; });
+  const up = ()=>{ drawing=false; }; cv.addEventListener("pointerup", up); cv.addEventListener("pointercancel", up);
+  return { clear(){ ctx.clearRect(0,0,cv.width,cv.height); marks=0; }, empty:()=>marks<8,
+    // The signature cropped to its ink, as a PNG.
+    png(){ const d=ctx.getImageData(0,0,cv.width,cv.height).data; let x0=cv.width,y0=cv.height,x1=0,y1=0;
+      for(let y=0;y<cv.height;y+=2) for(let x=0;x<cv.width;x+=2){ if(d[(y*cv.width+x)*4+3]>20){ if(x<x0)x0=x; if(y<y0)y0=y; if(x>x1)x1=x; if(y>y1)y1=y; } }
+      if(x1<=x0) return ""; const m=6; x0=Math.max(0,x0-m); y0=Math.max(0,y0-m); x1=Math.min(cv.width,x1+m); y1=Math.min(cv.height,y1+m);
+      const c=document.createElement("canvas"); c.width=x1-x0; c.height=y1-y0; c.getContext("2d").drawImage(cv,x0,y0,c.width,c.height,0,0,c.width,c.height); return c.toDataURL("image/png"); } };
+}
+const blankCache = {};
+async function blank(id){ if(id==="agreement") return PAPER.unb64(pkt.agreement||""); if(id==="deposit") return null;
+  if(!blankCache[id]){ const r = await fetch(PAPER.FORMS[id].file); if(!r.ok) throw new Error("The blank form did not load. Check your connection."); blankCache[id] = new Uint8Array(await r.arrayBuffer()); }
+  return blankCache[id]; }
+async function submit(id){
+  const err = $("err"), go = $("go"); err.textContent = "";
+  let miss = null; document.querySelectorAll("#fields [data-req]").forEach(el=>{ if(el.closest(".hide")) return; if(!String(el.value||"").trim()){ el.setAttribute("aria-invalid","true"); miss = miss || el; } });
+  if(miss){ err.textContent = "Fill in the boxes marked in red."; miss.focus(); return; }
+  const x = extraCheck(id); if(x){ err.textContent = x; return; }
+  if(pad.empty()){ err.textContent = "Sign in the box above."; return; }
+  if(id==="agreement" && !pkt.agreement){ err.textContent = pkt.agreementError || "The agreement did not load. Call the office."; return; }
+  if(isSealed(id) && !pkt.pub){ err.textContent = "The office has not finished setting up secure storage. Try again later."; return; }
+  go.disabled = true; go.textContent = "Filling in the form…";
+  try {
+    const f = Object.assign({}, me, { sig: pad.png(), mi:(me.mi||"").slice(0,1).toUpperCase() });
+    const a = { name:[f.first,f.mi,f.last].filter(Boolean).join(" "), email:me.email||pkt.email, at:Date.now(), id:(TOKEN.slice(-6)+"-"+id).toUpperCase(), date:PAPER.todayIso() };
+    const pdf = await PAPER.build(id, await blank(id), f, a, { companySig: pkt.companySig });
+    let res;
+    if(isSealed(id)){ go.textContent = "Locking it…"; const env = await PAPER.sealFor(pkt.pub, PAPER.keep(id, f), pdf); go.textContent = "Sending…"; res = await call("papersubmit", { form:id, env }); }
+    else { go.textContent = "Sending…"; res = await call("papersubmit", { form:id, pdf:PAPER.b64(pdf) }); }
+    if(!res || !res.ok) throw new Error(res && res.error || "It did not go through. Try again.");
+    copies[id] = URL.createObjectURL(new Blob([pdf], { type:"application/pdf" }));
+    const fm = pkt.forms.find(z=>z.id===id); fm.done = true; fm.at = Date.now();
+    delete me.ssn2; delete me.account2;
+    if(id==="deposit"){ delete me.routing; delete me.account; }
+    list();
+  } catch(e){ err.textContent = e.message || String(e); go.disabled = false; go.textContent = isSealed(id) ? "🔒 Sign, lock, and send" : "Sign and send"; }
+}
+window.addEventListener("pagehide", ()=>{ for(const k in me) delete me[k]; });
+load();
+</script>
+</body>
+</html>

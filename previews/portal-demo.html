@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="en">
+<head><meta name="robots" content="noindex, nofollow">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Mangiapane Brothers Team</title>
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#1d4d29">
+<link rel="icon" href="./mb-logo.png">
+<link rel="apple-touch-icon" href="./mb-logo.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600&display=swap" rel="stylesheet">
+<style>
+  /* The front door of the internal system (October 17, 2026). One Google sign-in; the team list decides where each
+     person lands: admins on Projects, crew managers on their crew's route, crew members on their schedule, walkers on
+     the door hanger routes. Colors are the logo's green. */
+  :root{color-scheme:light dark;
+    --green:#266234;--green-deep:#1d4d29;--green-dark:#123219;--leaf:#3f8a4f;--cream:#f6f3ea;--paper:#fffdf8;
+    --ink:#1b2a1f;--ink2:#4f5f53;--muted:#7d887f;--line:#dcd8cc;--red:#a63b3b;--red-soft:#f6e3e3;
+    --bg:var(--cream);--card:var(--paper);--shadow:0 18px 50px rgba(18,50,25,.18),0 2px 6px rgba(18,50,25,.08);--r:14px}
+  @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0d1a10;--ink:#1b2a1f;--shadow:0 18px 60px rgba(0,0,0,.5)}}
+  :root[data-theme="dark"]{--bg:#0d1a10;--shadow:0 18px 60px rgba(0,0,0,.5)}
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{margin:0;font:16px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;color:var(--ink);background:var(--bg);
+    display:flex;flex-direction:column;min-height:100dvh;-webkit-font-smoothing:antialiased}
+  /* mowing stripes across the top of the page */
+  .stripes{position:fixed;inset:0 0 auto 0;height:46vh;z-index:0;
+    background:repeating-linear-gradient(112deg,#1f532b 0 72px,#245c31 72px 144px);}
+  .stripes::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(13,26,16,0) 40%,var(--bg) 100%)}
+  main{position:relative;z-index:1;flex:1;display:flex;align-items:center;justify-content:center;
+    padding:max(28px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) 24px max(16px,env(safe-area-inset-left))}
+  .card{width:100%;max-width:420px;background:var(--card);border-radius:var(--r);box-shadow:var(--shadow);padding:34px 30px 26px;text-align:center;border:1px solid rgba(38,98,52,.12)}
+  .logo{display:block;width:min(260px,78%);height:auto;margin:0 auto 14px}
+  .tag{font-family:"Cormorant Garamond",Georgia,"Times New Roman",serif;font-weight:600;font-size:22px;letter-spacing:.01em;color:var(--green);margin:4px 0 2px;line-height:1.25}
+  .rule{width:56px;height:2px;background:var(--green);opacity:.5;margin:16px auto 18px;border:0}
+  .lede{color:var(--ink2);margin:0 0 20px;font-size:15px}
+  .gbtn{display:flex;align-items:center;justify-content:center;gap:12px;width:100%;min-height:52px;border-radius:999px;border:0;cursor:pointer;
+    background:var(--green);color:#fff;font:600 17px/1 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    box-shadow:0 6px 16px rgba(38,98,52,.28);transition:transform .12s,box-shadow .12s,background .12s}
+  .gbtn:hover{background:var(--green-deep);box-shadow:0 8px 20px rgba(38,98,52,.34)} .gbtn:active{transform:translateY(1px)}
+  .gbtn:focus-visible{outline:3px solid var(--leaf);outline-offset:3px}
+  .gbtn .g{width:26px;height:26px;border-radius:50%;background:#fff;display:grid;place-items:center;flex:none}
+  .gbtn[disabled]{opacity:.6;cursor:default}
+  .ghost{background:transparent;border:1px solid var(--line);color:var(--ink2);border-radius:999px;padding:10px 16px;font:500 15px/1 inherit;cursor:pointer;margin-top:12px}
+  .ghost:hover{border-color:var(--green);color:var(--green)}
+  .state{display:none} .state.on{display:block}
+  .spin{width:34px;height:34px;border-radius:50%;border:3px solid rgba(38,98,52,.18);border-top-color:var(--green);margin:6px auto 14px;animation:spin .8s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  @media (prefers-reduced-motion:reduce){.spin{animation-duration:2.4s}.gbtn{transition:none}}
+  .dest{font-family:"Cormorant Garamond",Georgia,serif;font-size:26px;font-weight:600;color:var(--green);margin:0}
+  .who{color:var(--muted);font-size:14px;margin:6px 0 0;word-break:break-all}
+  .msg{background:var(--red-soft);color:var(--red);border-radius:10px;padding:12px 14px;font-size:15px;text-align:left;margin:4px 0 6px}
+  .pick{display:grid;gap:8px;margin-top:16px;text-align:left}
+  .pick a{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:12px 14px;border:1px solid var(--line);border-radius:10px;color:var(--ink);text-decoration:none;background:#fff}
+  .pick a:hover{border-color:var(--green)} .pick a span{color:var(--muted);font-size:13px} .pick a b{font-weight:600}
+  .fine{color:var(--muted);font-size:13px;margin:18px 0 0}
+  footer{position:relative;z-index:1;text-align:center;color:var(--muted);font-size:13px;padding:0 16px max(18px,env(safe-area-inset-bottom))}
+  footer a{color:inherit}
+  @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) footer{color:#9aa79c}}
+  :root[data-theme="dark"] footer{color:#9aa79c}
+  @media (max-width:420px){.card{padding:28px 20px 22px}.tag{font-size:20px}}
+  .pvbar{position:relative;z-index:2;display:flex;flex-wrap:wrap;gap:6px;justify-content:center;align-items:center;padding:8px 16px;background:#fffdf8;border-bottom:1px solid var(--line);font-size:14px}
+  .pvbar button{border:1px solid var(--line);background:#fff;border-radius:999px;padding:6px 12px;font:inherit;cursor:pointer;color:var(--ink)} .pvbar button.on{background:var(--green);border-color:var(--green);color:#fff}
+  .pvbar b{color:var(--ink)}
+</style>
+</head>
+<body>
+<script>
+// Preview only: sample sign-ins instead of Google. Pick one in the bar; the portal shows where that person lands.
+(() => { let who = "out"; try { who = sessionStorage.getItem("pvWho") || "out"; } catch(e){}
+  const tree = { allowed: { "russel,mangiapaneiii@gmail,com": { name:"Russel Mangiapane", email:"russel.mangiapaneiii@gmail.com", tier:"admin" },
+    "boss@example,com": { name:"Marcus Reed", email:"boss@example.com", tier:"crew", crew:"Crew 1", crewRole:"manager" },
+    "tyler@example,com": { name:"Tyler Ng", email:"tyler@example.com", tier:"crew", crew:"Crew 1", crewRole:"member" },
+    "walker@example,com": { name:"Sam", email:"walker@example.com", tier:"walker" } } };
+  const users = { out:null, admin:"russel.mangiapaneiii@gmail.com", manager:"boss@example.com", member:"tyler@example.com", walker:"walker@example.com", stranger:"stranger@example.com" };
+  const get = p => p.split("/").reduce((o,k)=>o==null?null:(o[k]===undefined?null:o[k]), tree);
+  let cb=null;
+  window.__portalTest = { auth: { onAuthStateChanged(f){ cb=f; setTimeout(()=>f(users[who]?{ email:users[who], displayName:"" }:null), 400); },
+      signInWithPopup(){ try{ sessionStorage.setItem("pvWho","admin"); }catch(e){} location.reload(); return new Promise(()=>{}); }, signOut(){ try{ sessionStorage.setItem("pvWho","out"); }catch(e){} cb(null); } },
+    db: { ref: p => ({ once: () => Promise.resolve({ val: () => get(p) }) }) } };
+  window.firebase = { auth: { GoogleAuthProvider: function(){ this.setCustomParameters=()=>{}; } } };
+  window.__pvWho = who;
+})();
+</script>
+<div class="pvbar"><b>Preview as</b><button data-pv="out">Signed out</button><button data-pv="admin">Admin</button><button data-pv="manager">Crew manager</button><button data-pv="member">Crew member</button><button data-pv="walker">Walker</button><button data-pv="stranger">Not on the list</button></div>
+<script>document.querySelectorAll("[data-pv]").forEach(b=>{ if(b.dataset.pv===window.__pvWho) b.classList.add("on"); b.onclick=()=>{ try{ sessionStorage.setItem("pvWho",b.dataset.pv); }catch(e){} location.reload(); }; });</script>
+
+<div class="stripes" aria-hidden="true"></div>
+<main>
+  <div class="card" role="main">
+    <img class="logo" src="./mb-logo.png" alt="Mangiapane Brothers Lawn and Snow LLC" width="400" height="173">
+    <p class="tag">Reliable Service. Uncompromising Standards.</p>
+    <hr class="rule">
+
+    <div class="state" id="sLoading"><div class="spin" aria-hidden="true"></div><p class="lede" style="margin:0">Checking your sign-in</p></div>
+
+    <div class="state" id="sOut">
+      <p class="lede">Sign in with the Google account on the team list. You go straight to your page.</p>
+      <button class="gbtn" id="signin" type="button"><span class="g" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9.1 3.6l6.8-6.8C35.8 2.4 30.3 0 24 0 14.6 0 6.6 5.4 2.7 13.3l7.9 6.1C12.5 13.6 17.8 9.5 24 9.5z"/><path fill="#4285F4" d="M46.1 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.4c-.5 2.9-2.2 5.3-4.6 6.9l7.4 5.7c4.3-4 6.9-9.9 6.9-17.1z"/><path fill="#FBBC05" d="M10.6 28.6c-.5-1.4-.8-3-.8-4.6s.3-3.2.8-4.6l-7.9-6.1C1 16.6 0 20.2 0 24s1 7.4 2.7 10.7l7.9-6.1z"/><path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.8-5.8l-7.4-5.7c-2.1 1.4-4.8 2.3-8.4 2.3-6.2 0-11.5-4.1-13.4-9.9l-7.9 6.1C6.6 42.6 14.6 48 24 48z"/></svg></span>Sign in with Google</button>
+      <p class="msg" id="outMsg" hidden></p>
+      <p class="fine">For the Mangiapane Brothers team only.</p>
+    </div>
+
+    <div class="state" id="sGo"><div class="spin" aria-hidden="true"></div><p class="lede" style="margin:0 0 4px">Opening</p><p class="dest" id="dest"></p><p class="who" id="goWho"></p></div>
+
+    <div class="state" id="sAdmin">
+      <p class="lede" style="margin-bottom:4px">Welcome back<b id="adName"></b>.</p><p class="who" id="adWho"></p>
+      <div class="pick" id="adPick"></div>
+      <button class="ghost" id="adOut" type="button">Sign out</button>
+    </div>
+
+    <div class="state" id="sNo">
+      <p class="msg" id="noMsg"></p><p class="who" id="noWho"></p>
+      <button class="ghost" id="noOut" type="button">Sign out and use another account</button>
+    </div>
+  </div>
+</main>
+<footer>Mangiapane Brothers Lawn and Snow LLC &middot; Livonia and Westland, Michigan &middot; <a href="https://mangbrothers.com">mangbrothers.com</a></footer>
+
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyDLndoLTcm8zKyN3WlVfYoGVQmVlbMlib4",
+  authDomain: "mb-projects-c4383.firebaseapp.com",
+  databaseURL: "https://mb-projects-c4383-default-rtdb.firebaseio.com",
+  projectId: "mb-projects-c4383",
+  storageBucket: "mb-projects-c4383.firebasestorage.app",
+  messagingSenderId: "246828597156",
+  appId: "1:246828597156:web:dfa85db16f51d85b5fcb31"
+};
+const ADMIN_EMAIL = "russel.mangiapaneiii@gmail.com";
+// Every page of the system, and who may open it. ?to=page sends someone back where he was going after he signs in.
+const PAGES = {
+  "projects.html": { name:"Projects", note:"Admin task dashboard", tiers:["admin"] },
+  "crm.html":      { name:"CRM", note:"Leads, clients, contracts", tiers:["admin"] },
+  "crews.html":    { name:"Crews", note:"Routes, schedules, day logs", tiers:["admin","crew"] },
+  "team.html":     { name:"Team Manager", note:"Personnel, hiring, payroll, paperwork", tiers:["admin"] },
+  "routes.html":   { name:"Routes", note:"Door hanger routes", tiers:["admin","walker"] }
+};
+const $ = s => document.querySelector(s);
+const emailKey = e => e.toLowerCase().replace(/\./g, ",");
+const show = id => document.querySelectorAll(".state").forEach(s => s.classList.toggle("on", s.id === id));
+const params = new URLSearchParams(location.search);
+const want = PAGES[params.get("to")] ? params.get("to") : "";
+const stay = params.has("pick");   // an admin who opens the portal on purpose sees every page
+
+// Where a person lands: admins on Projects, crew managers on their crew's route, crew members on their schedule,
+// walkers on the door hanger routes. The Crews page itself shows a manager his route and a member his schedule.
+function homeFor(tier, entry){
+  if(tier === "admin") return { page:"projects.html", label:"Projects" };
+  if(tier === "crew") return { page:"crews.html", label: entry && entry.crewRole === "manager" ? (entry.crew ? entry.crew + " route" : "Your crew's route") : "Your schedule" };
+  if(tier === "walker") return { page:"routes.html", label:"Your routes" };
+  return null;
+}
+function go(page, label, email){
+  show("sGo"); $("#dest").textContent = label; $("#goWho").textContent = email;
+  /* preview: stays here */
+}
+function no(msg, email){ show("sNo"); $("#noMsg").textContent = msg; $("#noWho").textContent = email || ""; }
+
+const isTest = !!window.__portalTest;
+let auth = null, db = null;
+if(isTest){ auth = window.__portalTest.auth; db = window.__portalTest.db; }
+else { firebase.initializeApp(firebaseConfig); auth = firebase.auth(); db = firebase.database(); }
+
+$("#signin").onclick = async () => {
+  const p = new firebase.auth.GoogleAuthProvider(); p.setCustomParameters({ prompt:"select_account" });
+  $("#signin").disabled = true; $("#outMsg").hidden = true;
+  try { await auth.signInWithPopup(p); }
+  catch(e){
+    $("#signin").disabled = false;
+    if(/popup-blocked|operation-not-supported|web-storage/.test(e.code||"")) return auth.signInWithRedirect(p);
+    if(/popup-closed|cancelled-popup/.test(e.code||"")) return;
+    $("#outMsg").textContent = "Sign-in did not finish: " + (e.message || e); $("#outMsg").hidden = false;
+  }
+};
+const signOut = () => auth.signOut();
+$("#noOut").onclick = signOut; $("#adOut").onclick = signOut;
+
+show("sLoading");
+auth.onAuthStateChanged(async user => {
+  if(!user){ $("#signin").disabled = false; show("sOut"); return; }
+  const email = (user.email || "").toLowerCase();
+  show("sLoading");
+  try {
+    let entry = await db.ref("allowed/" + emailKey(email)).once("value").then(s => s.val()).catch(() => null);
+    let tier = entry && entry.tier || (email === ADMIN_EMAIL ? "admin" : "");
+    // Walkers added before the tiers still sit on the old walkers list.
+    if(!tier){ const w = await db.ref("walkers/" + emailKey(email)).once("value").then(s => s.val()).catch(() => null); if(w) tier = "walker"; }
+    if(!tier) return no(`${email} is not on the team list. Ask Russel to add it, then sign in again.`, "");
+    if(entry && entry.active === false) return no(`${email} is not active on the team list. Ask Russel.`, "");
+    if(tier === "crew" && !(entry && entry.crew)) return no(`You are on the team list but not on a crew yet. Ask Russel to put you on a crew.`, email);
+    const first = String((entry && entry.name) || user.displayName || "").split(" ")[0];
+    if(want && PAGES[want].tiers.includes(tier)) return go(want, PAGES[want].name, email);
+    if(tier === "admin" && stay){
+      show("sAdmin"); $("#adName").textContent = first ? ", " + first : ""; $("#adWho").textContent = email;
+      $("#adPick").innerHTML = Object.entries(PAGES).map(([p, x]) => `<a href="./${p}"><b>${x.name}</b><span>${x.note}</span></a>`).join("");
+      return;
+    }
+    const h = homeFor(tier, entry); if(!h) return no(`${email} has no page set. Ask Russel.`, "");
+    go(h.page, h.label, email);
+  } catch(e){ no("Your account could not be checked against the team list. Try again in a minute, or ask Russel.", email); }
+});
+</script>
+</body>
+</html>

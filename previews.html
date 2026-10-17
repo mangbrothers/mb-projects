@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<title>Previews · Mangiapane Brothers</title>
+<!--
+  Previews (October 17, 2026): every page the office does not normally see, running on sample data, in one place.
+  For revising with the admin team, and for showing how the system works. Each preview is built from the live page
+  (dev/build_previews.py), so it shows what is up now. Nothing in a preview reaches the database, Google, Intuit or email.
+  Admins only, like every office page.
+-->
+<style>
+  :root{color-scheme:light dark;
+    --bg:#eef1f5;--card:#ffffff;--tint:#e2e8f1;--ink:#16233a;--ink2:#4a5a6e;--muted:#6b778a;--line:#c9d1dd;
+    --navy:#1f4e8c;--navy-ink:#ffffff;--green:#1d6b45;--green-soft:#e1f0e8;--amber:#8f5400;--amber-soft:#fbf1dc;--frame:#1b2230;--shadow:0 10px 30px rgba(22,35,58,.18)}
+  @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+    --bg:#0f1622;--card:#18212f;--tint:#131b28;--ink:#e6ecf5;--ink2:#b3c0d3;--muted:#8f9cb0;--line:#34425b;
+    --navy:#5a8fd6;--navy-ink:#0f1622;--green:#62c08f;--green-soft:#16301f;--amber:#e0a646;--amber-soft:#3a2d14;--frame:#000;--shadow:0 10px 30px rgba(0,0,0,.5)}}
+  :root[data-theme="dark"]{
+    --bg:#0f1622;--card:#18212f;--tint:#131b28;--ink:#e6ecf5;--ink2:#b3c0d3;--muted:#8f9cb0;--line:#34425b;
+    --navy:#5a8fd6;--navy-ink:#0f1622;--green:#62c08f;--green-soft:#16301f;--amber:#e0a646;--amber-soft:#3a2d14;--frame:#000;--shadow:0 10px 30px rgba(0,0,0,.5)}
+  *{box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%}
+  body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;overflow-x:hidden}
+  header{background:var(--navy);color:var(--navy-ink);padding:10px max(16px,env(safe-area-inset-right)) 10px max(16px,env(safe-area-inset-left));display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:10}
+  header h1{font-size:18px;margin:0;flex:1;min-width:0}
+  header .who{font-size:12px;opacity:.85;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:40vw}
+  .navbtn{width:40px;height:40px;border:0;border-radius:8px;background:transparent;color:inherit;display:grid;place-items:center;cursor:pointer;flex:none}
+  .navbtn svg{width:24px;height:24px}
+  .layout{display:grid;grid-template-columns:300px minmax(0,1fr);gap:18px;max-width:1500px;margin:0 auto;padding:18px max(16px,env(safe-area-inset-right)) 40px max(16px,env(safe-area-inset-left))}
+  .side{display:flex;flex-direction:column;gap:6px;align-self:start;position:sticky;top:76px;max-height:calc(100vh - 92px);overflow:auto}
+  .intro{color:var(--ink2);font-size:14px;margin:0 0 8px}
+  .grp{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:12px 4px 2px}
+  .item{display:block;width:100%;text-align:left;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:10px;padding:10px 12px;cursor:pointer;font:inherit}
+  .item b{display:block;font-size:15px} .item span{display:block;font-size:13px;color:var(--muted)}
+  .item[aria-current="true"]{border-color:var(--navy);box-shadow:inset 3px 0 0 var(--navy);background:var(--tint)}
+  .item:focus-visible{outline:3px solid var(--navy);outline-offset:2px}
+  .view{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;min-width:0}
+  .view h2{font-size:21px;margin:0 0 4px}
+  .chips{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 8px}
+  .chip{font-size:12px;font-weight:650;padding:2px 9px;border-radius:999px;border:1px solid var(--line);color:var(--ink2)}
+  .chip.who{background:var(--green-soft);color:var(--green);border-color:var(--green)}
+  .desc{color:var(--ink2);margin:0 0 6px;max-width:80ch}
+  .try{margin:0 0 12px;padding:10px 12px;background:var(--amber-soft);color:var(--amber);border-radius:8px;font-size:14px;max-width:80ch}
+  .tools{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:0 0 12px}
+  .tools button,.tools a{font:inherit;font-size:14px;font-weight:600;min-height:38px;padding:7px 13px;border-radius:999px;border:1px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer;text-decoration:none;display:inline-flex;align-items:center}
+  .tools button[aria-pressed="true"]{background:var(--navy);border-color:var(--navy);color:var(--navy-ink)}
+  .tools .sp{flex:1}
+  .stage{display:flex;justify-content:center;background:var(--tint);border-radius:10px;padding:14px;overflow:hidden}
+  .device{background:var(--frame);border-radius:30px;padding:10px;max-width:100%;transition:width .25s}
+  .device iframe{display:block;width:100%;height:min(820px,78vh);border:0;border-radius:22px;background:#fff}
+  .stage.full{padding:0;background:transparent} .stage.full .device{background:transparent;border-radius:0;padding:0;width:100%!important}
+  .stage.full .device iframe{border-radius:10px;border:1px solid var(--line);height:min(1100px,86vh)}
+  .gate{max-width:420px;margin:12vh auto;text-align:center;padding:24px;background:var(--card);border:1px solid var(--line);border-radius:12px}
+  @media (prefers-reduced-motion:reduce){.device{transition:none}}
+  @media (max-width:900px){.layout{grid-template-columns:1fr}.side{position:static;max-height:none}.stage{padding:8px}.device{border-radius:24px;padding:8px}}
+  /* page menu, as on every office page */
+  .pgdrawer-bg{position:fixed;inset:0;background:rgba(10,16,28,.45);z-index:2000;opacity:0;pointer-events:none;transition:opacity .2s}
+  .pgdrawer-bg.open{opacity:1;pointer-events:auto}
+  .pgdrawer{position:fixed;top:0;left:0;bottom:0;width:min(290px,84vw);background:var(--card);color:var(--ink);z-index:2001;box-shadow:var(--shadow);transform:translateX(-102%);transition:transform .22s;display:flex;flex-direction:column;padding:14px 12px;touch-action:pan-y;overflow:auto}
+  .pgdrawer.open{transform:none}
+  .pgdrawer .pdhead{display:flex;align-items:center;gap:8px;padding:0 4px 12px;border-bottom:1px solid var(--line);margin-bottom:8px}
+  .pgdrawer .pdhead b{flex:1;font-size:15px}
+  .pgdrawer .pdx{width:36px;height:36px;border-radius:50%;border:0;background:var(--tint);color:var(--ink);font-size:22px;line-height:1;padding:0;cursor:pointer}
+  .pgdrawer a{display:block;padding:11px 12px;border-radius:8px;color:var(--ink);text-decoration:none;margin:2px 0}
+  .pgdrawer a span{display:block;font-size:12px;color:var(--muted)}
+  .pgdrawer a.here{background:var(--tint);font-weight:650}
+  .pgdrawer .pdfoot{margin-top:auto;font-size:12px;color:var(--muted);padding:12px 4px 0}
+</style>
+</head>
+<body>
+<header>
+  <button type="button" class="navbtn" id="navBtn" aria-label="Open page menu" aria-controls="pgDrawer" aria-expanded="false" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+  <h1>Previews</h1><span class="who" id="who"></span>
+</header>
+<div id="gate" class="gate"><p>Checking your sign-in…</p></div>
+<div class="layout" id="app" hidden>
+  <aside class="side" aria-label="Previews">
+    <p class="intro">What customers, new hires and crews see, running on sample data. Built from the live pages, so it is what is up now. Nothing here saves, charges or emails.</p>
+    <div id="list"></div>
+  </aside>
+  <section class="view" id="view" aria-live="polite"></section>
+</div>
+<div class="pgdrawer-bg" id="pgDrawerBg"></div>
+<nav class="pgdrawer" id="pgDrawer" aria-label="Pages" aria-hidden="true">
+  <div class="pdhead"><b>Mangiapane Brothers</b><button type="button" class="pdx" id="pgDrawerX" aria-label="Close page menu">&times;</button></div>
+  <p class="pdsec" style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted,#768276);padding:12px 12px 2px;margin:0">Admin</p><a href="./projects.html">Projects<span>Admin task dashboard</span></a><a href="./crm.html">CRM<span>Leads, clients, contracts</span></a><a href="./team.html">Team Manager<span>Personnel, hiring, paperwork, training, payroll</span></a><a href="./previews.html" class="here" aria-current="page">Previews<span>What customers and crews see, with sample data</span></a><p class="pdsec" style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted,#768276);padding:12px 12px 2px;margin:0">Employee</p><a href="./crews.html">Crews<span>Routes, schedules, training</span></a><a href="./routes.html">Routes<span>Door hanger routes</span></a>
+  <div class="pdfoot">Full-Service Property Maintenance for Those Who Take Pride in Their Home</div>
+</nav>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
+<script>
+"use strict";
+const firebaseConfig = {
+  apiKey: "AIzaSyDLndoLTcm8zKyN3WlVfYoGVQmVlbMlib4",
+  authDomain: "mb-projects-c4383.firebaseapp.com",
+  databaseURL: "https://mb-projects-c4383-default-rtdb.firebaseio.com",
+  projectId: "mb-projects-c4383",
+  storageBucket: "mb-projects-c4383.firebasestorage.app",
+  messagingSenderId: "246828597156",
+  appId: "1:246828597156:web:dfa85db16f51d85b5fcb31"
+};
+const ADMIN_EMAIL = "russel.mangiapaneiii@gmail.com";
+const TIER_HOME = { admin:"projects.html", crew:"crews.html", walker:"routes.html" };
+const $ = s => document.querySelector(s);
+const esc = s => String(s==null?"":s).replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
+// full: the preview brings its own controls (state buttons, emails), so it fills the panel. Otherwise it sits in a device frame.
+const ITEMS = [
+  { grp:"Customers" },
+  { id:"signing", title:"Signing and payment", sub:"The emailed agreement, card step, emails, signed PDF", who:"What the customer sees", src:"previews/client-signing.html", full:true,
+    desc:"The page a customer opens from the quote email: the quote, the full agreement, the typed signature, then the card form, which sends the card straight to Intuit. Below it, every email the customer gets and the signed PDF as it lands in Drive.",
+    tryit:"Use the state buttons across the top to jump to any outcome: declined, locked after three declines, charged, check, the $1 test agreement." },
+  { id:"crm", title:"CRM phone sale", sub:"Quote, send, charge, refund", who:"What the office uses", src:"previews/crm-sales.html", full:true,
+    desc:"The live CRM on sample clients, with the signing service simulated: build a quote, email it, watch it get signed, then run charges and refunds from Charges to run.",
+    tryit:"Jump buttons open each part of a sale. Charge and Refund change the sample data the way the real service does." },
+  { id:"sale", title:"Sale process map", sub:"Lead to money in QuickBooks", who:"Reference", src:"previews/sale-process.html", full:true,
+    desc:"Every step of a sale: who acts, what runs on its own, the checks that can stop a step, the records written and the emails sent." },
+  { grp:"New hires and crews" },
+  { id:"portal", title:"Front door sign-in", sub:"apps.mangbrothers.com", who:"What everyone sees first", src:"previews/portal-demo.html", w:400,
+    desc:"One Google sign-in for the whole team. The team list decides where each person lands: admins on Projects, crew managers on their crew's route, crew members on their schedule, door hangers on their routes.",
+    tryit:"Use the Preview as bar inside the frame to sign in as each kind of person." },
+  { id:"paperwork", title:"New-hire paperwork", sub:"Offer, W-4, MI-W4, I-9, direct deposit", who:"What a new hire sees", src:"previews/employee-paperwork.html", full:true,
+    desc:"The page a new hire opens from his paperwork email or his Training tab. The official IRS, Michigan and USCIS forms fill in on his phone and take his drawn signature; tax and bank forms are locked before they leave the phone." },
+  { id:"newhire", title:"First sign-in, offer not signed", sub:"Training tab only", who:"What a new hire sees", src:"crews.html?demo=newhire", w:400,
+    desc:"Until he signs his offer, the crew page shows only Training: a welcome, his paperwork as cards, and his training once the offer is signed." },
+  { id:"member", title:"Crew member", sub:"Schedule, training, hours, pay, files", who:"What a crew member sees", src:"crews.html?demo=member", w:400,
+    desc:"His next month of shifts and storm call-outs, clock in and out, training for his role, past hours by pay period, his pay log, his files and his contact information." },
+  { id:"manager", title:"Crew manager", sub:"Today, week, crew log, crew, training", who:"What a crew manager sees", src:"crews.html?demo=manager", w:400,
+    desc:"His crew's routes on the map with check-offs and photos, the crew log where he approves the day, his crew's contact and emergency info, his training, and his own employee pages." },
+  { id:"walker", title:"Door hanger routes", sub:"Map, check-off, daily count", who:"What a door hanger sees", src:"routes.html?demo=walker", w:400,
+    desc:"His routes on a street map, street by street check-off with a photo, and the day's count." },
+  { grp:"Office" },
+  { id:"team", title:"Team Manager", sub:"Hiring, personnel, paperwork, training, payroll", who:"What the office uses", src:"team.html?demo=admin", w:1180,
+    desc:"Onboarding board, personnel files, crews, paperwork by position and legal status with the password vault, the training library, employee reports and payroll. Sample people only.",
+    tryit:"On Paperwork, press Set password to see the vault set up; on Training, add a slide deck or an SOP." },
+  { id:"crewsoffice", title:"Crews, office view", sub:"Day board, routes, schedules, log", who:"What the office uses", src:"crews.html?demo=admin", w:1180,
+    desc:"Every crew's day on one board, the routes, everyone's shifts, each crew's log, meetings, and See as to look through any crew member's eyes." },
+  { grp:"How it works" },
+  { id:"diweb", title:"Digital infrastructure web", sub:"Every system and how data moves", who:"Reference", src:"previews/system-map.html", full:true,
+    desc:"The map of the whole system: where each kind of data lives, which system owns it, and what carries it between systems. With a plain-language guide to every part." }
+];
+const WIDTHS = [["Phone",400],["iPad",820],["Computer",1180]];
+let cur = null, width = 400;
+function list(){
+  $("#list").innerHTML = ITEMS.map(x => x.grp ? `<p class="grp">${esc(x.grp)}</p>` : `<button class="item" data-id="${x.id}" aria-current="${cur&&cur.id===x.id}"><b>${esc(x.title)}</b><span>${esc(x.sub)}</span></button>`).join("");
+  $("#list").querySelectorAll("[data-id]").forEach(b => b.onclick = () => { pick(b.dataset.id); if(innerWidth<=900) $("#view").scrollIntoView({ behavior:"smooth" }); });
+}
+function pick(id){
+  cur = ITEMS.find(x => x.id === id) || ITEMS[1]; width = cur.w || 400;
+  history.replaceState(null, "", "#" + cur.id);
+  list(); show();
+}
+function show(){
+  const x = cur;
+  $("#view").innerHTML = `<h2>${esc(x.title)}</h2><div class="chips"><span class="chip who">${esc(x.who)}</span><span class="chip">Sample data</span></div>
+    <p class="desc">${esc(x.desc)}</p>${x.tryit?`<p class="try"><b>Try:</b> ${esc(x.tryit)}</p>`:""}
+    <div class="tools">${x.full ? "" : WIDTHS.map(([l,w])=>`<button data-w="${w}" aria-pressed="${w===width}">${l}</button>`).join("")}<button id="reload">Start over</button><span class="sp"></span><a href="${esc(x.src)}" target="_blank" rel="noopener">Open full screen ↗</a></div>
+    <div class="stage ${x.full?"full":""}"><div class="device" id="dev" style="width:${x.full?"100%":width+"px"}"><iframe id="fr" title="${esc(x.title)} preview" src="${esc(x.src)}"></iframe></div></div>`;
+  $("#view").querySelectorAll("[data-w]").forEach(b => b.onclick = () => { width = +b.dataset.w; $("#dev").style.width = width + "px"; $("#view").querySelectorAll("[data-w]").forEach(z => z.setAttribute("aria-pressed", String(z === b))); });
+  $("#reload").onclick = () => { const f = $("#fr"); f.src = x.src + (x.src.includes("?") ? "&" : "?") + "r=" + Date.now(); };
+}
+function start(email){
+  $("#who").textContent = email || ""; $("#gate").hidden = true; $("#app").hidden = false; $("#navBtn").hidden = false;
+  pick((location.hash || "").slice(1) || "signing");
+}
+// Admins only, the same check as every office page; signed out goes to the front door and comes back here.
+if(window.__previewsTest){ start(window.__previewsTest); }
+else {
+  firebase.initializeApp(firebaseConfig);
+  const auth = firebase.auth(), db = firebase.database();
+  auth.onAuthStateChanged(async user => {
+    if(!user){ location.replace("./?to=previews.html"); return; }
+    const email = user.email.toLowerCase();
+    try {
+      const mine = (await db.ref("allowed/" + email.replace(/\./g, ",")).once("value")).val() || {};
+      const tier = mine.tier || (email === ADMIN_EMAIL ? "admin" : "");
+      if(tier !== "admin"){ if(TIER_HOME[tier]) location.replace(TIER_HOME[tier]); else $("#gate").innerHTML = `<p>${esc(email)} is not on the admin list.</p>`; return; }
+      start(email);
+    } catch(e){ $("#gate").innerHTML = `<p>${esc(email)} could not be checked against the team list.</p>`; }
+  });
+}
+</script>
+<script>
+// Page menu: opens from the three-line button, closes with the X, a tap outside, Escape, or a swipe left.
+(function(){
+  const btn=document.getElementById("navBtn"), d=document.getElementById("pgDrawer"), bg=document.getElementById("pgDrawerBg"), x=document.getElementById("pgDrawerX");
+  const set=open=>{ d.classList.toggle("open",open); bg.classList.toggle("open",open); d.setAttribute("aria-hidden",String(!open)); btn.setAttribute("aria-expanded",String(open)); if(open) x.focus(); };
+  btn.onclick=()=>set(!d.classList.contains("open")); x.onclick=()=>set(false); bg.onclick=()=>set(false);
+  document.addEventListener("keydown",e=>{ if(e.key==="Escape" && d.classList.contains("open")) set(false); });
+  let x0=null; d.addEventListener("pointerdown",e=>{ x0=e.clientX; }); d.addEventListener("pointerup",e=>{ if(x0!=null && x0-e.clientX>60) set(false); x0=null; });
+})();
+</script>
+</body>
+</html>

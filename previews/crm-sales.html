@@ -1,0 +1,58 @@
+<!doctype html><html><head><meta name="robots" content="noindex, nofollow"><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>CRM Phone Sales</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;700;800&family=Source+Sans+3:wght@400;600&display=swap">
+<style>
+/* Layout: jump buttons for each part of the sale above a device frame running the real CRM with sample clients. */
+:root{--bg:#eef1ee;--fg:#16233a;--muted:#55636b;--line:#cdd5cf;--accent:#1f6b33;--chip:#ffffff;--frame:#1b2620;
+  --display:"Archivo",system-ui,sans-serif;--body:"Source Sans 3",system-ui,sans-serif}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#121815;--fg:#e4ebe6;--muted:#9aa8a0;--line:#2c3832;--accent:#5fbf78;--chip:#1b231f;--frame:#000;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#121815;--fg:#e4ebe6;--muted:#9aa8a0;--line:#2c3832;--accent:#5fbf78;--chip:#1b231f;--frame:#000;color-scheme:dark}
+body{background:var(--bg);color:var(--fg);font:16px/1.5 var(--body);padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:20px 32px}
+.wrap{max-width:1180px;margin:0 auto;display:grid;gap:14px}
+h1{font:800 clamp(22px,4vw,30px)/1.15 var(--display);margin:0;text-wrap:balance;letter-spacing:-.01em}
+.sub{color:var(--muted);margin:4px 0 0;max-width:72ch}
+.bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.bar .lbl{font:700 12px var(--display);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-right:4px;min-width:70px}
+button{font:600 14px var(--body);padding:8px 14px;border-radius:999px;border:1px solid var(--line);background:var(--chip);color:var(--fg);cursor:pointer;min-height:38px}
+button[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:#fff}
+button:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.stage{display:flex;justify-content:center}
+.device{background:var(--frame);border-radius:34px;padding:12px;max-width:100%;transition:width .25s}
+.device iframe{display:block;border:0;border-radius:24px;background:#fff;width:100%;height:min(860px,80vh)}
+.notes{color:var(--muted);font-size:15px;max-width:76ch;margin:0}
+.notes b{color:var(--fg)}
+@media (prefers-reduced-motion: reduce){.device{transition:none}}
+</style>
+<div class="wrap">
+  <div><h1>CRM phone sales flow</h1>
+  <p class="sub">The real CRM running on sample clients, with the signing service simulated. Charge and Refund change the sample data the way the real service does; nothing is charged. Built from the live CRM.</p></div>
+  <div class="bar" role="group" aria-label="Go to"><span class="lbl">Go to</span>
+    <button data-go="leads" aria-pressed="true">Leads board</button>
+    <button data-go="charges" aria-pressed="false">Charges to run</button>
+    <button data-go="servicelog" aria-pressed="false">Service log</button>
+    <button data-go="test" aria-pressed="false">Test agreement setup</button>
+    <button data-go="sent" aria-pressed="false">Sent screen</button>
+    <button data-go="service" aria-pressed="false">Signing service</button>
+    <button data-go="addchg" aria-pressed="false">Add a charge</button>
+    <button data-go="lights" aria-pressed="false">Lights install gate</button>
+    <button data-go="land" aria-pressed="false">Landscaping 50/50</button></div>
+  <div class="bar" role="group" aria-label="Screen"><span class="lbl">Screen</span>
+    <button data-w="1150" aria-pressed="true">Computer</button><button data-w="820" aria-pressed="false">iPad</button><button data-w="400" aria-pressed="false">Phone</button></div>
+  <div class="stage"><div class="device" id="dev" style="width:1150px"><iframe id="fr" title="CRM preview" src="crm-demo.html"></iframe></div></div>
+  <p class="notes"><b>Charges to run</b> now charges a card the customer saved on the signing page: <b>Charge card on file</b> (two taps), <b>Charge now</b> on install-day and later charges, <b>Try again</b> under Needs attention, and <b>Refund</b> on anything charged through QuickBooks Payments in the last 45 days. A GoPayment card still uses Charged and Declined. <b>Test agreement</b>: tick the box in the agreement setup to send a $1 agreement with no service; the second $1 waits in Charges to run. Test charges carry a TEST tag and are left out of the totals.</p>
+  <p class="notes"><b>New, October 15 (late):</b> <b>Add a charge</b> on any client bills a snow visit past 16 (the signed per-visit price fills in), a lights service call ($40 or $65), or anything else, then charges the saved card or waits in Charges to run. <b>The job-done gate</b>: ticking <b>Installed, all lit</b> on Marie's lights and saving makes her $462.50 balance due; setting Ed's mulch job to <b>Done</b> and saving makes his $620 balance due. Ed's second job shows <b>Bill 50/50</b>.</p>
+</div>
+<script>
+const fr=document.getElementById("fr"), dev=document.getElementById("dev");
+document.querySelectorAll("[data-w]").forEach(b=>b.onclick=()=>{ document.querySelectorAll("[data-w]").forEach(x=>x.setAttribute("aria-pressed",String(x===b))); dev.style.width=b.dataset.w+"px"; });
+const go={ leads:"setNav('leads')", servicelog:"setNav('servicelog')", charges:"setNav('charges')", test:"setNav('leads'); openSeasonal('c4'); setTimeout(()=>{ const t=document.getElementById('ss-test'); t.checked=true; t.dispatchEvent(new Event('change',{bubbles:true})); },150)",
+  sent:"setNav('leads'); showSentFor('c4')", service:"setNav('contracts')",
+  addchg:"setNav('clients'); openClient('a1'); setTimeout(()=>{ openChargeDlg('a1').then(()=>{ const r=document.querySelector('input[name=chgk][value=overage]'); r.checked=true; r.dispatchEvent(new Event('change')); }); },200)",
+  lights:"setNav('clients'); openClient('a1'); setTimeout(()=>document.querySelector('[data-bill=la1]').scrollIntoView({block:'center'}),250)",
+  land:"setNav('clients'); openClient('g1'); setTimeout(()=>document.querySelector('[data-bill=lx2]').closest('.svc').scrollIntoView({block:'center'}),250)" };
+document.querySelectorAll("[data-go]").forEach(b=>b.onclick=()=>{ document.querySelectorAll("[data-go]").forEach(x=>x.setAttribute("aria-pressed",String(x===b)));
+  fr.onload=()=>{ try{ setTimeout(()=>fr.contentWindow.eval(go[b.dataset.go]),700); }catch(e){} }; fr.src="crm-demo.html?r="+Date.now(); });
+</script>
+
+</body></html>

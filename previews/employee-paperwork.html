@@ -1,0 +1,56 @@
+<!doctype html><html><head><meta name="robots" content="noindex, nofollow"><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Employee Paperwork</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;700;800&family=Source+Sans+3:wght@400;600&display=swap">
+<style>
+/* Layout: grouped state chips above a device frame running the real page with sample answers; emails and the PDF below in the same frame style. */
+:root{--bg:#eef1ee;--fg:#16233a;--muted:#55636b;--line:#cdd5cf;--accent:#1f6b33;--chip:#ffffff;--frame:#1b2620;--warn:#a63b3b;
+  --display:"Archivo",system-ui,sans-serif;--body:"Source Sans 3",system-ui,sans-serif}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#121815;--fg:#e4ebe6;--muted:#9aa8a0;--line:#2c3832;--accent:#5fbf78;--chip:#1b231f;--frame:#000;--warn:#e07a7a;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#121815;--fg:#e4ebe6;--muted:#9aa8a0;--line:#2c3832;--accent:#5fbf78;--chip:#1b231f;--frame:#000;--warn:#e07a7a;color-scheme:dark}
+body{background:var(--bg);color:var(--fg);font:16px/1.5 var(--body);padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:20px 32px}
+.wrap{max-width:1180px;margin:0 auto;display:grid;gap:14px}
+h1{font:800 clamp(22px,4vw,30px)/1.15 var(--display);margin:0;text-wrap:balance;letter-spacing:-.01em}
+h2{font:800 20px/1.2 var(--display);margin:18px 0 0;text-wrap:balance}
+.sub{color:var(--muted);margin:4px 0 0;max-width:72ch}
+.bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.bar .lbl{font:700 12px var(--display);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-right:4px;min-width:110px}
+button{font:600 14px var(--body);padding:8px 14px;border-radius:999px;border:1px solid var(--line);background:var(--chip);color:var(--fg);cursor:pointer;min-height:38px}
+button[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:#fff}
+button.t{border-color:var(--warn);color:var(--warn)} button.t[aria-pressed="true"]{background:var(--warn);color:#fff}
+button:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.stage{display:flex;justify-content:center}
+.device{background:var(--frame);border-radius:34px;padding:12px;max-width:100%;transition:width .25s}
+.device iframe{display:block;border:0;border-radius:24px;background:#fff;width:100%;height:min(820px,78vh)}
+.notes{color:var(--muted);font-size:15px;max-width:76ch;margin:0}
+.pages{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,300px),1fr));gap:16px;align-items:start}
+.pg{width:100%;height:auto;display:block;background:#fff;border:1px solid var(--line);border-radius:4px;box-shadow:0 6px 18px rgba(0,0,0,.12)}
+.notes b{color:var(--fg)}
+.cap{font-size:15px;color:var(--muted);margin:0;max-width:76ch} .cap b{color:var(--fg)}
+@media (prefers-reduced-motion: reduce){.device{transition:none}}
+</style>
+<div class="wrap">
+  <div><h1>Employee paperwork</h1>
+  <p class="sub">The live paperwork page with a sample new crew member, Jordan Hale. Everything works here: the official W-4, MI-W4 and I-9 fill in, the signature lands on them, and each tax and bank form is locked with a vault made in this page before "sending". The agreement here is a short sample; the real one is the crew member employment agreement from Drive. Nothing leaves the page.</p></div>
+  <div class="bar" role="group" aria-label="Screen"><span class="lbl">Screen</span>
+    <button data-w="400" aria-pressed="true">Phone</button><button data-w="820" aria-pressed="false">iPad</button><button data-w="980" aria-pressed="false">Computer</button>
+    <button id="restart" type="button">Start over</button></div>
+  <div class="stage"><div class="device" id="dev" style="width:400px"><iframe id="fr" title="Paperwork page preview" src="paperwork-demo.html?t=PREVIEWTOKEN0000000000000&amp;s=PREVIEW"></iframe></div></div>
+  <p class="notes"><b>What the office sees:</b> each form flips to Signed on the Paperwork tab. Tax, I-9 and bank forms show only that they exist until someone with access enters the paperwork password. <b>What he sees after signing the offer:</b> his crew page opens; the forms he has not signed stay as cards on his Training tab.</p>
+  <h2>Emails he gets</h2>
+  <p class="cap">Rendered by the signing service's own code. All of them are sent from admin@mangbrothers.com.</p>
+  <div class="bar" role="group" aria-label="Email" id="emailBar"></div>
+  <p class="cap" id="emailCap"></p>
+  <div class="stage"><div class="device" style="width:640px"><iframe id="mail" title="Email preview"></iframe></div></div>
+</div>
+<script>
+const EMAILS = [{"title":"1. New-hire paperwork link","note":"Sent from admin@ when he is hired, and again from any Email button on the Paperwork tab.","subject":"Your Mangiapane Brothers new-hire paperwork","html":"<div style=\"font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;font-size:15px;line-height:1.5;color:#16233a;max-width:560px\">\n    <img src=\"mb-logo.png\" alt=\"Mangiapane Brothers\" width=\"150\" style=\"display:block;margin:0 0 14px\"><p>Hello Jordan,</p>\n    <p>Welcome to Mangiapane Brothers. Your new-hire paperwork is ready to sign online:</p><ul><li>Employment or contractor agreement</li><li>Form W-4</li><li>Form MI-W4</li><li>Form I-9 (Section 1)</li><li>Direct deposit authorization</li></ul>\n    <p style=\"margin:20px 0\"><a href=\"https://apps.mangbrothers.com/paperwork.html?t=tok_abcdefghijklmnopqrstuv&amp;s=PREVIEW\" style=\"background:#1f6b33;color:#ffffff;text-decoration:none;font-weight:bold;padding:14px 24px;border-radius:8px;display:inline-block\">Open my paperwork</a></p>\n    <p>It takes about fifteen minutes on your phone. Have your Social Security number and, for direct deposit, your bank's routing and account numbers ready. Your tax and bank forms are locked on your phone before they are sent, and only the owner can open them.</p>\n    <p>This link is for you only. The same forms are on the Training tab once you sign in. Questions: reply here or call 734-450-2400.</p>\n    <p style=\"margin-top:22px;color:#4a5a62;font-size:13px\">Mangiapane Brothers<br>Full-Service Property Maintenance for Those Who Take Pride in Their Home<br>734-450-2400 · admin@mangbrothers.com</p></div>"},{"title":"1b. One form (the Email button under a form)","note":"","subject":"Your Mangiapane Brothers new-hire paperwork","html":"<div style=\"font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;font-size:15px;line-height:1.5;color:#16233a;max-width:560px\">\n    <img src=\"mb-logo.png\" alt=\"Mangiapane Brothers\" width=\"150\" style=\"display:block;margin:0 0 14px\"><p>Hello Jordan,</p>\n    <p>Welcome to Mangiapane Brothers. Your new-hire paperwork is ready to sign online:</p><ul><li>Form I-9 (Section 1)</li></ul>\n    <p style=\"margin:20px 0\"><a href=\"https://apps.mangbrothers.com/paperwork.html?t=tok_abcdefghijklmnopqrstuv&amp;s=PREVIEW\" style=\"background:#1f6b33;color:#ffffff;text-decoration:none;font-weight:bold;padding:14px 24px;border-radius:8px;display:inline-block\">Open my paperwork</a></p>\n    <p>It takes about fifteen minutes on your phone. Have your Social Security number and, for direct deposit, your bank's routing and account numbers ready. Your tax and bank forms are locked on your phone before they are sent, and only the owner can open them.</p>\n    <p>This link is for you only. The same forms are on the Training tab once you sign in. Questions: reply here or call 734-450-2400.</p>\n    <p style=\"margin-top:22px;color:#4a5a62;font-size:13px\">Mangiapane Brothers<br>Full-Service Property Maintenance for Those Who Take Pride in Their Home<br>734-450-2400 · admin@mangbrothers.com</p></div>"},{"title":"2. Signed agreement copy","note":"To him and to admin@, with the signed PDF attached. Tax and bank forms are never emailed.","subject":"Your signed Mangiapane Brothers agreement","html":"<div style=\"font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;font-size:15px;line-height:1.5;color:#16233a;max-width:560px\">\n    <img src=\"mb-logo.png\" alt=\"Mangiapane Brothers\" width=\"150\" style=\"display:block;margin:0 0 14px\"><p>Hello Jordan,</p><p>Your signed employment or contractor agreement is attached. Keep it for your records.</p>\n    <p style=\"margin-top:22px;color:#4a5a62;font-size:13px\">Mangiapane Brothers<br>Full-Service Property Maintenance for Those Who Take Pride in Their Home<br>734-450-2400 · admin@mangbrothers.com</p></div>"}];
+const fr=document.getElementById("fr"), dev=document.getElementById("dev");
+document.querySelectorAll("[data-w]").forEach(b=>b.onclick=()=>{ document.querySelectorAll("[data-w]").forEach(x=>x.setAttribute("aria-pressed",String(x===b))); dev.style.width=b.dataset.w+"px"; });
+document.getElementById("restart").onclick=()=>{ fr.src="paperwork-demo.html?t=PREVIEWTOKEN0000000000000&s=PREVIEW&r="+Date.now(); };
+const bar=document.getElementById("emailBar"), mail=document.getElementById("mail"), cap=document.getElementById("emailCap");
+const show=i=>{ const e=EMAILS[i]; mail.srcdoc='<meta charset="utf-8"><body style="margin:16px;background:#fff">'+e.html+'</body>'; cap.innerHTML="<b>Subject:</b> "+e.subject.replace(/&/g,"&amp;").replace(/</g,"&lt;")+(e.note?" · "+e.note:""); bar.querySelectorAll("button").forEach((x,j)=>x.setAttribute("aria-pressed",String(j===i))); };
+EMAILS.forEach((e,i)=>{ const b=document.createElement("button"); b.type="button"; b.textContent=e.title.replace(/^\d+[a-z]?\.\s*/,""); b.onclick=()=>show(i); bar.appendChild(b); });
+show(0);
+</script>
+</body></html>

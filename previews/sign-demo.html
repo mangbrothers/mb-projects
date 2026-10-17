@@ -1,0 +1,475 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="referrer" content="no-referrer">
+<title>Signing page preview</title>
+<!--
+  Customer page for agreements emailed from the CRM (phone sales). One link: read the quote and agreement,
+  sign with a typed name, choose a payment method (card first; bank account and check under More options),
+  then a confirmation page. It holds nothing private. The link carries a one-time token (t) and the address
+  of the signing service (s), a Google Apps Script on admin@mangbrothers.com. Card and bank numbers are
+  never received or stored by Mangiapane Brothers: the card form here sends the card straight to Intuit (QuickBooks Payments)
+  for a one-time token. If the signing service switches card mode off, the card step emails a QuickBooks page instead.
+  Agreement numbers starting TEST- are test agreements: a red banner on every step, no service, $1 charges.
+-->
+<style>
+  :root{color-scheme:light dark;
+    --bg:#f3f5f2;--card:#ffffff;--line:#d5dbd3;--ink:#16233a;--ink2:#4a5a62;--muted:#768276;
+    --brand:#1f6b33;--brand-ink:#ffffff;--brand-soft:#e3f0e5;--red:#a63b3b;--amber:#7a4f0e;--amber-soft:#fbf1dc;--amber-line:#d9a441}
+  @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+    --bg:#101612;--card:#18211b;--line:#2d3a30;--ink:#e8efe9;--ink2:#b4c2b6;--muted:#82907f;
+    --brand:#5fbf78;--brand-ink:#0f1511;--brand-soft:#173322;--red:#e07a7a;--amber:#f0c674;--amber-soft:#3a2d14;--amber-line:#8a6a2a}}
+  :root[data-theme="dark"]{
+    --bg:#101612;--card:#18211b;--line:#2d3a30;--ink:#e8efe9;--ink2:#b4c2b6;--muted:#82907f;
+    --brand:#5fbf78;--brand-ink:#0f1511;--brand-soft:#173322;--red:#e07a7a;--amber:#f0c674;--amber-soft:#3a2d14;--amber-line:#8a6a2a}
+  *{box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%}
+  body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;padding-bottom:84px}
+  a{color:var(--brand)}
+  header{background:var(--card);border-bottom:1px solid var(--line);padding:12px 16px}
+  header .in{max-width:760px;margin:0 auto;display:flex;align-items:center;gap:12px}
+  header img{height:46px;width:auto;background:#fff;border-radius:4px}
+  header .tag{margin-left:auto;text-align:right;color:var(--ink2);font-size:13px;line-height:1.3;max-width:300px}
+  main{max-width:760px;margin:0 auto;padding:16px}
+  .steps{display:flex;gap:6px;margin:0 0 12px;font-size:13px;color:var(--ink2);flex-wrap:wrap}
+  .steps span{padding:4px 10px;border-radius:999px;border:1px solid var(--line);background:var(--card)}
+  .steps span.on{background:var(--brand);color:var(--brand-ink);border-color:var(--brand);font-weight:700}
+  .steps span.ok{border-color:var(--brand);color:var(--brand)}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px 18px;margin:0 0 14px}
+  .card h1{font-size:22px;margin:0 0 6px}
+  .card h2{font-size:18px;margin:0 0 6px}
+  .meta{color:var(--ink2);font-size:14px}
+  .quote{width:100%;border-collapse:collapse;font-size:15px;margin:8px 0 0}
+  .quote td{padding:8px 0;border-bottom:1px solid var(--line);vertical-align:top}
+  .quote td:first-child{padding-right:12px}
+  .quote td:last-child{text-align:right;padding-left:0;overflow-wrap:anywhere}
+  .quote tr.big td:last-child,.quote td.amt{white-space:nowrap}
+  .quote sup{font-size:.75em;line-height:0;color:var(--ink2)}
+  .totals{margin-top:12px;border-top:2px solid var(--ink);padding-top:2px}
+  .totals.solo{border-top:0;margin-top:8px;padding-top:0}
+  .trow{display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding:10px 0}
+  .trow>span:last-child{white-space:nowrap;text-align:right}
+  .trow.tot{font-weight:700;font-size:17px}
+  .trow.today{background:var(--brand-soft);color:var(--ink);font-weight:800;font-size:19px;margin:2px -12px;padding:12px;border-radius:8px}
+  .trow.later{font-size:15px;color:var(--ink2);padding-top:8px}
+  .foot{font-size:13px;color:var(--ink2);margin:10px 0 0}
+  .three{align-items:end}
+  .quote tr.big td{font-weight:700;font-size:17px}
+  .doc{background:#fff;color:#16233a;border:1px solid #d3dae3;border-radius:8px;padding:24px 22px;margin:0 0 14px;font:16px/1.55 Georgia,"Times New Roman",serif}
+  .doc h2{font:700 21px/1.25 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;margin:0 0 12px}
+  .doc h3{font:700 16px/1.3 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;margin:20px 0 6px}
+  .doc h4{font:700 15px/1.3 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;margin:16px 0 4px}
+  .doc p{margin:0 0 10px} .doc ul,.doc ol{margin:0 0 10px;padding-left:24px}
+  .doc table{width:100%;border-collapse:collapse;margin:6px 0 14px;font:15px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+  .doc th{background:#1f3864;color:#fff;text-align:left;font-weight:700;padding:8px 10px;font-size:13px;border:1px solid #1f3864}
+  .doc td{border:1px solid #b9bec7;padding:7px 10px;color:#16233a;vertical-align:top}
+  .doc td.r{text-align:right;white-space:nowrap;width:120px;font-weight:600}
+  .doc tr.tot td{background:#f3ebd3;font-weight:700}
+  .ssahead{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;border-bottom:1px solid #b9bec7;padding-bottom:8px;margin-bottom:14px;font:14px/1.3 -apple-system,sans-serif;color:#5d6470}
+  .ssahead img{height:52px;width:auto} .ssahead span{text-align:right}
+  .notice{border:2px dashed #16233a}
+  .notice h3{margin-top:0;text-align:center;letter-spacing:.04em}
+  label.ck{display:flex;gap:12px;align-items:flex-start;margin:4px 0 14px;font-size:15px;cursor:pointer}
+  label.ck input{width:24px;height:24px;flex:none;margin:1px 0 0;accent-color:var(--brand)}
+  .field label{display:block;font-size:14px;color:var(--ink2);margin:0 0 4px}
+  .field input{width:100%;font:22px/1.3 "Brush Script MT","Segoe Script","Snell Roundhand",cursive;padding:10px 12px;border:1px solid var(--line);border-bottom:2px solid var(--ink);border-radius:8px 8px 0 0;background:var(--card);color:var(--ink)}
+  button,.btn{font:inherit;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--ink);padding:9px 14px;min-height:44px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;text-decoration:none}
+  .primary{background:var(--brand);color:var(--brand-ink);border-color:var(--brand);font-weight:700;font-size:17px;padding:12px 20px}
+  .wide{width:100%}
+  button:disabled{opacity:.55;cursor:default}
+  .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  .err{color:var(--red);font-weight:600;margin:10px 0 0}
+  .bar{position:fixed;left:0;right:0;bottom:0;background:#1f3864;color:#fff;padding:10px 16px calc(10px + env(safe-area-inset-bottom,0px));display:flex;justify-content:space-between;align-items:center;gap:12px;z-index:5}
+  .bar b{font-size:20px;margin-left:6px}
+  .bar button{background:#fff;color:#1f3864;border:0;font-weight:700;flex:none}
+  .opt{border:1px solid var(--line);border-radius:10px;padding:14px;margin-top:10px}
+  .opt.main{border:2px solid var(--brand);background:var(--brand-soft)}
+  .opt h3{margin:0 0 4px;font-size:17px}
+  .opt p{margin:0 0 10px;color:var(--ink2);font-size:15px}
+  .more{background:none;border:0;color:var(--brand);font-weight:600;padding:12px 0 0;min-height:0}
+  .field2{margin:0 0 12px;position:relative}
+  .field2 label{display:block;font-size:14px;color:var(--ink2);margin:0 0 4px}
+  .field2 input,.field2 select{width:100%;font-size:18px;padding:12px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink);box-sizing:border-box;min-height:48px}
+  .field2 .brand{position:absolute;right:12px;top:40px;font-size:13px;font-weight:700;color:var(--ink2)}
+  .two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .three{display:grid;grid-template-columns:1.2fr 1fr 1fr;gap:10px}
+  .testbar{border:2px solid var(--red);color:var(--red);border-radius:10px;padding:10px 14px;font-weight:700;margin:0 0 12px;background:var(--card)}
+  .banner{background:var(--amber-soft);color:var(--amber);border:1px solid var(--amber-line);border-radius:10px;padding:12px 14px;font-weight:700;margin:0 0 12px}
+  .done{border-color:var(--brand);background:var(--brand-soft)}
+  .tick{display:inline-flex;width:34px;height:34px;border-radius:50%;background:var(--brand);color:var(--brand-ink);align-items:center;justify-content:center;font-weight:700;margin-right:8px;vertical-align:-6px}
+  .center{text-align:center;padding:40px 16px;color:var(--ink2)}
+  @media(max-width:520px){.doc{padding:16px 14px;font-size:15.5px}.doc td.r{width:auto}header img{height:38px}header .tag{display:none}}
+  @media print{header,.bar,#signCard,.steps,button,.btn{display:none!important}body{background:#fff;padding:0}.doc{border:0;padding:0}main{max-width:none;padding:0}}
+</style>
+</head>
+<body>
+<header><div class="in"><img src="mb-logo.png" alt="Mangiapane Brothers Lawn &amp; Snow"><div class="tag">Full-Service Property Maintenance for Those Who Take Pride in Their Home</div></div></header>
+<main id="main"><div class="center">Loading your agreement…</div></main>
+
+<script>
+(function(){
+  const R = {"text": "# SEASONAL SERVICES AGREEMENT\n\nFall Cleanup \u2022 Snow & Ice Removal\n\n**Agreement No.:** MB-20261015-WR1I\n**Effective Date:** October 15, 2026\n\nThis Seasonal Services Agreement is entered into by and between **Mangiapane Brothers LLC** (the \u201cCompany\u201d) and the customer identified below (the \u201cCustomer\u201d). The Company and the Customer are each a \u201cParty\u201d and together the \u201cParties.\u201d The Parties agree as follows:\n\n## Article 1: Parties, Property and Term\n\n|= | Customer Information\n| Name | Linda Park\n| Address | 14320 Merriman Rd, Livonia\n| Phone | 734-555-0190\n| Email | linda@example.com\n| Second email | linda2@example.com\n\n**1.1 Service Property.** The services will be performed at: 14320 Merriman Rd, Livonia\n\n**1.2 Property Type.** Residential\n\n**1.3 Service Areas.** Driveway, apron, front walk to the door, porch steps, and the public sidewalk across the front of the lot.\n\n**1.4 Term.** This Agreement begins on the Effective Date and covers the season(s) below. It ends when the last selected season ends unless renewed in writing.\n\n|= Service | Timeframe\n| Fall Cleanup | Two visits, October to November, timed to the city leaf pickup for the Property's section\n| Snow & Ice Removal | November 1 to March 15\n\n## Article 2: Services and Pricing\n\nThe Customer purchases only the services listed below at the prices stated. All prices include card processing; there is no separate card fee.\n\n### 2.1 Fall Cleanup\n\n**Full Fall Cleanup.** Two leaf visits timed to the city curbside pickup for the Property's section; gutters cleared on the final visit; a look at the roof from the ladder; flower beds cleared of leaves and debris; sticks and branches gathered; everything blown to the curb for city pickup. Not included: bed cleanouts, mulch, bagging or hauling, and written roof inspections. Fall Cleanup is available in Livonia only.\n\n|= Item | Price\n| Full Fall Cleanup, South Livonia | $450\n|+ Fall Cleanup Total | $450\n\n### 2.3 Snow Removal\n\n|= Item | Price\n| Standard lot, season, South Livonia | $570\n|+ Snow Removal Season Total | $570\n| Each visit after the sixteenth (Section 4.8) | $45\n\n## Article 3: Fall Cleanup Terms\n\n**3.1 Scheduling.** The Company schedules two visits, each timed to the city curbside leaf pickup for the Property's section. Gutters are cleared on the final visit.\n\n**3.2 Debris Disposal.** Leaves and yard waste are blown to the curb for the city's collection service. The Company does not bag or haul leaves.\n\n**3.3 Gutters.** Gutter cleaning covers gutters safely reachable by ladder. If the crew determines a gutter is unsafe to clean, the Company will notify the Customer.\n\n**3.4 Concealed Items.** The Company is not responsible for damage to items concealed by leaves or vegetation, including hoses, toys, unmarked sprinkler heads and low-voltage wiring.\n\n## Article 4: Snow and Ice Removal Terms\n\n**4.1 Trigger Depth.** Service is performed when 1 inch or more of snow has accumulated, as measured by the Company at the Property. Drifting snow does not count toward the trigger depth.\n\n**4.2 Timing.** The Company is not required to begin service until a storm has stopped, and will clear the Property within 24 hours after the storm stops. The Company determines when a storm has stopped. The Company may, at its sole discretion, begin clearing during a storm and make more than one pass. Passes made during a storm that brings 5 inches or less count as one visit together with the pass after it; when a storm brings more than 5 inches, each pass counts as a separate visit. The Company does not guarantee completion by a specific time.\n\n**4.3 Route Priority.** The Company sets its service routes to serve every customer in an efficient and timely manner. Commercial and emergency-access accounts may be serviced first.\n\n**4.4 Municipal Plow Windrows.** Snow deposited at the driveway apron by city or county plows after a Company visit will be cleared on the next visit, unless the Customer requests a return trip. A return trip counts as a visit under Section 4.8.\n\n**4.5 Salt and Ice.** Salt is applied to the cleared areas after every visit. Snow removal does not eliminate all ice. The Customer acknowledges that melting, refreezing and runoff can create ice between visits that is outside the Company\u2019s control.\n\n**4.6 Snow Placement.** The Company will pile snow in reasonable locations on the Property and will not push snow into public streets.\n\n**4.7 Site Markers.** The Company may install stakes or markers along drive edges, curbs, beds and fixtures before the first snowfall. The Customer shall leave markers in place until the season ends. If they are removed, the Customer is liable for any resulting damage.\n\n**4.8 Season Limit.** The season price covers up to sixteen (16) visits, counted under Section 4.2. Each visit after the sixteenth is charged to the payment method on file after that visit, at the per-visit rate in Section 2.3 ($45).\n\n**4.9 Service Hours.** The Company does not operate equipment at residential properties before 7:00 a.m. or after 11:00 p.m.\n\n**4.10 Visit Photos.** The Company takes a time-stamped photo of the Property after every visit and sends it to the Customer. These photos are the Company\u2019s record that the visit was made.\n\n## Article 6: Payment Terms\n\n**6.1 Payment Schedule.** Fall Cleanup and Snow Removal are paid in full at signing. Holiday Lighting is paid fifty percent (50%) at signing and the balance on the day installation is complete. Visits past the season limit are charged under Section 4.8, and additional lighting service calls under Section 5.4. No service is scheduled until the amount due at signing has been paid.\n\n**6.2 Payment Method on File.** The Customer shall keep a valid credit or debit card on file with the Company for the length of this Agreement. With the Company\u2019s approval, the Customer may instead keep a bank account on file for electronic (ACH) payment. A Customer who does not keep a payment method on file may instead pay every amount under this Agreement in advance by check at signing, payable to Mangiapane Brothers LLC; no service is scheduled until the check is received. Payment information is stored by the Company\u2019s payment processor, QuickBooks Payments (Intuit Inc.). The Company keeps only the card brand and last four digits.\n\n**6.3 Due Dates and Declined Payments.** Each amount is due on the day stated in this Agreement. If a charge to the payment method on file is declined or fails for any reason, including an expired card or insufficient funds, the amount is past due as of that day. The Company will notify the Customer, and the Customer shall pay the amount or provide a working payment method. While any amount is past due, the Company may retry the charge, suspend service, and collect the amount under Section 6.5. Suspension does not reduce the amount owed. Any additional time the Company allows is at its discretion and does not waive this Section.\n\n**6.4 Reversed Payments.** If a payment is reversed, charged back, or returned after the Company has performed the service it paid for, the amount remains due, and the Customer shall also pay any fees the Company is charged for the reversal.\n\n**6.5 Collection Costs.** To the extent permitted by Michigan law, the Customer shall pay reasonable collection costs and attorney fees incurred by the Company to collect any unpaid balance.\n\n**6.6 Billing Disputes.** The Customer must dispute any charge in writing (text or email is acceptable) within 30 days of the receipt for it. Undisputed amounts remain due when payable.\n\n**6.7 Authorization to Charge.** By signing this Agreement, the Customer authorizes Mangiapane Brothers LLC to charge the payment method on file, without a separate approval each time, for: (a) each amount due under Section 6.1 when it comes due; (b) visits after the season limit under Section 4.8; (c) additional lighting service calls under Section 5.4; (d) replacement of Company materials under Section 5.2; and (e) any additional service the Customer requests in writing (text or email is acceptable) at the price agreed for it. This authorization remains in effect until every amount owed under this Agreement has been paid. The Customer may replace the payment method on file at any time by contacting the Company.\n\n**6.8 Receipts.** The Company emails a receipt for every charge to the email address(es) in Article 1, showing the service, the Property, the date of service, and the amount. The Company does not send notice before a charge; the receipt is the Customer\u2019s record. Charges appear on statements as Mangiapane Brothers.\n\n|= Payment Summary | Amount\n| 2.1 Fall Cleanup | $450\n| 2.3 Snow Removal (season) | $570\n|+ Charged at signing (Section 6.1) | $1,020\n| Each snow visit after the sixteenth, charged after the visit | $45\n\n## Article 7: Customer Obligations\n\nThe Customer shall:\n\n**7.1** Provide access to all service areas, including unlocked gates.\n\n**7.2** Keep service areas clear of vehicles, refuse containers, toys, hoses and other objects. Blocked areas may be skipped or serviced around and will still be charged.\n\n**7.3** Identify or mark concealed or fragile items before service, including sprinkler heads, landscape lighting, buried cables, invisible pet fencing, low walls, decorative stones and curbing.\n\n**7.4** Keep pets secured during service visits.\n\n**7.5** Report any damage or service deficiency in writing (text or email is acceptable) within forty-eight (48) hours of the visit, with photographs when possible. Late claims may be denied.\n\n**7.6** Promptly notify the Company of changes to the Property, including new landscaping, construction, or a change in ownership or occupancy.\n\n**Pre-existing conditions noted at signing:** None noted\n\n## Article 8: Insurance, Liability and Force Majeure\n\n**8.1 Insurance.** The Company maintains general liability insurances related to the services provided.\n\n**8.2 Repair of Damage.** If the Company\u2019s negligence damages the Property, the Company will, at its option, repair the damage or pay the reasonable cost of repair, provided the Customer gives timely notice under Section 7.5.\n\n**8.3 Exclusions.** The Company is not responsible for: ordinary wear to turf, lawn edges and gravel from plowing; damage to concealed, unmarked or undisclosed items; pre-existing conditions; effects of ordinary salt or ice-melt use (including concrete scaling and damage to plants or turf) where such service was requested; or damage to concrete, asphalt or pavers in poor condition.\n\n**8.4 Changing Conditions.** Snow and ice conditions may change after the Company leaves the Property. The Customer remains responsible for monitoring the Property between visits, warning visitors of hazards, and requesting additional service when needed. The Company is responsible only for its own negligence in performing the services selected in Article 2.\n\n**8.5 Limitation of Liability.** Except for gross negligence or willful misconduct, the Company\u2019s total liability under this Agreement shall not exceed the amount paid by the Customer for the season in which the claim arose. Neither Party is liable for indirect, incidental or consequential damages, including lost profits or rental income.\n\n**8.6 Force Majeure.** The Company is not in breach for delays or failures caused by severe weather, travel bans, equipment failure, fuel shortages, illness, road closures or other events beyond its reasonable control. Service will resume as soon as reasonably practicable.\n\n## Article 9: Cancellation and Termination\n\n**9.1 Customer\u2019s Three-Day Right to Cancel.** The Customer may cancel this Agreement, without any penalty or obligation, at any time before midnight of the third business day after the date of this Agreement, by written notice to the Company. If the Customer cancels within that period, the Company will refund all payments made under this Agreement, to the original payment method, within 10 business days after receiving the notice. See the Notice of Cancellation at the end of this Agreement.\n\n**9.2 By Company.** The Company may terminate this Agreement on 3 days\u2019 written notice, or immediately for non-payment, unsafe conditions, or abusive conduct toward Company personnel. The Company will refund prepaid amounts for services not performed, to the original payment method.\n\n**9.3 No Automatic Renewal.** This Agreement does not renew automatically. The Company may offer renewal in writing before the next season.\n\n## Article 10: General Provisions\n\n**10.1 Independent Contractor.** The Company is an independent contractor and controls the means, methods, equipment, and personnel used to perform the services, and may use subcontractors.\n\n**10.2 Photographs.** The Company photographs the Property before and after service. Photos may be sent to the Customer with receipts and visit records and are kept as the Company\u2019s service records.\n\n**10.3 Entire Agreement; Amendments.** This Agreement, with any attached exhibits, is the entire agreement of the Parties and supersedes all prior discussions. Amendments must be in writing and signed or confirmed by email by both Parties.\n\n**10.4 Governing Law; Venue.** This Agreement is governed by the laws of the State of Michigan. Any dispute shall be brought in the courts of Wayne County, Michigan, including small claims court where eligible.\n\n**10.5 Severability.** If any provision is held unenforceable, the remaining provisions remain in full force and effect.\n\n**10.6 Notices.** Notices under this Agreement may be delivered by hand, mail, or email to the addresses in Article 1.\n\n**10.7 Counterparts; Electronic Signatures and Records.** This Agreement may be signed in counterparts and by electronic signature, each of which is deemed an original. The Customer agrees to receive this Agreement, the Notice of Cancellation, receipts, and other notices electronically at the email address(es) in Article 1, and may ask for a paper copy at any time at no charge.\n\n## Signatures\n\nIN WITNESS WHEREOF, the Parties have executed this Agreement as of the dates below.\n\n**You, the buyer, may cancel this transaction at any time prior to midnight of the third business day after the date of this transaction. See the attached notice of cancellation form for an explanation of this right. Additionally, the seller is prohibited from having an independent courier service or other third party pick up your payment at your residence before the end of the 3-business-day period in which you can cancel the transaction.**\n\n**If you cancel within that period, all payments you have made will be refunded in full within 10 business days after the Company receives your cancellation notice.**", "notice": "## NOTICE OF CANCELLATION\n\n**Date of transaction:** October 15, 2026\n**Agreement No.:** MB-20261015-WR1I\n\nYou may cancel this transaction, without any penalty or obligation, within three business days from the above date.\n\nIf you cancel, any property traded in, any payments made by you under the contract or sale, and any negotiable instrument executed by you will be returned within 10 business days following receipt by the seller of your cancellation notice, and any security interest arising out of the transaction will be cancelled.\n\nIf you cancel, you must make available to the seller at your residence, in substantially as good condition as when received, any goods delivered to you under this contract or sale; or you may, if you wish, comply with the instructions of the seller regarding the return shipment of the goods at the seller\u2019s expense and risk.\n\nIf you do make the goods available to the seller and the seller does not pick them up within 20 days of the date of your notice of cancellation, you may retain or dispose of the goods without any further obligation. If you fail to make the goods available to the seller, or if you agree to return the goods to the seller and fail to do so, then you remain liable for performance of all obligations under the contract.\n\nTo cancel this transaction, mail or deliver a signed and dated copy of this cancellation notice or any other written notice to **Mangiapane Brothers LLC**, at **3540 Thorn Tree Ct., Ann Arbor, MI 48105**, or by email to **admin@mangbrothers.com**, not later than midnight of **October 19, 2026**.\n\nQuestions about cancelling: call Mangiapane Brothers LLC at **734-450-2400**.\n\n**I hereby cancel this transaction.**\n\nDate: ______________________________\nBuyer\u2019s signature: ______________________________", "lines": [["Fall Cleanup", 450], ["Snow Removal, season", 570]], "amount": 1020, "dueNow": 1020, "agreementNo": "MB-20261015-WR1I", "companySigner": "Russel"};
+  const st = (location.hash||"").slice(1);
+  const test = st.startsWith("test");
+  const base = { ok:true, signerName:"Linda Park", to:["linda@example.com"], agreementNo:R.agreementNo, tplName:"Seasonal Services Agreement", total:R.amount, dueNow:R.dueNow, dueInstall:0, perVisit:45,
+    lines:R.lines, cardMode:"token", payEnv:"production", captchaKey:"DEMO", check:{ payable:"Mangiapane Brothers LLC", mailTo:"3540 Thorn Tree Ct., Ann Arbor, MI 48105", amount:R.amount, memo:R.agreementNo } };
+  if(test) Object.assign(base, { test:true, agreementNo:"TEST-20261015-AB12", tplName:"Test Agreement", total:2, dueNow:1, perVisit:null, lines:[["Test charge at signing",1],["Test charge, later",1]],
+    check:{ payable:"Mangiapane Brothers LLC", mailTo:"3540 Thorn Tree Ct., Ann Arbor, MI 48105", amount:2, memo:"TEST-20261015-AB12" } });
+  const ready = Object.assign({}, base, { status:"ready", text:test ? "# TEST AGREEMENT\n\n**TEST AGREEMENT. No service will be performed. Charges are $1.00 and can be refunded.**\n\n**Agreement No.:** TEST-20261015-AB12\n**Effective Date:** October 15, 2026\n\nThis test agreement is between **Mangiapane Brothers LLC** (the \u201cCompany\u201d) and the person named below (the \u201cCustomer\u201d). Its only purpose is to test the Company's signing and payment system.\n\n|= Customer | \n| Name | Linda Park\n| Email | linda@example.com\n\n## 1. No Service\n\nThe Company will not perform any service under this agreement, and the Customer is not buying any service.\n\n## 2. Charges\n\n|= Item | Price\n| Test charge at signing | $1\n| Test charge, later | $1\n|+ Total | $2\n\nThe Customer authorizes Mangiapane Brothers LLC to charge the card on file $1.00 when this agreement is signed, and $1.00 once more on a later date. A receipt is emailed for every charge. Payments are processed by QuickBooks Payments, provided by Intuit Payments Inc.\n\n## 3. Refunds\n\nThe Company will void or refund both charges in full on request, and may do so without a request.\n\n## 4. Electronic Signature\n\nThe Customer may sign by typing their name. The Customer agrees to receive this agreement, receipts and notices by email at the address above." : R.text, notice:R.notice, todayLong:"October 15, 2026", companySigner:R.companySigner, expiresAt:Date.now()+6*864e5 });
+  const signed = Object.assign({}, base, { status:"signed", signedAt:Date.now(), cancelByLong:"October 19, 2026", pay:null });
+  const saved = Object.assign({}, signed, { pay:{ choice:"card", at:1, detailsAt:2 }, payLabel:"Visa ending 8954", chargedNow:"charged" });
+  let declines = 0;
+  const first = { "":ready, test:ready, pay:signed, decline:signed, captcha:signed, blocked:signed, locked:Object.assign({}, signed, { declines:2 }), lost:signed, testpay:signed,
+    done:saved, pending:Object.assign({}, saved, { chargedNow:"pending" }), testdone:Object.assign({}, saved, { chargedNow:"charged" }), link:Object.assign({}, signed, { pay:{ choice:"card", at:1, link:true } }),
+    check:Object.assign({}, signed, { pay:{ choice:"check", at:1 } }), expired:{ ok:true, status:"expired" }, cancelled:{ ok:true, status:"cancelled" } }[st] || ready;
+  let view = first;
+  const J = o => new Response(JSON.stringify(o), { status:200, headers:{ "Content-Type":"application/json" } });
+  window.fetch = async (url, opts={}) => {
+    const u = String(url);
+    if(u.includes("intuit.com")){ if(st==="blocked") throw new TypeError("Load failed"); await new Promise(r=>setTimeout(r,500)); return J({ value:"demo-token" }); }
+    if(u.includes("script.google.com")){
+      await new Promise(r=>setTimeout(r,450));
+      if(!opts.body) return J(view);
+      const b = JSON.parse(opts.body);
+      if(b.action==="sign") return J(view = signed);
+      if(b.action==="pay") return J(view = Object.assign({}, signed, { pay:{ choice:b.choice, at:1, link:!!b.link } }));
+      if(b.action==="paydetails"){
+        if(st==="decline"){ return J({ ok:false, error:"Your card was declined, so nothing was charged. Try a different card, or call 734-450-2400." }); }
+        if(st==="locked"){ return J({ ok:false, locked:true, error:"Your card was declined, so nothing was charged. For your security, card entry is now closed for this link. Tap \"Email me a secure QuickBooks page instead\", or call 734-450-2400." }); }
+        if(st==="lost"){ view = Object.assign({}, signed, { pay:{ choice:"card", at:1, detailsAt:2 }, payBusy:{ attempt:b.attempt, at:Date.now() } }); throw new TypeError("Failed to fetch"); }
+        return J(view = Object.assign({}, saved));
+      }
+    }
+    return J({ ok:false });
+  };
+  // Waits in the page are shortened so every state shows within a few seconds.
+  const st0 = window.setTimeout; window.setTimeout = (f, ms, ...a) => st0(f, ms===3000 ? 150 : ms, ...a);
+  window.__demoState = st;
+})();
+</script>
+<script>
+"use strict";
+const PHONE = "734-450-2400", EMAIL = "admin@mangbrothers.com";
+const q = new URLSearchParams(location.search);
+const TOKEN = (q.get("t")||"").replace(/[^\w-]/g,""), DEPLOY = (q.get("s")||"").replace(/[^\w-]/g,"");
+const SVC = DEPLOY ? `https://script.google.com/macros/s/${DEPLOY}/exec` : "";
+const $ = s => document.querySelector(s);
+const esc = s => String(s==null?"":s).replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const money = v => { if(v===""||v==null||isNaN(+v)) return ""; const n=+v, neg=n<0, a=Math.abs(n), cents=Math.round(a*100)%100!==0; return (neg?"−":"")+"$"+a.toLocaleString("en-US",{minimumFractionDigits:cents?2:0,maximumFractionDigits:2}); };
+const fmtStamp = ms => ms ? new Date(ms).toLocaleString("en-US",{timeZone:"America/Detroit",month:"long",day:"numeric",year:"numeric",hour:"numeric",minute:"2-digit"}) : "";
+const first = A => String(A.signerName||"").split(" ")[0];
+const contact = `Questions: call <a href="tel:+17344502400">${PHONE}</a> or email <a href="mailto:${EMAIL}">${EMAIL}</a>.`;
+const TEST_TEXT = "TEST AGREEMENT. No service will be performed. Charges are $1.00 and can be refunded.";
+let IS_TEST = false;
+const testBar = () => IS_TEST ? `<div class="testbar" role="note">${TEST_TEXT}</div>` : "";
+const steps = n => testBar() + `<div class="steps">${["Sign","Payment method","Done"].map((s,i)=>`<span class="${i===n?"on":i<n?"ok":""}">${i<n?"✓ ":""}${i+1}. ${s}</span>`).join("")}</div>`;
+
+// Same text rules as the CRM: headings, bold, lists and tables ("|" lines; "|=" header, "|+" total).
+function table(lines, inline){
+  return "<table>"+lines.map(l=>{ const kind=l[1]==="="?"h":l[1]==="+"?"t":""; const cells=l.replace(/^\|[=+]?/,"").split(/\s*\|\s*/).map(x=>x.trim());
+    return `<tr${kind==="t"?' class="tot"':""}>`+cells.map((x,i)=> kind==="h" ? `<th>${inline(x)}</th>` : `<td${i===cells.length-1&&/^[+−-]?\$/.test(x)?' class="r"':""}>${inline(x)}</td>`).join("")+"</tr>"; }).join("")+"</table>";
+}
+function renderDoc(text){
+  const inline = s => esc(s).replace(/\*\*(.+?)\*\*/g,"<b>$1</b>");
+  return String(text||"").replace(/\r/g,"").split(/\n{2,}/).map(b=>{
+    let lines=b.split("\n").filter(l=>l.trim()!==""); if(!lines.length) return "";
+    let head=""; const h=/^(#{1,3})\s+(.*)$/.exec(lines[0]);
+    if(h){ const n=h[1].length+1; head=`<h${n}>${inline(h[2])}</h${n}>`; lines=lines.slice(1); if(!lines.length) return head; }
+    if(lines.every(l=>/^\|/.test(l))) return head+table(lines, inline);
+    if(lines.every(l=>/^\s*[-*]\s+/.test(l))) return head+"<ul>"+lines.map(l=>"<li>"+inline(l.replace(/^\s*[-*]\s+/,""))+"</li>").join("")+"</ul>";
+    if(lines.every(l=>/^\s*\d+[.)]\s+/.test(l))) return head+"<ol>"+lines.map(l=>"<li>"+inline(l.replace(/^\s*\d+[.)]\s+/,""))+"</li>").join("")+"</ol>";
+    return head+"<p>"+lines.map(inline).join("<br>")+"</p>";
+  }).join("");
+}
+// The quote: one row per service, then the total and what is charged when, set apart under a rule. The snow price
+// past sixteen visits is a note under the quote, marked by an asterisk on the snow line.
+const isSnowLine = l => /^snow/i.test(String(l && l[0] || ""));
+function snowNote(A, starred){ return A.perVisit ? `<p class="foot">${starred?"* ":""}Snow visits after the sixteenth are ${esc(money(A.perVisit))} each, charged after the visit.</p>` : ""; }
+function quoteRows(A, withLines){
+  const r=(a,b)=>`<tr><td>${a}</td><td>${b}</td></tr>`, t=(a,b,cls)=>`<div class="trow ${cls}"><span>${a}</span><span>${b}</span></div>`;
+  const lines = withLines ? (A.lines||[]) : [], starred = !!A.perVisit && lines.some(isSnowLine);
+  return `${lines.length?`<table class="quote">${lines.map(l=>r(esc(l[0])+(starred&&isSnowLine(l)?"<sup>*</sup>":""),esc(money(l[1])))).join("")}</table>`:""}
+    <div class="totals${lines.length?"":" solo"}">${lines.length?t("Total",esc(money(A.total)),"tot"):""}
+    ${t("Charged today",esc(money(A.dueNow)||"$0"),"today")}
+    ${A.dueInstall>0?t("Charged when your lights are installed",esc(money(A.dueInstall)),"later"):""}</div>
+    ${snowNote(A, starred)}`;
+}
+
+async function call(action, body){
+  if(!SVC || !TOKEN) throw new Error("This link is incomplete.");
+  const r = body
+    ? await fetch(SVC, { method:"POST", redirect:"follow", headers:{ "Content-Type":"text/plain;charset=utf-8" }, body:JSON.stringify({ action, t:TOKEN, ...body }) })
+    : await fetch(`${SVC}?action=${action}&t=${encodeURIComponent(TOKEN)}`, { redirect:"follow" });
+  if(!r.ok) throw new Error("Our system did not answer ("+r.status+").");
+  return r.json();
+}
+function message(title, text){
+  document.body.style.paddingBottom="0";
+  $("#main").innerHTML = `${testBar()}<div class="card"><h1>${esc(title)}</h1><p>${text}</p><p class="meta">${contact}</p></div>`;
+}
+function dropBar(){ const b=$("#bar"); if(b) b.remove(); document.body.style.paddingBottom="0"; }
+
+// ---------- step 1: read and sign ----------
+function showSign(A){
+  const head = `<div class="ssahead"><img src="mb-logo.png" alt="Mangiapane Brothers"><span>${esc(A.tplName||"Seasonal Services Agreement")}</span></div>`;
+  $("#main").innerHTML = `${steps(0)}
+    <div class="card"><h1>Hello ${esc(first(A))},</h1>
+      <p style="margin:0 0 6px">Here is your official quote and agreement with Mangiapane Brothers, as we discussed. There are two steps: sign the agreement, then add your card. It takes about five minutes.</p>
+      ${quoteRows(A, true)}
+      <p class="meta" style="margin:10px 0 0">Agreement ${esc(A.agreementNo)}. This link works until ${esc(fmtStamp(A.expiresAt))}.</p></div>
+    <div class="doc">${head}${renderDoc(A.text)}</div>
+    <div class="card" id="signCard"><h2>Sign the agreement</h2>
+      <label class="ck"><input type="checkbox" id="consent"><span>I have read this agreement. I agree to sign it electronically, that my typed name is my signature and is as binding as one on paper, and to receive my copy, receipts, and notices by email at ${esc((A.to||[]).join(" and "))}.</span></label>
+      <div class="field"><label for="typed">Type your full name to sign</label><input id="typed" autocomplete="name" autocapitalize="words" spellcheck="false" placeholder="${esc(A.signerName||"Your full name")}"></div>
+      <p class="meta" style="margin:8px 0 4px">Date: <b>${esc(A.todayLong)}</b>. Countersigned for Mangiapane Brothers LLC by ${esc(A.companySigner||"the Company")}.</p>
+      <button type="button" class="primary wide" id="go" style="margin-top:10px">Sign and continue to payment</button>
+      <div class="err" id="err" hidden></div></div>
+    <div class="doc notice">${renderDoc(A.notice)}</div>
+    <p class="meta">${contact}</p>`;
+  const bar=document.createElement("div"); bar.className="bar"; bar.id="bar";
+  bar.innerHTML=`<span>Charged today <b>${money(A.dueNow)||"$0"}</b></span><button type="button" id="toSign">Go to signature</button>`;
+  document.body.appendChild(bar);
+  $("#toSign").onclick = () => $("#signCard").scrollIntoView({ behavior:"smooth", block:"start" });
+  const err = t => { const e=$("#err"); e.hidden=!t; e.textContent=t||""; };
+  $("#go").onclick = async () => {
+    const typed=$("#typed").value.replace(/\s+/g," ").trim();
+    if(!$("#consent").checked){ err("Tick the box above your name first."); return; }
+    if(typed.length<3 || !/[A-Za-z]/.test(typed)){ err("Type your full name to sign."); $("#typed").focus(); return; }
+    err(""); const b=$("#go"); b.disabled=true; b.textContent="Signing…";
+    try{
+      const R = await call("sign", { typedName:typed, consent:true, ua:navigator.userAgent.slice(0,300), screen:`${screen.width}x${screen.height}` });
+      if(!R.ok) throw new Error(R.error||"Not signed.");
+      dropBar(); route({ ...A, ...R });
+    }catch(e){ b.disabled=false; b.textContent="Sign and continue to payment"; err(e.message+" Nothing was signed. Try again, or call "+PHONE+"."); }
+  };
+}
+
+// ---------- step 2: payment method ----------
+// "token" (live): the card form below, with the security code, sends the card straight to Intuit from this browser for a
+// one-time token. Only the token comes to us. Bank accounts get the emailed QuickBooks page.
+// "off" (kill switch in the signing service): no card form. Add my card asks the office to email a secure QuickBooks page.
+const INTUIT_TOKENS = { sandbox:"https://sandbox.api.intuit.com/quickbooks/v4/payments/tokens", production:"https://api.intuit.com/quickbooks/v4/payments/tokens" };
+// reCAPTCHA v3 (required by Intuit for payment apps). The site key comes from the signing service; the secret never leaves it.
+let captchaReady = null;
+function loadCaptcha(key){
+  if(!key) return Promise.reject(new Error("no key"));
+  if(captchaReady) return captchaReady;
+  captchaReady = new Promise((ok, no) => {
+    const sc = document.createElement("script");
+    sc.src = "https://www.google.com/recaptcha/api.js?render=" + encodeURIComponent(key);
+    sc.async = true; sc.onerror = () => { captchaReady = null; no(new Error("blocked")); };
+    sc.onload = () => window.grecaptcha ? grecaptcha.ready(ok) : no(new Error("blocked"));
+    document.head.appendChild(sc);
+  });
+  return captchaReady;
+}
+async function captchaToken(key){
+  try{ await loadCaptcha(key); return await grecaptcha.execute(key, { action:"card" }); }
+  catch(e){ const x = new Error("Our security check could not load in this browser. A content blocker or privacy setting can cause this. Turn it off for this page and try again, or tap \"Email me a secure QuickBooks page instead\" below."); x.netFail = true; throw x; }
+}
+async function intuitToken(card, env){
+  let r;
+  try{ r = await fetch(INTUIT_TOKENS[env==="production"?"production":"sandbox"], { method:"POST", headers:{ "Content-Type":"application/json", "Accept":"application/json" }, body:JSON.stringify({ card }) }); }
+  catch(e){ const x = new Error("Your browser could not reach our payment processor. A content blocker or privacy setting can cause this. You can turn it off for this page and try again, or tap \"Email me a secure QuickBooks page instead\" below."); x.netFail = true; throw x; }
+  let j={}; try{ j = await r.json(); }catch(e){}
+  if(!r.ok || !j.value){ const m = j.errors && j.errors[0] && (j.errors[0].message||j.errors[0].code); throw new Error("The card was not accepted"+(m?": "+m:"")+". Check the details and try again."); }
+  return j.value;
+}
+const digits = v => String(v||"").replace(/\D/g,"");
+function luhn(n){ let s=0, alt=false; for(let i=n.length-1;i>=0;i--){ let d=+n[i]; if(alt){ d*=2; if(d>9) d-=9; } s+=d; alt=!alt; } return s%10===0; }
+function brandOf(n){ return /^4/.test(n)?"Visa":/^(5[1-5]|2[2-7])/.test(n)?"Mastercard":/^3[47]/.test(n)?"Amex":/^(6011|65|64[4-9]|622)/.test(n)?"Discover":""; }
+function abaOk(r){ if(!/^\d{9}$/.test(r)) return false; const d=r.split("").map(Number); return (3*(d[0]+d[3]+d[6])+7*(d[1]+d[4]+d[7])+(d[2]+d[5]+d[8]))%10===0; }
+function showPay(A){
+  dropBar();
+  if(A.cardMode!=="token") return showPayLink(A);
+  const token = true;
+  $("#main").innerHTML = `${steps(1)}
+    <div class="card done"><h2 style="margin:0"><span class="tick">✓</span>Signed. Thank you, ${esc(first(A))}.</h2>
+      <p class="meta" style="margin:8px 0 0">Agreement ${esc(A.agreementNo)}. Your signed copy is on its way to ${esc((A.to||[]).join(" and "))}.</p></div>
+    <div class="card"><h2>Last step: your card on file</h2>
+      ${quoteRows(A, false)}
+      <form class="opt main" id="cardForm" autocomplete="on" onsubmit="return false">
+        <div class="field2"><label for="ccName">Name on card</label><input id="ccName" name="ccname" autocomplete="cc-name" autocapitalize="words" value="${esc(A.signerName||"")}"></div>
+        <div class="field2"><label for="ccNum">Card number</label><input id="ccNum" name="cardnumber" autocomplete="cc-number" inputmode="numeric" placeholder="1234 5678 9012 3456" maxlength="23"><span class="brand" id="ccBrand"></span></div>
+        <div class="${token?"three":"two"}"><div class="field2"><label for="ccExp">Expiration</label><input id="ccExp" name="exp-date" autocomplete="cc-exp" inputmode="numeric" placeholder="MM/YY" maxlength="5"></div>
+          ${token?`<div class="field2"><label for="ccCvc">Security code</label><input id="ccCvc" name="cvc" autocomplete="cc-csc" inputmode="numeric" maxlength="4" placeholder="123"></div>`:""}
+          <div class="field2"><label for="ccZip">Billing ZIP</label><input id="ccZip" name="postal" autocomplete="billing postal-code" inputmode="numeric" placeholder="48150" maxlength="10"></div></div>
+        <button type="button" class="primary wide" id="cardGo">Save my card and finish</button>
+        <div class="err" id="err" hidden></div>
+        <button type="button" class="more" id="cardLink" style="margin-top:8px">Having trouble? Email me a secure QuickBooks page instead</button>
+        <p class="meta" style="margin:10px 0 0">${A.dueNow>0?`Today's ${esc(money(A.dueNow))} is charged when you save your card, and a receipt is emailed to you.`:"Nothing is charged today."} Later charges follow your agreement, with a receipt each time. There is no card fee.</p>
+        <p class="meta" style="margin:6px 0 0">Payments are processed by QuickBooks Payments, provided by Intuit Payments Inc. Your card goes straight to them; we never receive or store your card number or security code.</p>
+        <p class="meta" style="margin:6px 0 0">This page is protected by reCAPTCHA, and the Google <a href="https://policies.google.com/privacy" target="_blank" rel="noopener">Privacy Policy</a> and <a href="https://policies.google.com/terms" target="_blank" rel="noopener">Terms of Service</a> apply.</p>
+      </form>
+      <button type="button" class="more" id="moreBtn" aria-expanded="false">More options ▾</button>
+      <div id="more" hidden>
+        <div class="opt"><h3>Bank account (ACH)</h3><p>Use a checking or savings account instead of a card. We email you a secure QuickBooks page to add it, so your bank details go straight to QuickBooks Payments.</p><button type="button" class="wide" data-choice="ach">Email me the bank account page</button></div>
+        <div class="opt"><h3>Prepay by check</h3><p>Pay the full ${esc(money(A.total))} by check instead of keeping a payment method on file. Your spot is not confirmed until we receive the check.</p><button type="button" class="wide" data-choice="check">Pay by check</button></div>
+      </div></div>
+    <p class="meta">${contact}</p>`;
+  $("#moreBtn").onclick = () => { const m=$("#more"); m.hidden=!m.hidden; $("#moreBtn").setAttribute("aria-expanded",String(!m.hidden)); $("#moreBtn").textContent = m.hidden ? "More options ▾" : "Fewer options ▴"; };
+  const err = t => { const e=$("#err"); e.hidden=!t; e.textContent=t||""; if(t) e.scrollIntoView({block:"center"}); };
+  // While a card is being saved or confirmed, nothing else on this step can be chosen (no second way to pay).
+  const lockOthers = on => document.querySelectorAll("#cardLink,#moreBtn,[data-choice]").forEach(x => x.disabled = on);
+  loadCaptcha(A.captchaKey).catch(()=>{});
+  const num=$("#ccNum"), exp=$("#ccExp");
+  num.oninput = () => { const d=digits(num.value).slice(0,19); num.value = d.replace(/(\d{4})(?=\d)/g,"$1 "); $("#ccBrand").textContent = brandOf(d); };
+  exp.oninput = () => { let d=digits(exp.value).slice(0,4); if(d.length===1 && +d>1) d="0"+d; exp.value = d.length>2 ? d.slice(0,2)+"/"+d.slice(2) : d; };
+  // Each card submit has its own attempt id. If the reply is lost (the card may already be charged), the page never shows
+  // a failure and never invites a second try: it reads the outcome back from the signing service by that id.
+  const submit = async (btn, body) => {
+    btn.disabled=true; lockOthers(true); const was=btn.textContent; btn.textContent="Saving your card and charging today's amount…";
+    const attempt = "a-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2,10);
+    let R;
+    try{ R = await call("paydetails", { ...body, attempt }); }
+    catch(e){ return recheck(attempt, btn); }
+    if(!R || !R.ok){ btn.disabled=false; lockOthers(false); btn.textContent=was; return err((R && R.error) || "Not saved."); }
+    route({ ...A, ...R });
+  };
+  const recheck = async (attempt, btn) => {
+    btn.textContent="Confirming your payment…";
+    const why = { declined:"Your card was declined, so nothing was charged. Try a different card, or call "+PHONE+".",
+      locked:"For your security, card entry is closed for this link. Tap \"Email me a secure QuickBooks page instead\", or call "+PHONE+".",
+      captcha:"We could not confirm this request came from a person, so nothing was saved or charged. Try again, or call "+PHONE+".",
+      failed:"We could not save that card, and nothing was charged. Try again in a minute, or call "+PHONE+"." };
+    for(let i=0;i<15;i++){
+      await new Promise(r => setTimeout(r, 3000));
+      let V; try{ V = await call("get"); }catch(e){ continue; }
+      if(!V || !V.ok) continue;
+      const last = V.payLast && V.payLast.attempt===attempt ? V.payLast.result : "";
+      if(last==="saved" || (V.pay && V.pay.detailsAt && !V.payBusy)) return route({ ...A, ...V });
+      if(last){ route({ ...A, ...V }); const e=$("#err"); if(e){ e.hidden=false; e.textContent=why[last]||why.failed; e.scrollIntoView({block:"center"}); } return; }
+    }
+    dropBar();
+    message("We are still confirming your payment", "Please do not enter your card again. Your payment may already be complete. Reload this page in a minute to see the result. If it still shows the card form, call "+esc(PHONE)+" before trying again.");
+  };
+  $("#cardGo").onclick = async () => {
+    const n=digits(num.value), m=/^(\d{2})\/(\d{2})$/.exec(exp.value), zip=$("#ccZip").value.trim(), name=$("#ccName").value.trim(), cvc=digits(($("#ccCvc")||{}).value);
+    if(name.length<2) return err("Enter the name on the card.");
+    if(n.length<13 || !luhn(n)) return err("That card number is not valid. Check it and try again.");
+    if(!m || +m[1]<1 || +m[1]>12) return err("Enter the expiration as MM/YY.");
+    if(!/^\d{3,4}$/.test(cvc)) return err("Enter the security code from the card.");
+    if(!/^\d{5}(-\d{4})?$/.test(zip)) return err("Enter the billing ZIP code.");
+    err(""); const btn=$("#cardGo"); btn.disabled=true; const was=btn.textContent; btn.textContent="Checking your card…";
+    let cardToken;
+    try{ cardToken = await intuitToken({ number:n, expMonth:m[1], expYear:"20"+m[2], cvc, name, address:{ postalCode:zip } }, A.payEnv); }
+    catch(e){ btn.disabled=false; btn.textContent=was; return err(e.message); }
+    num.value=""; $("#ccCvc").value="";
+    let captcha;
+    try{ captcha = await captchaToken(A.captchaKey); }
+    catch(e){ btn.disabled=false; btn.textContent=was; return err(e.message); }
+    btn.disabled=false; btn.textContent=was;
+    submit(btn, { method:"card", cardToken, captcha });
+  };
+  $("#cardLink").onclick = async () => {
+    const el=$("#cardLink"); el.disabled=true;
+    try{ const R=await call("pay", { choice:"card", link:true }); if(!R.ok) throw new Error(R.error||"Not saved."); route({ ...A, ...R }); }
+    catch(e){ el.disabled=false; err(e.message+" Try again, or call "+PHONE+"."); }
+  };
+  document.querySelectorAll("[data-choice]").forEach(el => el.onclick = async () => {
+    el.disabled=true;
+    try{ const R=await call("pay", { choice:el.dataset.choice }); if(!R.ok) throw new Error(R.error||"Not saved."); route({ ...A, ...R }); }
+    catch(e){ el.disabled=false; err(e.message+" Try again, or call "+PHONE+"."); }
+  });
+}
+
+// Card mode off (the kill switch): the card is entered on a QuickBooks page we email, never on this page.
+function showPayLink(A){
+  $("#main").innerHTML = `${steps(1)}
+    <div class="card done"><h2 style="margin:0"><span class="tick">✓</span>Signed. Thank you, ${esc(first(A))}.</h2>
+      <p class="meta" style="margin:8px 0 0">Agreement ${esc(A.agreementNo)}. Your signed copy is on its way to ${esc((A.to||[]).join(" and "))}.</p></div>
+    <div class="card"><h2>Last step: your card on file</h2>
+      ${quoteRows(A, false)}
+      <div class="opt main"><h3>Card on file</h3>
+        <p>We email you a secure QuickBooks page, usually within the hour. QuickBooks Payments, provided by Intuit Payments Inc., is our payment processor, so your card goes straight to them. There is no card fee.</p>
+        <button type="button" class="primary wide" data-choice="card">Add my card</button></div>
+      <button type="button" class="more" id="moreBtn" aria-expanded="false">More options ▾</button>
+      <div id="more" hidden>
+        <div class="opt"><h3>Bank account (ACH)</h3><p>Use a checking or savings account instead. We email you the same secure QuickBooks page.</p><button type="button" class="wide" data-choice="ach">Use my bank account</button></div>
+        <div class="opt"><h3>Prepay by check</h3><p>Pay the full ${esc(money(A.total))} by check instead of keeping a payment method on file. Your spot is not confirmed until we receive the check.</p><button type="button" class="wide" data-choice="check">Pay by check</button></div>
+      </div>
+      <div class="err" id="err" hidden></div></div>
+    <p class="meta">${contact}</p>`;
+  $("#moreBtn").onclick = () => { const m=$("#more"); m.hidden=!m.hidden; $("#moreBtn").setAttribute("aria-expanded",String(!m.hidden)); $("#moreBtn").textContent = m.hidden ? "More options ▾" : "Fewer options ▴"; };
+  const err = t => { const e=$("#err"); e.hidden=!t; e.textContent=t||""; };
+  document.querySelectorAll("[data-choice]").forEach(el => el.onclick = async () => {
+    el.disabled=true;
+    try{ const R=await call("pay", { choice:el.dataset.choice }); if(!R.ok) throw new Error(R.error||"Not saved."); route({ ...A, ...R }); }
+    catch(e){ el.disabled=false; err(e.message+" Try again, or call "+PHONE+"."); }
+  });
+}
+
+// ---------- done ----------
+function showDone(A){
+  dropBar();
+  const ch = A.pay ? A.pay.choice : "", check = ch==="check";
+  const linkMode = (A.cardMode!=="token" || ch==="ach" || !!(A.pay && A.pay.link)) && !A.payLabel;
+  const methodLine = check ? "Check, waiting for it to arrive" : A.payLabel ? A.payLabel : `${ch==="ach"?"Bank account":"Card"}, on the QuickBooks page we email you`;
+  // Card saved on this page: say plainly whether today's charge went through (chargedNow from the signing service).
+  const charged = A.chargedNow==="charged", chargePending = A.chargedNow==="pending" || A.chargedNow==="declined";
+  const savedLine = !(A.dueNow>0) ? "We will be in touch to schedule your service."
+    : charged ? `Today's ${money(A.dueNow)} was charged to ${A.payLabel||"your card"}. Your receipt is on its way to your email.`
+    : chargePending ? `Today's ${money(A.dueNow)} has not gone through yet. We will run it shortly and email your receipt. You do not need to do anything or enter your card again.`
+    : `Today's ${money(A.dueNow)} is charged to your card, and your receipt is emailed to you.`;
+  const todayCell = check ? "" : !(A.dueNow>0) ? "$0" : charged ? `${money(A.dueNow)}, paid` : chargePending ? `${money(A.dueNow)}, processing` : money(A.dueNow);
+  const C = A.check||{};
+  const r=(a,b)=>`<tr><td>${a}</td><td>${b}</td></tr>`;
+  $("#main").innerHTML = `${steps(2)}
+    ${check?`<div class="banner">Your spot is not confirmed until we receive your check.</div>`:""}
+    <div class="card done"><h1><span class="tick">✓</span>${check||linkMode?"Almost done":"You are all set"}, ${esc(first(A))}.</h1>
+      <p style="margin:6px 0 0">${check?"Your agreement is signed. Mail your check and we will confirm your spot as soon as it arrives.":linkMode ? `Your agreement is signed. Watch your email for the secure QuickBooks page to add your ${ch==="ach"?"bank account":"card"}${A.dueNow>0?`, where today's ${money(A.dueNow)} is paid`:""}.` : `Your agreement is signed and your ${ch==="ach"?"bank account":"card"} is on file. ${savedLine}`}</p></div>
+    ${check?`<div class="card"><h2>Mail your check</h2><table class="quote">
+      ${r("Amount","<b>"+esc(money(C.amount))+"</b>")}${r("Payable to",esc(C.payable||"Mangiapane Brothers LLC"))}${r("Mail to",esc(C.mailTo||""))}${r("Memo line",esc(C.memo||A.agreementNo))}</table></div>`:""}
+    <div class="card"><h2>Summary</h2><table class="quote">
+      ${r("Agreement",esc(A.agreementNo))}
+      ${A.signedAt?r("Signed",esc(fmtStamp(A.signedAt))):""}
+      ${r("Signed copy sent to",esc((A.to||[]).join(" and ")))}
+      ${r("Payment method",esc(methodLine))}
+      ${check?"":r("Charged today",esc(linkMode ? (money(A.dueNow)||"$0") : todayCell))}
+      ${A.dueInstall>0&&!check?r("Charged when your lights are installed",esc(money(A.dueInstall))):""}</table>
+      ${check?"":snowNote(A, false)}
+      ${check?"":`<p class="meta" style="margin:10px 0 0">A receipt is emailed for every charge.</p>`}
+      ${A.cancelByLong?`<p class="meta" style="margin:8px 0 0">You may cancel without penalty until midnight of ${esc(A.cancelByLong)}. The Notice of Cancellation is at the end of your signed copy.</p>`:""}</div>
+    <p class="meta">${contact}</p>`;
+  window.scrollTo(0,0);
+}
+
+function route(A){
+  if(A.test) IS_TEST = true;
+  if(A.status!=="signed") return showSign(A);
+  // A card is being saved and charged right now (another tab, or a reload mid-charge): wait for the result, never show "all set" early.
+  if(A.payBusy && A.payBusy.at && Date.now() - A.payBusy.at < 120000){ dropBar(); return message("We are confirming your payment", "Please do not enter your card again. Reload this page in a minute to see the result, or call "+esc(PHONE)+"."); }
+  if(!A.pay) return showPay(A);
+  if(A.cardMode==="token" && A.pay.choice==="card" && !A.pay.detailsAt && !A.pay.link) return showPay(A);
+  return showDone(A);
+}
+
+(async function start(){
+  if(!TOKEN || !SVC) return message("This link is incomplete", "Open the link exactly as it came in the email, or ask us to send it again.");
+  let A;
+  try{ A = await call("get"); }
+  catch(e){ return message("We could not load your agreement", esc(e.message)+" Check your connection and reload this page."); }
+  if(!A.ok) return message("We could not load your agreement", esc(A.error||""));
+  if(A.status==="cancelled") return message("This link is no longer active", "This agreement link was withdrawn, usually because a corrected one was sent. Check your email for a newer link.");
+  if(A.status==="expired") return message("This link has expired", "Agreement links work for 7 days. Call us and we will send a new one.");
+  if(A.status!=="ready" && A.status!=="signed") return message("This link is not valid", "We could not find this agreement.");
+  route(A);
+})();
+</script>
+<script>
+// reCAPTCHA stand-in for the preview (the real page loads Google's script).
+window.loadCaptcha = () => Promise.resolve();
+window.captchaToken = async () => { if(window.__demoState==="captcha"){ const x=new Error("Our security check could not load in this browser. A content blocker or privacy setting can cause this. Turn it off for this page and try again, or tap \"Email me a secure QuickBooks page instead\" below."); x.netFail=true; throw x; } return "demo"; };
+// States that need a card typed: fill Visa's test number and press the button, so the result shows on its own.
+if(["decline","captcha","blocked","locked","lost"].includes(window.__demoState)){
+  const go = () => { const n=document.getElementById("ccNum"); if(!n) return setTimeout(go,100);
+    n.value="4111 1111 1111 1111"; document.getElementById("ccExp").value="12/30"; document.getElementById("ccCvc").value="123"; document.getElementById("ccZip").value="48150";
+    setTimeout(()=>document.getElementById("cardGo").click(), 400); };
+  go();
+}
+</script>
+</body>
+</html>
