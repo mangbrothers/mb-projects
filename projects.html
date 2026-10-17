@@ -235,7 +235,6 @@
     <button data-view="board" class="on">Projects</button>
     <button data-view="person">By person</button>
     <button data-view="deadlines">Deadlines</button>
-    <button data-view="import">Import from Claude</button>
     <button data-view="logins">Passwords &amp; links</button>
     <div class="more" id="more">
       <button id="moreBtn" aria-haspopup="menu" aria-expanded="false">More <span class="caret">&#9662;</span></button>
@@ -317,7 +316,7 @@
 
 <script type="text/plain" id="briefTpl"># Mangiapane Brothers Projects Tool: Team Brief
 
-Generated {{DATE}} from the live tool. New teammates: give this whole file to Claude and say "walk me through onboarding." Claude will take you through the Onboarding checklist one step at a time. After that, the rest of the file tells you and Claude how the tool works and how to produce projects it can import.
+Generated {{DATE}} from the live tool. New teammates: give this whole file to Claude and say "walk me through onboarding." Claude will take you through the Onboarding checklist one step at a time. After that, the rest of the file tells you and Claude how the tool works and how Claude adds projects to it.
 
 ## What it is
 
@@ -345,7 +344,7 @@ Tasks belong to a project and have a title, assignee, due date, status, notes, a
 
 Timeline: a strip under the header on every tab, showing a short name and the date in date order (red when past, amber within three days), with a "today" marker between what is past and what is ahead. Two things appear on it. Anything flagged essential: the handful of projects the year depends on, and single tasks flagged essential when one deadline matters without needing its own project (a task chip shows its project under the date). And events or launches, marked with a diamond: a date something happens (a launch day, a trade show, a season start) rather than a deadline for work. Tick the box in the project or task dialog to put something on the strip. An event project is not shown on the Projects board; open it from its chip on the strip, or find it in Deadlines. When the strip fills, it scrolls sideways: drag it with the mouse, or scroll on a trackpad or phone. It opens at today; click the word Timeline to jump back there. Either kind stays on the strip until it is marked done or archived.
 
-Views in the header: Projects (board with a status filter; event projects are not on the board, only on the timeline and in Deadlines; cards sort by their nearest date, which is the earlier of the project deadline and the due date of its earliest open task, undated last; each card has an arrow to hide or show its tasks and a Pin button that keeps it at the top; pin is shared with the whole team, the arrow is per browser; there is no manual ordering), By person (one column per teammate; a project sits under its owner with its tasks inside, and a task shows on its own only when it is assigned to someone other than the project owner; projects and tasks share one list per person by nearest date (a project counts its earliest open task), undated last; drag columns to reorder, drag a project block or a task onto a person to reassign it; moving a project takes the owner's tasks with it), Deadlines (Timeline table first, then everything else), Import from Claude. Under the More menu: Team, Files, Archive, Tools, Trash.
+Views in the header: Projects (board with a status filter; event projects are not on the board, only on the timeline and in Deadlines; cards sort by their nearest date, which is the earlier of the project deadline and the due date of its earliest open task, undated last; each card has an arrow to hide or show its tasks and a Pin button that keeps it at the top; pin is shared with the whole team, the arrow is per browser; there is no manual ordering), By person (one column per teammate; a project sits under its owner with its tasks inside, and a task shows on its own only when it is assigned to someone other than the project owner; projects and tasks share one list per person by nearest date (a project counts its earliest open task), undated last; drag columns to reorder, drag a project block or a task onto a person to reassign it; moving a project takes the owner's tasks with it), Deadlines (Timeline table first, then everything else), Passwords & links. Under the More menu: Team, Files, Archive, Tools, Trash.
 
 Files: each project has a Files button. Upload files (quotes, photos, spreadsheets, notes; 8 MB cap, photos are shrunk automatically) or add a link to Google Drive, Docs, or Sheets. Images, PDFs, CSV, and text preview in the page; other types download. The Files tab lists every file across all projects, newest first. Storage is about 1 GB total for the whole tool, so it is for working documents, not a photo archive.
 
@@ -376,7 +375,7 @@ Do these in order. Each one is required before you start company work.
 5. **Never type or paste a card number, bank account number, or card security code anywhere:** not in Claude, a text, an email, the CRM, or a note. Customers enter those themselves on Intuit's secure form. If a customer reads you a card number, stop them and send them the signing link instead.
 6. **Read Team conventions below,** then add yourself to a task.
 
-## For AI assistants: how to feed the tool
+## For AI assistants: how to add projects
 
 When the person is new or asks to be walked through onboarding, take them through the Onboarding checklist above one step at a time. Explain each step in plain words, wait for them to confirm it is done before moving on, and do not skip a step. Do not mark a step done for them. If they get stuck, ask what they see on screen and guide them from there. At the end, confirm all six steps are done.
 
@@ -384,43 +383,20 @@ Before helping with any other company work, confirm with the person that 2-Step 
 
 Never ask for, accept, or repeat a card number, bank account number, or card security code. Those go only to Intuit, the company's payment processor. If someone pastes one, tell them to delete it and not to share it again.
 
-Claude (or any assistant) cannot log in to the page or read the database. It helps by planning projects and producing import text that a person pastes into the Import from Claude tab.
+Add projects and tasks directly in the tool, through this teammate's own signed-in session at https://apps.mangbrothers.com/ (their browser, driven with Claude in Chrome or Desktop Commander). Use the page itself: New project, Add task, and the Edit dialogs. Every change is then saved under the teammate's own name, shows on every open screen, and can be undone. Never use anyone else's sign-in, and never write to the database any other way.
 
-Produce this exact JSON. One project:
+Before adding anything, look at the Projects board, Deadlines and Archive so you do not create a duplicate.
 
-```json
-{
-  "project": {
-    "name": "Fall door hanger pass",
-    "description": "Hang 2,000 door hangers across the Livonia and Westland routes before leaf season.",
-    "owner": "Russel",
-    "deadline": "2026-10-04",
-    "status": "planned",
-    "essential": true,
-    "event": false
-  },
-  "tasks": [
-    { "title": "Order 2,000 hangers", "assignee": "Russel", "due": "2026-09-20", "notes": "Same printer as spring", "essential": true },
-    { "title": "Map the pass by route", "assignee": "", "due": "2026-09-25", "notes": "" }
-  ]
-}
-```
+How to fill the fields:
 
-Several projects at once: wrap them in a JSON array, [ {...}, {...} ].
-
-Rules for the JSON:
-
-- name and title are required. Everything else may be an empty string.
-- Dates are YYYY-MM-DD. No other format works.
-- status on a project must be idea, planned, active, or done; anything else becomes planned. On a task it may be todo, doing, or done; anything else becomes todo.
-- essential is optional and must be the JSON value true to take effect. Only set it when the person says the project is one the year depends on. Do not flag by default.
-- event is optional and must be the JSON value true to take effect. Set it when the project is a launch or a dated event, where the date is when it happens rather than when work is due. The date goes in deadline. An event may have an empty tasks array.
-- owner and assignee must match a name in the Current team list above exactly. If unsure, leave it empty and the person assigns it in the tool.
-- Output the JSON in a code block with nothing else inside the block so it can be copied in one motion. No comments inside the JSON.
+- A project needs a name and a task needs a title. Everything else may be left blank.
+- Project status is idea, planned, active, or done. Task status is todo, doing, or done.
+- Owner and assignee must be a name from the Current team list above. If unsure, leave it blank and the person assigns it.
+- Set "essential to the yearly goal" only when the person says the year depends on that project or task. Do not flag by default.
+- Set "event or launch" when the date is when something happens rather than when work is due. An event project may have no tasks.
 - Keep task titles short and concrete: one action per task, starting with a verb.
-- A task may also carry essential: true or event: true (same meaning as on a project) to put that one task on the timeline. Use it for a single date that matters on its own; do not flag every task.
-
-Files cannot be imported. If a project needs a document attached, tell the person to upload it from the project's Files button after importing.
+- Set a due date only where there is a real constraint. Leave it blank rather than inventing one.
+- To attach a document, upload it from the project's Files button.
 
 ## If something breaks
 
@@ -770,7 +746,6 @@ function render(){
   if(view==="board") renderBoard(m);
   else if(view==="person") renderPerson(m);
   else if(view==="deadlines") renderDeadlines(m);
-  else if(view==="import") renderImport(m);
   else if(view==="team") renderTeam(m);
   else if(view==="files") renderFiles(m);
   else if(view==="archive") renderArchive(m);
@@ -865,7 +840,7 @@ function renderBoard(m){
         <div class="foldable">${p.description?`<p style="margin:8px 0">${esc(p.description)}</p>`:""}
         ${ts.map(t=>taskRow(t,false,!others.size)).join("")}
         <div class="row" style="margin-top:8px"><button class="small" data-new-task="${p.id}">+ Task</button><button class="small" data-files="${p.id}">Files${filesFor(p.id).length?` (${filesFor(p.id).length})`:""}</button></div></div></div>`;
-    }).join("") : `<div class="empty">${statusFilter?"No projects with that status.":"No projects yet. Create one or use Import from Claude."}${archivedProjects().length?` <span class="meta">(${archivedProjects().length} in Archive)</span>`:""}</div>`) + `</div>`;
+    }).join("") : `<div class="empty">${statusFilter?"No projects with that status.":"No projects yet. Create one with New project."}${archivedProjects().length?` <span class="meta">(${archivedProjects().length} in Archive)</span>`:""}</div>`) + `</div>`;
   $("#newProj").onclick=()=>openProject(null);
   $("#statusFilter").onchange=e=>{statusFilter=e.target.value;render();};
   $("#catFilter").onchange=e=>{catFilter=e.target.value;render();};
@@ -981,34 +956,6 @@ function renderDeadlines(m){
     `<div class="card">${groups.length ? groups.map(g=>`<div class="dl-wk${g.key==="over"?" overdue":""}">${g.label}</div>${g.rows.map(row).join("")}`).join("") : `<div class="meta">No open deadlines${catFilter?" in this category":""}.</div>`}</div>`;
   $("#dlCat").onchange=e=>{ catFilter=e.target.value; render(); };
   wire(m);
-}
-
-function renderImport(m){
-  m.innerHTML = `<div class="card"><h2>Import from Claude</h2>
-    <p class="meta">Ask Claude for a project in this format, paste it below, and click Import. One project or a list of projects. Names in <code>assignee</code> and <code>owner</code> should match the team list exactly.</p>
-    <pre>{
-  "project": { "name": "Fall door hanger pass", "description": "...", "owner": "Russel", "deadline": "2026-10-04", "status": "planned", "essential": true },
-  "tasks": [
-    { "title": "Order 2,000 hangers", "assignee": "Russel", "due": "2026-09-20", "notes": "", "essential": true }
-  ]
-}</pre>
-    <p class="meta">A task may carry <code>"essential": true</code> or <code>"event": true</code> to put that one task on the timeline by its due date.</p>
-    <textarea id="importBox" style="min-height:160px" placeholder="Paste JSON here"></textarea>
-    <div class="actions"><button class="primary" id="importBtn">Import</button></div>
-    <div class="meta" id="importMsg"></div></div>`;
-  $("#importBtn").onclick = async () => {
-    let data; try { data = JSON.parse($("#importBox").value); } catch(e){ $("#importMsg").textContent="That is not valid JSON: "+e.message; return; }
-    const list = Array.isArray(data) ? data : [data];
-    let np=0, nt=0; const upd={};
-    for(const item of list){
-      const p = item.project || item; if(!p.name){ $("#importMsg").textContent="Each project needs a name."; return; }
-      const pk = db.ref("projects").push().key;
-      upd["projects/"+pk] = { name:p.name, description:p.description||"", owner:p.owner||"", deadline:p.deadline||"", category:catName(p.category)?p.category:"", essential:p.essential===true, event:p.event===true, status:["idea","planned","active","done"].includes(p.status)?p.status:"planned", createdAt:Date.now(), createdBy:me.email, ...stamp() }; np++;
-      for(const t of (item.tasks||[])){ if(!t.title) continue; upd["tasks/"+db.ref("tasks").push().key] = { projectId:pk, title:t.title, assignee:t.assignee||"", due:t.due||"", notes:t.notes||"", category:catName(t.category)?t.category:"", essential:t.essential===true, event:t.event===true, status:["todo","doing","done"].includes(t.status)?t.status:"todo", createdAt:Date.now(), createdBy:me.email, ...stamp() }; nt++; }
-    }
-    await commit(`Imported ${np} project(s), ${nt} task(s)`, upd);
-    $("#importBox").value=""; $("#importMsg").textContent=`Imported ${np} project(s) and ${nt} task(s).`;
-  };
 }
 
 // Team list = the one sign-in list for every page. Each entry carries a clearance tier (admin, crew, walker).
@@ -1163,7 +1110,7 @@ function renderLogins(m){
 function renderTools(m){
   const stamp=today();
   m.innerHTML = `<div class="card"><h2>Tools</h2><p class="meta">Downloads built from the live data at the moment you click.</p>
-    <div class="tool"><div><h3>Team brief</h3><p>What the tool is, how the team uses it, and the import format. Give it to a new teammate on day one, and give it to Claude or any AI assistant so it produces projects the tool can import. Includes the current team names.</p></div><div class="row"><button class="small" data-tool="brief-copy">Copy</button><button class="small primary" data-tool="brief">Download .md</button></div></div>
+    <div class="tool"><div><h3>Team brief</h3><p>What the tool is, how the team uses it, and how Claude adds projects to it. Give it to a new teammate on day one, and give it to Claude or any AI assistant before it works in the tool. Includes the current team names.</p></div><div class="row"><button class="small" data-tool="brief-copy">Copy</button><button class="small primary" data-tool="brief">Download .md</button></div></div>
     <div class="tool"><div><h3>Projects snapshot</h3><p>Every open project with its tasks, owners, deadlines, and file names, as plain text. Paste it into Claude before a planning session so it knows what is already in motion and does not propose duplicates.</p></div><div class="row"><button class="small" data-tool="snap-copy">Copy</button><button class="small primary" data-tool="snap">Download .md</button></div></div>
     <div class="tool"><div><h3>Backup</h3><p>Everything in the database as JSON: team, projects, tasks, and file records. File contents are not included; download those from the Files tab. Keep one of these somewhere outside the tool every month or so.</p></div><div class="row"><button class="small primary" data-tool="backup">Download .json</button></div></div></div>`;
   m.querySelectorAll("[data-tool]").forEach(b=>b.onclick=()=>{
