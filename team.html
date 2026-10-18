@@ -619,6 +619,7 @@ let role="", myCrew="";              // crew tier: role manager or member, and t
 let crews={}, routes={}, storms={}, checks={}, events={}, team={}, clients={}, svcLog={}, dayLogs={}, timeAll={};
 // People data, keyed by person (emailKey). The office reads all of it; an employee binds his own; a manager also his crew's contact info and shifts.
 let staffAll={}, privAll={}, docsAll={}, shiftsAll={}, payLogAll={}, vault={}, payRates={}, svcCfg=null;
+let walkLogs={};   // door hangers' daily reports from the Routes page (routeLogsByWalker), office only
 let view="today", curDate=today(), openRoute=null, crewFilter="", editing=null, meTab="schedule", personOpen=null, payPeriod=null;
 let unsub=[], dayUnsub=[], memUnsub=[];
 let pendingSeeAs = (location.hash.match(/^#seeas=(.+)$/)||[])[1] ? decodeURIComponent(location.hash.slice(7)) : "";
@@ -677,6 +678,7 @@ function attach(){
     bind("applicants", v=>applicants=v); bind("personFile", v=>personFile=v); bind("staffReports", v=>reportsAll=v); bind("staffArchive", v=>archive=v); bind("personFileDoc", v=>fileDocs=v);
     bind("vaultPub", v=>vaultPub=typeof v==="string"?v:null); bind("vaultKey", v=>vaultKeyRec=v&&v.priv?v:null); bind("vaultAccess", v=>vaultAccess=v); bind("paper", v=>paperAll=v);
     bind("trainingAssign", v=>trainAssign=v); bind("trainingDone", v=>trainDone=v);
+    bind("routeLogsByWalker", v=>walkLogs=v);
   } else {
     // An employee's own record. The office preview reads the office's copy instead.
     const own = (path, map) => unsub.push(store.on(path+"/"+me.key, v=>{ map[me.key]=v||{}; render(); }));
@@ -1721,6 +1723,9 @@ function hireDialog(aid){
 // Someone who signed or uploaded anything, or has hours or pay, is a past employee: his record is archived.
 // Someone who never filled anything out is removed: off the Team list, Paperwork and Training, his paperwork link
 // stops working, and his applicant card goes back to Not hired with his notes and files (kept a year, privacy policy 8d).
+// Door hanger work logged on the Routes page: days with a door count or a walked route (the page's own system check excluded).
+function doorWork(k){ const days=Object.entries(walkLogs[k]||{}).filter(([,L])=>L && L.name!=="System check" && ((+L.count||0)>0 || Object.keys(L.walks||{}).length));
+  return { days:days.length, doors:days.reduce((n,[,L])=>n+(+L.count||0),0), first:days.length?days.map(x=>x[0]).sort()[0]:"", last:days.length?days.map(x=>x[0]).sort().pop():"" }; }
 function onFile(k){
   const why=[], p=paperAll[k]||{};
   const signed=packetOf(k).filter(f=>formState(k,f).done).length + (p.offerSigned && !((p.forms||{}).agreement||{}).status ? 1 : 0);
@@ -1728,6 +1733,7 @@ function onFile(k){
   const files=Object.values(docsAll[k]||{}).filter(Boolean).length; if(files) why.push(files===1?"1 file on record":files+" files on record");
   if(Object.keys(timeAll[k]||{}).length) why.push("logged hours");
   if(Object.keys(payLogAll[k]||{}).length) why.push("pay records");
+  const dw=doorWork(k); if(dw.days) why.push(dw.days===1?"1 day of door hanger work":dw.days+" days of door hanger work");
   return why;
 }
 function leaveDialog(k){ return onFile(k).length ? archiveDialog(k) : removeDialog(k); }
@@ -1761,8 +1767,10 @@ function removeDialog(k){
 function archiveDialog(k){
   const t=team[k]||{}, s=staffAll[k]||{}, name=t.name||s.name||personName(k); if(t.tier!=="crew" && t.tier!=="walker") return toast("Only crew and door hangers can be moved to Past here.");
   const cur=periodOf(today()), prev=addDays(cur,-PERIOD_DAYS), owed=[prev,cur].map(p=>({p,e:earnings(k,p)})).filter(x=>x.e.earned>0.005 && !(x.e.paid&&x.e.paid.paidAmount!=null));
+  const dw=doorWork(k);
   const dl=openDlg(`<h2>Move ${esc(name)} to Past?</h2>
     <p class="meta">This takes ${esc(firstName(name))} off the Team list so he can no longer sign in${t.crew?`, takes him off ${esc(t.crew)}`:""}, and moves his profile, files, shifts, hours and pay log into the archive. He comes off the Paperwork tab and his paperwork link stops working; his signed forms stay sealed in the vault. His personnel file stays, and his Drive folder moves to Past and Partial Hires. Nothing is deleted: drag his card from Past to Hired to bring him back.</p>
+    ${dw.days?`<div class="storm"><span><b>Door hanger work logged:</b> ${dw.days===1?"1 day":dw.days+" days"} (${esc(fmtShort(dw.first))}${dw.days>1?` to ${esc(fmtShort(dw.last))}`:""}), ${dw.doors} ${dw.doors===1?"door":"doors"}. It stays on the Routes page and in his archive. Pay him for it in the next payroll pass.</span></div>`:""}
     ${owed.length?`<div class="storm"><span><b>Not paid yet:</b> ${owed.map(x=>`${money(x.e.earned)} for ${fmtShort(x.p)} to ${fmtShort(periodEnd(x.p))}`).join("; ")}. His final pay is due by the next regular payday.</span></div>`:""}
     <div class="grid2"><div><label for="xWhy">Reason</label><select id="xWhy">${PAST_REASONS.map(r=>`<option>${esc(r)}</option>`).join("")}</select></div><div><label for="xLast">Last day worked</label><input id="xLast" type="date" value="${esc(today())}"></div></div>
     <label for="xNote">Note for his file (optional)</label><textarea id="xNote" rows="3" maxlength="2000"></textarea>
@@ -1771,7 +1779,8 @@ function archiveDialog(k){
     const now=Date.now(), why=$("#xWhy").value, note=$("#xNote").value.trim(), crew=t.crew||"";
     const copy=v=>v==null?null:JSON.parse(JSON.stringify(v));
     const rec={ name, email:t.email||s.email||null, crew:crew||null, crewRole:t.crewRole||null, archivedAt:now, by:me.email, reason:why, note:note||null, lastDay:$("#xLast").value||null,
-      allowed:copy(t), staff:copy(staffAll[k]), staffPrivate:copy(privAll[k]), staffDocs:copy(docsAll[k]), payLog:copy(payLogAll[k]), timeEntries:copy(timeAll[k]), shifts:copy(shiftsAll[k]) };
+      allowed:copy(t), staff:copy(staffAll[k]), staffPrivate:copy(privAll[k]), staffDocs:copy(docsAll[k]), payLog:copy(payLogAll[k]), timeEntries:copy(timeAll[k]), shifts:copy(shiftsAll[k]), routeLogs:copy(walkLogs[k]),
+      doorWorkUnpaid:dw.days?{ days:dw.days, doors:dw.doors, first:dw.first, last:dw.last }:null };
     const upd={ [`staffArchive/${k}`]:JSON.parse(JSON.stringify(rec)), [`allowed/${k}`]:null, [`staff/${k}`]:null, [`staffPrivate/${k}`]:null, [`staffDocs/${k}`]:null, [`payLog/${k}`]:null, [`timeEntries/${k}`]:null, [`shifts/${k}`]:null,
       [`personFile/${k}/${store.key()}`]:{ type:"past", text:`Moved to Past: ${why}.${note?" "+note:""}`, at:now, by:me.email, byName:me.name },
       [`sync/staffMove/${store.key()}`]:{ action:"archive", k, name, at:now }, ...fileDirty(k) };
