@@ -119,6 +119,32 @@
   .pgdrawer a:hover{background:var(--surface2)}
   .pgdrawer a.here{background:var(--accent-soft);color:var(--accent);font-weight:650}
   .pgdrawer .pdfoot{margin-top:auto;font-size:12px;color:var(--muted);padding:8px 4px 0}
+
+  /* Training modules: slide player and quiz (October 20, 2026) */
+  dialog.modplayer{width:min(720px,100vw);max-width:100vw;height:min(100dvh,860px);max-height:100dvh;padding:0;display:flex;flex-direction:column}
+  dialog.modplayer:not([open]){display:none}
+  .mp-head{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--line)}
+  .mp-head .t{font-weight:700;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .mp-bar{height:4px;background:var(--surface2)}.mp-bar i{display:block;height:100%;background:var(--accent)}
+  .mp-body{flex:1;overflow:auto;padding:18px 16px 10px;font-size:17px;line-height:1.5}
+  .mp-body h2{font-size:22px;margin:0 0 12px}
+  .mp-body ul{padding-left:22px;margin:0 0 12px}.mp-body li{margin:0 0 8px}
+  .mp-body li.hid{visibility:hidden}
+  .mp-body p.para{margin:0 0 10px}
+  .mp-img{display:block;width:100%;max-height:46vh;object-fit:contain;border-radius:var(--r);border:1px solid var(--line);margin:8px 0}
+  .mp-ph{display:flex;align-items:center;justify-content:center;min-height:150px;border:2px dashed var(--line);border-radius:var(--r);background:var(--surface2);color:var(--ink2);text-align:center;padding:12px;margin:8px 0;font-size:14px}
+  .mp-hl{display:inline-block;border:2px solid var(--amber);border-radius:999px;padding:2px 10px;font-weight:700;color:var(--ink)}
+  .mp-note{border-left:4px solid var(--accent);background:var(--accent-soft);padding:8px 10px;border-radius:var(--r);font-size:14px;margin-top:10px}
+  .mp-todo{border-left:4px solid var(--amber);background:var(--amber-soft);padding:8px 10px;border-radius:var(--r);font-size:14px;margin-bottom:10px}
+  .mp-foot{display:flex;gap:10px;align-items:center;padding:10px 14px calc(10px + env(safe-area-inset-bottom));border-top:1px solid var(--line)}
+  .mp-foot .grow{flex:1;text-align:center;color:var(--muted);font-size:14px}
+  .mp-foot button{min-height:44px;min-width:96px}
+  .qopt{display:block;width:100%;text-align:left;padding:12px 14px;margin:0 0 10px;border:1px solid var(--line);border-radius:var(--r);background:var(--card);color:var(--ink);font-size:16px;min-height:48px}
+  .qopt.right{border-color:var(--green);background:var(--green-soft)}
+  .qopt.wrong{border-color:var(--red);background:var(--red-soft)}
+  .qexp{padding:10px 12px;border-radius:var(--r);background:var(--surface2);margin-top:4px}
+  .t2chk{display:flex;gap:8px;align-items:center;padding:6px 0;border-top:1px solid var(--line)}
+  .t2chk:first-child{border-top:0}
 </style>
 </head>
 <body>
@@ -274,11 +300,13 @@ function attach(){
     bind("routeLogs", v=>logs=v);
     bind("allowed", v=>{ allowedWalkers=v; mergeWalkers(); });
     bind("walkers", v=>{ legacyWalkers=v; mergeWalkers(); });
+    bind("trainingLib", v=>trainLib=v); bind("trainingSettings", v=>trainSet=v); bind("trainingDone", v=>doneAll=v); bind("trainingViewed", v=>trainViewed=v); bind("paper", v=>paperAll=v);
   } else {
     // A walker reads only his own reports, from the copy kept under his key.
     walkers = { [me.key]: { name:me.name, email:me.email } };
     bind("routeLogsByWalker/"+me.key, v=>{ logs={}; Object.entries(v).forEach(([d,L])=>{ logs[d]={[me.key]:L}; }); });
-    bind("trainingLib", v=>trainLib=v); bind("trainingRoles", v=>trainRoles=v);
+    bind("trainingLib", v=>trainLib=v); bind("trainingRoles", v=>trainRoles=v); bind("trainingSettings", v=>trainSet=v);
+    bind("trainingQuiz/"+me.key, v=>{ trainQuiz={ [me.key]:v }; }); bind("trainingViewed/"+me.key, v=>{ trainViewed={ [me.key]:v }; });
     bind("trainingAssign/"+me.key, v=>trainAssign=v); bind("trainingDone/"+me.key, v=>trainDone=v);
     bind("paper/"+me.key, v=>{ myPaper=v; if(onboarding && !offerPending()){ onboarding=false; toast("Offer signed. Your routes are open."); } });
   }
@@ -378,6 +406,247 @@ function render(){
 }
 
 // ---------- training ----------
+
+// ----- Training modules, quizzes and gates (October 20, 2026) -----
+// Modules are written as Markdown files to the training content spec (training/SPEC.md), imported on Team Manager,
+// Training, and stored in trainingLib with kind "module": slides plus an optional quiz. A trainee clicks through the
+// slides and takes the quiz on his phone; every attempt is kept (trainingQuiz), a pass or reaching the last slide marks
+// the module done (trainingDone), and where he stopped is kept (trainingViewed). Nobody ticks a module done by hand.
+// Gates (spec section 7): scheduling and the crew manager role open only when a person's role gate is met. A gate
+// condition that names a module not imported yet is waived until it is imported. Settings live in trainingSettings.
+const T2_DEFAULTS = {
+  passMark: 80, retake: { mode:"unlimited", max:0, waitMinutes:0 }, walkerUnlock: "review",
+  seasons: { always:{from:""}, fall:{from:"2026-10-20"}, lights:{from:"2026-10-20"}, snow:{from:"2026-10-20"}, lawn:{from:"2027-03-15"} },
+  gates: {
+    walker: ["offer_signed","quiz_passed:walker-job","viewed:systems-walker"],
+    crew: ["offer_signed","quiz_passed:crew-safety","quiz_passed:crew-conduct","viewed:systems-crew"],
+    manager: ["gate:crew","viewed:systems-manager","practice_passed"] } };
+const T2_SEASONS = { always:"Always open", fall:"Fall", lights:"Holiday lights", snow:"Snow", lawn:"Lawn" };
+const T2_PRACTICE = [["schedule","Open the practice day"],["checkoff","Check off a house"],["photo","Save a photo on it"],["incident","File an incident report"],["eod","Approve the practice day in Crew log"]];
+let trainSet={}, trainQuiz={}, trainViewed={}, trainPractice={};
+function tset(){ const s=trainSet||{};
+  return { passMark:Number(s.passMark ?? T2_DEFAULTS.passMark), retake:{ ...T2_DEFAULTS.retake, ...(s.retake||{}) }, walkerUnlock:s.walkerUnlock||T2_DEFAULTS.walkerUnlock,
+    seasons:{ ...T2_DEFAULTS.seasons, ...(s.seasons||{}) }, gates:{ ...T2_DEFAULTS.gates, ...(s.gates||{}) }, route:s.route||null }; }
+const isModule = x => !!x && x.kind==="module";
+const t2Arr = v => Array.isArray(v) ? v : v && typeof v==="object" ? Object.keys(v).sort((a,b)=>a-b).map(i=>v[i]) : [];
+const seasonFrom = x => ((tset().seasons[(x&&x.season)||"always"])||{}).from || "";
+const seasonOpen = x => { const f=seasonFrom(x); return !f || today()>=f; };
+const t2Slides = (x, all) => t2Arr(x.slides).filter(s=>s && (all || !s.todo));
+const t2Quiz = x => t2Arr(x.quiz).filter(q=>q && t2Arr(q.opts).length);
+// Inline text: escaped, with **bold** kept.
+const t2Txt = s => esc(s).replace(/\*\*(.+?)\*\*/g,"<b>$1</b>");
+function t2Shuffle(a){ a=a.slice(); for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; }
+
+// ---- gates ----
+function offerSignedOf(k, paper, allowedRec){
+  if((allowedRec||{}).offerSigned) return true;
+  const p=paper||{}; return !!p.offerSigned || ((p.forms||{}).agreement||{}).status==="done";
+}
+// ctx: { offerSigned, done, viewed, practice } for one person.
+function gateCheck(which, ctx, seen){
+  const out={ ok:true, need:[], waived:[] }; seen=seen||{}; if(seen[which]) return out; seen[which]=1;
+  (tset().gates[which]||[]).forEach(c=>{
+    if(c.startsWith("gate:")){ const g=gateCheck(c.slice(5), ctx, seen); if(!g.ok){ out.ok=false; out.need.push(...g.need); } out.waived.push(...g.waived); return; }
+    let ok=false, label=c;
+    if(c==="offer_signed"){ ok=!!ctx.offerSigned; label="Sign the offer"; }
+    else if(c==="practice_passed"){ const p=ctx.practice||{}; ok=T2_PRACTICE.every(([i])=>p[i]); label="Finish the practice run"; }
+    else { const i=c.indexOf(":"), kind=c.slice(0,i), id=c.slice(i+1), m=trainLib[id];
+      if(!isModule(m)){ out.waived.push(id); return; }
+      const d=(ctx.done||{})[id], v=(ctx.viewed||{})[id];
+      if(kind==="quiz_passed"){ ok=!!(d && d.via==="quiz"); label="Pass "+m.title; }
+      else { ok=!!(d || (v && v.finished)); label="View "+m.title; } }
+    if(!ok){ out.ok=false; out.need.push(label); } });
+  return out;
+}
+const gateChip = g => g.ok ? `<span class="chip ok">Ready</span>` : `<span class="chip warn" title="${esc(g.need.join(", "))}">Needs ${g.need.length}</span>`;
+const gateList = g => (g.ok?"":`<ul style="margin:6px 0 0;padding-left:20px">${g.need.map(n=>`<li>${esc(n)}</li>`).join("")}</ul>`) + (g.waived.length?`<p class="muted" style="margin:6px 0 0">Waived until imported: ${g.waived.map(esc).join(", ")}</p>`:"");
+
+// ---- attempts and retakes ----
+function attemptsOf(k, id){ return Object.entries(((trainQuiz[k]||{})[id])||{}).map(([aid,a])=>({aid,...a})).sort((a,b)=>(a.at||0)-(b.at||0)); }
+function retakeBlock(k, id){
+  const r=tset().retake, at=attemptsOf(k,id), fails=at.filter(a=>!a.passed);
+  if(at.some(a=>a.passed)) return "";
+  if(r.mode==="limited" && Number(r.max)>0 && fails.length>=Number(r.max)) return `No tries left (${fails.length} of ${r.max}). Ask the office to reset your quiz.`;
+  const w=Number(r.waitMinutes)||0, last=fails[fails.length-1];
+  if(w && last && Date.now()-last.at < w*60000){ const m=Math.ceil((w*60000-(Date.now()-last.at))/60000); return `You can try again in ${m} minute${m===1?"":"s"}.`; }
+  return "";
+}
+
+// ---- the module card on a Training tab ----
+function moduleStatus(k, id, data){
+  const x=trainLib[id], d=(data.done||{})[id], v=(data.viewed||{})[id]||{}, n=t2Slides(x).length, at=attemptsOf(k,id), best=at.reduce((m,a)=>Math.max(m,a.pct||0),0);
+  if(d) return d.via==="quiz" ? `<span class="chip ok">Passed ${d.score!=null?d.score+"%":""}</span>` : `<span class="chip ok">Done</span>`;
+  if(!seasonOpen(x)) return `<span class="chip">Opens ${esc(fmtDay(seasonFrom(x)))}</span>`;
+  if(at.length) return `<span class="chip warn">Best ${best}%, ${at.length} tr${at.length===1?"y":"ies"}</span>`;
+  if(v.lastSlide!=null && n) return `<span class="chip">Slide ${Math.min(v.lastSlide+1,n)} of ${n}</span>`;
+  return "";
+}
+function moduleCardHtml(k, id, data, office){
+  const x=trainLib[id], d=(data.done||{})[id], v=(data.viewed||{})[id]||{}, n=t2Slides(x).length, q=t2Quiz(x).length, open=seasonOpen(x)||office;
+  const quizReady = x.completion==="quiz" && q && (v.finished || d);
+  const meta=[`${n} slide${n===1?"":"s"}`, x.completion==="quiz"&&q?`${q}-question quiz`:"", x.version?`version ${x.version}`:""].filter(Boolean).join(" &middot; ");
+  return `<div class="card trcard ${d?"done":""}"><div class="top"><span><span class="chip">Module</span> <b>${esc(x.title)}</b></span>${moduleStatus(k,id,data)}</div>
+    ${x.description?`<p class="meta">${esc(x.description)}</p>`:""}<p class="meta">${meta}</p>
+    <div class="actions">${open?`<button class="small ${d?"":"primary"}" data-mod="${esc(id)}">${d?"Review":v.lastSlide?"Resume":"Start"}</button>`:""}
+      ${open&&quizReady&&!d?`<button class="small primary" data-modquiz="${esc(id)}">Take the quiz</button>`:""}</div></div>`;
+}
+function wireModuleCards(root, k, preview){
+  root.querySelectorAll("[data-mod]").forEach(b=>b.onclick=()=>openModule(b.dataset.mod, { k, preview }));
+  root.querySelectorAll("[data-modquiz]").forEach(b=>b.onclick=()=>openModule(b.dataset.modquiz, { k, preview, quiz:true }));
+}
+
+// ---- the slide player ----
+async function openModule(id, o){
+  const x=trainLib[id]; if(!isModule(x)) return;
+  const k=o.k, preview=!!o.preview, all=!!o.office, slides=t2Slides(x, all), quiz=t2Quiz(x);
+  const dl=$("#dlg"); dl.classList.add("modplayer"); dl.innerHTML=`<div class="mp-body"><p class="meta">Loading...</p></div>`; if(!dl.open) dl.showModal();
+  dl.onclose=()=>{ dl.classList.remove("modplayer"); dl.onclose=null; };
+  const imgs=await store.get("trainingImages/"+id).catch(()=>null)||{};
+  const prior=((trainViewed[k]||{})[id])||{};
+  let i=o.quiz?slides.length:Math.max(0,Math.min(prior.finished?0:(prior.lastSlide||0), slides.length-1)), shown=0;
+  const reveals = s => t2Arr(s.items).filter(it=>it.r).length;
+  const save = async (obj) => { if(preview) return; try { await store.update(obj); } catch(e){ toast("Not saved: "+(e.message||e)); } };
+  const mark = (n, finished) => { const cur=((trainViewed[k]||{})[id])||{}; const rec={ at:Date.now(), lastSlide:n, version:x.version||1, finished:!!(finished||cur.finished) };
+    const upd={ [`trainingViewed/${k}/${id}`]:rec }; if(finished && x.completion!=="quiz" && !t2DoneMap(k)[id]) upd[`trainingDone/${k}/${id}`]={ at:Date.now(), version:x.version||1, via:"view" }; save(upd); };
+  function head(){ return `<div class="mp-head"><span class="t">${esc(x.title)}</span>${preview?'<span class="chip">Preview</span>':""}<button class="small" data-close aria-label="Close">Close</button></div>`; }
+  function slideHtml(s){
+    let r=0; const items=t2Arr(s.items).map(it=>{ const hid=it.r && (r++>=shown); return it.p ? `<p class="para ${hid?"hid":""}">${t2Txt(it.t)}</p>` : `<li class="${hid?"hid":""}">${t2Txt(it.t)}</li>`; });
+    const list=[]; let ul=[]; items.forEach(h=>{ if(h.startsWith("<li")) ul.push(h); else { if(ul.length){ list.push(`<ul>${ul.join("")}</ul>`); ul=[]; } list.push(h); } }); if(ul.length) list.push(`<ul>${ul.join("")}</ul>`);
+    const im=s.img ? (imgs[s.img.name] ? `<img class="mp-img" src="${imgs[s.img.name]}" alt="${esc(s.img.cap||"")}">` : `<div class="mp-ph">${esc(s.img.cap||"Photo coming")}${all?`<br><span class="muted">image:${esc(s.img.name)}</span>`:""}</div>`) : "";
+    return `${s.todo?`<div class="mp-todo"><b>Not finished:</b> ${t2Arr(s.todos).map(esc).join("; ")||"this slide has a TODO"}. Trainees do not see this slide.</div>`:""}
+      <h2>${t2Txt(s.h||"")}</h2>${t2Arr(s.hl).map(h=>`<p><span class="mp-hl">${esc(h)}</span></p>`).join("")}${list.join("")}${im}
+      ${s.video?`<p><a class="mapbtn" href="${esc(s.video)}" target="_blank" rel="noopener">Watch the video</a></p>`:""}
+      ${s.note&&(all||isAdmin)?`<div class="mp-note">${t2Txt(s.note)}</div>`:""}`;
+  }
+  function paint(){
+    if(i>=slides.length) return quiz.length && x.completion==="quiz" ? startQuiz() : finish();
+    const s=slides[i], left=reveals(s)-shown, last=i===slides.length-1;
+    dl.innerHTML=`${head()}<div class="mp-bar"><i style="width:${Math.round((i+1)/slides.length*100)}%"></i></div><div class="mp-body">${slideHtml(s)}</div>
+      <div class="mp-foot"><button id="mpBack" ${i===0?"disabled":""}>Back</button><span class="grow">${i+1} of ${slides.length}</span>
+      <button class="primary" id="mpNext">${left>0?"Next point":last?(x.completion==="quiz"&&quiz.length?"Take the quiz":"Finish"):"Next"}</button></div>`;
+    dl.querySelector("[data-close]").onclick=()=>dl.close();
+    dl.querySelector("#mpBack").onclick=()=>{ i--; shown=reveals(slides[i]); paint(); };
+    dl.querySelector("#mpNext").onclick=()=>{ if(left>0){ shown++; return paint(); } if(last){ mark(i,true); i++; shown=0; return paint(); } i++; shown=0; mark(i,false); paint(); };
+    dl.querySelector(".mp-body").onclick=e=>{ if(e.target.closest("a,button")) return; if(left>0){ shown++; paint(); } };
+  }
+  function finish(){
+    dl.innerHTML=`${head()}<div class="mp-body"><h2>Done</h2><p>${esc(x.title)} is finished.${preview?" This was a preview, so nothing was saved.":""}</p></div><div class="mp-foot"><span class="grow"></span><button class="primary" data-close>Close</button></div>`;
+    dl.querySelectorAll("[data-close]").forEach(b=>b.onclick=()=>dl.close());
+  }
+  function startQuiz(){
+    const block=preview?"":retakeBlock(k,id);
+    if(block){ dl.innerHTML=`${head()}<div class="mp-body"><h2>Quiz</h2><p>${esc(block)}</p></div><div class="mp-foot"><span class="grow"></span><button class="primary" data-close>Close</button></div>`; dl.querySelectorAll("[data-close]").forEach(b=>b.onclick=()=>dl.close()); return; }
+    const qs=t2Shuffle(quiz.map((q,qi)=>({...q, qi, opts:t2Shuffle(t2Arr(q.opts).map((t,oi)=>({t,oi})))})));
+    let n=0, right=0; const answers=[];
+    function paintQ(picked){
+      const q=qs[n], done=picked!=null;
+      dl.innerHTML=`${head()}<div class="mp-bar"><i style="width:${Math.round((n+(done?1:0))/qs.length*100)}%"></i></div><div class="mp-body">
+        <p class="meta">Question ${n+1} of ${qs.length}</p><h2>${t2Txt(q.q)}</h2>
+        ${q.opts.map(o=>`<button class="qopt ${done?(o.oi===q.ans?"right":o.oi===picked?"wrong":""):""}" data-oi="${o.oi}" ${done?"disabled":""}>${t2Txt(o.t)}</button>`).join("")}
+        ${done?`<div class="qexp"><b>${picked===q.ans?"Right.":"Not quite."}</b> ${t2Txt(q.explain||"")}${picked!==q.ans&&q.slide?` <button class="small" id="qRev">Review slide ${esc(q.slide)}</button>`:""}</div>`:""}</div>
+        <div class="mp-foot"><span class="grow">${right} right so far</span>${done?`<button class="primary" id="qNext">${n===qs.length-1?"See my score":"Next question"}</button>`:""}</div>`;
+      dl.querySelector("[data-close]").onclick=()=>dl.close();
+      dl.querySelectorAll("[data-oi]").forEach(b=>b.onclick=()=>{ const a=+b.dataset.oi, ok=a===q.ans; if(ok) right++; answers.push({ q:q.qi, a, ok }); paintQ(a); });
+      const rv=dl.querySelector("#qRev"); if(rv) rv.onclick=()=>{ const sn=Math.max(1,Math.min(+q.slide||1, slides.length)); const sv=shown; shown=99;
+        dl.innerHTML=`${head()}<div class="mp-body">${slideHtml(slides[sn-1])}</div><div class="mp-foot"><span class="grow">Slide ${sn}</span><button class="primary" id="qBack">Back to the quiz</button></div>`; shown=sv;
+        dl.querySelector("[data-close]").onclick=()=>dl.close(); dl.querySelector("#qBack").onclick=()=>paintQ(picked); };
+      const nx=dl.querySelector("#qNext"); if(nx) nx.onclick=()=>{ if(n<qs.length-1){ n++; paintQ(null); } else result(); };
+    }
+    async function result(){
+      const pct=Math.round(right/qs.length*100), passed=pct>=tset().passMark, now=Date.now();
+      const upd={ [`trainingQuiz/${k}/${id}/${store.key()}`]:{ at:now, version:x.version||1, score:right, total:qs.length, pct, passed, answers } };
+      if(passed) upd[`trainingDone/${k}/${id}`]={ at:now, version:x.version||1, via:"quiz", score:pct };
+      await save(upd);
+      const wrong=answers.filter(a=>!a.ok).map(a=>quiz[a.q]);
+      const again=!passed && !preview ? retakeBlock(k,id) : "";
+      dl.innerHTML=`${head()}<div class="mp-body"><h2>${passed?"Passed":"Not passed yet"}</h2><p><b>${right} of ${qs.length}</b> (${pct}%). You need ${tset().passMark}% to pass.${preview?" Preview: nothing was saved.":""}</p>
+        ${wrong.length?`<h3>To go over</h3>${wrong.map(q=>`<div class="qexp" style="margin-bottom:8px"><b>${t2Txt(q.q)}</b><br>${t2Txt(q.explain||"")}</div>`).join("")}`:""}
+        ${again?`<p class="meta">${esc(again)}</p>`:""}</div>
+        <div class="mp-foot">${!passed&&!again?`<button id="qAgain">Try again</button>`:""}<span class="grow"></span><button class="primary" data-close>Close</button></div>`;
+      dl.querySelectorAll("[data-close]").forEach(b=>b.onclick=()=>dl.close());
+      const ag=dl.querySelector("#qAgain"); if(ag) ag.onclick=()=>{ i=0; shown=0; startQuiz(); };
+      if(typeof render==="function") render();
+    }
+    paintQ(null);
+  }
+  if(!slides.length && !quiz.length) return finish();
+  paint();
+}
+
+// ---- Markdown import (spec sections 1 to 4) ----
+function parseModuleMd(src){
+  const errs=[], warns=[]; src=String(src||"").replace(/\r\n?/g,"\n").replace(/^﻿/,"");
+  const fm=src.match(/^---\n([\s\S]*?)\n---\n?/); if(!fm) return { errs:["No front matter block at the top of the file"], warns, meta:{} };
+  const meta={}; fm[1].split("\n").forEach(l=>{ const m=l.match(/^([A-Za-z_]+):\s*(.*)$/); if(m) meta[m[1].toLowerCase()]=m[2].trim().replace(/^["']|["']$/g,""); });
+  meta.roles=String(meta.roles||"").replace(/[\[\]]/g,"").split(",").map(s=>s.trim().toLowerCase()).filter(Boolean);
+  let rest=src.slice(fm[0].length); const qm=rest.search(/^---quiz---\s*$/m);
+  const slidePart=qm>=0?rest.slice(0,qm):rest, quizPart=qm>=0?rest.slice(qm).replace(/^---quiz---\s*$/m,""):"";
+  const slides=[]; let todos=0;
+  slidePart.split(/^---slide---\s*$/m).map(s=>s.trim()).filter(Boolean).forEach((blk,si)=>{
+    const s={ h:"", items:[] }, td=[];
+    blk.replace(/\[\[TODO:\s*([\s\S]*?)\]\]/g,(m,t)=>{ td.push(t.trim()); return m; });
+    blk.split("\n").forEach(raw=>{ const l=raw.trim(); if(!l) return; let m;
+      if((m=l.match(/^##\s+(.*)$/)) && !s.h) s.h=m[1].trim();
+      else if((m=l.match(/^!\[(.*?)\]\(image:([a-z0-9-]+)\)$/))) s.img={ cap:m[1], name:m[2] };
+      else if((m=l.match(/^video:\s*(\S+)$/i))) s.video=m[1];
+      else if((m=l.match(/^note:\s*(.*)$/i))) s.note=(s.note?s.note+" ":"")+m[1];
+      else if((m=l.match(/^\{highlight:\s*(.*?)\}$/i))) (s.hl=s.hl||[]).push(m[1]);
+      else if((m=l.match(/^[-*]\s+(.*)$/))) { let t=m[1]; const r=/\{reveal\}\s*$/.test(t); t=t.replace(/\s*\{reveal\}\s*$/,""); s.items.push(r?{t,r:true}:{t}); }
+      else { const r=/\{reveal\}\s*$/.test(l), t=l.replace(/\s*\{reveal\}\s*$/,""); s.items.push(r?{t,p:true,r:true}:{t,p:true}); } });
+    if(td.length){ s.todo=true; s.todos=td; todos+=td.length; }
+    if(!s.h) errs.push(`Slide ${si+1} has no ## heading`);
+    if(s.items.filter(x=>!x.p).length>5) warns.push(`Slide ${si+1} has more than five bullets`);
+    slides.push(s); });
+  const quiz=[];
+  quizPart.split(/^###\s+Q\d+.*$/m).map(s=>s.trim()).filter(Boolean).forEach((blk,qi)=>{
+    const q={ q:"", opts:[], ans:-1, explain:"" };
+    blk.split("\n").forEach(raw=>{ const l=raw.trim(); if(!l) return; let m;
+      if((m=l.match(/^[-*]\s+\[( |x|X)\]\s+(.*)$/))){ if(m[1].toLowerCase()==="x"){ if(q.ans>=0) errs.push(`Question ${qi+1} has more than one [x]`); q.ans=q.opts.length; } q.opts.push(m[2].trim()); }
+      else if((m=l.match(/^explain:\s*(.*)$/i))) q.explain=m[1];
+      else if((m=l.match(/^slide:\s*(\d+)/i))) q.slide=+m[1];
+      else if(!q.q) q.q=l; else q.q+=" "+l; });
+    if(!q.q) errs.push(`Question ${qi+1} has no question line`);
+    if(q.opts.length<3 || q.opts.length>4) errs.push(`Question ${qi+1} needs 3 or 4 options (has ${q.opts.length})`);
+    if(q.ans<0) errs.push(`Question ${qi+1} has no correct answer marked [x]`);
+    if(!q.explain) errs.push(`Question ${qi+1} has no explain: line`);
+    if(q.opts.some(o=>/^(all|none) of the above$/i.test(o))) errs.push(`Question ${qi+1} uses "all/none of the above"`);
+    quiz.push(q); });
+  if(!/^[a-z0-9-]+$/.test(meta.id||"")) errs.push("id is missing or not lowercase with hyphens");
+  if(!meta.title) errs.push("title is missing");
+  if(!slides.length) errs.push("No slides");
+  const comp=(meta.completion||"view").toLowerCase(); if(!["quiz","view"].includes(comp)) errs.push("completion must be quiz or view");
+  if(comp==="quiz" && !quiz.length) errs.push("completion is quiz but there is no ---quiz--- section");
+  if(meta.season && !T2_SEASONS[meta.season]) errs.push("season must be one of: "+Object.keys(T2_SEASONS).join(", "));
+  const bad=meta.roles.filter(r=>!["walker","member","manager","all","admin"].includes(r)); if(bad.length) errs.push("Unknown role: "+bad.join(", "));
+  const rec={ title:meta.title||"", kind:"module", category:meta.category||"Other", roles:meta.roles, season:meta.season||"always", order:Number(meta.order)||0,
+    version:Number(meta.version)||1, completion:comp, status:(meta.status||"draft").toLowerCase(), description:meta.description||null, slides, quiz, todos };
+  return { id:meta.id, meta, rec, errs, warns, todos, images:slides.filter(s=>s.img).map(s=>s.img.name) };
+}
+
+// ---- Routes page: door hanger training records and the door hanger gate (October 20, 2026) ----
+// A walker can be put in a seat only once his gate is met (signed offer, the job module quiz, the systems deck). The
+// office sees who is ready on the Schedule tab. In review mode (Russel's choice) a ready walker waits there to be seated;
+// in auto mode he goes into the first seat that has no one.
+let doneAll={}, paperAll={};
+const t2DoneMap = k => (!isAdmin && me && k===me.key) ? (trainDone||{}) : (doneAll[k]||{});
+function walkerGate(k){ return gateCheck("walker", { offerSigned:offerSignedOf(k, paperAll[k]||(k===me.key?myPaper:null), allowedWalkers[k]), done:t2DoneMap(k), viewed:trainViewed[k]||{}, practice:{} }); }
+function readyCard(){
+  const seated=new Set(seatList().map(seatPerson).filter(Boolean)), list=Object.entries(walkers).filter(([k])=>!seated.has(k)).map(([k,w])=>({ k, w, g:walkerGate(k) }));
+  const ready=list.filter(x=>x.g.ok), waiting=list.filter(x=>!x.g.ok);
+  if(!list.length) return "";
+  return `<div class="card"><h2>Door hangers not in a seat</h2><p class="meta">${tset().walkerUnlock==="auto"?"Auto: a door hanger who finishes training goes into the first seat with no one in it when this tab opens.":"Review: a door hanger who finishes training waits here. Put him in a seat above."}</p>
+    ${ready.map(x=>`<div class="t2chk"><span class="chip ok">Ready</span> <b>${esc(x.w.name)}</b>${x.g.waived.length?` <span class="muted">(${x.g.waived.length} waived, not imported yet)</span>`:""}</div>`).join("")}
+    ${waiting.map(x=>`<div class="t2chk"><span class="chip warn">In training</span> <b>${esc(x.w.name)}</b> <span class="muted">${esc(x.g.need.join(", "))}</span></div>`).join("")}</div>`;
+}
+let autoSeating=false;
+async function autoSeat(){
+  if(autoSeating || tset().walkerUnlock!=="auto" || !isAdmin || viewAs) return; const t=today();
+  const seated=new Set(seatList().map(seatPerson).filter(Boolean)), ready=Object.keys(walkers).filter(k=>!seated.has(k) && walkerGate(k).ok);
+  const open=seatList().filter(s=>!seatPerson(s) && seatRoutes(s).some(([,r])=>routeOpen(r,t)));
+  if(!ready.length || !open.length) return; autoSeating=true;
+  try { const upd={}; ready.slice(0,open.length).forEach((k,i)=>seatRoutes(open[i]).forEach(([id,r])=>{ if(routeOpen(r,t)) upd["routes/"+id+"/walker"]=k; }));
+    await store.update(upd); toast(`${ready.slice(0,open.length).map(walkerName).join(", ")} seated automatically`); } finally { autoSeating=false; }
+}
 const TRAIN_KINDS = { deck:"Slide deck", sop:"SOP", video:"Video", doc:"Document", link:"Link" };
 const PAPER_TITLES = { agreement:"Distributor agreement (your offer)", privacy:"Employee information privacy policy", w9:"Form W-9, taxpayer ID", deposit:"Direct deposit authorization",
   w4:"Form W-4, federal tax withholding", miw4:"Form MI-W4, Michigan tax withholding", i9:"Form I-9, employment eligibility" };
@@ -386,21 +655,27 @@ function offerPending(){ return !!myPaper.token && paperList().includes("agreeme
 function renderLearn(app){
   const ids=new Set(); ["walker","all"].forEach(r=>Object.entries(trainRoles[r]||{}).forEach(([id,on])=>{ if(on) ids.add(id); }));
   Object.entries(trainAssign||{}).forEach(([id,v])=>{ if(v) ids.add(id); });
-  const list=[...ids].filter(id=>trainLib[id]&&trainLib[id].title), done=id=>!!(trainDone||{})[id];
+  const all=[...ids].filter(id=>trainLib[id]&&trainLib[id].title), done=id=>!!(trainDone||{})[id];
+  const mods=all.filter(id=>isModule(trainLib[id]) && trainLib[id].status!=="draft").sort((a,b)=>(trainLib[a].order||0)-(trainLib[b].order||0)||trainLib[a].title.localeCompare(trainLib[b].title));
+  const list=all.filter(id=>!isModule(trainLib[id]));
   const left=paperList().filter(f=>PAPER_TITLES[f] && ((myPaper.forms||{})[f]||{}).status!=="done").sort((a,b)=>(a==="agreement"?-1:b==="agreement"?1:0));
   const link=myPaper.token ? `paperwork.html?t=${encodeURIComponent(myPaper.token)}${myPaper.s?"&s="+encodeURIComponent(myPaper.s):""}` : "";
   const byCat={}; list.forEach(id=>{ const c=trainLib[id].category||"Other"; (byCat[c]=byCat[c]||[]).push(id); });
+  const data={ done:trainDone||{}, viewed:trainViewed[me.key]||{} }, g=walkerGate(me.key), total=mods.length+list.length, n=mods.filter(done).length+list.filter(done).length;
   app.innerHTML = (onboarding ? `<div class="card"><h2 style="margin:0 0 6px">Welcome to Mangiapane Brothers</h2><p>Sign your distributor agreement below to get started. Once it is signed, your routes open up. The rest of your paperwork can be done here any time before your first check.</p></div>` : "")
     + (left.length && link ? `<h2 style="margin:6px 0 8px">Paperwork to sign</h2>` + left.map(f=>`<div class="card" style="border-left:4px solid var(--amber)"><p style="margin:0 0 4px"><span class="chip warn">To sign</span> <b>${esc(PAPER_TITLES[f])}</b></p>
         <p class="meta">${f==="agreement"?"Your offer. Sign it to get your routes.":f==="deposit"?"Optional. Without it you are paid by check.":"Needed before your first check. Tax and bank forms are locked on your phone before they are sent."}</p>
         <div class="actions"><a class="mapbtn" href="${esc(link)}">Sign now</a></div></div>`).join("") : "")
-    + `<div class="bar"><span class="date">Training</span>${list.length?`<span class="chip ${list.every(done)?"ok":"warn"}">${list.filter(done).length} of ${list.length} done</span>`:""}</div>`
+    + `<div class="card"><h2 style="margin:0 0 6px">${g.ok?"Ready for routes":"Before you get routes"}</h2>${g.ok?'<p class="meta">Your training is done. The office puts you on routes.</p>':`<p class="meta">The office cannot give you routes until these are done:</p>${gateList(g).replace(/<p class="muted"[\s\S]*$/,"")}`}</div>`
+    + `<div class="bar"><span class="date">Training</span>${total?`<span class="chip ${n===total?"ok":"warn"}">${n} of ${total} done</span>`:""}</div>`
+    + (mods.length ? `<h3 style="margin:14px 0 6px">Modules</h3>${mods.map(id=>moduleCardHtml(me.key,id,data,false)).join("")}` : "")
     + (list.length ? Object.keys(byCat).sort().map(c=>`<h3 style="margin:14px 0 6px">${esc(c)}</h3>`+byCat[c].sort((a,b)=>done(a)-done(b)).map(id=>{ const x=trainLib[id];
         return `<div class="card"><p style="margin:0 0 4px"><span class="chip">${esc(TRAIN_KINDS[x.kind]||"Material")}</span> <b>${esc(x.title)}</b> ${done(id)?'<span class="chip ok">Done</span>':""}</p>
           ${x.description?`<p class="meta">${esc(x.description)}</p>`:""}
           <div class="actions">${x.url?`<a class="mapbtn" href="${esc(x.url)}" target="_blank" rel="noopener">${x.kind==="deck"?"Open slides":x.kind==="video"?"Watch":"Open"}</a>`:""}${x.body?`<button class="small" data-sop="${esc(id)}">Read the SOP</button>`:""}
-          ${done(id)?`<button class="small" data-undone="${esc(id)}">Not done</button>`:`<button class="small primary" data-done="${esc(id)}">Mark done</button>`}</div></div>`; }).join("")).join("")
-      : `<div class="card"><p class="meta">${onboarding?"Your training shows up here after you sign your agreement.":"Nothing assigned to you yet. The office adds how-tos and videos for door hangers here."}</p></div>`);
+          ${done(id)?`<button class="small" data-undone="${esc(id)}">Not done</button>`:`<button class="small primary" data-done="${esc(id)}">Mark done</button>`}</div></div>`; }).join("")).join("") : "")
+    + (!total ? `<div class="card"><p class="meta">${onboarding?"Your training shows up here after you sign your agreement.":"Nothing assigned to you yet. The office adds how-tos and videos for door hangers here."}</p></div>` : "");
+  wireModuleCards(app, me.key, !!viewAs && viewAs!=="__training");
   app.querySelectorAll("[data-sop]").forEach(b=>b.onclick=()=>{ const x=trainLib[b.dataset.sop]||{}; const steps=String(x.body||"").split(/\n+/).map(t=>t.trim()).filter(Boolean);
     openDlg(`<h2>${esc(x.title)}</h2><ol style="padding-left:22px">${steps.map(t=>`<li style="margin:0 0 8px">${esc(t.replace(/^\d+[.)]\s*/,""))}</li>`).join("")}</ol><div class="actions"><button data-close>Close</button></div>`); });
   app.querySelectorAll("[data-done],[data-undone]").forEach(b=>b.onclick=async()=>{ if(previewOnly()) return; const id=b.dataset.done||b.dataset.undone;
@@ -563,10 +838,12 @@ function renderSchedule(app){
   app.innerHTML=`<div class="bar"><span class="date">Schedule</span><button class="small" id="shiftBtn">Move a campaign</button><button class="primary small" id="addRoute">Add route</button></div>
     <p class="meta">${list.length} routes, ${doors.toLocaleString()} doors, about ${Math.round(doors/PACE)} hours, ${money(doors*RATE)} in distributor pay. Tap a row to change it.</p>
     ${seatCard()}
+    ${readyCard()}
     <div class="card scroll"><table><tr><th>Dates</th><th>Route</th><th>Area</th><th>Doors</th><th>Walker</th><th>Done</th></tr>
     ${list.map(([id,r])=>{ const p=progress(id); return `<tr data-edit="${esc(id)}" style="cursor:pointer"><td>${r.start?fmtRange(r.start,r.end):'<span class="chip warn">Not scheduled</span>'}${r.floating?' <span class="chip warn">floats</span>':""}</td><td><b>${esc(r.name)}</b><div class="muted">${esc(r.group||"")}</div></td><td>${esc((areas[r.areaId]||{}).name||"")}</td><td>${Number(r.doors||0).toLocaleString()}</td><td>${r.seat?`<b>${esc(r.seat)}</b><div class="muted">${r.walker?esc(walkerName(r.walker)):"no one assigned"}</div>`:(r.walker?esc(walkerName(r.walker)):'<span class="chip warn">Unassigned</span>')}</td><td>${p.done}/${p.total}</td></tr>`; }).join("")}</table></div>`;
   $("#addRoute").onclick=()=>editRoute(null);
   $("#shiftBtn").onclick=shiftCampaign;
+  autoSeat();
   app.querySelectorAll("[data-seatgo]").forEach(b=>b.onclick=()=>assignSeat(b.dataset.seatgo));
   app.querySelectorAll("[data-edit]").forEach(tr=>tr.onclick=()=>editRoute(tr.dataset.edit));
 }
@@ -578,7 +855,7 @@ function seatCard(){
     <div class="scroll"><table><tr><th>Seat</th><th>Routes</th><th>Doors</th><th>Hours</th><th>Pay</th><th>Person</th><th>From</th><th></th></tr>
     ${seats.map((s,i)=>{ const rs=seatRoutes(s).map(([,r])=>r); const doors=rs.reduce((n,r)=>n+(Number(r.doors)||0),0); const cur=seatPerson(s); const left=rs.filter(r=>routeOpen(r,t)).length;
       return `<tr><td><b>${esc(s)}</b><div class="muted">${left} still to walk</div></td><td>${rs.length}</td><td>${doors.toLocaleString()}</td><td>${Math.round(doors/PACE)}</td><td>${money(doors*RATE)}</td>
-      <td><select id="seatWho${i}" style="min-width:130px" aria-label="Person for ${esc(s)}"><option value="">No one</option>${people.map(([k,n])=>`<option value="${esc(k)}" ${cur===k?"selected":""}>${esc(n)}</option>`).join("")}</select></td>
+      <td><select id="seatWho${i}" style="min-width:130px" aria-label="Person for ${esc(s)}"><option value="">No one</option>${people.map(([k,n])=>`<option value="${esc(k)}" ${cur===k?"selected":""}>${esc(n)}${walkerGate(k).ok?"":" (training not done)"}</option>`).join("")}</select></td>
       <td><input type="date" id="seatFrom${i}" value="${t}" style="width:auto" aria-label="Starting day for ${esc(s)}"></td>
       <td><button class="small primary" data-seatgo="${i}">Assign</button></td></tr>`; }).join("")||'<tr><td class="meta" colspan="8">No seats yet. Open a route and type a seat name, such as Walker 1.</td></tr>'}</table></div>
     ${loose?`<p class="muted"><span class="chip warn">${loose} routes have no seat</span> Open each one below to give it a seat.</p>`:""}
@@ -586,6 +863,7 @@ function seatCard(){
 }
 async function assignSeat(i){
   const s=seatList()[Number(i)]; if(!s) return; const who=$("#seatWho"+i).value; const from=$("#seatFrom"+i).value||today();
+  if(who){ const g=walkerGate(who); if(!g.ok) return openDlg(`<h2>${esc(walkerName(who))} is not ready for routes</h2><p class="meta">Still to do:</p>${gateList(g)}<div class="actions"><button class="primary" data-close>OK</button></div>`); }
   const upd={}; seatRoutes(s).forEach(([id,r])=>{ if(routeOpen(r,from)) upd["routes/"+id+"/walker"]=who; });
   const n=Object.keys(upd).length; if(!n) return toast("No routes in "+s+" from that day forward");
   await store.update(upd); toast(`${s}: ${n} routes ${who?"assigned to "+walkerName(who):"cleared"}`);
@@ -762,6 +1040,16 @@ if(DEMO){
       "paper/walker,one@example,com":{ token:"p_demo_w1", s:"DEMO", position:"walker", type:"1099", list:["agreement","privacy","w9","deposit"], offerSigned:Date.now()-5*864e5, forms:{ agreement:{ status:"done", at:Date.now()-5*864e5 } } }};
     Object.entries(s.areas||{}).forEach(([k,v])=>upd["routeAreas/"+k]=v);
     Object.entries(s.routes||{}).forEach(([k,v],i)=>upd["routes/"+k]={...v,walker:v.training?v.walker:v.seat==="Walker 2"?"walker,two@example,com":v.seat==="Walker 1"?"walker,one@example,com":""});
+    // Training modules (October 20, 2026): a sample door hanger job module with a quiz, and a third walker still in training.
+    const wm=parseModuleMd(["---","id: walker-job","title: Hanging door hangers","roles: [walker]","category: Door hangers","order: 10","version: 1","completion: quiz","status: ready","---",
+      "---slide---","## Where the hanger goes","- Doorknob first {reveal}","- Then the screen door sill {reveal}","- Never in a mailbox {reveal}","![A hanger on a doorknob](image:knob)",
+      "---slide---","## Stay off the lawn","- Walks and sidewalks only","- Loose dog: skip the house",
+      "---quiz---","### Q1","Where does a hanger never go?","- [ ] On the doorknob","- [x] In the mailbox","- [ ] In the screen door sill","explain: Mailboxes are federal property. Never put anything in one.","slide: 1",
+      "### Q2","A loose dog is in the front yard. What do you do?","- [x] Skip the house","- [ ] Walk fast to the door","- [ ] Wait for the owner","explain: A loose dog means skip the house.","slide: 2"].join("\n"));
+    upd["trainingLib/walker-job"]={ ...wm.rec, createdAt:Date.now()-864e5 }; upd["trainingRoles/walker/walker-job"]=true;
+    upd["trainingDone/walker,one@example,com/walker-job"]={ at:Date.now()-864e5, version:1, via:"quiz", score:100 };
+    upd["allowed/walker,three@example,com"]={name:"Walker Three",email:"walker.three@example.com",tier:"walker"};
+    upd["paper/walker,three@example,com"]={ token:"p_demo_w3", position:"walker", type:"1099", list:["agreement"], forms:{ agreement:{ status:"done", at:Date.now()-864e5 } } };
     await store.update(upd);
     const first=Object.values(s.routes||{}).map(r=>r.start).filter(Boolean).sort()[0]; if(first && first>curDate) curDate=first;
     enter(DEMO==="walker" ? {email:"walker.one@example.com",displayName:"Walker One"} : {email:ADMIN_EMAIL,displayName:"Russel"});

@@ -1,6 +1,6 @@
 # Training Content Spec
 
-**Mangiapane Brothers Lawn and Snow LLC. Version 1, written Tuesday 20 October 2026 by DI.**
+**Mangiapane Brothers Lawn and Snow LLC. Version 2, 20 October 2026, with Russel's decisions on the open items.**
 
 This file is the only shared piece between DI and Fall + Winter Planning. Fall + Winter Planning writes module files to this spec. DI renders them on the site, grades the quizzes and runs the gates. If a rule here and a rule in a module disagree, this file wins.
 
@@ -116,14 +116,14 @@ Database nodes. The first four already exist on the site; the rest are new.
 - A new `version` does not erase a pass. The office sees "Passed v1, current v2" and can reassign it if the change matters.
 - Questions and options shuffle on every attempt.
 
-## 6. Settings (Russel's open decisions, built as settings)
+## 6. Settings (decided by Russel; still settings, so they can change without code)
 
-| Setting | Path | Default until Russel decides |
+| Setting | Path | Value |
 |---|---|---|
-| Pass mark | `trainingSettings/passMark` | 80 |
-| Retake rule | `trainingSettings/retake` = `{ mode: "unlimited" or "limited", max, waitMinutes }` | unlimited, wait 10 minutes after a fail |
-| Walker unlock | `trainingSettings/walkerUnlock` = `"auto"` or `"review"` | review |
-| Season dates | `trainingSettings/seasons/{season}` = `{ from: "YYYY-MM-DD" }` | always: open. fall, lights, snow: 2026-10-20. lawn: 2027-03-15 |
+| Pass mark | `trainingSettings/passMark` | 80 (decided) |
+| Retake rule | `trainingSettings/retake` = `{ mode: "unlimited" or "limited", max, waitMinutes }` | unlimited, no wait (decided) |
+| Walker unlock | `trainingSettings/walkerUnlock` = `"auto"` or `"review"` | review (decided): a ready walker shows on the Routes Schedule tab for Russel to seat |
+| Season dates | `trainingSettings/seasons/{season}` = `{ from: "YYYY-MM-DD" }` | always: open. fall, lights, snow: 2026-10-20 (decided). lawn: spring 2027, set when the lawn modules are written |
 
 Snow opens on or before 1 November in every case.
 
@@ -139,6 +139,8 @@ The system computes these per person. Content files may reference them by name i
 | `practice_passed` | All five practice items in `trainingPractice/{k}` are true (below). |
 | `can_schedule` | The role's gate (below) is met. Scheduling and shift assignment refuse anyone without it. |
 | `can_manage` | `can_schedule` for crew, plus `viewed:systems-manager` and `practice_passed`. The crew manager role refuses anyone without it. |
+
+A condition naming a module that has not been imported yet is waived, and the office sees it marked as waived. It switches on by itself the moment that module is imported. This keeps scheduling working while content is still being written.
 
 Gates, stored at `trainingSettings/gates` so they can change without code:
 
@@ -156,7 +158,7 @@ Practice run items, all on the training route under the training account:
 | Incident | `trainingPractice/{k}/incident` | One incident report filed on a training house. |
 | End of day | `trainingPractice/{k}/eod` | One end-of-day form submitted for the training crew. |
 
-Rules: the end-of-day form and incident report are the real ones, unchanged. Every practice entry carries `training: true`. Billing, the end-of-day review, office complaint flags and payroll skip anything with `training: true`. This is the reuse of the existing training route and system check, not a second setup.
+Rules: the practice run uses the real screens (route map, check-off, photo, incident report, Crew log approval), unchanged. The practice route is real house addresses copied from a real route so the map works, with no link to any client record. Every practice entry is stored under `trainingPractice/{k}/run`, never in the crew's real check-offs, service log, day approvals or time, so nothing from a practice run can reach the CRM, QuickBooks, billing or payroll. The clock is hidden during practice.
 
 ## 8. Module ids (use these exactly)
 
@@ -171,7 +173,7 @@ Rules: the end-of-day form and incident report are the real ones, unchanged. Eve
 | `crew-gutters` | Gutters, ladders and roofs | member, manager | fall | quiz | none |
 | `crew-lights` | Holiday lights | member, manager | lights | quiz | none |
 | `crew-snow` | Snow | member, manager | snow | quiz | none |
-| `crew-snow-equipment` | Snow equipment | member, manager | snow | quiz | none (later) |
+| `crew-snow-equipment` | Snow equipment: ATVs | member, manager | snow | none | Not written now. Taught in person once the ATVs are bought. |
 | `mgr-day` | Running the crew day and route | manager | always | quiz | none |
 | `mgr-quality` | Quality checks | manager | always | quiz | none |
 | `mgr-complaints` | Client handling and complaints | manager | always | quiz | none |
@@ -183,7 +185,9 @@ Rules: the end-of-day form and incident report are the real ones, unchanged. Eve
 | `systems-manager` | Using the site: crew managers | manager | always | view | manager |
 | `systems-admin` | Using the site: office | admin only | always | view | none |
 
-`systems-*` are written by DI, not Fall + Winter Planning. `crew-conduct` quiz questions may draw on the handbook as well, since the handbook has no quiz of its own.
+`systems-*` are written by DI, not Fall + Winter Planning. The handbook has no quiz of its own, so the `crew-conduct` quiz must also test the handbook, including the attendance policy (personal days, notice, unexcused absences). At least two of its questions come from the handbook.
+
+Equipment today is backpack blowers only. Lawn equipment waits for the spring lawn modules; ATVs wait for in-person training.
 
 ## 9. File layout and handoff
 
@@ -200,7 +204,7 @@ Mangiapane Brothers/05 Hiring & Crew/Training/
 - Fall + Winter Planning saves finished files straight into the right `Modules` folder with `status: ready`. Drafts stay `status: draft` in the same place.
 - DI imports every `ready` file into `trainingLib`, assigns it by `roles`, and keeps a copy in the repo at `mb-projects/training/modules/`.
 - To change a published module: edit the file, raise `version`, keep `status: ready`. DI re-imports.
-- Crew fall packet order (first, for Crew 1 on 26 October): `crew-safety`, `crew-conduct`, `handbook`, `crew-fall-cleanup`, `crew-equipment`, `crew-gutters`, `crew-lights`, `crew-snow`.
+- Crew fall packet order (first, for Crew 1's start): `crew-safety`, `crew-conduct`, `handbook`, `crew-fall-cleanup`, `crew-equipment`, `crew-gutters`, `crew-lights`, `crew-snow`.
 
 ## 10. What content must not do
 

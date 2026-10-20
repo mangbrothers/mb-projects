@@ -119,6 +119,32 @@
   .pgdrawer a:hover{background:var(--surface2)}
   .pgdrawer a.here{background:var(--accent-soft);color:var(--accent);font-weight:650}
   .pgdrawer .pdfoot{margin-top:auto;font-size:12px;color:var(--muted);padding:8px 4px 0}
+
+  /* Training modules: slide player and quiz (October 20, 2026) */
+  dialog.modplayer{width:min(720px,100vw);max-width:100vw;height:min(100dvh,860px);max-height:100dvh;padding:0;display:flex;flex-direction:column}
+  dialog.modplayer:not([open]){display:none}
+  .mp-head{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--line)}
+  .mp-head .t{font-weight:700;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .mp-bar{height:4px;background:var(--surface2)}.mp-bar i{display:block;height:100%;background:var(--accent)}
+  .mp-body{flex:1;overflow:auto;padding:18px 16px 10px;font-size:17px;line-height:1.5}
+  .mp-body h2{font-size:22px;margin:0 0 12px}
+  .mp-body ul{padding-left:22px;margin:0 0 12px}.mp-body li{margin:0 0 8px}
+  .mp-body li.hid{visibility:hidden}
+  .mp-body p.para{margin:0 0 10px}
+  .mp-img{display:block;width:100%;max-height:46vh;object-fit:contain;border-radius:var(--r);border:1px solid var(--line);margin:8px 0}
+  .mp-ph{display:flex;align-items:center;justify-content:center;min-height:150px;border:2px dashed var(--line);border-radius:var(--r);background:var(--surface2);color:var(--ink2);text-align:center;padding:12px;margin:8px 0;font-size:14px}
+  .mp-hl{display:inline-block;border:2px solid var(--amber);border-radius:999px;padding:2px 10px;font-weight:700;color:var(--ink)}
+  .mp-note{border-left:4px solid var(--accent);background:var(--accent-soft);padding:8px 10px;border-radius:var(--r);font-size:14px;margin-top:10px}
+  .mp-todo{border-left:4px solid var(--amber);background:var(--amber-soft);padding:8px 10px;border-radius:var(--r);font-size:14px;margin-bottom:10px}
+  .mp-foot{display:flex;gap:10px;align-items:center;padding:10px 14px calc(10px + env(safe-area-inset-bottom));border-top:1px solid var(--line)}
+  .mp-foot .grow{flex:1;text-align:center;color:var(--muted);font-size:14px}
+  .mp-foot button{min-height:44px;min-width:96px}
+  .qopt{display:block;width:100%;text-align:left;padding:12px 14px;margin:0 0 10px;border:1px solid var(--line);border-radius:var(--r);background:var(--card);color:var(--ink);font-size:16px;min-height:48px}
+  .qopt.right{border-color:var(--green);background:var(--green-soft)}
+  .qopt.wrong{border-color:var(--red);background:var(--red-soft)}
+  .qexp{padding:10px 12px;border-radius:var(--r);background:var(--surface2);margin-top:4px}
+  .t2chk{display:flex;gap:8px;align-items:center;padding:6px 0;border-top:1px solid var(--line)}
+  .t2chk:first-child{border-top:0}
 </style>
 <style>
   /* Crews additions: the same look as the routes page, plus what a job carries */
@@ -653,6 +679,7 @@ async function enter(user){
     isAdmin = tier==="admin"; realAdmin=isAdmin; viewAs=""; meReal=null;
     role = isAdmin ? "" : (mine.crewRole==="manager" ? "manager" : "member"); myCrew = isAdmin ? "" : mine.crew;
     if(mine?.name) me.name = mine.name;
+    meRec = mine||{};
     view = onboarding ? "training" : role==="member" ? "schedule" : isAdmin ? OFFICE_TABS[0][0] : "today";
     $("#title").textContent = isAdmin ? (PAGE==="team" ? "Mangiapane Brothers Team Manager" : "Mangiapane Brothers Crews") : `${myCrew}`;
     $("#gate").hidden=true; $("#app").hidden=false; $("#nav").hidden=false; $("#navBtn").hidden=!isAdmin; attach();
@@ -663,11 +690,11 @@ function attach(){
   unsub.forEach(f=>f()); unsub=[];
   const bind = (path, set) => unsub.push(store.on(path, v=>{ set(v||{}); render(); }));
   const w = winterOf(today()), from = [addDays(today(), -KEEP_DAYS), today()>=w.from ? w.from : "9"].sort()[0];
-  bind("crews", v=>{ const had=JSON.stringify(crewMembers(myCrew)); crews=v; if(!isAdmin && JSON.stringify(crewMembers(myCrew))!==had) memberBind(); }); bind("crewRoutes", v=>routes=v); bind("events", v=>events=v);
+  bind("crews", v=>{ const had=JSON.stringify(crewMembers(myCrew)); crews=v; if(!isAdmin && JSON.stringify(crewMembers(myCrew))!==had) memberBind(); }); bind("crewRoutes", v=>{ routesReal=v; if(!practice) routes=v; }); bind("events", v=>events=v);
   bind("payRates", v=>payRates=v);
-  bind("trainingLib", v=>trainLib=v); bind("trainingRoles", v=>trainRoles=v);
+  bind("trainingLib", v=>trainLib=v); bind("trainingRoles", v=>trainRoles=v); bind("trainingSettings", v=>trainSet=v);
   unsub.push(store.onFrom("storms", from, v=>{ storms=v||{}; render(); }));
-  unsub.push(store.onFrom("crewChecks", from, v=>{ checks=v||{}; render(); }));
+  unsub.push(store.onFrom("crewChecks", from, v=>{ checksReal=v||{}; if(!practice) checks=checksReal; render(); }));
   if(isAdmin){
     bind("allowed", v=>team=v); bind("clients", v=>clients=v);
     unsub.push(store.onFrom("serviceLog", from, v=>{ svcLog=v||{}; render(); }));
@@ -678,12 +705,15 @@ function attach(){
     bind("applicants", v=>applicants=v); bind("personFile", v=>personFile=v); bind("staffReports", v=>reportsAll=v); bind("staffArchive", v=>archive=v); bind("personFileDoc", v=>fileDocs=v);
     bind("vaultPub", v=>vaultPub=typeof v==="string"?v:null); bind("vaultKey", v=>vaultKeyRec=v&&v.priv?v:null); bind("vaultAccess", v=>vaultAccess=v); bind("paper", v=>paperAll=v);
     bind("trainingAssign", v=>trainAssign=v); bind("trainingDone", v=>trainDone=v);
+    bind("trainingQuiz", v=>trainQuiz=v); bind("trainingViewed", v=>trainViewed=v); bind("trainingPractice", v=>trainPractice=v);
+    unsub.push(store.onFrom("crewIncidents", from, v=>{ incidents=v||{}; render(); }));
     bind("routeLogsByWalker", v=>walkLogs=v);
   } else {
     // An employee's own record. The office preview reads the office's copy instead.
     const own = (path, map) => unsub.push(store.on(path+"/"+me.key, v=>{ map[me.key]=v||{}; render(); }));
     own("timeEntries", timeAll); own("staff", staffAll); own("staffPrivate", privAll); own("staffDocs", docsAll); own("shifts", shiftsAll); own("payLog", payLogAll);
     own("trainingAssign", trainAssign); own("trainingDone", trainDone);
+    own("trainingQuiz", trainQuiz); own("trainingViewed", trainViewed); own("trainingPractice", trainPractice);
     // His paperwork packet. Signing the offer ends onboarding mode and opens the rest of the page.
     unsub.push(store.on("paper/"+me.key, v=>{ paperAll[me.key]=v||{}; if(onboarding && !offerPending(me.key)){ onboarding=false; if(!myCrew) toast("Offer signed. The office puts you on a crew next."); } render(); }));
     // A manager reads the employee reports he and the office filed for his crew.
@@ -701,9 +731,11 @@ function memberBind(){
 // What depends on the day on screen, for crew sign-ins: the crew's approval for that day and (managers) the crew's time.
 function dayBind(){
   dayUnsub.forEach(f=>f()); dayUnsub=[];
+  if(practice) return;
   const crew = viewCrew(); if(isAdmin && !viewAs) return; if(!crew) return;
   if(viewAs) return; // the office already reads everything
   dayUnsub.push(store.on(`dayLogs/${curDate}/crews/${crew}`, v=>{ setApproval(curDate, crew, v); render(); }));
+  if(role==="manager"){ const d=curDate; dayUnsub.push(store.on(`crewIncidents/${d}/${crew}`, v=>{ incidents[d]={ ...(incidents[d]||{}), [crew]:v||{} }; render(); })); }
 }
 function setApproval(d, crew, v){ const day=dayLogs[d]=dayLogs[d]||{}; day.crews=day.crews||{}; if(v) day.crews[crew]=v; else delete day.crews[crew]; }
 // Approvals for days off screen (pay periods), read once each for a crew sign-in.
@@ -762,7 +794,8 @@ function tabs(){
     : [["schedule","Schedule"],["training","Training"],["hours","Hours"],["pay","Pay"],["files","Files"],["info","My info"]];
   $("#nav").innerHTML = t.map(([k,l])=>`<button data-v="${k}" class="${view===k&&!openRoute&&!editing?"on":""}">${l}</button>`).join("")
     + (realAdmin && PAGE==="crews" && (crewList().length || people().length) ? `<select id="viewAs" class="viewas" aria-label="See the page as someone else"><option value="">Office view</option>${crewList().map(c=>`<option value="${esc(c)}" ${viewAs===c?"selected":""}>See as ${esc(c)} manager</option>`).join("")}${people().map(([k,t])=>`<option value="emp:${esc(k)}" ${viewAs==="emp:"+k?"selected":""}>See as ${esc(t.name)}</option>`).join("")}</select>` : "");
-  const pb=$("#previewBar"); pb.hidden=!viewAs;
+  const pb=$("#previewBar"); pb.hidden=!viewAs && !practice;
+  if(practice && !viewAs){ pb.innerHTML=`Practice run: you are managing a practice crew on the practice route. Nothing here reaches a client, billing or payroll. <button class="small" id="exitPractice">Exit practice</button>`; $("#exitPractice").onclick=exitPractice; }
   if(viewAs){ pb.innerHTML=`${isEmpPreview()?`Employee preview: this is what <b>${esc(me.name)}</b> sees.`:`Manager preview: this is what the <b>${esc(viewAs)}</b> manager sees.`} Nothing is saved. <button class="small" id="exitPreview">Back to office view</button>`; $("#exitPreview").onclick=()=>setViewAs(""); }
   const va=$("#viewAs"); if(va) va.onchange=()=>setViewAs(va.value);
   $("#nav").querySelectorAll("button[data-v]").forEach(b=>b.onclick=()=>{ view=b.dataset.v; openRoute=null; editing=null; personOpen=null; applicantOpen=null; archiveOpen=null; render(); window.scrollTo(0,0); });
@@ -789,6 +822,7 @@ const wireCards = () => document.querySelectorAll("[data-open]").forEach(el=>el.
 // ---------- views ----------
 function render(){
   if(!me) return;
+  syncPractice();
   tabs();
   const app=$("#app");
   if(editing) return renderEditRoute(app);
@@ -811,14 +845,14 @@ function renderToday(app){
     if(snowCrews.length) h += `<div class="storm">${off.length?`<span>No storm on for ${esc(off.join(", "))} on ${fmtDay(curDate)}.</span><button class="primary small" id="stormAll">Start storm for every crew</button>`:`<span><b>Storm on</b> for ${esc(snowCrews.join(", "))} on ${fmtDay(curDate)}.</span>`}</div>`;
     if(!crewList().length) h += `<div class="card"><p class="meta">No crews yet. Set them up on Team Manager, under Crews, then build their routes under Routes.</p></div>`;
     h += `<div class="lanes">${list.map(c=>{ const rs=routesOn(curDate,c); const a=approvalOf(curDate,c); const mk=(crews[c]||{}).manager;
-      return `<section class="lane"><h3>${esc(c)} ${stormOn(curDate,c)?'<span class="chip svc-snow">Storm</span>':""} ${a&&a.status==="approved"?'<span class="chip ok">Approved</span>':""}</h3><p class="lanewho">${mk?"Manager "+esc(personName(mk)):"No manager"} &middot; ${Object.keys(crewMembers(c)).length} on the crew</p>${rs.length?rs.map(([id,r])=>routeCard(id,r,curDate)).join(""):'<p class="muted">No route this day.</p>'}</section>`; }).join("")}</div>`;
+      return `<section class="lane"><h3>${esc(c)} ${stormOn(curDate,c)?'<span class="chip svc-snow">Storm</span>':""} ${a&&a.status==="approved"?'<span class="chip ok">Approved</span>':""}${incidentsFor(curDate,c).length?` <span class="chip bad">${incidentsFor(curDate,c).length} incident${incidentsFor(curDate,c).length>1?"s":""}</span>`:""}</h3><p class="lanewho">${mk?"Manager "+esc(personName(mk)):"No manager"} &middot; ${Object.keys(crewMembers(c)).length} on the crew</p>${rs.length?rs.map(([id,r])=>routeCard(id,r,curDate)).join(""):'<p class="muted">No route this day.</p>'}</section>`; }).join("")}</div>`;
     h += eventsCard(curDate, "");
     app.innerHTML=h; wireDateBar(1); wireCards();
     const sa=$("#stormAll"); if(sa) sa.onclick=()=>startStorm(off);
     return;
   }
   const crew=viewCrew(), rs=routesOn(curDate,crew), a=approvalOf(curDate,crew);
-  if(curDate===today()) h += clockCard();
+  if(curDate===today() && !practice) h += clockCard();
   const hasSnow = Object.values(routes).some(r=>r&&r.standing&&r.crew===crew);
   if(hasSnow){
     if(stormOn(curDate,crew)){ const s=storms[curDate][crew]; h += `<div class="storm"><b>Storm on</b><span>Started ${fmtTime(s.at)}${s.by?" by "+esc(personName(s.by)):""}. Your snow route is below.</span></div>`; }
@@ -884,12 +918,14 @@ function renderRoute(app){
       return `<li class="${k?(k.skipped?"skip":"done"):""}"><span class="num">${i+1}</span><button class="tick" data-tick="${esc(s.id)}" aria-label="Check off ${esc(s.name)}" ${can?"":"disabled"}>${k?(k.skipped?"&ndash;":"&#10003;"):""}</button>
         <span class="nm"><b>${esc(s.name)}</b> ${(KINDS_FOR[r.service]||[]).length>1||s.kind==="call"?`<span class="chip">${esc(KINDS[s.kind]||"")}</span>`:""}<div class="addr">${esc(s.address||"")}${s.phone?" &middot; "+telLink(s.phone):""}</div>
           ${s.note?`<div class="cnote">${esc(s.note)}</div>`:""}
+          ${incidentsFor(d,r.crew).filter(x=>x.stop===s.id).map(x=>`<span class="chip bad">${esc(INC_TYPES[x.type]||x.type)} reported</span>`).join(" ")}
           ${k?`<div class="muted">${k.skipped?"Skipped: "+esc(k.reason||""):esc(DONE_WORD[k.kind]||"Done")+(k.ladder?", ladder":"")} &middot; ${k.date!==d?fmtDay(k.date)+" ":""}${fmtTime(k.at)} &middot; ${esc(personName(k.by))}${k.note?" &middot; "+esc(k.note):""}</div>`:""}
           ${s.lat?"":'<div class="muted">Not on the map</div>'}
           <div class="acts">${k&&k.photo?`<button class="iconbtn small" data-view="${esc(s.id)}">Photo</button>`:""}
           ${can&&k&&!k.skipped?`<label class="iconbtn small" style="margin:0;border:1px solid var(--line);border-radius:var(--r);cursor:pointer;color:var(--ink)">${k.photo?"Retake photo":"Add photo"}<input type="file" accept="image/*" capture="environment" data-photo="${esc(s.id)}" hidden></label>`:""}
           ${can&&k?`<button class="iconbtn small" data-note="${esc(s.id)}">Note</button>`:""}
-          ${can&&!k?`<button class="iconbtn small" data-skip="${esc(s.id)}">Skip</button>`:""}</div></span>
+          ${can&&!k?`<button class="iconbtn small" data-skip="${esc(s.id)}">Skip</button>`:""}
+          ${can?`<button class="iconbtn small" data-inc="${esc(s.id)}">Report</button>`:""}</div></span>
         <a class="mapbtn" target="_blank" rel="noopener" href="${dirUrl(stopDest(s))}" data-stop style="flex:none">Directions</a></li>`; }).join("")||'<li class="meta">No stops on this route yet.</li>'}</ul>`;
   $("#back").onclick=()=>{ openRoute=null; render(); };
   app.querySelectorAll("[data-tick]").forEach(b=>b.onclick=()=>tapStop(id,b.dataset.tick));
@@ -897,6 +933,7 @@ function renderRoute(app){
   app.querySelectorAll("[data-view]").forEach(b=>b.onclick=()=>viewPhoto(id,b.dataset.view));
   app.querySelectorAll("[data-note]").forEach(b=>b.onclick=()=>editNote(id,b.dataset.note));
   app.querySelectorAll("[data-skip]").forEach(b=>b.onclick=()=>skipStop(id,b.dataset.skip));
+  app.querySelectorAll("[data-inc]").forEach(b=>b.onclick=()=>incidentDialog(id,b.dataset.inc));
   drawMap(id, st, c, can);
   $("#locate").onclick=locate;
 }
@@ -1019,8 +1056,9 @@ function logHtml(d, crew){
     <h3 style="margin-top:12px">Stops</h3>${rows.map(x=>`<div class="logrow"><span class="t">${fmtTime(x.k.at)}</span><span class="w"><b>${esc(x.s.name)}</b> <span class="meta">${esc(x.s.address||"")}</span><div class="meta">${esc(KINDS[x.k.kind]||x.k.kind)}${x.k.ladder?", ladder":""} &middot; ${esc(personName(x.k.by))} &middot; ${esc(routeName(x.r))}${x.k.note?" &middot; "+esc(x.k.note):""}</div></span>${(((payRates.callbacks||{})[d]||{})[x.rid]||{})[x.s.id]?' <span class="chip bad">Callback</span>':""}${x.k.photo?`<button class="small" data-lview="${esc(x.rid)}|${esc(x.s.id)}">Photo</button>`:'<span class="chip bad">No photo</span>'}${isAdmin&&!viewAs?`<button class="small" data-cb="${esc(x.rid)}|${esc(x.s.id)}">${(((payRates.callbacks||{})[d]||{})[x.rid]||{})[x.s.id]?"Undo callback":"Callback"}</button>`:""}</div>`).join("")||'<p class="muted">Nothing checked off.</p>'}
     ${skipped.length?`<h3 style="margin-top:12px">Skipped</h3>${skipped.map(x=>`<div class="logrow"><span class="t">${fmtTime(x.k.at)}</span><span class="w"><b>${esc(x.s.name)}</b><div class="meta">${esc(x.k.reason||"")} &middot; ${esc(personName(x.k.by))}</div></span></div>`).join("")}`:""}
     ${open.length?`<h3 style="margin-top:12px">Not done</h3><p class="meta">${open.map(x=>esc(x.s.name)).join(", ")}</p>`:""}
-    ${reportsHtml(d, crew)}
-    ${locked?"":`<div class="actions"><span class="muted" style="margin-right:auto">Approving locks the day, approves the hours above and sends the stops to billing.</span><button class="primary" id="approveDay" data-crew="${esc(crew)}">Approve ${esc(crew)} day</button></div>`}</div>`;
+    ${incidentsHtml(d, crew)}
+    ${practice?"":reportsHtml(d, crew)}
+    ${locked?"":`<div class="actions"><span class="muted" style="margin-right:auto">${practice?"Practice: approving records your practice day. Nothing is billed and no hours are paid.":"Approving locks the day, approves the hours above and sends the stops to billing."}</span><button class="primary" id="approveDay" data-crew="${esc(crew)}">Approve ${esc(crew)} day</button></div>`}</div>`;
 }
 function wireLog(root, d){
   root.querySelectorAll("[data-lview]").forEach(b=>b.onclick=()=>{ const [rid,sid]=b.dataset.lview.split("|"); viewPhoto(rid,sid,d); });
@@ -1030,6 +1068,7 @@ function wireLog(root, d){
   root.querySelectorAll("[data-tout]").forEach(i=>i.onchange=()=>setT(i,"out"));
   root.querySelectorAll("#approveDay").forEach(b=>b.onclick=()=>approveDay(d, b.dataset.crew));
   root.querySelectorAll("[data-report]").forEach(b=>b.onclick=()=>reportDialog(b.dataset.report, d));
+  wireIncidents(root);
   const crewOfCard = el => { const c=el.closest(".card"); const b=c&&c.querySelector("#approveDay"); return b?b.dataset.crew:(c&&c.dataset.crew)||viewCrew(); };
   root.querySelectorAll("#stTier").forEach(sel=>sel.onchange=()=>{ if(previewOnly()) return; store.update({[`storms/${d}/${crewOfCard(sel)}/tier`]:sel.value}).then(()=>toast("Depth changed")); });
   root.querySelectorAll("#stTwo").forEach(cb=>cb.onchange=()=>{ if(previewOnly()) return; store.update({[`storms/${d}/${crewOfCard(cb)}/twoPass`]:cb.checked||null}).then(()=>toast(cb.checked?"Marked two-pass":"Not two-pass")); });
@@ -1045,7 +1084,7 @@ async function approveDay(d, crew){
   if(openClock.length) return toast(`Set a clock-out time for ${openClock.join(", ")} first`);
   const upd={ [`dayLogs/${d}/crews/${crew}`]:{ status:"approved", approvedBy:isAdmin?me.email:me.key, approvedAt:Date.now(), entries:rows.length } };
   Object.entries(t).forEach(([k,day])=>Object.keys(day).forEach(id=>{ upd[`timeEntries/${k}/${d}/${id}/status`]="approved"; }));
-  try { await store.update(upd); toast(`${crew} day approved. Billing runs within 5 minutes.`); } catch(e){ toast("Not approved: "+(e.message||e)); }
+  try { await store.update(upd); toast(practice?"Practice day approved. Nothing was billed.":`${crew} day approved. Billing runs within 5 minutes.`); } catch(e){ toast("Not approved: "+(e.message||e)); }
 }
 function renderCrewLog(app){
   app.innerHTML = dateBar(1) + logHtml(curDate, viewCrew()); wireDateBar(1); wireLog(app, curDate);
@@ -1172,7 +1211,7 @@ function renderCrews(app){
     if(old && crews[old]){ upd[`crews/${old}/members/${k}`]=null; if(crews[old].manager===k) upd[`crews/${old}/manager`]=null; }
     upd[`crews/${c}/members/${k}`]=t.name||k; upd[`allowed/${k}/crew`]=c; upd[`allowed/${k}/crewRole`]="member"; if(t.email) upd[`staff/${k}/email`]=t.email;
     await store.update(upd); toast(`${t.name} is on ${c}`); });
-  app.querySelectorAll("[data-mgr]").forEach(b=>b.onclick=async()=>{ const [c,k]=b.dataset.mgr.split("|"), cr=crews[c]||{}, upd={ [`crews/${c}/manager`]:k, [`allowed/${k}/crewRole`]:"manager" };
+  app.querySelectorAll("[data-mgr]").forEach(b=>b.onclick=async()=>{ if(gateBlock(b.dataset.mgr.split("|")[1], "manager", "to manage a crew")) return; const [c,k]=b.dataset.mgr.split("|"), cr=crews[c]||{}, upd={ [`crews/${c}/manager`]:k, [`allowed/${k}/crewRole`]:"manager" };
     if(cr.manager && cr.manager!==k && team[cr.manager]) upd[`allowed/${cr.manager}/crewRole`]="member";
     await store.update(upd); toast(`${personName(k)} manages ${c}`); });
   app.querySelectorAll("[data-off]").forEach(b=>b.onclick=async()=>{ const [c,k]=b.dataset.off.split("|"), upd={ [`crews/${c}/members/${k}`]:null, [`allowed/${k}/crew`]:null, [`allowed/${k}/crewRole`]:null };
@@ -1284,6 +1323,7 @@ function shiftList(k, from, days){
   return Object.keys(sh).filter(d=>d>=from&&d<=to).sort().map(d=>`<div class="who-row"><span style="min-width:96px">${fmtDay(d)}</span><span class="meta">${esc(sh[d].start||"")}${sh[d].end?" to "+esc(sh[d].end):""}${sh[d].note?" &middot; "+esc(sh[d].note):""}</span>${isAdmin&&!viewAs?`<button class="small danger" style="margin-left:auto" data-shrm="${esc(k)}|${d}">Remove</button>`:""}</div>`).join("") || '<p class="muted">No shifts set.</p>';
 }
 function shiftDialog(k){
+  if(gateBlock(k, "crew", "for shifts")) return;
   const t=today(), crew=crewOfPerson(k);
   const dl=openDlg(`<h2>Shifts for ${esc(personName(k))}</h2><div class="grid2"><div><label for="shFrom">From</label><input type="date" id="shFrom" value="${t}"></div><div><label for="shTo">To</label><input type="date" id="shTo" value="${addDays(t,13)}"></div>
     <div><label for="shStart">Start</label><input type="time" id="shStart" value="07:00"></div><div><label for="shEnd">End (optional)</label><input type="time" id="shEnd"></div></div>
@@ -1345,10 +1385,11 @@ function renderPerson(app, k){
     <h2 style="margin:14px 0 8px">Pay log</h2>${payRowsHtml(k)}
     ${s.applicantId||s.indeedUrl?`<div class="card"><h2>Hiring</h2><p class="meta">${s.hiredAt?"Hired "+fmtDay(iso(new Date(s.hiredAt)))+" from Onboarding":"Hired"}${s.appliedFor?", applied for "+esc(APPLIED_FOR[s.appliedFor]||s.appliedFor):""}${s.source?" through "+esc(s.source):""}.</p>${s.indeedUrl?`<a class="mapbtn" href="${esc(s.indeedUrl)}" target="_blank" rel="noopener">Indeed profile</a>`:""}</div>`:""}
     ${personTrainHtml(k)}
+    ${personTrainExtra(k)}
     ${pfileHtml(k)}
     <div class="card"><h2>Leaving</h2><p class="meta">${onFile(k).length?`${esc(firstName(t.name))} has ${esc(onFile(k).join(", "))}, so his whole record moves to the archive (Past).`:`${esc(firstName(t.name))} has not filled anything out, so he is removed and his applicant card goes to Not hired.`} Either way he comes off the Team list and the Paperwork tab. It asks first.</p><div class="actions"><button class="danger" id="toPast">${onFile(k).length?"Move to Past":"Remove"}</button></div></div>`;
   $("#back").onclick=()=>{ personOpen=null; render(); };
-  $("#toPast").onclick=()=>leaveDialog(k); wirePfile(app, k); wirePersonTrain(app, k);
+  $("#toPast").onclick=()=>leaveDialog(k); wirePfile(app, k); wirePersonTrain(app, k); wirePersonTrainExtra(app, k);
   $("#seeAs").onclick=()=>{ if(PAGE==="team") location.href="crews.html#seeas="+encodeURIComponent("emp:"+k); else setViewAs("emp:"+k); };
   $("#pfForm").onsubmit=async e=>{ e.preventDefault();
     try { await store.update({ [`staff/${k}/phone`]:$("#pfPhone").value.trim()||null, [`staff/${k}/address`]:$("#pfAddr").value.trim()||null,
@@ -2147,20 +2188,6 @@ function trainCardHtml(k, id, office){
 }
 function sopDialog(id){ const x=trainLib[id]||{}, lines=String(x.body||"").split(/\n+/).map(s=>s.trim()).filter(Boolean);
   openDlg(`<h2>${esc(x.title)}</h2>${x.category?`<p class="meta">${esc(x.category)}</p>`:""}<ol class="sop">${lines.map(l=>`<li>${esc(l.replace(/^\d+[.)]\s*/,""))}</li>`).join("")}</ol><div class="actions"><button data-close>Close</button></div>`); }
-// Crew side: the Training tab.
-function renderTraining(app){
-  const k=me.key, ids=assignedTo(k, role==="manager"?"manager":"member"), left=ids.filter(id=>!isDone(k,id));
-  const byCat={}; ids.forEach(id=>{ const c=trainLib[id].category||"Other"; (byCat[c]=byCat[c]||[]).push(id); });
-  const pc=paperCardsHtml(k);
-  app.innerHTML = (onboarding ? `<div class="card welcome"><h2>Welcome to Mangiapane Brothers</h2><p>Sign your offer below to get started. Once it is signed, your schedule, hours and the rest of this page open up. Your other paperwork can be done here any time before your first paycheck.</p></div>` : "")
-    + (pc ? `<h2 style="margin:6px 0 8px">Paperwork to sign</h2>${pc}` : "")
-    + `<div class="bar" style="margin-top:6px"><span class="date">Training</span>${ids.length?`<span class="chip ${left.length?"warn":"ok"}">${ids.length-left.length} of ${ids.length} done</span>`:""}</div>`
-    + (ids.length ? Object.keys(byCat).sort().map(c=>`<h3 style="margin:14px 0 6px">${esc(c)}</h3>${byCat[c].sort((a,b)=>isDone(k,a)-isDone(k,b)).map(id=>trainCardHtml(k,id,false)).join("")}`).join("")
-       : `<div class="card"><p class="meta">${onboarding?"Your training shows up here after you sign your offer.":"Nothing assigned to you yet. The office adds slide decks and how-tos for your role here."}</p></div>`);
-  app.querySelectorAll("[data-sop]").forEach(b=>b.onclick=()=>sopDialog(b.dataset.sop));
-  app.querySelectorAll("[data-done],[data-undone]").forEach(b=>b.onclick=async()=>{ if(previewOnly()) return; const id=b.dataset.done||b.dataset.undone;
-    try { await store.update({ [`trainingDone/${k}/${id}`]: b.dataset.done ? { at:Date.now() } : null }); } catch(e){ toast("Not saved: "+(e.message||e)); } });
-}
 // Profile info: the same paperwork, with what is already signed.
 function myPaperHtml(k){
   const p=paperAll[k]; if(!p || !p.token) return "";
@@ -2181,17 +2208,20 @@ function renderTrainOffice(app){
   app.innerHTML=`<div class="bar"><span class="date">Training</span><select id="trCat" style="width:auto"><option value="">All categories</option>${cats.map(c=>`<option ${trainCat===c?"selected":""}>${esc(c)}</option>`).join("")}</select>
       <input id="trQ" value="${esc(trainQ)}" placeholder="Search" style="flex:1;min-width:120px" autocomplete="off"><button class="primary small" id="trAdd">+ Add material</button></div>
     <p class="meta">Upload a slide deck or document, link one (Google Slides, YouTube), or write an SOP step by step. Assign it to a role (crew managers, crew members, door hangers), to everyone, or to single people. Crew see it on the Crews page and door hangers on the Routes page, each on a Training tab, and mark it done.</p>
+    ${t2OfficeHtml()}
     ${Object.keys(byCat).sort().map(c=>`<h2 style="margin:16px 0 6px">${esc(c)}</h2>${byCat[c].map(id=>{ const x=trainLib[id], w=who(id);
-      return `<div class="card trcard"><div class="top"><span><span class="chip">${esc(TRAIN_KINDS[x.kind]||"Material")}</span> <b>${esc(x.title)}</b></span><span class="chip ${w.reach&&w.done===w.reach?"ok":""}">${w.done} of ${w.reach} done</span></div>
+      return `<div class="card trcard"><div class="top"><span><span class="chip">${esc(TRAIN_KINDS[x.kind]||(isModule(x)?"Module":"Material"))}</span> <b>${esc(x.title)}</b>${isModule(x)&&x.status==="draft"?' <span class="chip warn">Draft</span>':""}${isModule(x)&&x.todos?` <span class="chip warn">${x.todos} TODO</span>`:""}</span><span class="chip ${w.reach&&w.done===w.reach?"ok":""}">${w.done} of ${w.reach} done</span></div>
         ${x.description?`<p class="meta">${esc(x.description)}</p>`:""}
         <p class="meta">Assigned to: ${w.roles.map(r=>`<span class="chip">${esc(TRAIN_ROLES[r])}</span>`).join(" ")||""}${w.named?` <span class="chip">${w.named} by name</span>`:""}${!w.roles.length&&!w.named?"nobody yet":""}</p>
         <div class="actions">${x.url?`<a class="mapbtn" href="${esc(x.url)}" target="_blank" rel="noopener">Open</a>`:""}${x.body?`<button class="small" data-sop="${esc(id)}">Read</button>`:""}${x.pending?'<span class="chip">Uploading to Drive</span>':""}
-          <button class="small" data-trassign="${esc(id)}">Assign</button><button class="small" data-tredit="${esc(id)}">Edit</button><button class="small danger" data-trdel="${esc(id)}">Delete</button></div></div>`; }).join("")}`).join("")
+          <button class="small" data-trassign="${esc(id)}">Assign</button>${isModule(x)?`<button class="small" data-modprev="${esc(id)}">Preview</button>`:`<button class="small" data-tredit="${esc(id)}">Edit</button>`}<button class="small danger" data-trdel="${esc(id)}">Delete</button></div></div>`; }).join("")}`).join("")
       || `<div class="card"><p class="meta">${items.length?"Nothing matches.":"No training material yet. Add the first slide deck or SOP."}</p></div>`}
-    <h2 style="margin:18px 0 6px">Progress</h2><div class="card scroll"><table><tr><th>Name</th><th>Role</th><th>Assigned</th><th>Done</th><th>Paperwork left</th></tr>
+    <h2 style="margin:18px 0 6px">Progress</h2><div class="card scroll"><table><tr><th>Name</th><th>Role</th><th>Assigned</th><th>Done</th><th>Paperwork left</th><th>Schedule</th></tr>
       ${ppl.map(([k,t])=>{ const ids=assignedTo(k), d=ids.filter(id=>isDone(k,id)).length, pl=paperLeft(k).length;
-        return `<tr data-trperson="${esc(k)}" style="cursor:pointer"><td><b>${esc(t.name)}</b>${offerPending(k)?' <span class="chip warn">Offer not signed</span>':""}</td><td>${{manager:"Manager",member:"Crew",walker:"Door hanger"}[roleKeyOf(k)]}</td><td>${ids.length}</td><td>${ids.length?`<span class="chip ${d===ids.length?"ok":"warn"}">${d}</span>`:"0"}</td><td>${pl||""}</td></tr>`; }).join("")||'<tr><td colspan="5" class="meta">No crew yet.</td></tr>'}</table></div>`;
+        return `<tr data-trperson="${esc(k)}" style="cursor:pointer"><td><b>${esc(t.name)}</b>${offerPending(k)?' <span class="chip warn">Offer not signed</span>':""}</td><td>${{manager:"Manager",member:"Crew",walker:"Door hanger"}[roleKeyOf(k)]}</td><td>${ids.length}</td><td>${ids.length?`<span class="chip ${d===ids.length?"ok":"warn"}">${d}</span>`:"0"}</td><td>${pl||""}</td><td>${gateChip(gateOf(k, roleKeyOf(k)==="walker"?"walker":"crew"))}</td></tr>`; }).join("")||'<tr><td colspan="5" class="meta">No crew yet.</td></tr>'}</table></div>`;
   $("#trAdd").onclick=()=>trainDialog();
+  wireT2Office(app);
+  app.querySelectorAll("[data-modprev]").forEach(b=>b.onclick=()=>openModule(b.dataset.modprev, { k:me.key, preview:true, office:true }));
   $("#trCat").onchange=e=>{ trainCat=e.target.value; render(); };
   const q=$("#trQ"); q.oninput=()=>{ trainQ=q.value; const pos=q.selectionStart; render(); const n=$("#trQ"); n.focus(); try{ n.setSelectionRange(pos,pos); }catch(e){} };
   app.querySelectorAll("[data-sop]").forEach(b=>b.onclick=()=>sopDialog(b.dataset.sop));
@@ -2199,7 +2229,7 @@ function renderTrainOffice(app){
   app.querySelectorAll("[data-trassign]").forEach(b=>b.onclick=()=>assignDialog(b.dataset.trassign));
   app.querySelectorAll("[data-trdel]").forEach(b=>b.onclick=()=>{ const id=b.dataset.trdel, x=trainLib[id]||{};
     const d=openDlg(`<h2>Delete "${esc(x.title)}"?</h2><p class="meta">It comes off everyone's Training tab. ${x.fileId?"The file stays in Drive.":""}</p><div class="actions"><button class="danger" id="trDelGo">Delete</button><button data-close>Cancel</button></div>`);
-    d.querySelector("#trDelGo").onclick=async()=>{ const upd={ [`trainingLib/${id}`]:null }; Object.keys(TRAIN_ROLES).forEach(r=>{ if((trainRoles[r]||{})[id]) upd[`trainingRoles/${r}/${id}`]=null; });
+    d.querySelector("#trDelGo").onclick=async()=>{ const upd={ [`trainingLib/${id}`]:null, [`trainingImages/${id}`]:null }; Object.keys(TRAIN_ROLES).forEach(r=>{ if((trainRoles[r]||{})[id]) upd[`trainingRoles/${r}/${id}`]=null; });
       Object.keys(trainAssign).forEach(k=>{ if((trainAssign[k]||{})[id]) upd[`trainingAssign/${k}/${id}`]=null; }); await store.update(upd); d.close(); toast("Deleted"); }; });
   app.querySelectorAll("[data-trperson]").forEach(tr=>tr.onclick=()=>{ const k=tr.dataset.trperson; if((team[k]||{}).tier==="walker") return assignPersonDialog(k); view="people"; personOpen=k; render(); window.scrollTo(0,0); });
 }
@@ -2264,6 +2294,422 @@ function personTrainHtml(k){
     ${rest.length?`<div class="row" style="margin-top:8px"><select id="ptAdd" style="flex:1;min-width:180px"><option value="">Assign more…</option>${rest.map(([id,x])=>`<option value="${esc(id)}">${esc(x.category||"Other")}: ${esc(x.title)}</option>`).join("")}</select></div>`:""}</div>`;
 }
 function wirePersonTrain(app, k){ const s=app.querySelector("#ptAdd"); if(s) s.onchange=async()=>{ if(!s.value) return; await store.update({ [`trainingAssign/${k}/${s.value}`]:{ at:Date.now(), by:me.email } }); toast("Assigned"); }; }
+
+
+// ----- Training modules, quizzes and gates (October 20, 2026) -----
+// Modules are written as Markdown files to the training content spec (training/SPEC.md), imported on Team Manager,
+// Training, and stored in trainingLib with kind "module": slides plus an optional quiz. A trainee clicks through the
+// slides and takes the quiz on his phone; every attempt is kept (trainingQuiz), a pass or reaching the last slide marks
+// the module done (trainingDone), and where he stopped is kept (trainingViewed). Nobody ticks a module done by hand.
+// Gates (spec section 7): scheduling and the crew manager role open only when a person's role gate is met. A gate
+// condition that names a module not imported yet is waived until it is imported. Settings live in trainingSettings.
+const T2_DEFAULTS = {
+  passMark: 80, retake: { mode:"unlimited", max:0, waitMinutes:0 }, walkerUnlock: "review",
+  seasons: { always:{from:""}, fall:{from:"2026-10-20"}, lights:{from:"2026-10-20"}, snow:{from:"2026-10-20"}, lawn:{from:"2027-03-15"} },
+  gates: {
+    walker: ["offer_signed","quiz_passed:walker-job","viewed:systems-walker"],
+    crew: ["offer_signed","quiz_passed:crew-safety","quiz_passed:crew-conduct","viewed:systems-crew"],
+    manager: ["gate:crew","viewed:systems-manager","practice_passed"] } };
+const T2_SEASONS = { always:"Always open", fall:"Fall", lights:"Holiday lights", snow:"Snow", lawn:"Lawn" };
+const T2_PRACTICE = [["schedule","Open the practice day"],["checkoff","Check off a house"],["photo","Save a photo on it"],["incident","File an incident report"],["eod","Approve the practice day in Crew log"]];
+let trainSet={}, trainQuiz={}, trainViewed={}, trainPractice={};
+function tset(){ const s=trainSet||{};
+  return { passMark:Number(s.passMark ?? T2_DEFAULTS.passMark), retake:{ ...T2_DEFAULTS.retake, ...(s.retake||{}) }, walkerUnlock:s.walkerUnlock||T2_DEFAULTS.walkerUnlock,
+    seasons:{ ...T2_DEFAULTS.seasons, ...(s.seasons||{}) }, gates:{ ...T2_DEFAULTS.gates, ...(s.gates||{}) }, route:s.route||null }; }
+const isModule = x => !!x && x.kind==="module";
+const t2Arr = v => Array.isArray(v) ? v : v && typeof v==="object" ? Object.keys(v).sort((a,b)=>a-b).map(i=>v[i]) : [];
+const seasonFrom = x => ((tset().seasons[(x&&x.season)||"always"])||{}).from || "";
+const seasonOpen = x => { const f=seasonFrom(x); return !f || today()>=f; };
+const t2Slides = (x, all) => t2Arr(x.slides).filter(s=>s && (all || !s.todo));
+const t2Quiz = x => t2Arr(x.quiz).filter(q=>q && t2Arr(q.opts).length);
+// Inline text: escaped, with **bold** kept.
+const t2Txt = s => esc(s).replace(/\*\*(.+?)\*\*/g,"<b>$1</b>");
+function t2Shuffle(a){ a=a.slice(); for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; }
+
+// ---- gates ----
+function offerSignedOf(k, paper, allowedRec){
+  if((allowedRec||{}).offerSigned) return true;
+  const p=paper||{}; return !!p.offerSigned || ((p.forms||{}).agreement||{}).status==="done";
+}
+// ctx: { offerSigned, done, viewed, practice } for one person.
+function gateCheck(which, ctx, seen){
+  const out={ ok:true, need:[], waived:[] }; seen=seen||{}; if(seen[which]) return out; seen[which]=1;
+  (tset().gates[which]||[]).forEach(c=>{
+    if(c.startsWith("gate:")){ const g=gateCheck(c.slice(5), ctx, seen); if(!g.ok){ out.ok=false; out.need.push(...g.need); } out.waived.push(...g.waived); return; }
+    let ok=false, label=c;
+    if(c==="offer_signed"){ ok=!!ctx.offerSigned; label="Sign the offer"; }
+    else if(c==="practice_passed"){ const p=ctx.practice||{}; ok=T2_PRACTICE.every(([i])=>p[i]); label="Finish the practice run"; }
+    else { const i=c.indexOf(":"), kind=c.slice(0,i), id=c.slice(i+1), m=trainLib[id];
+      if(!isModule(m)){ out.waived.push(id); return; }
+      const d=(ctx.done||{})[id], v=(ctx.viewed||{})[id];
+      if(kind==="quiz_passed"){ ok=!!(d && d.via==="quiz"); label="Pass "+m.title; }
+      else { ok=!!(d || (v && v.finished)); label="View "+m.title; } }
+    if(!ok){ out.ok=false; out.need.push(label); } });
+  return out;
+}
+const gateChip = g => g.ok ? `<span class="chip ok">Ready</span>` : `<span class="chip warn" title="${esc(g.need.join(", "))}">Needs ${g.need.length}</span>`;
+const gateList = g => (g.ok?"":`<ul style="margin:6px 0 0;padding-left:20px">${g.need.map(n=>`<li>${esc(n)}</li>`).join("")}</ul>`) + (g.waived.length?`<p class="muted" style="margin:6px 0 0">Waived until imported: ${g.waived.map(esc).join(", ")}</p>`:"");
+
+// ---- attempts and retakes ----
+function attemptsOf(k, id){ return Object.entries(((trainQuiz[k]||{})[id])||{}).map(([aid,a])=>({aid,...a})).sort((a,b)=>(a.at||0)-(b.at||0)); }
+function retakeBlock(k, id){
+  const r=tset().retake, at=attemptsOf(k,id), fails=at.filter(a=>!a.passed);
+  if(at.some(a=>a.passed)) return "";
+  if(r.mode==="limited" && Number(r.max)>0 && fails.length>=Number(r.max)) return `No tries left (${fails.length} of ${r.max}). Ask the office to reset your quiz.`;
+  const w=Number(r.waitMinutes)||0, last=fails[fails.length-1];
+  if(w && last && Date.now()-last.at < w*60000){ const m=Math.ceil((w*60000-(Date.now()-last.at))/60000); return `You can try again in ${m} minute${m===1?"":"s"}.`; }
+  return "";
+}
+
+// ---- the module card on a Training tab ----
+function moduleStatus(k, id, data){
+  const x=trainLib[id], d=(data.done||{})[id], v=(data.viewed||{})[id]||{}, n=t2Slides(x).length, at=attemptsOf(k,id), best=at.reduce((m,a)=>Math.max(m,a.pct||0),0);
+  if(d) return d.via==="quiz" ? `<span class="chip ok">Passed ${d.score!=null?d.score+"%":""}</span>` : `<span class="chip ok">Done</span>`;
+  if(!seasonOpen(x)) return `<span class="chip">Opens ${esc(fmtDay(seasonFrom(x)))}</span>`;
+  if(at.length) return `<span class="chip warn">Best ${best}%, ${at.length} tr${at.length===1?"y":"ies"}</span>`;
+  if(v.lastSlide!=null && n) return `<span class="chip">Slide ${Math.min(v.lastSlide+1,n)} of ${n}</span>`;
+  return "";
+}
+function moduleCardHtml(k, id, data, office){
+  const x=trainLib[id], d=(data.done||{})[id], v=(data.viewed||{})[id]||{}, n=t2Slides(x).length, q=t2Quiz(x).length, open=seasonOpen(x)||office;
+  const quizReady = x.completion==="quiz" && q && (v.finished || d);
+  const meta=[`${n} slide${n===1?"":"s"}`, x.completion==="quiz"&&q?`${q}-question quiz`:"", x.version?`version ${x.version}`:""].filter(Boolean).join(" &middot; ");
+  return `<div class="card trcard ${d?"done":""}"><div class="top"><span><span class="chip">Module</span> <b>${esc(x.title)}</b></span>${moduleStatus(k,id,data)}</div>
+    ${x.description?`<p class="meta">${esc(x.description)}</p>`:""}<p class="meta">${meta}</p>
+    <div class="actions">${open?`<button class="small ${d?"":"primary"}" data-mod="${esc(id)}">${d?"Review":v.lastSlide?"Resume":"Start"}</button>`:""}
+      ${open&&quizReady&&!d?`<button class="small primary" data-modquiz="${esc(id)}">Take the quiz</button>`:""}</div></div>`;
+}
+function wireModuleCards(root, k, preview){
+  root.querySelectorAll("[data-mod]").forEach(b=>b.onclick=()=>openModule(b.dataset.mod, { k, preview }));
+  root.querySelectorAll("[data-modquiz]").forEach(b=>b.onclick=()=>openModule(b.dataset.modquiz, { k, preview, quiz:true }));
+}
+
+// ---- the slide player ----
+async function openModule(id, o){
+  const x=trainLib[id]; if(!isModule(x)) return;
+  const k=o.k, preview=!!o.preview, all=!!o.office, slides=t2Slides(x, all), quiz=t2Quiz(x);
+  const dl=$("#dlg"); dl.classList.add("modplayer"); dl.innerHTML=`<div class="mp-body"><p class="meta">Loading...</p></div>`; if(!dl.open) dl.showModal();
+  dl.onclose=()=>{ dl.classList.remove("modplayer"); dl.onclose=null; };
+  const imgs=await store.get("trainingImages/"+id).catch(()=>null)||{};
+  const prior=((trainViewed[k]||{})[id])||{};
+  let i=o.quiz?slides.length:Math.max(0,Math.min(prior.finished?0:(prior.lastSlide||0), slides.length-1)), shown=0;
+  const reveals = s => t2Arr(s.items).filter(it=>it.r).length;
+  const save = async (obj) => { if(preview) return; try { await store.update(obj); } catch(e){ toast("Not saved: "+(e.message||e)); } };
+  const mark = (n, finished) => { const cur=((trainViewed[k]||{})[id])||{}; const rec={ at:Date.now(), lastSlide:n, version:x.version||1, finished:!!(finished||cur.finished) };
+    const upd={ [`trainingViewed/${k}/${id}`]:rec }; if(finished && x.completion!=="quiz" && !t2DoneMap(k)[id]) upd[`trainingDone/${k}/${id}`]={ at:Date.now(), version:x.version||1, via:"view" }; save(upd); };
+  function head(){ return `<div class="mp-head"><span class="t">${esc(x.title)}</span>${preview?'<span class="chip">Preview</span>':""}<button class="small" data-close aria-label="Close">Close</button></div>`; }
+  function slideHtml(s){
+    let r=0; const items=t2Arr(s.items).map(it=>{ const hid=it.r && (r++>=shown); return it.p ? `<p class="para ${hid?"hid":""}">${t2Txt(it.t)}</p>` : `<li class="${hid?"hid":""}">${t2Txt(it.t)}</li>`; });
+    const list=[]; let ul=[]; items.forEach(h=>{ if(h.startsWith("<li")) ul.push(h); else { if(ul.length){ list.push(`<ul>${ul.join("")}</ul>`); ul=[]; } list.push(h); } }); if(ul.length) list.push(`<ul>${ul.join("")}</ul>`);
+    const im=s.img ? (imgs[s.img.name] ? `<img class="mp-img" src="${imgs[s.img.name]}" alt="${esc(s.img.cap||"")}">` : `<div class="mp-ph">${esc(s.img.cap||"Photo coming")}${all?`<br><span class="muted">image:${esc(s.img.name)}</span>`:""}</div>`) : "";
+    return `${s.todo?`<div class="mp-todo"><b>Not finished:</b> ${t2Arr(s.todos).map(esc).join("; ")||"this slide has a TODO"}. Trainees do not see this slide.</div>`:""}
+      <h2>${t2Txt(s.h||"")}</h2>${t2Arr(s.hl).map(h=>`<p><span class="mp-hl">${esc(h)}</span></p>`).join("")}${list.join("")}${im}
+      ${s.video?`<p><a class="mapbtn" href="${esc(s.video)}" target="_blank" rel="noopener">Watch the video</a></p>`:""}
+      ${s.note&&(all||isAdmin)?`<div class="mp-note">${t2Txt(s.note)}</div>`:""}`;
+  }
+  function paint(){
+    if(i>=slides.length) return quiz.length && x.completion==="quiz" ? startQuiz() : finish();
+    const s=slides[i], left=reveals(s)-shown, last=i===slides.length-1;
+    dl.innerHTML=`${head()}<div class="mp-bar"><i style="width:${Math.round((i+1)/slides.length*100)}%"></i></div><div class="mp-body">${slideHtml(s)}</div>
+      <div class="mp-foot"><button id="mpBack" ${i===0?"disabled":""}>Back</button><span class="grow">${i+1} of ${slides.length}</span>
+      <button class="primary" id="mpNext">${left>0?"Next point":last?(x.completion==="quiz"&&quiz.length?"Take the quiz":"Finish"):"Next"}</button></div>`;
+    dl.querySelector("[data-close]").onclick=()=>dl.close();
+    dl.querySelector("#mpBack").onclick=()=>{ i--; shown=reveals(slides[i]); paint(); };
+    dl.querySelector("#mpNext").onclick=()=>{ if(left>0){ shown++; return paint(); } if(last){ mark(i,true); i++; shown=0; return paint(); } i++; shown=0; mark(i,false); paint(); };
+    dl.querySelector(".mp-body").onclick=e=>{ if(e.target.closest("a,button")) return; if(left>0){ shown++; paint(); } };
+  }
+  function finish(){
+    dl.innerHTML=`${head()}<div class="mp-body"><h2>Done</h2><p>${esc(x.title)} is finished.${preview?" This was a preview, so nothing was saved.":""}</p></div><div class="mp-foot"><span class="grow"></span><button class="primary" data-close>Close</button></div>`;
+    dl.querySelectorAll("[data-close]").forEach(b=>b.onclick=()=>dl.close());
+  }
+  function startQuiz(){
+    const block=preview?"":retakeBlock(k,id);
+    if(block){ dl.innerHTML=`${head()}<div class="mp-body"><h2>Quiz</h2><p>${esc(block)}</p></div><div class="mp-foot"><span class="grow"></span><button class="primary" data-close>Close</button></div>`; dl.querySelectorAll("[data-close]").forEach(b=>b.onclick=()=>dl.close()); return; }
+    const qs=t2Shuffle(quiz.map((q,qi)=>({...q, qi, opts:t2Shuffle(t2Arr(q.opts).map((t,oi)=>({t,oi})))})));
+    let n=0, right=0; const answers=[];
+    function paintQ(picked){
+      const q=qs[n], done=picked!=null;
+      dl.innerHTML=`${head()}<div class="mp-bar"><i style="width:${Math.round((n+(done?1:0))/qs.length*100)}%"></i></div><div class="mp-body">
+        <p class="meta">Question ${n+1} of ${qs.length}</p><h2>${t2Txt(q.q)}</h2>
+        ${q.opts.map(o=>`<button class="qopt ${done?(o.oi===q.ans?"right":o.oi===picked?"wrong":""):""}" data-oi="${o.oi}" ${done?"disabled":""}>${t2Txt(o.t)}</button>`).join("")}
+        ${done?`<div class="qexp"><b>${picked===q.ans?"Right.":"Not quite."}</b> ${t2Txt(q.explain||"")}${picked!==q.ans&&q.slide?` <button class="small" id="qRev">Review slide ${esc(q.slide)}</button>`:""}</div>`:""}</div>
+        <div class="mp-foot"><span class="grow">${right} right so far</span>${done?`<button class="primary" id="qNext">${n===qs.length-1?"See my score":"Next question"}</button>`:""}</div>`;
+      dl.querySelector("[data-close]").onclick=()=>dl.close();
+      dl.querySelectorAll("[data-oi]").forEach(b=>b.onclick=()=>{ const a=+b.dataset.oi, ok=a===q.ans; if(ok) right++; answers.push({ q:q.qi, a, ok }); paintQ(a); });
+      const rv=dl.querySelector("#qRev"); if(rv) rv.onclick=()=>{ const sn=Math.max(1,Math.min(+q.slide||1, slides.length)); const sv=shown; shown=99;
+        dl.innerHTML=`${head()}<div class="mp-body">${slideHtml(slides[sn-1])}</div><div class="mp-foot"><span class="grow">Slide ${sn}</span><button class="primary" id="qBack">Back to the quiz</button></div>`; shown=sv;
+        dl.querySelector("[data-close]").onclick=()=>dl.close(); dl.querySelector("#qBack").onclick=()=>paintQ(picked); };
+      const nx=dl.querySelector("#qNext"); if(nx) nx.onclick=()=>{ if(n<qs.length-1){ n++; paintQ(null); } else result(); };
+    }
+    async function result(){
+      const pct=Math.round(right/qs.length*100), passed=pct>=tset().passMark, now=Date.now();
+      const upd={ [`trainingQuiz/${k}/${id}/${store.key()}`]:{ at:now, version:x.version||1, score:right, total:qs.length, pct, passed, answers } };
+      if(passed) upd[`trainingDone/${k}/${id}`]={ at:now, version:x.version||1, via:"quiz", score:pct };
+      await save(upd);
+      const wrong=answers.filter(a=>!a.ok).map(a=>quiz[a.q]);
+      const again=!passed && !preview ? retakeBlock(k,id) : "";
+      dl.innerHTML=`${head()}<div class="mp-body"><h2>${passed?"Passed":"Not passed yet"}</h2><p><b>${right} of ${qs.length}</b> (${pct}%). You need ${tset().passMark}% to pass.${preview?" Preview: nothing was saved.":""}</p>
+        ${wrong.length?`<h3>To go over</h3>${wrong.map(q=>`<div class="qexp" style="margin-bottom:8px"><b>${t2Txt(q.q)}</b><br>${t2Txt(q.explain||"")}</div>`).join("")}`:""}
+        ${again?`<p class="meta">${esc(again)}</p>`:""}</div>
+        <div class="mp-foot">${!passed&&!again?`<button id="qAgain">Try again</button>`:""}<span class="grow"></span><button class="primary" data-close>Close</button></div>`;
+      dl.querySelectorAll("[data-close]").forEach(b=>b.onclick=()=>dl.close());
+      const ag=dl.querySelector("#qAgain"); if(ag) ag.onclick=()=>{ i=0; shown=0; startQuiz(); };
+      if(typeof render==="function") render();
+    }
+    paintQ(null);
+  }
+  if(!slides.length && !quiz.length) return finish();
+  paint();
+}
+
+// ---- Markdown import (spec sections 1 to 4) ----
+function parseModuleMd(src){
+  const errs=[], warns=[]; src=String(src||"").replace(/\r\n?/g,"\n").replace(/^﻿/,"");
+  const fm=src.match(/^---\n([\s\S]*?)\n---\n?/); if(!fm) return { errs:["No front matter block at the top of the file"], warns, meta:{} };
+  const meta={}; fm[1].split("\n").forEach(l=>{ const m=l.match(/^([A-Za-z_]+):\s*(.*)$/); if(m) meta[m[1].toLowerCase()]=m[2].trim().replace(/^["']|["']$/g,""); });
+  meta.roles=String(meta.roles||"").replace(/[\[\]]/g,"").split(",").map(s=>s.trim().toLowerCase()).filter(Boolean);
+  let rest=src.slice(fm[0].length); const qm=rest.search(/^---quiz---\s*$/m);
+  const slidePart=qm>=0?rest.slice(0,qm):rest, quizPart=qm>=0?rest.slice(qm).replace(/^---quiz---\s*$/m,""):"";
+  const slides=[]; let todos=0;
+  slidePart.split(/^---slide---\s*$/m).map(s=>s.trim()).filter(Boolean).forEach((blk,si)=>{
+    const s={ h:"", items:[] }, td=[];
+    blk.replace(/\[\[TODO:\s*([\s\S]*?)\]\]/g,(m,t)=>{ td.push(t.trim()); return m; });
+    blk.split("\n").forEach(raw=>{ const l=raw.trim(); if(!l) return; let m;
+      if((m=l.match(/^##\s+(.*)$/)) && !s.h) s.h=m[1].trim();
+      else if((m=l.match(/^!\[(.*?)\]\(image:([a-z0-9-]+)\)$/))) s.img={ cap:m[1], name:m[2] };
+      else if((m=l.match(/^video:\s*(\S+)$/i))) s.video=m[1];
+      else if((m=l.match(/^note:\s*(.*)$/i))) s.note=(s.note?s.note+" ":"")+m[1];
+      else if((m=l.match(/^\{highlight:\s*(.*?)\}$/i))) (s.hl=s.hl||[]).push(m[1]);
+      else if((m=l.match(/^[-*]\s+(.*)$/))) { let t=m[1]; const r=/\{reveal\}\s*$/.test(t); t=t.replace(/\s*\{reveal\}\s*$/,""); s.items.push(r?{t,r:true}:{t}); }
+      else { const r=/\{reveal\}\s*$/.test(l), t=l.replace(/\s*\{reveal\}\s*$/,""); s.items.push(r?{t,p:true,r:true}:{t,p:true}); } });
+    if(td.length){ s.todo=true; s.todos=td; todos+=td.length; }
+    if(!s.h) errs.push(`Slide ${si+1} has no ## heading`);
+    if(s.items.filter(x=>!x.p).length>5) warns.push(`Slide ${si+1} has more than five bullets`);
+    slides.push(s); });
+  const quiz=[];
+  quizPart.split(/^###\s+Q\d+.*$/m).map(s=>s.trim()).filter(Boolean).forEach((blk,qi)=>{
+    const q={ q:"", opts:[], ans:-1, explain:"" };
+    blk.split("\n").forEach(raw=>{ const l=raw.trim(); if(!l) return; let m;
+      if((m=l.match(/^[-*]\s+\[( |x|X)\]\s+(.*)$/))){ if(m[1].toLowerCase()==="x"){ if(q.ans>=0) errs.push(`Question ${qi+1} has more than one [x]`); q.ans=q.opts.length; } q.opts.push(m[2].trim()); }
+      else if((m=l.match(/^explain:\s*(.*)$/i))) q.explain=m[1];
+      else if((m=l.match(/^slide:\s*(\d+)/i))) q.slide=+m[1];
+      else if(!q.q) q.q=l; else q.q+=" "+l; });
+    if(!q.q) errs.push(`Question ${qi+1} has no question line`);
+    if(q.opts.length<3 || q.opts.length>4) errs.push(`Question ${qi+1} needs 3 or 4 options (has ${q.opts.length})`);
+    if(q.ans<0) errs.push(`Question ${qi+1} has no correct answer marked [x]`);
+    if(!q.explain) errs.push(`Question ${qi+1} has no explain: line`);
+    if(q.opts.some(o=>/^(all|none) of the above$/i.test(o))) errs.push(`Question ${qi+1} uses "all/none of the above"`);
+    quiz.push(q); });
+  if(!/^[a-z0-9-]+$/.test(meta.id||"")) errs.push("id is missing or not lowercase with hyphens");
+  if(!meta.title) errs.push("title is missing");
+  if(!slides.length) errs.push("No slides");
+  const comp=(meta.completion||"view").toLowerCase(); if(!["quiz","view"].includes(comp)) errs.push("completion must be quiz or view");
+  if(comp==="quiz" && !quiz.length) errs.push("completion is quiz but there is no ---quiz--- section");
+  if(meta.season && !T2_SEASONS[meta.season]) errs.push("season must be one of: "+Object.keys(T2_SEASONS).join(", "));
+  const bad=meta.roles.filter(r=>!["walker","member","manager","all","admin"].includes(r)); if(bad.length) errs.push("Unknown role: "+bad.join(", "));
+  const rec={ title:meta.title||"", kind:"module", category:meta.category||"Other", roles:meta.roles, season:meta.season||"always", order:Number(meta.order)||0,
+    version:Number(meta.version)||1, completion:comp, status:(meta.status||"draft").toLowerCase(), description:meta.description||null, slides, quiz, todos };
+  return { id:meta.id, meta, rec, errs, warns, todos, images:slides.filter(s=>s.img).map(s=>s.img.name) };
+}
+
+// ---- Crews and Team Manager: training data per person, gates, the manager practice run, incident reports ----
+let meRec={}, incidents={}, routesReal={}, checksReal={}, practice=false, practiceSaved=null;
+const PRAC = "__practice", PRAC_RID = "__practice";
+const t2DoneMap = k => trainDone[k]||{};
+function gateCtx(k){ const rec = team[k] || (me && k===(meReal||me).key ? meRec : {}); return { offerSigned:offerSignedOf(k, paperAll[k], rec), done:trainDone[k]||{}, viewed:trainViewed[k]||{}, practice:trainPractice[k]||{} }; }
+const gateOf = (k, which) => gateCheck(which, gateCtx(k));
+const t2Data = k => ({ done:trainDone[k]||{}, viewed:trainViewed[k]||{}, practice:trainPractice[k]||{} });
+const modSort = (a,b) => (trainLib[a].order||0)-(trainLib[b].order||0) || (trainLib[a].title||"").localeCompare(trainLib[b].title||"");
+const liveModule = id => isModule(trainLib[id]) && trainLib[id].status!=="draft";
+// A gate that is not met opens a dialog that says what is left, and the action does not happen.
+function gateBlock(k, which, what){
+  const g=gateOf(k, which); if(g.ok) return false;
+  openDlg(`<h2>${esc(personName(k))} is not ready ${esc(what)}</h2><p class="meta">Still to do:</p>${gateList(g)}<p class="muted">Training is on his Training tab. Team Manager, Training shows where everyone stands.</p><div class="actions"><button class="primary" data-close>OK</button></div>`);
+  return true;
+}
+
+// ---- incident reports (crew managers, from a stop) ----
+// Russel's design (October 18, Fall + Winter Planning): one report per house for anything the office should know,
+// with a type and an optional photo. The crew log lists them, damage and complaints first, and the office sees them in
+// the Log and on the Day lanes. They never touch the CRM or billing.
+const INC_TYPES = { damage:"Damage", complaint:"Complaint", noservice:"Could not service", question:"Client question", other:"Other" };
+const INC_ORDER = ["damage","complaint","noservice","question","other"];
+const incidentsFor = (d, crew) => Object.entries(((incidents[d]||{})[crew])||{}).map(([id,x])=>({id,...x})).filter(x=>x&&x.type)
+  .sort((a,b)=>INC_ORDER.indexOf(a.type)-INC_ORDER.indexOf(b.type) || (a.at||0)-(b.at||0));
+function incidentDialog(rid, sid){
+  const r=routes[rid]||{}, s=(r.stops||{})[sid]||{};
+  const dl=openDlg(`<h2>Incident report</h2><p class="meta">${esc(s.name||"")}${s.address?" &middot; "+esc(s.address):""}</p>
+    <label for="incType">Type</label><select id="incType">${INC_ORDER.map(v=>`<option value="${v}">${INC_TYPES[v]}</option>`).join("")}</select>
+    <label for="incText">What happened</label><textarea id="incText" rows="4" maxlength="2000" placeholder="What happened, what you told the client, what the office needs to do"></textarea>
+    <label for="incPhoto">Photo (optional)</label><input type="file" id="incPhoto" accept="image/*" capture="environment">
+    <div class="actions"><button data-close>Cancel</button><button class="primary" id="incGo">File report</button></div>`);
+  dl.querySelector("#incGo").onclick=async()=>{ const text=$("#incText").value.trim(); if(!text) return toast("Write what happened"); if(previewOnly()) return dl.close();
+    const f=$("#incPhoto").files[0]; let photo=null; if(f){ try { photo=await shrinkImage(f); } catch(e){ return toast(e.message||"Photo failed"); } }
+    const id=store.key(), b=dl.querySelector("#incGo"); b.disabled=true;
+    try { await store.update({ [`crewIncidents/${curDate}/${r.crew}/${id}`]:{ type:$("#incType").value, text, route:rid, stop:sid, name:s.name||"", address:s.address||"", by:me.key, at:Date.now(), ...(photo?{photo}:{}) } });
+      dl.close(); toast(practice?"Practice incident report filed":"Incident report filed. The office sees it in the Log."); }
+    catch(e){ b.disabled=false; toast("Not saved: "+(e.message||e)); } };
+}
+function incidentsHtml(d, crew){
+  const list=incidentsFor(d, crew); if(!list.length) return "";
+  return `<h3 style="margin-top:12px">Incident reports</h3>${list.map(x=>`<div class="logrow"><span class="t">${fmtTime(x.at)}</span><span class="w"><span class="chip ${x.type==="damage"||x.type==="complaint"?"bad":"warn"}">${esc(INC_TYPES[x.type]||x.type)}</span> <b>${esc(x.name||"")}</b> <span class="meta">${esc(x.address||"")}</span>
+    <div class="muted" style="white-space:pre-wrap">${esc(x.text||"")}</div><div class="meta">${esc(personName(x.by))}</div></span>${x.photo?`<button class="small" data-incphoto="${esc(d)}|${esc(crew)}|${esc(x.id)}">Photo</button>`:""}</div>`).join("")}`;
+}
+function wireIncidents(root){
+  root.querySelectorAll("[data-incphoto]").forEach(b=>b.onclick=()=>{ const [d,c,id]=b.dataset.incphoto.split("|"), x=((incidents[d]||{})[c]||{})[id]||{};
+    openDlg(`<h2>${esc(INC_TYPES[x.type]||"Incident")}: ${esc(x.name||"")}</h2><img class="photo" src="${x.photo}" alt="Incident photo"><div class="actions"><button data-close>Close</button></div>`); });
+}
+
+// ---- the crew manager practice run (spec section 7) ----
+// The practice route is real house addresses copied from a real route, with no client attached. While a person is in
+// practice he is a manager of a pretend crew working that route today, on the real screens. Every write is redirected
+// under trainingPractice/{him}/run, and anything else (service log, time, storms, reports) is dropped, so nothing from a
+// practice run can reach the CRM, QuickBooks, billing or payroll.
+const pracRun = () => ((trainPractice[(practiceSaved&&practiceSaved.me||me).key]||{}).run)||{};
+function practiceMap(obj){
+  const k=me.key, base=`trainingPractice/${k}`, out={}; let kept=0;
+  Object.entries(obj).forEach(([p,v])=>{ let m;
+    if(p.startsWith(base+"/")){ out[p]=v; kept++; }
+    else if((m=p.match(/^crewChecks\/(.+)$/))){ out[`${base}/run/checks/${m[1]}`]=v; kept++; if(v && typeof v==="object" && !v.skipped) out[`${base}/checkoff`]=true; }
+    else if((m=p.match(/^crewPhotos\/(.+)$/))){ out[`${base}/run/photos/${m[1]}`]=v; kept++; if(v) out[`${base}/photo`]=true; }
+    else if((m=p.match(/^dayLogs\/([^/]+)\/crews\/[^/]+$/))){ out[`${base}/run/eod/${m[1]}`]=v; kept++; if(v) out[`${base}/eod`]=true; }
+    else if((m=p.match(/^crewIncidents\/([^/]+)\/[^/]+\/([^/]+)$/))){ out[`${base}/run/incidents/${m[1]}/${m[2]}`]=v; kept++; if(v) out[`${base}/incident`]=true; } });
+  if(!kept) out[`${base}/touched`]=Date.now();
+  return out;
+}
+(function(){ const up=store.update.bind(store), get=store.get.bind(store);
+  store.update = obj => up(practice ? practiceMap(obj) : obj);
+  store.get = path => (practice && /^crewPhotos\//.test(path)) ? get(`trainingPractice/${me.key}/run/photos/`+path.slice(11)) : get(path);
+})();
+function syncPractice(){
+  if(!practice) return; const run=pracRun(), r=tset().route||{};
+  routes = { [PRAC_RID]: { ...r, crew:PRAC, standing:false, start:today(), end:today(), name:r.name||"Practice route" } };
+  checks = run.checks||{};
+  const inc={}; Object.entries(run.incidents||{}).forEach(([d,list])=>{ inc[d]={ [PRAC]:list||{} }; }); incidents=inc;
+  Object.keys(dayLogs).forEach(d=>{ if(((dayLogs[d]||{}).crews||{})[PRAC]) delete dayLogs[d].crews[PRAC]; });
+  Object.entries(run.eod||{}).forEach(([d,v])=>setApproval(d, PRAC, v));
+}
+async function startPractice(){
+  const r=tset().route; if(!r || !Object.keys(r.stops||{}).length) return toast("The office has not set up the practice route yet");
+  if(viewAs) return toast("Preview. Practice runs from the person's own sign-in.");
+  practiceSaved={ role, myCrew, view, curDate, me:{...me} }; practice=true;
+  role="manager"; myCrew=PRAC; curDate=today(); view="today"; openRoute=null; editing=null;
+  dayUnsub.forEach(f=>f()); dayUnsub=[];
+  try { await store.update({ [`trainingPractice/${me.key}/schedule`]:true, [`trainingPractice/${me.key}/startedAt`]:Date.now() }); } catch(e){}
+  render(); window.scrollTo(0,0);
+}
+function exitPractice(){
+  if(!practice) return; const s=practiceSaved||{}; practice=false; practiceSaved=null;
+  role=s.role; myCrew=s.myCrew; view="training"; curDate=s.curDate||today(); openRoute=null; editing=null;
+  routes=routesReal; checks=checksReal; incidents={}; dayBind(); render(); window.scrollTo(0,0);
+}
+function practiceCardHtml(k){
+  const p=trainPractice[k]||{}, r=tset().route, started=T2_PRACTICE.some(([i])=>p[i]);
+  return `<div class="card"><h2>Crew manager practice run</h2><p class="meta">Run one practice day on the practice route with the real manager screens. ${r?`It has ${Object.keys(r.stops||{}).length} real houses on the map.`:""} Nothing you do in practice reaches a client, billing or payroll.</p>
+    ${T2_PRACTICE.map(([i,l])=>`<div class="t2chk">${p[i]?'<span class="chip ok">Done</span>':'<span class="chip">To do</span>'} ${esc(l)}</div>`).join("")}
+    <div class="actions">${practice?`<button class="primary small" id="prExit">Exit practice</button>`:r?`<button class="primary small" id="prStart">${started?"Continue the practice run":"Start the practice run"}</button>`:'<span class="muted">The office has not set up the practice route yet.</span>'}
+      ${!practice&&(p.run||started)?`<button class="small" id="prReset">Start over</button>`:""}</div></div>`;
+}
+function wirePractice(root, k){
+  const s=root.querySelector("#prStart"), x=root.querySelector("#prExit"), z=root.querySelector("#prReset");
+  if(s) s.onclick=startPractice; if(x) x.onclick=exitPractice;
+  if(z) z.onclick=async()=>{ if(previewOnly()) return; const upd={}; ["run","touched","startedAt",...T2_PRACTICE.map(([i])=>i)].forEach(f=>upd[`trainingPractice/${k}/${f}`]=null); await store.update(upd); toast("Practice run cleared"); };
+}
+
+// ---- crew side: the Training tab ----
+function renderTraining(app){
+  const k=(practiceSaved&&practiceSaved.me||me).key, roleK=(practiceSaved?practiceSaved.role:role)==="manager"?"manager":"member", ids=assignedTo(k, roleK);
+  const data=t2Data(k), mods=ids.filter(liveModule).sort(modSort), other=ids.filter(id=>!isModule(trainLib[id]));
+  const total=mods.length+other.length, done=mods.filter(id=>data.done[id]).length+other.filter(id=>isDone(k,id)).length;
+  const byCat={}; other.forEach(id=>{ const c=trainLib[id].category||"Other"; (byCat[c]=byCat[c]||[]).push(id); });
+  const pc=paperCardsHtml(k), g=gateOf(k,"crew"), mgr=roleK==="manager" || !!(trainPractice[k]||{}).open, gm=mgr?gateOf(k,"manager"):null;
+  app.innerHTML = (onboarding ? `<div class="card welcome"><h2>Welcome to Mangiapane Brothers</h2><p>Sign your offer below to get started. Once it is signed, your schedule, hours and the rest of this page open up. Your other paperwork can be done here any time before your first paycheck.</p></div>` : "")
+    + (pc ? `<h2 style="margin:6px 0 8px">Paperwork to sign</h2>${pc}` : "")
+    + `<div class="card"><h2>${g.ok?"Ready for the schedule":"Before you can be scheduled"}</h2>${g.ok?'<p class="meta">Your required training is done. The office can put you on the schedule.</p>':`<p class="meta">The office cannot schedule you until these are done:</p>${gateList(g).replace(/<p class="muted"[\s\S]*$/,"")}`}</div>`
+    + (gm ? (gm.ok ? `<div class="card"><h2>Ready to manage a crew</h2><p class="meta">Manager training and the practice run are done.</p></div>` : "") + practiceCardHtml(k) : "")
+    + `<div class="bar" style="margin-top:6px"><span class="date">Training</span>${total?`<span class="chip ${done<total?"warn":"ok"}">${done} of ${total} done</span>`:""}</div>`
+    + (mods.length ? `<h3 style="margin:14px 0 6px">Modules</h3>${mods.map(id=>moduleCardHtml(k,id,data,false)).join("")}` : "")
+    + (other.length ? Object.keys(byCat).sort().map(c=>`<h3 style="margin:14px 0 6px">${esc(c)}</h3>${byCat[c].sort((a,b)=>isDone(k,a)-isDone(k,b)).map(id=>trainCardHtml(k,id,false)).join("")}`).join("") : "")
+    + (!total ? `<div class="card"><p class="meta">${onboarding?"Your training shows up here after you sign your offer.":"Nothing assigned to you yet. The office adds training for your role here."}</p></div>` : "");
+  app.querySelectorAll("[data-sop]").forEach(b=>b.onclick=()=>sopDialog(b.dataset.sop));
+  app.querySelectorAll("[data-done],[data-undone]").forEach(b=>b.onclick=async()=>{ if(previewOnly()) return; const id=b.dataset.done||b.dataset.undone;
+    try { await store.update({ [`trainingDone/${k}/${id}`]: b.dataset.done ? { at:Date.now() } : null }); } catch(e){ toast("Not saved: "+(e.message||e)); } });
+  wireModuleCards(app, k, !!viewAs); wirePractice(app, k);
+}
+
+// ---- office: modules, settings, the practice route ----
+function gateText(which){ const L=c=>c==="offer_signed"?"signed offer":c==="practice_passed"?"practice run":c.startsWith("gate:")?"the "+c.slice(5)+" gate":c.startsWith("quiz_passed:")?"pass "+c.slice(12):"view "+c.slice(7);
+  return (tset().gates[which]||[]).map(L).join(", "); }
+function t2OfficeHtml(){
+  const s=tset(), r=s.route, crs=Object.entries(routesReal&&Object.keys(routesReal).length?routesReal:routes).filter(([id,x])=>x && id!==PRAC_RID && Object.keys(x.stops||{}).length);
+  return `<div class="card"><h2>Modules</h2><p class="meta">Modules are Markdown files written to the training content spec (Drive, 05 Hiring &amp; Crew, Training). Import the whole Training folder or single files. A module with the same id is replaced. Only files marked ready reach trainees.</p>
+      <div class="actions"><label class="mapbtn primary" style="cursor:pointer">Import the Training folder<input type="file" id="t2Dir" webkitdirectory multiple hidden></label><label class="mapbtn" style="cursor:pointer">Import files<input type="file" id="t2Files" multiple accept=".md,.markdown,.txt,image/*" hidden></label></div></div>
+    <details class="card"><summary><b>Training settings and gates</b></summary>
+      <div class="grid2" style="margin-top:10px"><div><label for="t2Pass">Pass mark (%)</label><input id="t2Pass" type="number" min="1" max="100" value="${s.passMark}"></div>
+        <div><label for="t2Ret">Retakes</label><select id="t2Ret"><option value="unlimited" ${s.retake.mode!=="limited"?"selected":""}>Unlimited</option><option value="limited" ${s.retake.mode==="limited"?"selected":""}>Limited</option></select></div>
+        <div><label for="t2Max">Tries allowed when limited</label><input id="t2Max" type="number" min="1" value="${s.retake.max||3}"></div>
+        <div><label for="t2Wait">Wait after a fail (minutes)</label><input id="t2Wait" type="number" min="0" value="${s.retake.waitMinutes||0}"></div>
+        <div><label for="t2Unlock">A door hanger who finishes training</label><select id="t2Unlock"><option value="review" ${s.walkerUnlock!=="auto"?"selected":""}>Shows on Routes, Schedule, for review</option><option value="auto" ${s.walkerUnlock==="auto"?"selected":""}>Goes into an open seat</option></select></div></div>
+      <h3 style="margin-top:12px">Seasons open</h3><div class="grid2">${["fall","lights","snow","lawn"].map(x=>`<div><label for="t2S_${x}">${T2_SEASONS[x]}</label><input type="date" id="t2S_${x}" value="${esc((s.seasons[x]||{}).from||"")}"></div>`).join("")}</div>
+      <div class="actions"><button class="primary small" id="t2Save">Save settings</button></div>
+      <h3>Gates</h3><p class="meta"><b>Door hangers</b> can be seated after: ${esc(gateText("walker"))}.<br><b>Crew</b> can be given shifts after: ${esc(gateText("crew"))}.<br><b>Crew managers</b> can be made manager after: ${esc(gateText("manager"))}.<br>A module that is not imported yet is waived until it is.</p></details>
+    <div class="card"><h2>Practice route for crew managers</h2><p class="meta">${r?`${Object.keys(r.stops||{}).length} houses copied from ${esc(r.fromName||"a route")}${r.on?" on "+fmtDay(r.on):""}. Real addresses so the map works; no client is attached, and nothing done on it reaches the CRM, QuickBooks, billing or payroll.`:"Not set up yet. Copy a few houses from a real route so the map works."}</p>
+      <div class="actions"><button class="small ${r?"":"primary"}" id="t2Route" ${crs.length?"":"disabled"}>${r?"Rebuild":"Set up"} the practice route</button></div></div>`;
+}
+function wireT2Office(app){
+  const imp=e=>{ const f=e.target.files; if(f&&f.length) t2ImportFiles(f); e.target.value=""; };
+  $("#t2Dir").onchange=imp; $("#t2Files").onchange=imp;
+  $("#t2Save").onclick=async()=>{ const pm=Math.max(1,Math.min(100,+$("#t2Pass").value||80)); const seasons={}; ["fall","lights","snow","lawn"].forEach(x=>seasons[x]={ from:$("#t2S_"+x).value||"" });
+    try { await store.update({ "trainingSettings/passMark":pm, "trainingSettings/retake":{ mode:$("#t2Ret").value, max:Math.max(1,+$("#t2Max").value||3), waitMinutes:Math.max(0,+$("#t2Wait").value||0) },
+      "trainingSettings/walkerUnlock":$("#t2Unlock").value, "trainingSettings/seasons":seasons }); toast("Training settings saved"); } catch(e){ toast("Not saved: "+(e.message||e)); } };
+  $("#t2Route").onclick=()=>{ const src=routesReal&&Object.keys(routesReal).length?routesReal:routes; const list=Object.entries(src).filter(([id,x])=>x && id!==PRAC_RID && Object.values(x.stops||{}).some(s=>s.lat&&s.lon));
+    const dl=openDlg(`<h2>Practice route</h2><p class="meta">Copies the first houses of a real route: address and map pin only. Names become "Practice house 1, 2, 3", and no client, phone or note comes along.</p>
+      <label for="prSrc">Copy from</label><select id="prSrc">${list.map(([id,x])=>`<option value="${esc(id)}">${esc(routeName(x))} (${esc(x.crew||"")}, ${Object.keys(x.stops||{}).length} stops)</option>`).join("")}</select>
+      <label for="prN">How many houses</label><input id="prN" type="number" min="2" max="12" value="5"><div class="actions"><button data-close>Cancel</button><button class="primary" id="prGo">Save practice route</button></div>`);
+    dl.querySelector("#prGo").onclick=async()=>{ const id=$("#prSrc").value, x=src[id]; if(!x) return; const n=Math.max(2,Math.min(12,+$("#prN").value||5));
+      const stops={}; stopsOf(x).filter(s=>s.lat&&s.lon).slice(0,n).forEach((s,i)=>{ stops["p"+(i+1)]={ name:"Practice house "+(i+1), address:s.address||"", lat:s.lat, lon:s.lon, order:i+1 }; });
+      await store.update({ "trainingSettings/route":{ name:"Practice route", service:x.service==="snow"?"fall":(x.service||"fall"), stops, fromName:routeName(x), from:id, on:today(), by:me.email } }); dl.close(); toast("Practice route saved"); }; };
+}
+async function t2ImportFiles(files){
+  files=[...files]; const mds=files.filter(f=>/\.(md|markdown|txt)$/i.test(f.name)), pics=files.filter(f=>/^image\//.test(f.type)||/\.(jpe?g|png|webp)$/i.test(f.name));
+  if(!mds.length) return toast("No Markdown (.md) files in what you chose");
+  const parsed=[]; for(const f of mds){ const p=parseModuleMd(await f.text()); p.file=f.webkitRelativePath||f.name; if(/(^|\/)(SPEC|README|training-content-spec)\.md$/i.test(p.file)) continue; parsed.push(p); }
+  const rp=f=>(f.webkitRelativePath||f.name).toLowerCase(), base=f=>f.name.toLowerCase().replace(/\.[a-z0-9]+$/,"");
+  const picFor=(id,name)=>pics.find(f=>base(f)===name && rp(f).includes("/"+id+"/")) || pics.find(f=>base(f)===name);
+  const rows=parsed.map(p=>({ ...p, ready:!p.errs.length && p.rec.status==="ready", draft:!p.errs.length && p.rec.status!=="ready", missing:p.images.filter(n=>!picFor(p.id,n)) }));
+  const dl=openDlg(`<h2>Import modules</h2><div class="scroll"><table><tr><th>Module</th><th>State</th><th>Slides</th><th>Quiz</th><th>Photos</th></tr>
+    ${rows.map(p=>`<tr><td><b>${esc(p.rec.title||p.file)}</b><div class="muted">${esc(p.id||"")} &middot; ${esc(p.file)}</div>${p.errs.map(e=>`<div class="meta" style="color:var(--red)">${esc(e)}</div>`).join("")}${p.warns.map(e=>`<div class="muted">${esc(e)}</div>`).join("")}</td>
+      <td>${p.errs.length?`<span class="chip bad">${p.errs.length} problem${p.errs.length>1?"s":""}</span>`:p.ready?'<span class="chip ok">Ready</span>':'<span class="chip">Draft</span>'}${p.todos?` <span class="chip warn">${p.todos} TODO</span>`:""}${trainLib[p.id]?' <span class="chip">Replaces</span>':""}</td>
+      <td>${(p.rec.slides||[]).length}</td><td>${(p.rec.quiz||[]).length}</td><td>${p.images.length-p.missing.length} of ${p.images.length}</td></tr>`).join("")}</table></div>
+    <label style="display:flex;gap:8px;align-items:center;margin-top:10px;color:var(--ink)"><input type="checkbox" id="impDraft"> Also import drafts (only the office sees them, for review)</label>
+    <p class="muted">Photos come from Training/Images/&lt;module id&gt;/. A missing photo shows as a grey box with its caption until it is added and the module is imported again.</p>
+    <div class="actions"><button data-close>Cancel</button><button class="primary" id="impGo">Import</button></div>`);
+  dl.querySelector("#impGo").onclick=async()=>{ const withDraft=dl.querySelector("#impDraft").checked, go=rows.filter(p=>p.ready || (withDraft && p.draft));
+    if(!go.length) return toast("Nothing ready to import"); const b=dl.querySelector("#impGo"); b.disabled=true; b.textContent="Importing...";
+    try {
+      const now=Date.now(), upd={};
+      go.forEach(p=>{ upd[`trainingLib/${p.id}`]={ ...p.rec, file:p.file, updatedAt:now, by:me.email, createdAt:(trainLib[p.id]||{}).createdAt||now };
+        Object.keys(TRAIN_ROLES).forEach(r=>{ upd[`trainingRoles/${r}/${p.id}`]= p.rec.status==="ready" && p.rec.roles.includes(r) ? true : null; }); });
+      await store.update(upd);
+      let n=0; for(const p of go){ for(const name of p.images){ const f=picFor(p.id,name); if(!f) continue; try { await store.update({ [`trainingImages/${p.id}/${name}`]: await shrinkImage(f) }); n++; } catch(e){} } }
+      dl.close(); toast(`${go.length} module${go.length>1?"s":""} imported${n?`, ${n} photo${n>1?"s":""}`:""}`);
+    } catch(e){ b.disabled=false; b.textContent="Import"; toast("Not imported: "+(e.message||e)); } };
+}
+// Office: one person's training, with quiz attempts, gates and manager training.
+function personTrainExtra(k){
+  const data=t2Data(k), ids=assignedTo(k).filter(id=>isModule(trainLib[id])).sort(modSort), g=gateOf(k,"crew"), gm=gateOf(k,"manager"), p=trainPractice[k]||{};
+  return `<div class="card"><h2>Gates</h2><p><b>Shifts</b> ${gateChip(g)}</p>${gateList(g)}<p style="margin-top:10px"><b>Crew manager</b> ${gateChip(gm)}</p>${gateList(gm)}
+    <div class="actions"><button class="small" id="mgrTrain">${p.open?"Stop manager training":"Start manager training"}</button></div>
+    <p class="muted">Manager training gives him the manager modules and the practice run on his Training tab.</p>
+    ${ids.length?`<h3 style="margin-top:12px">Modules</h3>${ids.map(id=>{ const at=attemptsOf(k,id); return `<div class="logrow"><span class="w"><b>${esc(trainLib[id].title)}</b> <span class="meta">${at.length?at.map(a=>`${a.pct}%${a.passed?" pass":""}`).join(", "):"no quiz tries"}</span></span><span>${moduleStatus(k,id,data)||'<span class="chip warn">Not started</span>'}${at.length&&!data.done[id]?` <button class="small" data-qreset="${esc(id)}">Reset quiz</button>`:""}</span></div>`; }).join("")}`:""}
+    <h3 style="margin-top:12px">Practice run</h3>${T2_PRACTICE.map(([i,l])=>`<div class="t2chk">${p[i]?'<span class="chip ok">Done</span>':'<span class="chip">Not yet</span>'} ${esc(l)}</div>`).join("")}</div>`;
+}
+function wirePersonTrainExtra(app, k){
+  const b=app.querySelector("#mgrTrain"); if(b) b.onclick=async()=>{ const on=!(trainPractice[k]||{}).open, upd={ [`trainingPractice/${k}/open`]: on ? { at:Date.now(), by:me.email } : null };
+    trainItems().forEach(([id,x])=>{ if(isModule(x) && (trainRoles.manager||{})[id] && !(trainRoles.member||{})[id] && !(trainRoles.all||{})[id]) upd[`trainingAssign/${k}/${id}`]= on ? { at:Date.now(), by:me.email, mgr:true } : ((trainAssign[k]||{})[id]||{}).mgr ? null : (trainAssign[k]||{})[id]||null; });
+    await store.update(upd); toast(on?"Manager training started":"Manager training stopped"); };
+  app.querySelectorAll("[data-qreset]").forEach(x=>x.onclick=async()=>{ await store.update({ [`trainingQuiz/${k}/${x.dataset.qreset}`]:null }); toast("Quiz reset. He can take it again."); });
+}
 
 // ----- employee reports: optional, from the manager's crew log -----
 const reportsFor = (crew, d) => Object.entries(reportsAll[crew]||{}).filter(([,r])=>r&&(!d||r.date===d)).sort((a,b)=>(a[1].at||0)-(b[1].at||0));
@@ -2386,6 +2832,30 @@ function demoSeed(){
     [`personFileDoc/${S("m1")}`]:{ url:"https://drive.google.com/", at:ago(2), entries:3 },
     "staffArchive/kevin,ward@example,com":{ name:"Kevin Ward", email:"kevin.ward@example.com", crew:"Crew 2", crewRole:"member", archivedAt:ago(12), by:ADMIN_EMAIL, reason:"Season ended", lastDay:addDays(d,-12),
       staff:{ phone:"734-555-0299", startDate:"2026-04-06", type:"W-2" }, timeEntries:{ [addDays(d,-13)]:{ t1:{ in:ago(13), out:ago(13)+8*3600e3 } } }, payLog:{ "2026-09-21":{ paidAmount:845.5 } } }
+  });
+
+  // Training modules (October 20, 2026): a sample module with a quiz, the crew systems deck, a practice route.
+  const md1 = ["---","id: crew-safety","title: Safety and protective gear","roles: [member, manager]","category: Safety","season: always","order: 10","version: 1","completion: quiz","status: ready","---",
+    "---slide---","## Gear on every job","- Safety glasses on whenever a blower or trimmer runs {reveal}","- Ear protection: company headphones, or your own if NRR rated {reveal}","- Steel-toed boots, your own {reveal}","![Crew in full gear](image:gear)",
+    "---slide---","## Ladders and roofs","- Never on a wet, frosty or icy roof","- Ladder held or spotted while climbing","- Three feet above the roof edge","note: Managers make the final call on steep roofs.",
+    "---slide---","## Injuries","- Serious: closest hospital first, then call Russel","- Life threatening: call 911","[[TODO: nearest hospital to the service area]]",
+    "---quiz---","### Q1","Which hearing protection is allowed?","- [ ] Any earbuds","- [x] Company headphones, or your own if NRR rated","- [ ] None if the blower is on low","explain: Some ear protection is always required, and personal headphones count only if they are NRR rated.","slide: 1",
+    "### Q2","The roof is frosty at 8 a.m. What do you do?","- [ ] Go up carefully","- [x] Stay off it until it is dry","- [ ] Go up with a spotter","explain: No one goes on a wet, frosty or icy roof.","slide: 2",
+    "### Q3","A crew member falls off a ladder and hits his head. First step?","- [ ] Drive him to urgent care","- [x] Call 911","- [ ] Finish the house, then call the office","explain: Head injuries and roof falls are life threatening: call 911.","slide: 3"].join("\n");
+  const md2 = ["---","id: systems-crew","title: Using the site: crew","roles: [member, manager]","category: Onboarding","order: 5","version: 1","completion: view","status: ready","---",
+    "---slide---","## Signing in","- Open apps.mangbrothers.com on your phone","- Sign in with the Google account the office has on file","{highlight: Sign in with Google}",
+    "---slide---","## Your Training tab","- Paperwork to sign sits at the top","- Modules open here; finish each one to the end"].join("\n");
+  [md1, md2].forEach(m=>{ const p=parseModuleMd(m); upd[`trainingLib/${p.id}`]={ ...p.rec, createdAt:Date.now()-864e5 }; p.rec.roles.forEach(r=>{ upd[`trainingRoles/${r}/${p.id}`]=true; }); });
+  Object.assign(upd, {
+    [`trainingDone/${S("m1")}/crew-safety`]:{ at:Date.now()-864e5, version:1, via:"quiz", score:100 },
+    [`trainingQuiz/${S("m1")}/crew-safety/q1`]:{ at:Date.now()-864e5-600e3, version:1, score:2, total:3, pct:67, passed:false, answers:[] },
+    [`trainingQuiz/${S("m1")}/crew-safety/q2`]:{ at:Date.now()-864e5, version:1, score:3, total:3, pct:100, passed:true, answers:[] },
+    [`trainingViewed/${S("m1")}/systems-crew`]:{ at:Date.now()-2*864e5, lastSlide:1, version:1, finished:true },
+    [`trainingDone/${S("m1")}/systems-crew`]:{ at:Date.now()-2*864e5, version:1, via:"view" },
+    [`trainingPractice/${S("m1")}/open`]:{ at:Date.now()-864e5, by:ADMIN_EMAIL },
+    "trainingSettings/route":{ name:"Practice route", service:"fall", fromName:"Livonia snow route", from:"snow1", on:addDays(d,-1),
+      stops:{ p1:{ name:"Practice house 1", address:cl[0][1], lat:cl[0][2], lon:cl[0][3], order:1 }, p2:{ name:"Practice house 2", address:cl[1][1], lat:cl[1][2], lon:cl[1][3], order:2 }, p3:{ name:"Practice house 3", address:cl[2][1], lat:cl[2][2], lon:cl[2][3], order:3 } } },
+    [`crewIncidents/${d}/Crew 1/i1`]:{ type:"damage", text:"Trimmer string chipped the paint on the garage door trim. Client was not home. Photo taken.", route:"snow1", stop:"b", name:cl[1][0], address:cl[1][1], by:S("boss"), at:Date.now()-3600e3 }
   });
   for(let i=0;i<20;i++){ const x=addDays(d,i), w=pd(x).getUTCDay(); if(w===0||w===6) continue; ["m1","m2","boss"].forEach(k=>{ upd[`shifts/${S(k)}/${x}`]={ start:k==="boss"?"06:30":"07:00", end:"15:30", crew:"Crew 1", note:i%5===2?"Lights installs, meet at the yard":null }; }); }
   return { upd, who:{ admin:{email:ADMIN_EMAIL,displayName:"Russel"}, manager:{email:ppl.boss,displayName:"Marcus Reed"}, member:{email:ppl.m1,displayName:"Tyler Ng"}, newhire:{email:ppl.m3,displayName:"Luis Park"}, crew2:{email:ppl.boss2,displayName:"Dave Kim"} } };
