@@ -1094,6 +1094,13 @@ $("#noteAdd").onclick = async () => {
 $("#noteText").onkeydown = e => { if((e.metaKey||e.ctrlKey) && e.key==="Enter") $("#noteAdd").click(); };
 $("#clientTrash").onclick = async () => { if(!openId) return; await trashClient(openId); $("#clientDlg").close(); };
 $("#clientCancel").onclick = () => $("#clientDlg").close();
+// Tap the empty space around the lead/client card to close it without saving (same as Cancel).
+// Only closes when the press both starts and ends outside the card, so dragging to select text never closes it.
+(()=>{ const d=$("#clientDlg"); let downOut=false;
+  const outside=e=>{ if(e.target!==d) return false; const r=d.getBoundingClientRect(); return e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom; };
+  d.addEventListener("pointerdown", e=>{ downOut=outside(e); });
+  d.addEventListener("click", e=>{ if(downOut && outside(e)) d.close(); downOut=false; });
+})();
 $("#clientForm").onkeydown = e => { if(e.key==="Enter" && e.target.tagName==="INPUT"){ e.preventDefault(); } };
 $("#clientSave").onclick = async () => {
   const f=$("#clientForm"); readSvcForm();
