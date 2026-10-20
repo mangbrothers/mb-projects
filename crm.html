@@ -2817,14 +2817,14 @@ function renderTrash(m){
 }
 
 // ---------- seasons (service views docked under Clients, pinnable to the main menu) ----------
-const SEASON_ORDER = [["lawn","var(--s-lawn)"],["fall","var(--s-fall)"],["lights","var(--s-lights)"],["snow","#9ec3f0"],["landscaping","var(--s-landscaping)"]];
+const SEASON_ORDER = [["lawn","var(--s-lawn)","Lawn"],["fall","var(--s-fall)","Fall"],["lights","var(--s-lights)","Lights"],["snow","#9ec3f0","Snow"],["landscaping","var(--s-landscaping)","Landscaping"]];
 let pinnedSvc = []; try{ pinnedSvc = JSON.parse(localStorage.getItem("crmPinnedSvc")||"[]").filter(k=>SERVICE_TYPES[k]); }catch(e){}
 function seasonBar(active){
   const n = k => live().filter(([,c])=>c.status==="active"&&hasSvc(c,k)).length;
   const pinned = active && pinnedSvc.includes(active);
   return `<div class="seasonbar" role="tablist" aria-label="Filter clients by season">
     <button type="button" class="sb${active?"":" on"}" data-season="">All clients</button>
-    ${SEASON_ORDER.map(([k,col])=>`<button type="button" class="sb${active===k?" on":""}" data-season="${k}"><span class="dot" style="background:${col}"></span>${esc(SERVICE_TYPES[k].label)} <span class="n">${n(k)}</span></button>`).join("")}
+    ${SEASON_ORDER.map(([k,col,lb])=>`<button type="button" class="sb${active===k?" on":""}" data-season="${k}"><span class="dot" style="background:${col}"></span>${esc(lb)} <span class="n">${n(k)}</span></button>`).join("")}
     ${active?`<button type="button" class="small pinbtn" data-pin="${active}" title="${pinned?"Take it off":"Put it on"} the main menu">${pinned?"Unpin from menu":"\u{1F4CC} Pin to menu"}</button>`:""}
   </div>`;
 }
@@ -2837,7 +2837,7 @@ function wireSeasonBar(m){
 }
 function renderPins(){
   const slot=$("#pinSlot");
-  slot.innerHTML = SEASON_ORDER.filter(([k])=>pinnedSvc.includes(k)).map(([k,col])=>`<button data-view="svc-${k}"><span class="dot" style="background:${col}"></span>${esc(SERVICE_TYPES[k].label)}</button>`).join("");
+  slot.innerHTML = SEASON_ORDER.filter(([k])=>pinnedSvc.includes(k)).map(([k,col,lb])=>`<button data-view="svc-${k}"><span class="dot" style="background:${col}"></span>${esc(lb)}</button>`).join("");
   slot.querySelectorAll("button[data-view]").forEach(b => b.onclick = () => setNav(b.dataset.view));
 }
 renderPins();
