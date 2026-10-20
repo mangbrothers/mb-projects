@@ -169,7 +169,7 @@ td strong{font-weight:650}
 
 <div class="page central" id="root">
 <header>
-  <span class="eyebrow">Mangiapane Brothers LLC · internal · drawn October 7, 2026 · last updated October 19, 2026 (2400 ported to Quo, Quo to CRM sync)</span>
+  <span class="eyebrow">Mangiapane Brothers LLC · internal · drawn October 7, 2026 · last updated October 19, 2026 (2400 ported to Quo, scheduled bridges)</span>
   <h1>System Map</h1>
   <p class="lede">Where each kind of company data lives, which system owns it, and which tool carries it from one system to the next. A plain-language guide to every part follows the map. The first view is the central system for the next month. The second view adds everything planned after it.</p>
 </header>
@@ -237,6 +237,7 @@ td strong{font-weight:650}
   <div class="tw"><table>
     <thead><tr><th>Date</th><th>Change</th><th>State</th></tr></thead>
     <tbody>
+    <tr><td><strong>Oct 19, night</strong></td><td><strong>Two more scheduled bridges, live.</strong> <em>QuickBooks payments to CRM</em> runs at 7:52am and 5:52pm: it reads every 2026 invoice in QuickBooks, sets each linked client's billing status (paid, open or past due), open balance and latest invoice in the CRM, and logs every balance change on the client record. It never writes to QuickBooks. <em>Quo email cross-check</em> runs at 10:12pm: it compares the day's Quo emails at admin@ against what the hourly sync logged, fills any gap, and warns if the sync has stopped. Every arrow between Claude, the database and QuickBooks now runs on a schedule except the payroll push, which waits for the first approved pay period.</td><td><span class="pill live">Live</span></td></tr>
     <tr><td><strong>Oct 19</strong></td><td><strong>Quo to CRM sync, live (scheduled task).</strong> Every hour from 8am to 9pm, Claude pulls new calls, voicemails and texts on 2400 (and the temporary number until it is deleted) through the Quo connector, matches each one to a client by phone number, and writes it into that client's contact log with a <em>quo</em> tag and a new last-contact date. A real conversation from an unknown number (an answered call over 20 seconds, a voicemail, or a text that is not spam) becomes a new lead on the Leads board. Hang-ups with no voicemail and spam are only counted in the report. It never texts anyone and never changes status, billing or contracts. Each activity is logged once, by its Quo ID. First run October 20 at 8:37am, back-filling from the port. Quo webhooks for instant updates are deferred to the Christmas Break DI Update project.</td><td><span class="pill live">Live</span></td></tr>
     <tr><td><strong>Oct 19</strong></td><td><strong>734-450-2400 ported to Quo.</strong> The main number moved from Verizon One Talk into Quo. Calls in and out and texts in and out tested and working; texting registration (A2P 10DLC) approved; caller ID name "Mangiapane Bros" approved; every call recorded with an AI transcript and summary. Texts, missed calls and voicemails now email admin@. Open: rename the 2400 inbox, add a missed-call auto-reply text, decide on the recording notice before a second person answers 2400, delete the temporary number after two weeks, and remove One Talk and the virtual lines from Verizon.</td><td><span class="pill live">Live</span></td></tr>
     <tr><td><strong>Oct 18</strong></td><td><strong>Door hanger work counts as on file, live (f359d16).</strong> A door hanger who logged any day of work on the Routes page goes to Past, not Remove. The Past dialog shows the days and doors still to be paid, his archive keeps a copy of the route logs, and the Routes history is never deleted. The signing service code from earlier today is deployed.</td><td><span class="pill live">Live</span></td></tr>
@@ -295,7 +296,7 @@ td strong{font-weight:650}
     <tr><td><strong>Calls, texts, transcripts</strong></td><td>Quo</td><td>CRM contact log (summary per contact), new leads from unknown numbers</td><td>Claude, hourly scheduled task through the Quo connector</td><td><span class="pill live">Live, hourly</span></td></tr>
     <tr><td><strong>Services sold and prices</strong></td><td>CRM</td><td>QuickBooks invoice lines</td><td>Claude</td><td><span class="pill part">By hand</span></td></tr>
     <tr><td><strong>Signed agreements</strong></td><td>CRM, locked record</td><td>PDF in Google Drive, PDF emailed to the client</td><td>The CRM page itself</td><td><span class="pill live">Live</span></td></tr>
-    <tr><td><strong>Invoices and money received</strong></td><td>QuickBooks</td><td>CRM billing status: billed, paid, past due, date</td><td>Card charges: the signing service, at signing and from the CRM. Everything else: Claude</td><td><span class="pill part">By hand</span></td></tr>
+    <tr><td><strong>Invoices and money received</strong></td><td>QuickBooks</td><td>CRM billing status: billed, paid, past due, open balance, latest invoice</td><td>Card charges: the signing service, at signing and from the CRM. Status back to the CRM: Claude, twice a day on a schedule</td><td><span class="pill live">Live, twice daily</span></td></tr>
     <tr><td><strong>Card and bank details</strong></td><td>QuickBooks only</td><td>Nowhere. The CRM keeps card brand, last 4 and expiration only</td><td>The customer's browser, straight to Intuit</td><td><span class="pill live">Live</span></td></tr>
     <tr><td><strong>Books and financial statements</strong></td><td>QuickBooks</td><td>Accountant and CFO read them there</td><td>Nobody</td><td><span class="pill live">Live</span></td></tr>
     <tr><td><strong>Admin tasks, projects, timelines</strong></td><td>Projects page</td><td>None</td><td>Nobody</td><td><span class="pill live">Live</span></td></tr>
@@ -352,7 +353,7 @@ td strong{font-weight:650}
   <h2>Weak points in the plan, with a recommendation for each</h2>
   <div class="cols">
     <div class="note"><h3>Payroll authority is assigned to the wrong system</h3><p>The site cannot be the system of record for payroll. It does not calculate withholding, file taxes or issue pay stubs.</p><p class="rec">Make the site the system of record for time records. QuickBooks Payroll stays the system of record for pay. An admin approves hours before they leave the site.</p></div>
-    <div class="note"><h3>Claude is a single point of failure</h3><p>Every transfer depends on one personal account, one Mac and a Chrome window that must be open. Nothing runs unless someone asks. A missed session means a missed client record.</p><p class="rec">Give Claude its own limited sign-in to the database, which the access rules already allow for. Run the Quo and QuickBooks transfers as scheduled tasks. Keep a queue with receipts and a daily reconciliation count.</p><p>Update October 19: Claude has its own sign-in, and both the QuickBooks queue and the Quo to CRM transfer run hourly as scheduled tasks.</p></div>
+    <div class="note"><h3>Claude is a single point of failure</h3><p>Every transfer depends on one personal account, one Mac and a Chrome window that must be open. Nothing runs unless someone asks. A missed session means a missed client record.</p><p class="rec">Give Claude its own limited sign-in to the database, which the access rules already allow for. Run the Quo and QuickBooks transfers as scheduled tasks. Keep a queue with receipts and a daily reconciliation count.</p><p>Update October 19: Claude has its own sign-in; the QuickBooks queue, the Quo to CRM transfer, payment status back to the CRM and a nightly email cross-check all run as scheduled tasks.</p></div>
     <div class="note"><h3>Money received has two entry points</h3><p>An admin records a payment in the CRM at signing. QuickBooks records the same payment when the card clears or the deposit lands. The two will drift.</p><p class="rec">QuickBooks owns money received. The CRM entry at signing is a claim. Claude confirms it against QuickBooks and flags every mismatch.</p><p>Update October 15: once card mode is on, the card charge at signing is recorded in QuickBooks by the signing service itself, which closes this gap for card payments. Checks and bank payments still need the cross-check.</p></div>
     <div class="note"><h3>A password page on the site is a liability</h3><p>A home-built page in Firebase has no encryption at rest that you control, no audit trail and no safe way to rotate access. One rules mistake exposes bank logins.</p><p class="rec">Buy a password manager with shared vaults by tier. Link to it from the portal. Client door codes that crews need belong on the job record, not in the vault.</p></div>
     <div class="note"><h3>Drive cannot replace Firebase</h3><p>Drive stores files. The pages need a database. Moving "all data" to Drive would break every page.</p><p class="rec">Keep Firebase as the database. Move only documents to a company shared Drive: signed agreements, worker paperwork, templates.</p></div>
@@ -395,7 +396,7 @@ quoCrm:{t:'Quo to CRM transfer',st:'live',d:'Every hour from 8am to 9pm, a sched
 quoHook:{t:'Instant updates (webhooks)',st:'plan',d:'Quo tells the system the moment a call ends or a text arrives, so leads show in seconds instead of within the hour. Deferred to the Christmas Break DI Update.'},
 
 email:{t:'Email inbox',k:'Outside service',st:'live',web:[20,290,210,70],s:['texts, missed calls, voicemails','to admin@ since Oct 19'],
- d:['A second copy of every incoming text, missed call and voicemail (with its transcript), emailed by Quo to admin@mangbrothers.com.','It is switched on as of October 19. Claude does not use it as a cross-check yet.']},
+ d:['A second copy of every incoming text, missed call and voicemail (with its transcript), emailed by Quo to admin@mangbrothers.com.','It is switched on as of October 19. Every night at 10:12pm a scheduled task checks it against what the hourly sync logged and fills any gap.']},
 
 internal:{t:'Internal system',k:'System',st:'live',
  d:['One web app at apps.mangbrothers.com with one sign-in list. Owners, office staff, crew managers, crew members and door hanger distributors all come through the same front door, and each sees only the pages their role needs.','Behind the pages sit the database, which holds the records, and the signing service, which sends mail, files documents and charges cards.'],
@@ -522,15 +523,15 @@ drive:{t:'Google Drive',gt:'Google Workspace',k:'Outside service',st:'live',web:
 claude:{t:'Claude on Russel’s account',gt:'Claude (AI assistant)',k:'Integration layer',st:'hand',web:[380,520,420,100],hub:1,
  s:['Integration layer: carries data between the systems','Quo connector · QuickBooks connector · Chrome · GitHub'],fs:'At the Team plan: split into a company account and a personal account',
  g:'builds and maintains the system, and carries data between systems that have no direct link yet (for example the phone system and the CRM). By design, it cannot open the employee paperwork vault on its own.',
- d:['Claude builds and maintains the system and carries data between systems that have no direct link yet, such as the phone system and the CRM.','The Quo and QuickBooks transfers now run hourly as scheduled tasks. Other transfers still run only when someone asks in a session. By design, it cannot open the employee paperwork vault.'],
+ d:['Claude builds and maintains the system and carries data between systems that have no direct link yet, such as the phone system and the CRM.','The Quo and QuickBooks transfers now run on their own as scheduled tasks. Work in the browser and the payroll push still run only when someone asks in a session. By design, it cannot open the employee paperwork vault.'],
  ffact:'At the Team plan: split into a company account and a personal account.',
  kids:['clQuo','clQb','clDb','clChrome','clGit','clSched']},
 clQuo:{t:'Quo connector',st:'live',d:'Reads call transcripts, voicemails and texts. The hourly Quo to CRM sync writes them into the contact log and turns real conversations from unknown numbers into leads.'},
-clQb:{t:'QuickBooks connector',st:'hand',d:'Records customers, invoices and payments in QuickBooks, and brings who paid and when back to the CRM.'},
+clQb:{t:'QuickBooks connector',st:'live',d:'Records customers, invoices and payments in QuickBooks from the hourly queue, and twice a day brings who paid and when back to the CRM.'},
 clDb:{t:'Own database sign-in',st:'live',d:'Since October 16 Claude has its own admin sign-in to the database. It cannot add sign-ins, remove Russel, edit a signed contract or open the paperwork vault.'},
 clChrome:{t:'Chrome',st:'hand',d:'Works in Russel’s signed-in browser where no connector exists, such as editing records directly in the CRM.'},
 clGit:{t:'GitHub',st:'live',d:'Edits the page code and publishes it from Russel’s Mac.'},
-clSched:{t:'Scheduled tasks',st:'live',d:'Two scheduled tasks run on their own every hour: the QuickBooks queue push and, since October 19, the Quo to CRM sync. The payroll push is next.'},
+clSched:{t:'Scheduled tasks',st:'live',d:'Four scheduled tasks run on their own: the QuickBooks queue push (hourly), the Quo to CRM sync (hourly), QuickBooks payments to CRM (7:52am and 5:52pm) and the Quo email cross-check (10:12pm). The payroll push waits for the first approved pay period.'},
 
 github:{t:'GitHub',k:'Supporting service',st:'live',web:[450,660,280,52],s:['account mangbrothers · publishes the pages'],
  g:'where the application’s code lives and is published to the web. Every change is recorded and can be rolled back.',
@@ -559,12 +560,12 @@ var E=[
  {id:'e4',a:'crewsPeople',b:'frontdoor',d:'M810 66V110',dir:1,lb:[[818,92,'sign in']]},
  {id:'e5',a:'qb',b:'accountant',d:'M1065 150V66',dir:1,lb:[[1073,112,'reports']]},
  {id:'e6',a:'quo',b:'email',d:'M125 240V290',dir:1,lb:[[133,269,'notifications']]},
- {id:'e7',a:'email',b:'claude',d:'M230 325H262',dir:0,kind:'plan',lb:[]},
+ {id:'e7',a:'email',b:'claude',d:'M230 325H262',dir:1,lb:[]},
  {id:'e8',a:'quo',b:'claude',d:'M230 195H262V555H380',dir:1,lb:[[270,547,'transcripts, texts'],[270,571,'hourly, scheduled','s']]},
  {id:'e9',a:'signing',b:'qb',d:'M900 340H970',dir:2,lb:[[935,332,'API','m']]},
  {id:'e10',a:'signing',b:'drive',d:'M920 430H970',dir:1,lb:[[945,422,'PDFs','m']]},
- {id:'e11',a:'claude',b:'firebase',d:'M520 520V420',dir:2,kind:'hand',lb:[[532,466,'writes clients, leads, contact log, billing status · reads the QuickBooks queue'],[532,482,'own database sign-in since Oct 16 · shut out of the paperwork vault','s']]},
- {id:'e12',a:'claude',b:'qb',d:'M800 555H1128V370',dir:2,kind:'hand',lb:[[964,547,'customers, invoices, payments recorded','m'],[964,571,'who paid and when, back to the CRM','m'],[964,589,'approved hours to Payroll (next)','mf']]},
+ {id:'e11',a:'claude',b:'firebase',d:'M520 520V420',dir:2,lb:[[532,466,'writes clients, leads, contact log, billing status · reads the QuickBooks queue'],[532,482,'scheduled tasks, own sign-in since Oct 16 · shut out of the paperwork vault','s']]},
+ {id:'e12',a:'claude',b:'qb',d:'M800 555H1128V370',dir:2,lb:[[964,547,'customers, invoices, payments recorded (hourly)','m'],[964,571,'who paid and when, back to the CRM (twice daily)','m'],[964,589,'approved hours to Payroll (next)','mf']]},
  {id:'e13',a:'claude',b:'github',d:'M590 620V660',dir:1,lb:[[598,645,'edits page code']]}
 ];
 
