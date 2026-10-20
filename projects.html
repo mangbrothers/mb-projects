@@ -1076,7 +1076,7 @@ function backupJson(){ return JSON.stringify({ exportedAt:new Date().toISOString
 // holds a password in plain text. The code is never stored or sent anywhere. Three wrong codes lock the tab with
 // growing waits (1, 5, 15, then 60 minutes), kept per person at logins/_lock and in this browser. The tab locks again
 // after 10 minutes without use, when the page is hidden, or on leaving the tab. Lose the code and the list is gone:
-// only Russel can wipe it and start over.
+// delete logins/_vault in the Firebase console to clear the tab and set a new code.
 let logins = {}, loginEdit = null, loginAdding = false, loginQ = "", loginShown = new Set();
 const LG = { key: null, items: {}, salt: null, iter: 600000, openedVer: null, idle: null, entry: "", busy: false, setup: null, msg: "" };
 const LG_WAITS = [60e3, 5*60e3, 15*60e3, 60*60e3], LG_IDLE = 10*60e3;
@@ -1148,7 +1148,7 @@ function lgKeypad(m, title, sub, onDone){
     <input id="lgPinIn" class="lgpinin" inputmode="numeric" pattern="[0-9]*" autocomplete="off" maxlength="6" aria-label="6-digit code" ${locked || LG.busy ? "disabled" : ""}>
     <div class="lgpad">${[1,2,3,4,5,6,7,8,9,"",0,"del"].map(d => d === "" ? "<span></span>" : `<button data-pin="${d}" ${locked || LG.busy ? "disabled" : ""}>${d === "del" ? "&#9003;" : d}</button>`).join("")}</div>
     ${LG.setup ? `<button id="lgPinCancel" style="margin-top:12px">Cancel</button>` : ""}
-    ${!LG.setup && logins._vault && isAdmin ? `<button class="small danger" id="lgWipe" style="margin-top:16px">Forgot the code: wipe the list</button>` : ""}</div></div>`;
+</div></div>`;
   const push = d => { if(LG.busy || lgLockState().until > Date.now()) return; LG.msg = "";
     LG.entry = d === "del" ? LG.entry.slice(0, -1) : (LG.entry + d).slice(0, 6);
     // update the dots in place so the phone keeps its number pad open between digits
@@ -1160,10 +1160,6 @@ function lgKeypad(m, title, sub, onDone){
     inp.oninput = () => { const d = inp.value.replace(/\D/g, "").slice(-1); inp.value = ""; if(d) push(d); };
     inp.onkeydown = e => { if(e.key === "Backspace"){ e.preventDefault(); push("del"); } }; }
   const cx = $("#lgPinCancel"); if(cx) cx.onclick = () => { LG.setup = null; LG.entry = ""; LG.msg = ""; render(); };
-  const wp = $("#lgWipe"); if(wp) wp.onclick = async () => {
-    if(!confirm("Wipe every saved password? This cannot be undone. Only do this if nobody has the code.")) return;
-    if(prompt('Type WIPE to confirm') !== "WIPE") return;
-    await db.ref("logins").set(null); LG.key = null; LG.items = {}; toast("List wiped. Set a new code."); render(); };
   if(locked){ clearTimeout(LG.unlockT); LG.unlockT = setTimeout(() => { if(view === "logins" && !LG.key) render(); }, Math.min(wait + 200, 30000)); }
 }
 function renderLogins(m){
