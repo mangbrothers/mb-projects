@@ -190,6 +190,18 @@
   #refundDlg textarea{min-height:70px}
   .ribbon{position:sticky;bottom:0;z-index:5;margin:12px -4px 0;background:var(--amber-soft);border:1px solid var(--amber);border-radius:var(--r);padding:10px 12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
   .ribbon[hidden]{display:none}
+  .svcfiles{margin-top:10px}
+  .svcfiles .lbl{font-size:12px;color:var(--muted);margin-bottom:4px}
+  .svcfiles .thumbs{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+  .svcfiles .thumb{width:76px;height:76px;border-radius:8px;border:1px solid var(--line);background:var(--surface2,#eef0f2);object-fit:cover;cursor:pointer;padding:0;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:650;color:var(--ink2);overflow:hidden}
+  .svcfiles .thumb img{width:100%;height:100%;object-fit:cover;display:block}
+  .svcfiles .addf{width:76px;height:76px;border-radius:8px;border:1px dashed var(--line);display:flex;align-items:center;justify-content:center;text-align:center;font-size:12px;color:var(--ink2);cursor:pointer;margin:0;line-height:1.2}
+  .svcfiles .busy{font-size:12px;color:var(--muted)}
+  #fileView{width:min(900px,96vw)}
+  #fileView .fvbtn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:7px 12px;border-radius:var(--r);font-weight:500;text-decoration:none;font-size:14px}
+  #fileView .body{display:grid;gap:10px}
+  #fileView .fv{display:flex;justify-content:center;align-items:center;min-height:120px;background:var(--surface2,#eef0f2);border-radius:8px;overflow:hidden}
+  #fileView .fv img{max-width:100%;max-height:72vh;display:block}
   .ribbon .t{flex:1;min-width:200px;font-size:14px;color:var(--ink)}
   .ribbon .t ul{margin:4px 0 0;padding-left:18px}
   .recgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin:6px 0}
@@ -212,13 +224,8 @@
   .log .e{padding:6px 0;border-top:1px solid var(--line);font-size:14px}
   .log .e:first-child{border-top:0}
   .log .e .when{font-size:12px;color:var(--muted)}
-  .log .e .tosvc{margin-top:4px}
-  .log .e .tosvc button{min-height:30px}
-  .log .e .tosvcEd{display:grid;gap:6px;margin-top:6px}
-  .log .e .tosvcEd textarea{min-height:56px}
-  .log .e .tosvcEd .row{display:flex;gap:6px;flex-wrap:wrap}
-  .svcbar textarea[name$="/notes"]{width:100%;white-space:pre-wrap}
-  .addnote .noteside{display:flex;flex-direction:column;gap:6px}
+  .svcbar textarea[name$="/notes"],.svcbar textarea[name$="/privateNotes"]{width:100%;white-space:pre-wrap}
+  .svcbar textarea[name$="/privateNotes"]{background:var(--surface2,#f3f4f6)}
   .addnote{display:grid;grid-template-columns:1fr auto;gap:8px;margin-top:8px;align-items:start}
   .kv{display:grid;grid-template-columns:auto 1fr;gap:2px 12px;font-size:13px}
   .kv b{color:var(--muted);font-weight:500}
@@ -396,7 +403,7 @@ details.ssamore summary{cursor:pointer;font-weight:600}
 
     <div class="sect">Contact log <span class="n" id="logCount"></span></div>
     <div class="log" id="logList"></div>
-    <div class="addnote" id="addNote"><textarea id="noteText" placeholder="What happened on this call or visit. Saved with the time you press Add."></textarea><div class="noteside"><button type="button" class="primary" id="noteAdd">Add note</button><select id="noteSvc" title="Also put this note on a service, so the crew sees it"></select></div></div>
+    <div class="addnote" id="addNote"><textarea id="noteText" placeholder="What happened on this call or visit. Saved with the time you press Add."></textarea><button type="button" class="primary" id="noteAdd">Add note</button></div>
 
     <div class="ribbon" id="chgRibbon" hidden><div class="t" id="chgRibbonT"></div><button type="button" class="primary" id="chgRibbonGo">Save and charge</button></div>
     <div class="actions">
@@ -408,6 +415,8 @@ details.ssamore summary{cursor:pointer;font-weight:600}
 </dialog>
 
 <!-- Refund? pop-up: a card charge refunded with a reason. The X closes it and saves nothing. -->
+<dialog id="fileView"><div class="body"><div class="row" style="justify-content:space-between;align-items:center"><b id="fvName"></b><span class="meta" id="fvMeta"></span></div><div class="fv" id="fvBox"></div>
+  <div class="actions" style="margin-top:0"><button type="button" class="small danger left" id="fvDel">Delete</button><a class="fvbtn" id="fvOpen" target="_blank" rel="noopener" download>Download</a><button type="button" class="primary" id="fvClose">Close</button></div></div></dialog>
 <dialog id="refundDlg">
   <div class="body">
     <button type="button" class="rfx" id="rfX" aria-label="Close without refunding">&times;</button>
@@ -519,7 +528,8 @@ const SERVICE_TYPES = {
     {k:"freq",l:"Frequency",t:"select",o:["Weekly","Biweekly"]},
     {k:"price",l:"Price per cut",t:"money"},
     {k:"season",l:"Season",t:"select",o:["On","Off"]},
-    {k:"notes",l:"Service notes (the crew sees these)",t:"note",w:3} ],
+    {k:"notes",l:"Public notes (crew and managers see these)",t:"note",w:3},
+    {k:"privateNotes",l:"Private notes (admins only)",t:"note",w:3,ph:"Prices, billing, job history. Only admins see this."} ],
     summary:s=>[s.day, s.freq, money(s.price), s.season==="Off"?"off season":""].filter(Boolean).join(" · ") },
   fall: { label:"Fall Cleanup", fields:[
     {k:"package",l:"Package",t:"select",o:["Two passes","One pass"]},
@@ -527,21 +537,24 @@ const SERVICE_TYPES = {
     {k:"price",l:"Price",t:"money"},
     {k:"pass1",l:"Pass 1 done",t:"check"},
     {k:"pass2",l:"Pass 2 done",t:"check"},
-    {k:"notes",l:"Service notes (the crew sees these)",t:"note",w:3} ],
+    {k:"notes",l:"Public notes (crew and managers see these)",t:"note",w:3},
+    {k:"privateNotes",l:"Private notes (admins only)",t:"note",w:3,ph:"Prices, billing, job history. Only admins see this."} ],
     summary:s=>[s.package, s.route, money(s.price), s.pass1?"P1 ✓":"", s.pass2?"P2 ✓":""].filter(Boolean).join(" · ") },
   snow: { label:"Snow", fields:[
     {k:"price",l:"Seasonal price",t:"money"},
     {k:"crew",l:"Crew",t:"select",o:["","Crew 1","Crew 2"]},
     {k:"start",l:"Contract start",t:"date",d:"2026-11-01"},
     {k:"end",l:"Contract end",t:"date",d:"2027-03-15"},
-    {k:"notes",l:"Service notes (the crew sees these)",t:"note",w:3} ],
+    {k:"notes",l:"Public notes (crew and managers see these)",t:"note",w:3},
+    {k:"privateNotes",l:"Private notes (admins only)",t:"note",w:3,ph:"Prices, billing, job history. Only admins see this."} ],
     summary:s=>[money(s.price), s.crew, s.start?fmtDate(s.start)+" to "+fmtDate(s.end):""].filter(Boolean).join(" · ") },
   landscaping: { label:"Landscaping", fields:[
     {k:"desc",l:"Job",t:"text",w:2},
     {k:"jobStatus",l:"Status",t:"select",o:["Quoted","Scheduled","Done"]},
     {k:"date",l:"Date",t:"date"},
     {k:"price",l:"Price / quote",t:"money"},
-    {k:"notes",l:"Service notes (the crew sees these)",t:"note",w:3} ],
+    {k:"notes",l:"Public notes (crew and managers see these)",t:"note",w:3},
+    {k:"privateNotes",l:"Private notes (admins only)",t:"note",w:3,ph:"Prices, billing, job history. Only admins see this."} ],
     summary:s=>[s.desc, s.jobStatus, s.date?fmtDate(s.date):"", money(s.price)].filter(Boolean).join(" · ") },
   lights: { label:"Christmas Lights", fields:[
     {k:"install",l:"Install date",t:"date"},
@@ -549,7 +562,8 @@ const SERVICE_TYPES = {
     {k:"takedown",l:"Takedown date",t:"date"},
     {k:"price",l:"Price",t:"money"},
     {k:"gutters",l:"Bundled with gutters",t:"check"},
-    {k:"notes",l:"Service notes (the crew sees these)",t:"note",w:3} ],
+    {k:"notes",l:"Public notes (crew and managers see these)",t:"note",w:3},
+    {k:"privateNotes",l:"Private notes (admins only)",t:"note",w:3,ph:"Prices, billing, job history. Only admins see this."} ],
     summary:s=>[s.install?"install "+fmtDate(s.install):"", s.installed?"installed ✓":"", s.takedown?"down "+fmtDate(s.takedown):"", money(s.price), s.gutters?"w/ gutters":""].filter(Boolean).join(" · ") }
 };
 // ================================================================
@@ -638,6 +652,7 @@ auth.onAuthStateChanged(async user => {
 const refs = {}; let backfilled=false;
 function attach(){
   refs.c = db.ref("clients"); refs.l = db.ref("clientLog"); refs.t = db.ref("contractTemplates"); refs.q = db.ref("sync/qb");
+  refs.fm = db.ref("fileMeta"); refs.fm.on("value", s => { fileMetaAll = s.val()||{}; if(openId) renderSvcFiles(); }, ()=>{});
   refs.cr = db.ref("crewRoutes"); refs.cr.on("value", s => { crewRoutesAll = s.val()||{}; queueStopSync(); }, ()=>{});
   refs.c.on("value", s => { clients = s.val()||{}; queueStopSync(); render(); if(openId) refreshDialogLive(); if(!backfilled){ backfilled=true; backfillPhones(); } driveNag(); });
   refs.l.on("value", s => { logs = s.val()||{}; render(); if(openId) renderLog(); });
@@ -764,26 +779,80 @@ const unsignedFor = (c, sid) => (c.status==="active"||c.status==="quoted") && (c
 const unsignedPill = (c, sid) => unsignedFor(c, sid) ? ` <span class="pill unsigned" title="A required contract is not signed">unsigned</span>` : "";
 
 // ---------- service notes: what the crew sees ----------
-// Service notes live on each service. Any important note from the contact log can be copied in (dated),
-// and every crew route stop for that client carries a copy (svcNote) so the crew list shows it.
+// Each service has Public notes (crew and managers) and Private notes (admins only). The Quo scheduled tasks
+// fill both from calls, texts and typed log notes. Every crew route stop carries a copy of the Public notes
+// only (svcNote); Private notes never leave the CRM.
 const noteDay = t => new Date(t||Date.now()).toLocaleDateString("en-US",{month:"short",day:"numeric",timeZone:TZ});
-const svcTargets = c => Object.entries(c?.services||{}).filter(([,sv])=>sv && SERVICE_TYPES[sv.type]);
-const cleanForCrew = t => String(t||"").replace(/^(Call (inbound|outbound), [^.]*\.\s*Summary:\s*|Missed call, voicemail:\s*|Text (in|out):\s*)/i,"").replace(/\s*\(caught by the nightly email check\)\s*$/,"").trim();
-async function appendSvcNote(id, sids, text, at){
-  const c=clients[id]; text=String(text||"").trim(); if(!c||!text) return 0;
-  const inDlg = $("#clientDlg").open && openId===id; if(inDlg) readSvcForm();
-  const line=`${noteDay(at)}: ${text}`, upd={}; let n=0;
-  for(const sid of sids){
-    const cur=String((inDlg && draftServices[sid] ? draftServices[sid].notes : c.services?.[sid]?.notes) || "");
-    if(!c.services?.[sid] || cur.includes(text)) continue;
-    const next = cur.trim() ? cur.replace(/\s+$/,"")+"\n"+line : line;
-    upd[`clients/${id}/services/${sid}/notes`]=next; if(inDlg && draftServices[sid]) draftServices[sid].notes=next; n++;
-  }
-  if(!n) return 0;
-  await commit(`${c.name}: added to service notes`, { ...upd, ...fieldUpdates("clients/"+id, stamp()) });
-  if(inDlg) renderSvcs();
-  return n;
+// ---------- photos and files on a service ----------
+// Same storage as the Projects page files: metadata at fileMeta/{id} (with clientId and sid), bytes as base64 at
+// fileData/{id}/data, fetched only when shown. Photos are shrunk on the device first. Admins only.
+let fileMetaAll={};
+const FILE_LIMIT = 8*1024*1024;
+const fmtSize = b => b>=1048576 ? (b/1048576).toFixed(1)+" MB" : Math.max(1,Math.round(b/1024))+" KB";
+const svcFiles = (cid, sid) => Object.entries(fileMetaAll).filter(([,f])=>f && f.clientId===cid && f.sid===sid && !f.deletedAt).sort((a,b)=>a[1].uploadedAt-b[1].uploadedAt);
+async function shrinkImage(file){
+  if(!/^image\/(jpeg|png|webp|heic|heif)$/.test(file.type) || file.size<600*1024) return file;
+  const img = await createImageBitmap(file).catch(()=>null); if(!img) return file;
+  const sc=Math.min(1,1800/Math.max(img.width,img.height)); const c=document.createElement("canvas"); c.width=Math.round(img.width*sc); c.height=Math.round(img.height*sc);
+  c.getContext("2d").drawImage(img,0,0,c.width,c.height);
+  const blob=await new Promise(r=>c.toBlob(r,"image/jpeg",.82));
+  return blob && blob.size<file.size ? new File([blob], (file.name||"photo").replace(/\.\w+$/,"")+".jpg", {type:"image/jpeg"}) : file;
 }
+const toB64 = f => new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>res(String(r.result).split(",")[1]); r.onerror=rej; r.readAsDataURL(f); });
+const blobUrls = new Map();
+async function fileUrl(id){
+  if(blobUrls.has(id)) return blobUrls.get(id);
+  const f=fileMetaAll[id]; const b64=(await db.ref("fileData/"+id+"/data").once("value")).val(); if(!b64||!f) return null;
+  const bin=atob(b64), arr=new Uint8Array(bin.length); for(let i=0;i<bin.length;i++) arr[i]=bin.charCodeAt(i);
+  const url=URL.createObjectURL(new Blob([arr],{type:f.type||"application/octet-stream"})); blobUrls.set(id,url); return url;
+}
+const isImg = f => /^image\//.test(f.type||"");
+const extOf = f => ((f.name||"").split(".").pop()||"FILE").toUpperCase().slice(0,4);
+function renderSvcFiles(){
+  document.querySelectorAll("#svcList [data-files]").forEach(box=>{
+    const sid=box.dataset.files, saved=!!(openId && clients[openId]?.services?.[sid]);
+    if(box.dataset.busy) return;
+    if(!saved){ box.innerHTML=`<div class="lbl">Photos and files</div><div class="meta">Save first, then add photos here.</div>`; return; }
+    const list=svcFiles(openId, sid);
+    box.innerHTML=`<div class="lbl">Photos and files${list.length?` (${list.length})`:""}</div><div class="thumbs">${list.map(([id,f])=>`<button type="button" class="thumb" data-fv="${id}" title="${esc(f.name)}">${isImg(f)?`<img alt="" data-thumb="${id}">`:esc(extOf(f))}</button>`).join("")}
+      <label class="addf">+ Photo<br>or file<input type="file" multiple accept="image/*,application/pdf,.heic,.doc,.docx,.xls,.xlsx,.csv,.txt" hidden data-up="${sid}"></label></div>`;
+    box.querySelectorAll("img[data-thumb]").forEach(async im=>{ const u=await fileUrl(im.dataset.thumb).catch(()=>null); if(u) im.src=u; });
+    box.querySelectorAll("[data-fv]").forEach(b=>b.onclick=()=>openFileView(b.dataset.fv));
+    box.querySelector("[data-up]").onchange=e=>uploadSvcFiles(openId, sid, [...e.target.files], box);
+  });
+}
+async function uploadSvcFiles(cid, sid, list, box){
+  if(!list.length) return; box.dataset.busy="1"; let ok=0;
+  const st=document.createElement("div"); st.className="busy"; box.appendChild(st);
+  try{
+    for(const [i,raw] of list.entries()){
+      st.textContent=`Uploading ${i+1} of ${list.length}\u2026`;
+      const f=await shrinkImage(raw);
+      if(f.size>FILE_LIMIT){ toast(`${raw.name} is ${fmtSize(f.size)}; the limit is 8 MB.`); continue; }
+      const id=db.ref("fileMeta").push().key, data=await toB64(f), now=Date.now();
+      await db.ref().update({ ["fileData/"+id]:{data}, ["fileMeta/"+id]:{ clientId:cid, sid, svcType:clients[cid]?.services?.[sid]?.type||"", name:f.name||"photo.jpg", type:f.type||"application/octet-stream", size:f.size, kind:"file", uploadedAt:now, uploadedBy:me.email } });
+      ok++;
+    }
+    if(ok) toast(`Added ${ok} file${ok===1?"":"s"}.`);
+  }catch(e){ toast("Upload failed: "+(e.code||e.message)); }
+  finally{ delete box.dataset.busy; renderSvcFiles(); }
+}
+let fvId=null;
+async function openFileView(id){
+  const f=fileMetaAll[id]; if(!f) return; fvId=id;
+  $("#fvName").textContent=f.name; $("#fvMeta").textContent=`${fmtSize(f.size||0)} \u00b7 ${fmtStamp(f.uploadedAt)} \u00b7 ${(f.uploadedBy||"").split("@")[0]}`;
+  $("#fvBox").innerHTML=`<div class="meta" style="padding:30px">Loading\u2026</div>`; $("#fvOpen").removeAttribute("href");
+  if(!$("#fileView").open) $("#fileView").showModal();
+  const u=await fileUrl(id).catch(()=>null); if(fvId!==id) return;
+  if(!u){ $("#fvBox").innerHTML=`<div class="meta" style="padding:30px">This file's data is missing.</div>`; return; }
+  $("#fvOpen").href=u; $("#fvOpen").setAttribute("download", f.name);
+  $("#fvBox").innerHTML = isImg(f) ? `<img src="${u}" alt="">` : `<div style="padding:30px;text-align:center"><b>${esc(extOf(f))}</b><div class="meta">Tap Download to open it.</div></div>`;
+}
+$("#fvClose").onclick=()=>$("#fileView").close();
+$("#fileView").addEventListener("click", e=>{ if(e.target===$("#fileView")){ const r=$("#fileView").getBoundingClientRect(); if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom) $("#fileView").close(); } });
+$("#fvDel").onclick=async()=>{ const f=fileMetaAll[fvId]; if(!f || !confirm(`Delete ${f.name}?`)) return;
+  await db.ref("fileMeta/"+fvId).update({ deletedAt:Date.now(), deletedBy:me.email }); $("#fileView").close(); toast("Deleted."); };
+
 let crewRoutesAll={}, stopSyncTimer=null;
 function queueStopSync(){ clearTimeout(stopSyncTimer); stopSyncTimer=setTimeout(syncStopNotes, 1500); }
 function syncStopNotes(){
@@ -1060,7 +1129,7 @@ function fieldInput(sid, fld, val){
   if(fld.t==="check") return `<div style="padding-top:6px"><input type="checkbox" name="${n}" ${val?"checked":""}></div>`;
   if(fld.t==="money") return `<input name="${n}" type="number" step="0.01" min="0" value="${esc(val ?? "")}" placeholder="$">`;
   if(fld.t==="date") return `<input name="${n}" type="date" value="${esc(val ?? fld.d ?? "")}">`;
-  if(fld.t==="note") return `<textarea name="${n}" rows="${Math.min(8, Math.max(2, String(val||"").split("\n").length+1))}" placeholder="Gate code, dog, where to pile snow, what to avoid. One line per note.">${esc(val ?? "")}</textarea>`;
+  if(fld.t==="note") return `<textarea name="${n}" rows="${Math.min(8, Math.max(2, String(val||"").split("\n").length+1))}" placeholder="${esc(fld.ph||"What the crew needs at this property that is not already in the agreement.")}">${esc(val ?? "")}</textarea>`;
   return `<input name="${n}" value="${esc(val ?? "")}">`;
 }
 let svcRendering=false;
@@ -1076,8 +1145,9 @@ function renderSvcsInner(){
     <div class="hd"><span class="tag ${s.type}">${esc(T.label)}</span><span class="sum">${esc(T.summary(s))}</span><button type="button" class="small danger" data-rm="${sid}">Remove</button></div>
     <div class="fields grid3">${T.fields.map(fld=>`<div${fld.w?` style="grid-column:span ${fld.w}"`:""}><label>${esc(fld.l)}</label>${fieldInput(sid,fld,s[fld.k])}</div>`).join("")}</div>
     <div class="svcbill" data-bill="${sid}" hidden></div>
+    <div class="svcfiles" data-files="${sid}"></div>
   </div>`; }).join("") || `<div class="meta">No services yet.</div>`;
-  renderSvcBills();
+  renderSvcBills(); renderSvcFiles();
   $("#svcList").querySelectorAll("[data-rm]").forEach(b=> b.onclick = () => { readSvcForm(); removedServices.add(b.dataset.rm); delete draftServices[b.dataset.rm]; renderSvcs(); renderContracts(); });
   $("#svcList").querySelectorAll("input,select,textarea").forEach(i=> i.onchange = () => { readSvcForm(); renderSvcs(); renderContracts(); renderRibbon(); });
 }
@@ -1130,32 +1200,12 @@ $("#addSvcSel").onchange = e => {
 function renderLog(){
   const l = openId ? Object.entries(logs[openId]||{}).sort((a,b)=>b[1].at-a[1].at) : [];
   $("#logCount").textContent = l.length ? `(${l.length})` : "";
-  const svcs = openId ? svcTargets(clients[openId]) : [];
-  const sel=$("#noteSvc"); if(sel){ sel.hidden=!svcs.length; sel.innerHTML = `<option value="">Log only</option>` + svcs.map(([sid,sv])=>`<option value="${sid}">Also to ${esc(SERVICE_TYPES[sv.type].label)} notes</option>`).join("") + (svcs.length>1?`<option value="*">Also to every service's notes</option>`:""); }
-  $("#logList").innerHTML = l.map(([k,e])=>`<div class="e" data-e="${k}"><div class="when">${fmtStamp(e.at)} · ${esc((e.by||"").split("@")[0])}${e.source&&e.source!=="crm"?` · <span class="pill" style="font-size:11px;padding:0 6px">${esc(e.source)}</span>`:""}</div>${esc(e.text)}${svcs.length && !["contract","payment","quickbooks","service"].includes(e.source)?`<div class="tosvc"><button type="button" class="small" data-tosvc="${k}">Add to service notes</button></div>`:""}</div>`).join("") || `<div class="meta">No notes yet. ${openId?"":"Save the client first, then add notes."}</div>`;
+  $("#logList").innerHTML = l.map(([k,e])=>`<div class="e" data-e="${k}"><div class="when">${fmtStamp(e.at)} · ${esc((e.by||"").split("@")[0])}${e.source&&e.source!=="crm"?` · <span class="pill" style="font-size:11px;padding:0 6px">${esc(e.source)}</span>`:""}</div>${esc(e.text)}</div>`).join("") || `<div class="meta">No notes yet. ${openId?"":"Save the client first, then add notes."}</div>`;
 }
 $("#noteAdd").onclick = async () => {
   const t=$("#noteText").value.trim(); if(!t || !openId) return;
-  const to=$("#noteSvc")?.value||"", id=openId;
-  await addNote(id, t); $("#noteText").value=""; renderLog(); renderStamps();
-  if(to){ const sids = to==="*" ? svcTargets(clients[id]).map(x=>x[0]) : [to]; const n=await appendSvcNote(id, sids, t); toast(n?"Note added to the log and the service notes.":"Already in the service notes."); }
+  await addNote(openId, t); $("#noteText").value=""; renderLog(); renderStamps();
 };
-$("#logList").addEventListener("click", async ev => {
-  const b=ev.target.closest("[data-tosvc]"); if(b){
-    const id=openId, k=b.dataset.tosvc, e=(logs[id]||{})[k]; if(!e) return;
-    const svcs=svcTargets(clients[id]); const box=b.parentElement;
-    box.className="tosvcEd";
-    box.innerHTML=`<textarea>${esc(cleanForCrew(e.text))}</textarea><div class="meta">Trim it to what the crew needs on site, then pick where it goes.</div>
-      <div class="row">${svcs.map(([sid,sv])=>`<button type="button" class="small primary" data-put="${sid}">${esc(SERVICE_TYPES[sv.type].label)}</button>`).join("")}${svcs.length>1?`<button type="button" class="small primary" data-put="*">All services</button>`:""}<button type="button" class="small" data-put="x">Cancel</button></div>`;
-    box.querySelector("textarea").focus();
-    box.querySelectorAll("[data-put]").forEach(p=>p.onclick=async()=>{
-      if(p.dataset.put==="x") return renderLog();
-      const txt=box.querySelector("textarea").value.trim(); if(!txt) return toast("Write the note first");
-      const sids = p.dataset.put==="*" ? svcs.map(x=>x[0]) : [p.dataset.put];
-      const n=await appendSvcNote(id, sids, txt, e.at); renderLog(); toast(n?"Added to the service notes.":"Already in the service notes.");
-    });
-  }
-});
 $("#noteText").onkeydown = e => { if((e.metaKey||e.ctrlKey) && e.key==="Enter") $("#noteAdd").click(); };
 $("#clientTrash").onclick = async () => { if(!openId) return; await trashClient(openId); $("#clientDlg").close(); };
 $("#clientCancel").onclick = () => $("#clientDlg").close();

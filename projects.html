@@ -697,7 +697,8 @@ let fileFilterProject="", fileQuery="";
 function renderFiles(m){
   const all=live(files).map(([id,f])=>({id,...f})).sort((a,b)=>b.uploadedAt-a.uploadedAt);
   const q=fileQuery.trim().toLowerCase();
-  const list=all.filter(f=>(!fileFilterProject||f.projectId===fileFilterProject) && (!q||(f.name+" "+(projects[f.projectId]?.name||"")).toLowerCase().includes(q)));
+  // CRM service photos share this storage (they carry a clientId); they count toward the space used but are listed in the CRM, not here.
+  const list=all.filter(f=>!f.clientId).filter(f=>(!fileFilterProject||f.projectId===fileFilterProject) && (!q||(f.name+" "+(projects[f.projectId]?.name||"")).toLowerCase().includes(q)));
   const used=all.reduce((n,f)=>n+Math.ceil((f.size||0)*4/3),0);
   const groups=[]; for(const f of list){ const d=new Date(f.uploadedAt).toLocaleDateString(undefined,{weekday:"short",month:"short",day:"numeric",year:"numeric"}); if(!groups.length||groups[groups.length-1].d!==d) groups.push({d,fs:[]}); groups[groups.length-1].fs.push(f); }
   const projOpts=live(projects).sort((a,b)=>a[1].name.localeCompare(b[1].name)).map(([k,p])=>`<option value="${k}" ${k===fileFilterProject?"selected":""}>${esc(p.name)}${p.archivedAt?" (archived)":""}</option>`).join("");
