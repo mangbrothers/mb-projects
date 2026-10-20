@@ -1132,7 +1132,7 @@ function renderLog(){
   $("#logCount").textContent = l.length ? `(${l.length})` : "";
   const svcs = openId ? svcTargets(clients[openId]) : [];
   const sel=$("#noteSvc"); if(sel){ sel.hidden=!svcs.length; sel.innerHTML = `<option value="">Log only</option>` + svcs.map(([sid,sv])=>`<option value="${sid}">Also to ${esc(SERVICE_TYPES[sv.type].label)} notes</option>`).join("") + (svcs.length>1?`<option value="*">Also to every service's notes</option>`:""); }
-  $("#logList").innerHTML = l.map(([k,e])=>`<div class="e" data-e="${k}"><div class="when">${fmtStamp(e.at)} · ${esc((e.by||"").split("@")[0])}${e.source&&e.source!=="crm"?` · <span class="pill" style="font-size:11px;padding:0 6px">${esc(e.source)}</span>`:""}</div>${esc(e.text)}${svcs.length?`<div class="tosvc"><button type="button" class="small" data-tosvc="${k}">Add to service notes</button></div>`:""}</div>`).join("") || `<div class="meta">No notes yet. ${openId?"":"Save the client first, then add notes."}</div>`;
+  $("#logList").innerHTML = l.map(([k,e])=>`<div class="e" data-e="${k}"><div class="when">${fmtStamp(e.at)} · ${esc((e.by||"").split("@")[0])}${e.source&&e.source!=="crm"?` · <span class="pill" style="font-size:11px;padding:0 6px">${esc(e.source)}</span>`:""}</div>${esc(e.text)}${svcs.length && !["contract","payment","quickbooks","service"].includes(e.source)?`<div class="tosvc"><button type="button" class="small" data-tosvc="${k}">Add to service notes</button></div>`:""}</div>`).join("") || `<div class="meta">No notes yet. ${openId?"":"Save the client first, then add notes."}</div>`;
 }
 $("#noteAdd").onclick = async () => {
   const t=$("#noteText").value.trim(); if(!t || !openId) return;
