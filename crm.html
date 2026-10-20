@@ -211,6 +211,13 @@
   .log .e{padding:6px 0;border-top:1px solid var(--line);font-size:14px}
   .log .e:first-child{border-top:0}
   .log .e .when{font-size:12px;color:var(--muted)}
+  .log .e .tosvc{margin-top:4px}
+  .log .e .tosvc button{min-height:30px}
+  .log .e .tosvcEd{display:grid;gap:6px;margin-top:6px}
+  .log .e .tosvcEd textarea{min-height:56px}
+  .log .e .tosvcEd .row{display:flex;gap:6px;flex-wrap:wrap}
+  .svcbar textarea[name$="/notes"]{width:100%;white-space:pre-wrap}
+  .addnote .noteside{display:flex;flex-direction:column;gap:6px}
   .addnote{display:grid;grid-template-columns:1fr auto;gap:8px;margin-top:8px;align-items:start}
   .kv{display:grid;grid-template-columns:auto 1fr;gap:2px 12px;font-size:13px}
   .kv b{color:var(--muted);font-weight:500}
@@ -388,7 +395,7 @@ details.ssamore summary{cursor:pointer;font-weight:600}
 
     <div class="sect">Contact log <span class="n" id="logCount"></span></div>
     <div class="log" id="logList"></div>
-    <div class="addnote" id="addNote"><textarea id="noteText" placeholder="What happened on this call or visit. Saved with the time you press Add."></textarea><button type="button" class="primary" id="noteAdd">Add note</button></div>
+    <div class="addnote" id="addNote"><textarea id="noteText" placeholder="What happened on this call or visit. Saved with the time you press Add."></textarea><div class="noteside"><button type="button" class="primary" id="noteAdd">Add note</button><select id="noteSvc" title="Also put this note on a service, so the crew sees it"></select></div></div>
 
     <div class="ribbon" id="chgRibbon" hidden><div class="t" id="chgRibbonT"></div><button type="button" class="primary" id="chgRibbonGo">Save and charge</button></div>
     <div class="actions">
@@ -511,7 +518,7 @@ const SERVICE_TYPES = {
     {k:"freq",l:"Frequency",t:"select",o:["Weekly","Biweekly"]},
     {k:"price",l:"Price per cut",t:"money"},
     {k:"season",l:"Season",t:"select",o:["On","Off"]},
-    {k:"notes",l:"Notes",t:"text"} ],
+    {k:"notes",l:"Service notes (the crew sees these)",t:"note",w:3} ],
     summary:s=>[s.day, s.freq, money(s.price), s.season==="Off"?"off season":""].filter(Boolean).join(" · ") },
   fall: { label:"Fall Cleanup", fields:[
     {k:"package",l:"Package",t:"select",o:["Two passes","One pass"]},
@@ -519,21 +526,21 @@ const SERVICE_TYPES = {
     {k:"price",l:"Price",t:"money"},
     {k:"pass1",l:"Pass 1 done",t:"check"},
     {k:"pass2",l:"Pass 2 done",t:"check"},
-    {k:"notes",l:"Notes",t:"text"} ],
+    {k:"notes",l:"Service notes (the crew sees these)",t:"note",w:3} ],
     summary:s=>[s.package, s.route, money(s.price), s.pass1?"P1 ✓":"", s.pass2?"P2 ✓":""].filter(Boolean).join(" · ") },
   snow: { label:"Snow", fields:[
     {k:"price",l:"Seasonal price",t:"money"},
     {k:"crew",l:"Crew",t:"select",o:["","Crew 1","Crew 2"]},
     {k:"start",l:"Contract start",t:"date",d:"2026-11-01"},
     {k:"end",l:"Contract end",t:"date",d:"2027-03-15"},
-    {k:"notes",l:"Notes",t:"text"} ],
+    {k:"notes",l:"Service notes (the crew sees these)",t:"note",w:3} ],
     summary:s=>[money(s.price), s.crew, s.start?fmtDate(s.start)+" to "+fmtDate(s.end):""].filter(Boolean).join(" · ") },
   landscaping: { label:"Landscaping", fields:[
     {k:"desc",l:"Job",t:"text",w:2},
     {k:"jobStatus",l:"Status",t:"select",o:["Quoted","Scheduled","Done"]},
     {k:"date",l:"Date",t:"date"},
     {k:"price",l:"Price / quote",t:"money"},
-    {k:"notes",l:"Notes",t:"text"} ],
+    {k:"notes",l:"Service notes (the crew sees these)",t:"note",w:3} ],
     summary:s=>[s.desc, s.jobStatus, s.date?fmtDate(s.date):"", money(s.price)].filter(Boolean).join(" · ") },
   lights: { label:"Christmas Lights", fields:[
     {k:"install",l:"Install date",t:"date"},
@@ -541,7 +548,7 @@ const SERVICE_TYPES = {
     {k:"takedown",l:"Takedown date",t:"date"},
     {k:"price",l:"Price",t:"money"},
     {k:"gutters",l:"Bundled with gutters",t:"check"},
-    {k:"notes",l:"Notes",t:"text"} ],
+    {k:"notes",l:"Service notes (the crew sees these)",t:"note",w:3} ],
     summary:s=>[s.install?"install "+fmtDate(s.install):"", s.installed?"installed ✓":"", s.takedown?"down "+fmtDate(s.takedown):"", money(s.price), s.gutters?"w/ gutters":""].filter(Boolean).join(" · ") }
 };
 // ================================================================
@@ -630,7 +637,8 @@ auth.onAuthStateChanged(async user => {
 const refs = {}; let backfilled=false;
 function attach(){
   refs.c = db.ref("clients"); refs.l = db.ref("clientLog"); refs.t = db.ref("contractTemplates"); refs.q = db.ref("sync/qb");
-  refs.c.on("value", s => { clients = s.val()||{}; render(); if(openId) refreshDialogLive(); if(!backfilled){ backfilled=true; backfillPhones(); } driveNag(); });
+  refs.cr = db.ref("crewRoutes"); refs.cr.on("value", s => { crewRoutesAll = s.val()||{}; queueStopSync(); }, ()=>{});
+  refs.c.on("value", s => { clients = s.val()||{}; queueStopSync(); render(); if(openId) refreshDialogLive(); if(!backfilled){ backfilled=true; backfillPhones(); } driveNag(); });
   refs.l.on("value", s => { logs = s.val()||{}; render(); if(openId) renderLog(); });
   refs.t.on("value", s => { templates = s.val()||{}; render(); if(openId) renderContracts(); });
   refs.q.on("value", s => { qbRows = s.val()||{}; if(view==="tools"||view==="servicelog"||view==="charges") render(); if(openId) { renderSvcBills(); renderStamps(); renderRecord(); } });
@@ -753,6 +761,41 @@ function contractNeeds(c){
 }
 const unsignedFor = (c, sid) => (c.status==="active"||c.status==="quoted") && (contractNeeds(c).some(x=>!x.signed && (!sid || x.sid===sid)) || ssaOpen(c, sid));
 const unsignedPill = (c, sid) => unsignedFor(c, sid) ? ` <span class="pill unsigned" title="A required contract is not signed">unsigned</span>` : "";
+
+// ---------- service notes: what the crew sees ----------
+// Service notes live on each service. Any important note from the contact log can be copied in (dated),
+// and every crew route stop for that client carries a copy (svcNote) so the crew list shows it.
+const noteDay = t => new Date(t||Date.now()).toLocaleDateString("en-US",{month:"short",day:"numeric",timeZone:TZ});
+const svcTargets = c => Object.entries(c?.services||{}).filter(([,sv])=>sv && SERVICE_TYPES[sv.type]);
+const cleanForCrew = t => String(t||"").replace(/^(Call (inbound|outbound), [^.]*\.\s*Summary:\s*|Missed call, voicemail:\s*|Text (in|out):\s*)/i,"").replace(/\s*\(caught by the nightly email check\)\s*$/,"").trim();
+async function appendSvcNote(id, sids, text, at){
+  const c=clients[id]; text=String(text||"").trim(); if(!c||!text) return 0;
+  const inDlg = $("#clientDlg").open && openId===id; if(inDlg) readSvcForm();
+  const line=`${noteDay(at)}: ${text}`, upd={}; let n=0;
+  for(const sid of sids){
+    const cur=String((inDlg && draftServices[sid] ? draftServices[sid].notes : c.services?.[sid]?.notes) || "");
+    if(!c.services?.[sid] || cur.includes(text)) continue;
+    const next = cur.trim() ? cur.replace(/\s+$/,"")+"\n"+line : line;
+    upd[`clients/${id}/services/${sid}/notes`]=next; if(inDlg && draftServices[sid]) draftServices[sid].notes=next; n++;
+  }
+  if(!n) return 0;
+  await commit(`${c.name}: added to service notes`, { ...upd, ...fieldUpdates("clients/"+id, stamp()) });
+  if(inDlg) renderSvcs();
+  return n;
+}
+let crewRoutesAll={}, stopSyncTimer=null;
+function queueStopSync(){ clearTimeout(stopSyncTimer); stopSyncTimer=setTimeout(syncStopNotes, 1500); }
+function syncStopNotes(){
+  if(myTier!=="admin") return;
+  const upd={};
+  for(const [rid,r] of Object.entries(crewRoutesAll||{})) for(const [stid,st] of Object.entries(r?.stops||{})){
+    if(!st || !st.clientId) continue; const c=clients[st.clientId]; if(!c) continue;
+    const sv = (st.svcId && c.services?.[st.svcId]) || Object.values(c.services||{}).find(x=>x && x.type===r.service);
+    const want = String(sv?.notes||"").trim() || null, have = st.svcNote ?? null;
+    if(want!==have) upd[`crewRoutes/${rid}/stops/${stid}/svcNote`]=want;
+  }
+  if(Object.keys(upd).length) db.ref().update(upd).catch(e=>console.warn("stop note sync", e));
+}
 
 // ---------- render ----------
 function render(){
@@ -1016,6 +1059,7 @@ function fieldInput(sid, fld, val){
   if(fld.t==="check") return `<div style="padding-top:6px"><input type="checkbox" name="${n}" ${val?"checked":""}></div>`;
   if(fld.t==="money") return `<input name="${n}" type="number" step="0.01" min="0" value="${esc(val ?? "")}" placeholder="$">`;
   if(fld.t==="date") return `<input name="${n}" type="date" value="${esc(val ?? fld.d ?? "")}">`;
+  if(fld.t==="note") return `<textarea name="${n}" rows="${Math.min(8, Math.max(2, String(val||"").split("\n").length+1))}" placeholder="Gate code, dog, where to pile snow, what to avoid. One line per note.">${esc(val ?? "")}</textarea>`;
   return `<input name="${n}" value="${esc(val ?? "")}">`;
 }
 let svcRendering=false;
@@ -1034,7 +1078,7 @@ function renderSvcsInner(){
   </div>`; }).join("") || `<div class="meta">No services yet.</div>`;
   renderSvcBills();
   $("#svcList").querySelectorAll("[data-rm]").forEach(b=> b.onclick = () => { readSvcForm(); removedServices.add(b.dataset.rm); delete draftServices[b.dataset.rm]; renderSvcs(); renderContracts(); });
-  $("#svcList").querySelectorAll("input,select").forEach(i=> i.onchange = () => { readSvcForm(); renderSvcs(); renderContracts(); renderRibbon(); });
+  $("#svcList").querySelectorAll("input,select,textarea").forEach(i=> i.onchange = () => { readSvcForm(); renderSvcs(); renderContracts(); renderRibbon(); });
 }
 function readSvcForm(){
   const f=$("#clientForm");
@@ -1085,12 +1129,32 @@ $("#addSvcSel").onchange = e => {
 function renderLog(){
   const l = openId ? Object.entries(logs[openId]||{}).sort((a,b)=>b[1].at-a[1].at) : [];
   $("#logCount").textContent = l.length ? `(${l.length})` : "";
-  $("#logList").innerHTML = l.map(([,e])=>`<div class="e"><div class="when">${fmtStamp(e.at)} · ${esc((e.by||"").split("@")[0])}${e.source&&e.source!=="crm"?` · <span class="pill" style="font-size:11px;padding:0 6px">${esc(e.source)}</span>`:""}</div>${esc(e.text)}</div>`).join("") || `<div class="meta">No notes yet. ${openId?"":"Save the client first, then add notes."}</div>`;
+  const svcs = openId ? svcTargets(clients[openId]) : [];
+  const sel=$("#noteSvc"); if(sel){ sel.hidden=!svcs.length; sel.innerHTML = `<option value="">Log only</option>` + svcs.map(([sid,sv])=>`<option value="${sid}">Also to ${esc(SERVICE_TYPES[sv.type].label)} notes</option>`).join("") + (svcs.length>1?`<option value="*">Also to every service's notes</option>`:""); }
+  $("#logList").innerHTML = l.map(([k,e])=>`<div class="e" data-e="${k}"><div class="when">${fmtStamp(e.at)} · ${esc((e.by||"").split("@")[0])}${e.source&&e.source!=="crm"?` · <span class="pill" style="font-size:11px;padding:0 6px">${esc(e.source)}</span>`:""}</div>${esc(e.text)}${svcs.length?`<div class="tosvc"><button type="button" class="small" data-tosvc="${k}">Add to service notes</button></div>`:""}</div>`).join("") || `<div class="meta">No notes yet. ${openId?"":"Save the client first, then add notes."}</div>`;
 }
 $("#noteAdd").onclick = async () => {
   const t=$("#noteText").value.trim(); if(!t || !openId) return;
-  await addNote(openId, t); $("#noteText").value=""; renderLog(); renderStamps();
+  const to=$("#noteSvc")?.value||"", id=openId;
+  await addNote(id, t); $("#noteText").value=""; renderLog(); renderStamps();
+  if(to){ const sids = to==="*" ? svcTargets(clients[id]).map(x=>x[0]) : [to]; const n=await appendSvcNote(id, sids, t); toast(n?"Note added to the log and the service notes.":"Already in the service notes."); }
 };
+$("#logList").addEventListener("click", async ev => {
+  const b=ev.target.closest("[data-tosvc]"); if(b){
+    const id=openId, k=b.dataset.tosvc, e=(logs[id]||{})[k]; if(!e) return;
+    const svcs=svcTargets(clients[id]); const box=b.parentElement;
+    box.className="tosvcEd";
+    box.innerHTML=`<textarea>${esc(cleanForCrew(e.text))}</textarea><div class="meta">Trim it to what the crew needs on site, then pick where it goes.</div>
+      <div class="row">${svcs.map(([sid,sv])=>`<button type="button" class="small primary" data-put="${sid}">${esc(SERVICE_TYPES[sv.type].label)}</button>`).join("")}${svcs.length>1?`<button type="button" class="small primary" data-put="*">All services</button>`:""}<button type="button" class="small" data-put="x">Cancel</button></div>`;
+    box.querySelector("textarea").focus();
+    box.querySelectorAll("[data-put]").forEach(p=>p.onclick=async()=>{
+      if(p.dataset.put==="x") return renderLog();
+      const txt=box.querySelector("textarea").value.trim(); if(!txt) return toast("Write the note first");
+      const sids = p.dataset.put==="*" ? svcs.map(x=>x[0]) : [p.dataset.put];
+      const n=await appendSvcNote(id, sids, txt, e.at); renderLog(); toast(n?"Added to the service notes.":"Already in the service notes.");
+    });
+  }
+});
 $("#noteText").onkeydown = e => { if((e.metaKey||e.ctrlKey) && e.key==="Enter") $("#noteAdd").click(); };
 $("#clientTrash").onclick = async () => { if(!openId) return; await trashClient(openId); $("#clientDlg").close(); };
 $("#clientCancel").onclick = () => $("#clientDlg").close();

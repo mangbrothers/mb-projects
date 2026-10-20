@@ -157,6 +157,7 @@
   .stops li{display:flex;align-items:flex-start;gap:10px;padding:10px 4px;border-bottom:1px solid var(--line)}
   .stops li .nm{flex:1;min-width:0}
   .stops li .nm .addr{font-size:14px;color:var(--ink2)}
+  .stops li .nm .cnote.svcnote{white-space:pre-line}
   .stops li .nm .cnote{font-size:14px;margin-top:3px;padding:4px 8px;border-left:3px solid var(--amber);background:var(--amber-soft);border-radius:4px;color:var(--ink)}
   .stops li.done .nm b{text-decoration:line-through;color:var(--muted)}
   .stops li.skip .nm b{color:var(--muted)}
@@ -917,6 +918,7 @@ function renderRoute(app){
     <ul class="stops">${st.map((s,i)=>{ const k=c[s.id];
       return `<li class="${k?(k.skipped?"skip":"done"):""}"><span class="num">${i+1}</span><button class="tick" data-tick="${esc(s.id)}" aria-label="Check off ${esc(s.name)}" ${can?"":"disabled"}>${k?(k.skipped?"&ndash;":"&#10003;"):""}</button>
         <span class="nm"><b>${esc(s.name)}</b> ${(KINDS_FOR[r.service]||[]).length>1||s.kind==="call"?`<span class="chip">${esc(KINDS[s.kind]||"")}</span>`:""}<div class="addr">${esc(s.address||"")}${s.phone?" &middot; "+telLink(s.phone):""}</div>
+          ${s.svcNote?`<div class="cnote svcnote">${esc(s.svcNote)}</div>`:""}
           ${s.note?`<div class="cnote">${esc(s.note)}</div>`:""}
           ${incidentsFor(d,r.crew).filter(x=>x.stop===s.id).map(x=>`<span class="chip bad">${esc(INC_TYPES[x.type]||x.type)} reported</span>`).join(" ")}
           ${k?`<div class="muted">${k.skipped?"Skipped: "+esc(k.reason||""):esc(DONE_WORD[k.kind]||"Done")+(k.ladder?", ladder":"")} &middot; ${k.date!==d?fmtDay(k.date)+" ":""}${fmtTime(k.at)} &middot; ${esc(personName(k.by))}${k.note?" &middot; "+esc(k.note):""}</div>`:""}
@@ -1176,7 +1178,7 @@ async function addStop(rid, cid){
   const r=routes[rid], c=clients[cid]||{}; if(!c.name) return;
   const svc=Object.entries(c.services||{}).find(([,s])=>s&&s.type===r.service);
   const order=Math.max(0,...stopsOf(r).map(s=>s.order||0))+1, sid=store.key();
-  const stop={ clientId:cid, name:c.name, address:c.address||"", phone:c.phone||null, order, kind:(KINDS_FOR[r.service]||["other"])[0], ...(svc?{svcId:svc[0]}:{}),
+  const stop={ clientId:cid, name:c.name, address:c.address||"", phone:c.phone||null, order, kind:(KINDS_FOR[r.service]||["other"])[0], ...(svc?{svcId:svc[0]}:{}), ...(svc&&String(svc[1].notes||"").trim()?{svcNote:String(svc[1].notes).trim()}:{}),
     zone: c.region==="Newburgh / 7 Mile" ? "north" : "rosedale" };
   try { const sg=Object.entries(c.contracts||{}).filter(([,m])=>m.tpl==="seasonal"&&m.status==="signed"&&!m.voided).sort((a,b)=>b[1].signedAt-a[1].signedAt)[0];
     if(sg){ const det=((await store.get(`contracts/${cid}/${sg[0]}`))||{}).details||{}; if(det.zone) stop.zone=det.zone==="north"?"north":"rosedale"; if(det.lights&&det.lights.package) stop.pkg=det.lights.package; } } catch(e){}
