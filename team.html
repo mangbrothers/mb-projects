@@ -1587,7 +1587,7 @@ const HIRE_STAGES = { applied:"Applied", screen:"Phone screen", interview:"Inter
 const BOARD_STAGES = ["applied","screen","interview","offer","hired","backup","nothired","past"];
 const APPLIED_FOR = { crew:"Crew member", manager:"Crew manager", walker:"Door hanger", office:"Office" };
 const HIRE_SOURCES = ["Indeed","Referral","Facebook","Walk-in","Returning","Other"];
-const HIRE_CHECKS = { screen:"Phone screen done", refs:"References called", driving:"Driving record pulled", consent:"Background check consent", offer:"Offer and contract sent", training:"Training date set" };
+const HIRE_CHECKS = { screen:"Phone screen done", refs:"References called", driving:"Driving record pulled", consent:"Background check consent", offer:"Offer sent", training:"Training date set" };
 const FILE_TYPES = { indeed:"Indeed profile", call:"Phone call", interview:"Interview", reference:"Reference check", note:"Note", report:"Employee report", stage:"Stage change", hired:"Hired", past:"Moved to Past" };
 const NOTE_TYPES = ["call","interview","reference","note"];
 const REPORT_KINDS = { good:"Commendation", concern:"Performance concern", attendance:"Attendance", safety:"Safety", incident:"Incident", general:"General" };
@@ -1673,6 +1673,7 @@ function applicantCard(it){
     <select data-stage="${esc(it.id)}" aria-label="Move to">${BOARD_STAGES.map(s=>`<option value="${s}" ${(a.stage||"applied")===s?"selected":""}>${esc(HIRE_STAGES[s])}</option>`).join("")}</select></div>`;
 }
 function renderOnboard(app){
+  sweepSigned();
   if(applicantOpen && applicants[applicantOpen]) return renderApplicant(app, applicantOpen);
   if(archiveOpen && archive[archiveOpen]) return renderArchived(app, archiveOpen);
   applicantOpen=null; archiveOpen=null;
@@ -1714,10 +1715,14 @@ function moveCard(id, to){
   if(t==="x"){ if(to==="hired") return restoreDialog(k); if(to!=="past") toast("Drag a past employee to Hired to bring him back."); return render(); }
   const a=applicants[k]; if(!a) return; const from=a.stage||"applied"; if(from===to) return;
   const emp=a.hiredKey&&team[a.hiredKey];
-  if(to==="hired") return emp ? toast(`${a.name} is already an employee.`) : hireDialog(k);
+  if(to==="offer") return emp ? toast(`${a.name} already has his offer.`) : hireDialog(k);
+  if(to==="hired"){ if(!emp){ toast(`Move ${firstName(a.name)} to Offer first. That emails his offer; he moves to Hired when he signs it.`); return render(); }
+    if(a.stage==="hired") return toast(`${a.name} is already hired.`);
+    if(!offerSignedOf(a.hiredKey, paperAll[a.hiredKey], team[a.hiredKey])){ toast(`${firstName(a.name)} has not signed his offer yet. He moves to Hired by himself when he signs.`); return render(); }
+    return markHired(k); }
   if(to==="past"){ if(emp) return leaveDialog(a.hiredKey); toast("Past is for people who worked here. Drag to Not hired instead."); return render(); }
   if(to==="nothired" && emp) return leaveDialog(a.hiredKey);
-  if(from==="hired" && emp){ toast(`${a.name} is an employee. Drag him to Not hired or Past to take him off.`); return render(); }
+  if((from==="hired" || from==="offer") && emp){ toast(`${a.name} ${from==="offer"?"has an offer out":"is an employee"}. Drag him to Not hired${from==="hired"?" or Past":""} to take him off.`); return render(); }
   if(previewOnly()) return render();
   store.update({ [`applicants/${k}/stage`]:to, [`applicants/${k}/stageAt`]:Date.now(),
     [`personFile/${k}/${store.key()}`]:{ type:"stage", text:`${HIRE_STAGES[from]} to ${HIRE_STAGES[to]}`, at:Date.now(), by:me.email, byName:me.name }, ...fileDirty(k) })
@@ -1725,36 +1730,48 @@ function moveCard(id, to){
 }
 
 // ----- hire: the applicant becomes an employee -----
+function markHired(aid){
+  const a=applicants[aid]; if(!a || a.stage!=="offer" || !a.hiredKey || previewOnly()) return; const now=Date.now();
+  return store.update({ [`applicants/${aid}/stage`]:"hired", [`applicants/${aid}/stageAt`]:now, [`applicants/${aid}/hiredAt`]:now,
+    [`personFile/${a.hiredKey}/${store.key()}`]:{ type:"stage", text:"Offer to Hired: signed his offer.", at:now, by:me.email, byName:me.name }, ...fileDirty(a.hiredKey) })
+    .then(()=>toast(`${a.name} signed his offer: Hired`)).catch(()=>{});
+}
+let hiredSweepAt=0;
+function sweepSigned(){
+  if(!isAdmin || viewAs || Date.now()-hiredSweepAt<15000) return; hiredSweepAt=Date.now();
+  Object.entries(applicants||{}).forEach(([aid,a])=>{ if(a && a.stage==="offer" && a.hiredKey && team[a.hiredKey] && offerSignedOf(a.hiredKey, paperAll[a.hiredKey], team[a.hiredKey])) markHired(aid); });
+}
 function hireDialog(aid){
   const a=applicants[aid]; if(!a) return;
-  const dl=openDlg(`<h2>Hire ${esc(a.name)}?</h2>
-    <p class="meta">This makes ${esc(firstName(a.name))}'s employee profile under Personnel and puts him on the Team list with Crew access so he can sign in. His applicant file, notes, Indeed profile and files move into his employee file, and his Drive folder moves from Potential Hires to Staff.</p>
+  const dl=openDlg(`<h2>Send ${esc(firstName(a.name))} his offer?</h2>
+    <p class="meta">This emails his offer: his confirmation after the phone screen, with the link to read and sign it. It also puts him on the Team list so he can sign in (until he signs, he sees only Training), makes his profile under Personnel and moves his applicant file and Drive folder into Staff. He moves to Hired by himself when he signs the offer.</p>
     <label for="hEmail">His Google account (the email he signs in with)</label><input id="hEmail" type="email" autocapitalize="off" value="${esc(/@indeedemail\.com$/i.test(a.email||"")?"":(a.email||""))}" placeholder="name@gmail.com">
-    <div class="grid2"><div><label for="hRole">Position</label><select id="hRole"><option value="member" ${a.role!=="manager"?"selected":""}>Crew member</option><option value="manager" ${a.role==="manager"?"selected":""}>Crew manager</option></select></div>
+    <div class="grid2"><div><label for="hRole">Position</label><select id="hRole"><option value="member" ${a.role!=="manager"&&a.role!=="walker"?"selected":""}>Crew member</option><option value="manager" ${a.role==="manager"?"selected":""}>Crew manager</option><option value="walker" ${a.role==="walker"?"selected":""}>Door hanger distributor</option><option value="walkerpt">Door hanger (part-time)</option></select></div>
       <div><label for="hCrew">Crew</label><select id="hCrew"><option value="">Not on a crew yet</option>${crewList().map(c=>`<option>${esc(c)}</option>`).join("")}</select></div>
-      <div><label for="hType">Paid as</label><select id="hType"><option value="W-2">Employee (W-2)</option><option value="1099">Contractor (1099)</option></select></div>
+      <div><label for="hType">Paid as</label><select id="hType"><option value="W-2" ${a.role!=="walker"?"selected":""}>Employee (W-2)</option><option value="1099" ${a.role==="walker"?"selected":""}>Contractor (1099)</option></select></div>
       <div><label for="hStart">Start date</label><input id="hStart" type="date" value="${esc(today())}"></div></div>
     <p class="muted">He cannot open his schedule until he is on a crew. You can put him on one later under Crews.</p>
-    <div class="actions"><button data-close>Cancel</button><button class="primary" id="hGo">Yes, hire ${esc(firstName(a.name))}</button></div>`);
+    <div class="actions"><button data-close>Cancel</button><button class="primary" id="hGo">Send the offer</button></div>`);
+  const rs=dl.querySelector("#hRole"), wk=()=>/^walker/.test(rs.value); rs.onchange=()=>{ dl.querySelector("#hCrew").disabled=wk(); if(wk()) dl.querySelector("#hType").value="1099"; }; rs.onchange();
   dl.querySelector("#hGo").onclick=async()=>{
     const email=$("#hEmail").value.trim().toLowerCase(); if(!/^\S+@\S+\.\S+$/.test(email)) return toast("Enter his Google account email");
     const k=emailKey(email); if(archive[k]) return toast("That person is in Past. Drag his Past card to Hired to bring him back.");
     if(team[k] && team[k].tier==="admin") return toast("That email is an admin.");
     if(previewOnly()) return dl.close();
-    const role=$("#hRole").value, crew=$("#hCrew").value, now=Date.now(), upd={};
-    upd[`allowed/${k}`]={ ...(team[k]||{}), name:a.name, email, tier:"crew", crewRole:role, ...(crew?{crew}:{}) };
+    const role=$("#hRole").value, walker=/^walker/.test(role), crew=walker?"":$("#hCrew").value, now=Date.now(), upd={};
+    upd[`allowed/${k}`]= walker ? { ...(team[k]||{}), name:a.name, email, tier:"walker", crewRole:null, crew:null } : { ...(team[k]||{}), name:a.name, email, tier:"crew", crewRole:role, ...(crew?{crew}:{}) };
     if(crew){ upd[`crews/${crew}/members/${k}`]=a.name; const cr=crews[crew]||{};
       if(role==="manager"){ upd[`crews/${crew}/manager`]=k; if(cr.manager&&cr.manager!==k&&team[cr.manager]) upd[`allowed/${cr.manager}/crewRole`]="member"; } }
-    upd[`staff/${k}`]={ ...(staffAll[k]||{}), name:a.name, email, phone:a.phone||null, address:a.address||null, city:a.city||null, startDate:$("#hStart").value||today(), type:$("#hType").value, position:role==="manager"?"manager":"member",
+    upd[`staff/${k}`]={ ...(staffAll[k]||{}), name:a.name, email, phone:a.phone||null, address:a.address||null, city:a.city||null, startDate:$("#hStart").value||today(), type:$("#hType").value, position:role,
       applicantId:aid, appliedFor:a.role||null, job:a.job||null, source:a.source||null, indeedUrl:a.indeedUrl||null, hiredAt:now, hiredBy:me.email };
     Object.entries(personFile[aid]||{}).forEach(([id,e])=>{ upd[`personFile/${k}/${id}`]=e; }); upd[`personFile/${aid}`]=null;
-    upd[`personFile/${k}/${store.key()}`]={ type:"hired", text:`Hired as ${role==="manager"?"crew manager":"crew member"}${crew?" on "+crew:""}, starting ${fmtDay($("#hStart").value||today())}. Paid as ${$("#hType").value}.`, at:now, by:me.email, byName:me.name };
+    upd[`personFile/${k}/${store.key()}`]={ type:"stage", text:`Offer sent: ${PAPER.POSITIONS[role]||role}${crew?" on "+crew:""}, starting ${fmtDay($("#hStart").value||today())}. Paid as ${$("#hType").value}. Moves to Hired when he signs.`, at:now, by:me.email, byName:me.name };
     const docs=docsAll[aid]||{}, vlt=vault[aid]||{}; Object.entries(docs).forEach(([id,d])=>{ upd[`staffDocs/${k}/${id}`]=d; }); Object.entries(vlt).forEach(([id,v])=>{ upd[`staffVault/${k}/${id}`]=v; });
     if(Object.keys(docs).length) upd[`staffDocs/${aid}`]=null; if(Object.keys(vlt).length) upd[`staffVault/${aid}`]=null;
     if(fileDocs[aid]){ upd[`personFileDoc/${k}`]=fileDocs[aid]; upd[`personFileDoc/${aid}`]=null; }
-    Object.assign(upd, { [`applicants/${aid}/stage`]:"hired", [`applicants/${aid}/stageAt`]:now, [`applicants/${aid}/hiredAt`]:now, [`applicants/${aid}/hiredKey`]:k,
+    Object.assign(upd, { [`applicants/${aid}/stage`]:"offer", [`applicants/${aid}/stageAt`]:now, [`applicants/${aid}/offerAt`]:now, [`applicants/${aid}/hiredKey`]:k, [`applicants/${aid}/checks/offer`]:now,
       [`sync/staffMove/${store.key()}`]:{ action:"hire", from:aid, to:k, name:a.name, email, at:now }, [`sync/personFileDirty/${aid}`]:null, ...fileDirty(k) });
-    try { await store.update(upd); dl.close(); toast(`${a.name} is hired. His profile is under Personnel.`); pingTeam();
+    try { await store.update(upd); dl.close(); toast(`Offer going to ${email}. ${firstName(a.name)} moves to Hired when he signs.`); pingTeam();
       // His new-hire paperwork goes out right away; until he signs the offer, the crew page shows him only Training.
       setTimeout(()=>paperSend(k), 600); }
     catch(e){ toast("Not hired: "+(e.message||e)); }
