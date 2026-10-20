@@ -620,7 +620,7 @@ auth.onAuthStateChanged(async user => {
       if(TIER_HOME[myTier]){ location.replace(TIER_HOME[myTier]); return; }
       return gateMsg(`${user.email} is on the list but has no access level yet. Ask Russel to open the Projects page once, then try again.`);
     }
-    $("#gate").hidden=true; $("#app").hidden=false; $("#nav").hidden=false; attach();
+    $("#gate").hidden=true; $("#app").hidden=false; $("#nav").hidden=false; attach(); watchPins();
   } catch(e){
     gateMsg(`${user.email} could not be checked against the team list (${e.code||e.message}). Ask Russel.`);
   }
@@ -2832,8 +2832,27 @@ function wireSeasonBar(m){
   m.querySelectorAll("[data-season]").forEach(b=>b.onclick=()=>setNav(b.dataset.season?"svc-"+b.dataset.season:"clients"));
   m.querySelectorAll("[data-pin]").forEach(b=>b.onclick=()=>{ const k=b.dataset.pin;
     pinnedSvc = pinnedSvc.includes(k) ? pinnedSvc.filter(x=>x!==k) : SEASON_ORDER.map(x=>x[0]).filter(x=>x===k||pinnedSvc.includes(x));
-    try{ localStorage.setItem("crmPinnedSvc", JSON.stringify(pinnedSvc)); }catch(e){}
-    renderPins(); setNav(view); });
+    savePins(); renderPins(); setNav(view); });
+}
+// Pins follow the signed-in account (saved on the person's team-list entry), so they match on the Mac, iPad and phone.
+// This browser keeps a copy only so the menu draws right away while the database loads.
+const pinsRef = () => db.ref("allowed/"+emailKey(me.email)+"/crmPins");
+function savePins(){
+  try{ localStorage.setItem("crmPinnedSvc", JSON.stringify(pinnedSvc)); }catch(e){}
+  if(me) pinsRef().set(pinnedSvc.length ? pinnedSvc : null).catch(e=>toast("Pin not saved to your account: "+(e.code||e.message)));
+}
+let pinsWatched=false;
+function watchPins(){
+  if(pinsWatched || !me) return; pinsWatched=true; let first=true;
+  pinsRef().on("value", snap => {
+    const v = snap.val();
+    if(v==null && first && pinnedSvc.length){ first=false; savePins(); return; } // first sign-in since this change: carry this device's pins up to the account
+    first=false;
+    const next = (Array.isArray(v) ? v : Object.values(v||{})).filter(k=>SERVICE_TYPES[k]);
+    if(JSON.stringify(next)===JSON.stringify(pinnedSvc)) return;
+    pinnedSvc = next; try{ localStorage.setItem("crmPinnedSvc", JSON.stringify(pinnedSvc)); }catch(e){}
+    renderPins(); setNav(view);
+  });
 }
 function renderPins(){
   const slot=$("#pinSlot");
