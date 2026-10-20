@@ -399,12 +399,14 @@ async function load(){
 }
 function list(){
   const forms = pkt.forms, left = forms.filter(f=>!f.done);
-  const off = PAPER.FORMS;
+  const off = PAPER.FORMS, walker = /^walker/.test(pkt.position||""), offerDone = forms.some(f=>f.id==="agreement" && f.done);
+  const next = `<div class="card"><h2 style="margin:0 0 6px">Next: your training</h2><p style="margin:0 0 12px">Your ${walker?"agreement":"offer"} is signed. Sign in with the Google account for <b>${esc(pkt.email||"")}</b> and finish the training on your Training tab. ${walker?"The office gives you routes":"The office puts you on the schedule"} once it is done.</p><a class="btn primary" href="./?to=${walker?"routes.html":"crews.html"}">Go to my training</a></div>`;
   main.innerHTML = `<div class="card ${left.length?"":"done"}">
       <h1>${left.length ? "Your new-hire paperwork" : `<span class="tick">✓</span>All signed`}</h1>
       <p class="meta">${esc(pkt.name)} · ${esc(PAPER.POSITIONS[pkt.position]||"")}${pkt.type==="1099"?" · independent contractor":""}</p>
-      ${left.length ? `<p style="margin:10px 0 0">${left.length} of ${forms.length} left. Do them in any order. Your <b>agreement</b> is the one that opens your crew pages; the rest are needed before your first paycheck.</p>` : `<p style="margin:10px 0 0">Thank you. The office has everything it needs. Bring your I-9 documents on your first day if you have not shown them yet.</p>`}
+      ${left.length ? `<p style="margin:10px 0 0">${left.length} of ${forms.length} left. Do them in any order. Your <b>agreement</b> is the one that opens your ${walker?"routes and training":"crew pages"}; the rest are needed before your first ${walker?"check":"paycheck"}.</p>` : `<p style="margin:10px 0 0">Thank you. The office has everything it needs.${pkt.type==="1099"?"":" Bring your I-9 documents on your first day if you have not shown them yet."}</p>`}
     </div>
+    ${offerDone ? next : ""}
     ${pkt.vaultNotSet ? `<div class="banner">The office is still setting up secure storage for tax and bank forms. You can sign your agreement now; the other forms open as soon as that is done.</div>` : ""}
     <div class="lock">🔒 Tax, I-9 and bank forms are locked on this phone before they are sent. Only the owner can open them. Nothing you type is saved in this browser.</div>
     <div class="card">${forms.map(f=>`<div class="formrow"><div class="t"><b>${esc(off[f.id].title)}</b><span>${f.done?"Signed"+(f.at?" "+new Date(f.at).toLocaleDateString():""):(off[f.id].optional?"Optional. Without it you are paid by check.":"To sign")}</span></div>
