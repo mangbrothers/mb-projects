@@ -53,6 +53,8 @@
   .device iframe{display:block;width:100%;height:min(820px,78vh);border:0;border-radius:22px;background:#fff}
   .stage.full{padding:0;background:transparent} .stage.full .device{background:transparent;border-radius:0;padding:0;width:100%!important}
   .stage.full .device iframe{border-radius:10px;border:1px solid var(--line);height:min(1100px,86vh)}
+  body.presenting{overflow:hidden}
+  body.presenting #fr{position:fixed;inset:0;width:100vw;height:100vh;height:100dvh;border:0;border-radius:0;z-index:5000;background:#fff}
   .gate{max-width:420px;margin:12vh auto;text-align:center;padding:24px;background:var(--card);border:1px solid var(--line);border-radius:12px}
   @media (prefers-reduced-motion:reduce){.device{transition:none}}
   @media (max-width:900px){.layout{grid-template-columns:1fr}.side{position:static;max-height:none}.stage{padding:8px}.device{border-radius:24px;padding:8px}}
@@ -139,7 +141,7 @@ const ITEMS = [
   { id:"crewsoffice", title:"Crews, office view", sub:"Day board, routes, schedules, log", who:"What the office uses", src:"crews.html?demo=admin", w:1180,
     desc:"Every crew's day on one board, the routes, everyone's shifts, each crew's log, meetings, and See as to look through any crew member's eyes." },
   { grp:"How it works" },
-  { id:"diweb", title:"Digital infrastructure web", sub:"Every system, zoom into any part", who:"Reference", src:"previews/system-map.html", full:true,
+  { id:"diweb", title:"Digital infrastructure web", sub:"Every system, zoom into any part", who:"Reference", src:"previews/system-map.html", full:true, present:true,
     desc:"The map of the whole system: where each kind of data lives, which system owns it, and what carries it between systems. Click any card to zoom in to its parts and their descriptions; click any empty space to zoom back out. With a plain-language guide to every part.",
     tryit:"Click CRM, then Customer signing and payment, then Card step. Click the empty space to back out one level at a time." }
 ];
@@ -158,11 +160,27 @@ function show(){
   const x = cur;
   $("#view").innerHTML = `<h2>${esc(x.title)}</h2><div class="chips"><span class="chip who">${esc(x.who)}</span><span class="chip">Sample data</span></div>
     <p class="desc">${esc(x.desc)}</p>${x.tryit?`<p class="try"><b>Try:</b> ${esc(x.tryit)}</p>`:""}
-    <div class="tools">${x.full ? "" : WIDTHS.map(([l,w])=>`<button data-w="${w}" aria-pressed="${w===width}">${l}</button>`).join("")}<button id="reload">Start over</button><span class="sp"></span><a href="${esc(x.src)}" target="_blank" rel="noopener">Open full screen ↗</a></div>
+    <div class="tools">${x.full ? "" : WIDTHS.map(([l,w])=>`<button data-w="${w}" aria-pressed="${w===width}">${l}</button>`).join("")}<button id="reload">Start over</button>${x.present?`<button id="present">Present</button>`:""}<span class="sp"></span><a href="${esc(x.src)}" target="_blank" rel="noopener">Open full screen ↗</a></div>
     <div class="stage ${x.full?"full":""}"><div class="device" id="dev" style="width:${x.full?"100%":width+"px"}"><iframe id="fr" title="${esc(x.title)} preview" src="${esc(x.src)}"></iframe></div></div>`;
   $("#view").querySelectorAll("[data-w]").forEach(b => b.onclick = () => { width = +b.dataset.w; $("#dev").style.width = width + "px"; $("#view").querySelectorAll("[data-w]").forEach(z => z.setAttribute("aria-pressed", String(z === b))); });
+  if($("#present")) $("#present").onclick = () => window.mbPresentFrame();
   $("#reload").onclick = () => { const f = $("#fr"); f.src = x.src + (x.src.includes("?") ? "&" : "?") + "r=" + Date.now(); };
 }
+// Presenter mode for the map: the frame fills the screen; the map inside leaves on a double tap in its top-right corner.
+function fsEl(){ return document.fullscreenElement || document.webkitFullscreenElement; }
+function endPresent(){
+  document.body.classList.remove("presenting");
+  if(fsEl()){ const ex = document.exitFullscreen || document.webkitExitFullscreen; try{ const p = ex.call(document); if(p && p.catch) p.catch(()=>{}); }catch(e){} }
+}
+window.mbPresentFrame = () => {
+  const f = $("#fr"); if(!f || !f.contentWindow || !f.contentWindow.mbPresent) return;
+  document.body.classList.add("presenting");
+  const rq = f.requestFullscreen || f.webkitRequestFullscreen;
+  if(rq) try{ const p = rq.call(f); if(p && p.catch) p.catch(()=>{}); }catch(e){}
+  f.contentWindow.mbPresent(true, endPresent);
+};
+function fsChange(){ if(!fsEl() && document.body.classList.contains("presenting")){ try{ $("#fr").contentWindow.mbPresent(false); }catch(e){ endPresent(); } } }
+document.addEventListener("fullscreenchange", fsChange); document.addEventListener("webkitfullscreenchange", fsChange);
 function start(email){
   $("#who").textContent = email || ""; $("#gate").hidden = true; $("#app").hidden = false; $("#navBtn").hidden = false;
   pick((location.hash || "").slice(1) || "signing");
