@@ -1116,9 +1116,10 @@ $("#clientSave").onclick = async () => {
     await db.ref().update(B.upd); staged=[];
     toast(B.lines.length ? `Saved and sent to billing: ${B.lines.map(l=>l.text).join("; ")}.${apiCard(clients[id])?" A saved card is charged within 5 minutes.":" Charge it in QuickBooks, then mark it in Charges to run."}` : "Saved. Service logged; nothing to charge."); }
   // Stay open when a contract is now waiting, so it can be signed right away.
+  // Oct 20, 2026: Save never closes the client card, so the contract can be set up right after saving. Close and Cancel close it.
   const saved = clients[id];
-  if(saved && contractNeeds(saved).some(x=>!x.signed)){ openClient(id); toast("Saved. The contract is ready to sign below."); }
-  else $("#clientDlg").close();
+  openClient(id);
+  if(!pend.length) toast(saved && contractNeeds(saved).some(x=>!x.signed) ? "Saved. The contract is ready to sign below." : "Saved.");
 };
 $("#clientDlg").onclose = () => { openId=null; };
 
@@ -1662,6 +1663,12 @@ const SSA_L_ADJ = [["two","Two-storey home",155],["twoShow","Two-storey home (Sh
 // sw / n2: season price South (and Westland) / North. ppSw / ppN: per-visit rate after the sixteenth visit.
 const SSA_SNOW = [{k:"standard",n:"Standard lot",sw:570,n2:610,ppSw:45,ppN:50},{k:"corner",n:"Corner lot",sw:775,n2:820,ppSw:60,ppN:65}];
 const SSA_NEIGHBOR = 50;
+// Custom price (Oct 20, 2026): a manager sets the final price of a service in setup and picks a reason.
+// The contract keeps the standard lines, then one adjustment line so the service total equals the custom price.
+const SSA_CP_REASONS = ["Repeat or loyal customer","Matched a competitor's quote","Several services bundled","Larger or harder property than standard","Smaller or easier property than standard","Friends and family","Promotion or referral","Making good on a past service issue","Other"];
+const ssaCpWhy = x => String(x.cpWhy==="Other" ? (x.cpOther||"Other") : (x.cpWhy||"")).replace(/[|\r\n]+/g," ").trim();
+const ssaCpOn = x => !!(x.cp && x.cpPrice!=="" && x.cpPrice!=null && isFinite(+x.cpPrice) && +x.cpPrice>=0);
+const ssaCpDetail = x => ssaCpOn(x) ? { price:+x.cpPrice, reason:x.cpWhy||"", other:x.cpWhy==="Other"?(x.cpOther||""):"", by:(typeof me!=="undefined"&&me?me.email:"") } : null;
 const SSA_CALL = { plain:40, ladder:65 };
 const SSA_TERM = { fall:["Fall Cleanup","Two visits, October to November, timed to the city leaf pickup for the Property's section"], lights:["Holiday Lighting","Installed by November 26; removed by the end of January"], snow:["Snow & Ice Removal","November 1 to March 15"] };
 const SSA_ART = [
@@ -1730,9 +1737,9 @@ const ssaBlank = c => ({
   zone: ssaZoneOf(c.region),
   ptype:"Residential", prop:c.address||"", areas:"", pre:"", email:c.email||"", email2:c.email2||"",
   neighborName:"", neighborAddr:"",
-  fall:{ on:hasSvc(c,"fall"), two:false, corner:false, oak:false, gutters:false, big:false, bigPrice:"", nb:false },
-  lights:{ on:hasSvc(c,"lights"), pkg:"", color:"", shrub:0, medTree:0, lgTree:0, wreath:0, two:false, twoShow:false, steep:false, ft:0, nb:false },
-  snow:{ on:hasSvc(c,"snow"), lot:"", nb:false } });
+  fall:{ on:hasSvc(c,"fall"), two:false, corner:false, oak:false, gutters:false, big:false, bigPrice:"", nb:false, cp:false, cpPrice:"", cpWhy:"", cpOther:"" },
+  lights:{ on:hasSvc(c,"lights"), pkg:"", color:"", shrub:0, medTree:0, lgTree:0, wreath:0, two:false, twoShow:false, steep:false, ft:0, nb:false, cp:false, cpPrice:"", cpWhy:"", cpOther:"" },
+  snow:{ on:hasSvc(c,"snow"), lot:"", nb:false, cp:false, cpPrice:"", cpWhy:"", cpOther:"" } });
 // Showcase carries a full season Fall Cleanup inside its price. It is sold only in Livonia (South or North).
 const ssaShowcaseFall = S => S.lights.on && S.lights.pkg==="showcase" && S.zone!=="westland";
 const r2 = n => Math.round(n*100)/100;
@@ -1744,16 +1751,19 @@ function ssaCalc(S){
   if(f.on && S.zone!=="westland"){ fall+=SSA_FALL[S.zone]; fl.push([`Full Fall Cleanup, ${area}`,SSA_FALL[S.zone]]);
     SSA_FALL_ADJ.forEach(([k,n,p])=>{ if(f[k]){ fall+=p; fl.push([n,p]); } });
     if(f.big){ const p=+f.bigPrice||0; fall+=p; fl.push(["Turf over 10,000 sq ft (walked)",p]); }
-    if(f.nb){ fall-=SSA_NEIGHBOR; fl.push(credit); } }
+    if(f.nb){ fall-=SSA_NEIGHBOR; fl.push(credit); }
+    if(ssaCpOn(f)){ const adj=r2(+f.cpPrice-fall); if(adj) fl.push([`Custom price adjustment (${ssaCpWhy(f)})`,adj]); fall=r2(+f.cpPrice); } }
   if(l.on && l.pkg){ const P=SSA_PKG.find(x=>x.k===l.pkg); const p = north?P.n2:P.sw;
     lights+=p; ll.push([`${P.n}, ${area}`,p]);
     SSA_ADDONS.forEach(([k,n,pr])=>{ if(l[k]>0){ lights+=l[k]*pr; ll.push([`${n} × ${l[k]}`,l[k]*pr]); } });
     SSA_L_ADJ.forEach(([k,n,pr])=>{ if(!l[k]) return; if(k==="two"&&l.pkg==="showcase") return; if(k==="twoShow"&&l.pkg!=="showcase") return; lights+=pr; ll.push([n,pr]); });
     if(l.ft>0){ lights+=l.ft*6; ll.push([`Roofline beyond 120 ft: ${l.ft} ft × $6`,l.ft*6]); }
     lightsGross=lights;
-    if(l.nb){ lights-=SSA_NEIGHBOR; ll.push(credit); } }
+    if(l.nb){ lights-=SSA_NEIGHBOR; ll.push(credit); }
+    if(ssaCpOn(l)){ const adj=r2(+l.cpPrice-lights); if(adj) ll.push([`Custom price adjustment (${ssaCpWhy(l)})`,adj]); lights=r2(+l.cpPrice); lightsGross=r2(lightsGross+adj); } }
   if(s.on && s.lot){ const P=SSA_SNOW.find(x=>x.k===s.lot); snow=north?P.n2:P.sw; sl.push([`${P.n}, season, ${area}`,snow]);
-    if(s.nb){ snow-=SSA_NEIGHBOR; sl.push(credit); } }
+    if(s.nb){ snow-=SSA_NEIGHBOR; sl.push(credit); }
+    if(ssaCpOn(s)){ const adj=r2(+s.cpPrice-snow); if(adj) sl.push([`Custom price adjustment (${ssaCpWhy(s)})`,adj]); snow=r2(+s.cpPrice); } }
   // Lights: half of the price before the credit at signing; the credit comes off the install-day balance.
   const lightsHalf = r2(lightsGross/2);
   const dueNow = r2(fall + snow + lightsHalf), dueInstall = r2(lights - lightsHalf);
@@ -1892,6 +1902,11 @@ function ssaSetup(){
   const X=signCtx, S=X.S, c=clients[X.clientId]; X.mode="ssa-setup"; X.pad=null; ssaBarOff();
   const ck=(id,label,on)=>`<label class="row ssack"><input type="checkbox" id="${id}" ${on?"checked":""}> <span>${label}</span></label>`;
   const nb=(id,on)=>ck(id,`Neighbor credit −$${SSA_NEIGHBOR} (same street, same service, both signed by the deadline)`,on);
+  const cp=(p,x,label)=>`<div class="sscp"><button type="button" class="small" id="ss-${p}-cpbtn" data-cp="${p}">${x.cp?"Remove custom price":"Custom price"}</button>
+    <div id="ss-${p}-cpbox" class="grid2" ${x.cp?"":"hidden"} style="margin-top:6px">
+      <div><label>Final ${label} price, $ (after any neighbor credit)</label><input id="ss-${p}-cpp" type="number" inputmode="decimal" min="0" step="0.01" value="${esc(x.cpPrice??"")}"></div>
+      <div><label>Reason</label><select id="ss-${p}-cpw"><option value="">Choose</option>${SSA_CP_REASONS.map(r=>`<option${x.cpWhy===r?" selected":""}>${esc(r)}</option>`).join("")}</select></div>
+      <div id="ss-${p}-cporow" style="grid-column:1/-1" ${x.cpWhy==="Other"?"":"hidden"}><label>Other reason</label><input id="ss-${p}-cpo" value="${esc(x.cpOther||"")}" autocomplete="off" placeholder="Shown on the contract next to the adjustment"></div></div></div>`;
   $("#signTitle").textContent = SSA_NAME+": setup";
   $("#signBody").innerHTML = `<div class="signpanel" id="ssaForm" style="margin-top:0">
     <h4>${esc(c.name)}</h4>
@@ -1913,7 +1928,7 @@ function ssaSetup(){
       <div class="warnline" id="ss-fall-wl" hidden>Fall Cleanup is not offered in Westland.</div>
       <div id="ss-fall-box" class="ssabox">${SSA_FALL_ADJ.map(([k,n,p])=>ck("ss-f-"+k,`${n} +$${p}`,S.fall[k])).join("")}
         <div class="row">${ck("ss-f-big","Turf over 10,000 sq ft, walked price $",S.fall.big)}<input id="ss-f-bigp" type="number" inputmode="decimal" min="0" style="width:110px" value="${esc(S.fall.bigPrice)}"></div>
-        ${nb("ss-f-nb",S.fall.nb)}</div></div>
+        ${nb("ss-f-nb",S.fall.nb)}${cp("f",S.fall,"Fall Cleanup")}</div></div>
     <div class="svc svcbar lights">${ck("ss-lights",`<b>Christmas Lights</b> <span class="meta" id="ss-lights-p"></span>`,S.lights.on)}
       <div id="ss-lights-box" class="ssabox">
         <div class="grid2"><div><label>Package</label><select id="ss-l-pkg"><option value="">Choose</option>${SSA_PKG.map(P=>`<option value="${P.k}"${S.lights.pkg===P.k?" selected":""}>${P.n} ($${P.sw.toLocaleString()} South and Westland, $${P.n2.toLocaleString()} North)</option>`).join("")}</select></div>
@@ -1925,10 +1940,10 @@ function ssaSetup(){
         <div id="ss-la-twoShow-row">${ck("ss-la-twoShow",`Two-storey home (Showcase) +$${SSA_L_ADJ[1][2]}`,S.lights.twoShow)}</div>
         ${ck("ss-la-steep",`Steep roof over 7/12 pitch +$${SSA_L_ADJ[2][2]}`,S.lights.steep)}
         <div class="row"><span>Roofline beyond 120 ft, $6 per ft:</span><input id="ss-l-ft" type="number" inputmode="numeric" min="0" style="width:100px" value="${S.lights.ft||""}"><span>ft</span></div>
-        ${nb("ss-l-nb",S.lights.nb)}</div></div>
+        ${nb("ss-l-nb",S.lights.nb)}${cp("l",S.lights,"Christmas Lights")}</div></div>
     <div class="svc svcbar snow">${ck("ss-snow",`<b>Snow Removal</b> <span class="meta" id="ss-snow-p"></span>`,S.snow.on)}
       <div id="ss-snow-box" class="ssabox"><label>Lot</label><select id="ss-s-lot"><option value="">Choose</option>${SSA_SNOW.map(P=>`<option value="${P.k}"${S.snow.lot===P.k?" selected":""}>${P.n} ($${P.sw} South and Westland, $${P.n2} North)</option>`).join("")}</select>
-        ${nb("ss-s-nb",S.snow.nb)}</div></div>
+        ${nb("ss-s-nb",S.snow.nb)}${cp("s",S.snow,"Snow Removal")}</div></div>
     <div id="ss-nb-box" class="grid2" hidden>
       <div><label>Neighbor's name</label><input id="ss-nb-name" value="${esc(S.neighborName||"")}" autocomplete="off"></div>
       <div><label>Neighbor's address</label><input id="ss-nb-addr" value="${esc(S.neighborAddr||"")}" autocomplete="off"></div></div>
@@ -1941,6 +1956,8 @@ function ssaSetup(){
     <p class="meta" style="margin:8px 0 0">${svcReady()?`<b>Email contract to sign</b> sends one link to ${esc([S.email,S.email2].filter(Boolean).join(" and ")||"the customer's email")}: the quote, the agreement, a typed-name signature, then their card on the next screen.`:`Emailing the contract needs the signing service: More, Contracts, Signing service.`} <b>Sign here</b> is for door to door and landscaping: the customer signs on this screen, then you take the card.</p>
   </div>`;
   const form=$("#ssaForm"); form.oninput=ssaSync; form.onchange=ssaSync; ssaSync();
+  const CPK={f:"fall",l:"lights",s:"snow"};
+  form.querySelectorAll("[data-cp]").forEach(b=>b.onclick=()=>{ ssaSync(); const p=b.dataset.cp, x=S[CPK[p]]; x.cp=!x.cp; ssaSync(); if(x.cp){ const el=document.getElementById(`ss-${p}-cpp`); if(el) el.focus(); } });
   $("#ss-later").onclick = async () => { ssaSync(); try{ await ssaSaveDraft(); toast("Setup saved on the client."); $("#signDlg").close(); }catch(e){ toast("Not saved: "+(e.code||e.message)); } };
   $("#ss-go").onclick = () => { ssaSync(); const e=ssaErrors(); $("#ss-err").textContent = e.length ? "Still needed: "+e.join(", ")+"." : ""; if(!e.length) ssaShow(); };
   $("#ss-send").onclick = () => { ssaSync(); const e=ssaErrors(); if(!S.email) e.unshift("the customer's email"); $("#ss-err").textContent = e.length ? "Still needed: "+e.join(", ")+"." : ""; if(!e.length) ssaSend(); };
@@ -1953,6 +1970,8 @@ function ssaSync(){
   S.lights.on=g("ss-lights").checked; S.lights.pkg=g("ss-l-pkg").value; S.lights.color=g("ss-l-color").value; S.lights.nb=g("ss-l-nb").checked;
   SSA_ADDONS.forEach(([k])=>S.lights[k]=n("ss-a-"+k)); SSA_L_ADJ.forEach(([k])=>S.lights[k]=g("ss-la-"+k).checked); S.lights.ft=n("ss-l-ft");
   S.snow.on=g("ss-snow").checked; S.snow.lot=g("ss-s-lot").value; S.snow.nb=g("ss-s-nb").checked;
+  [["f",S.fall],["l",S.lights],["s",S.snow]].forEach(([p,x])=>{ x.cpPrice=g(`ss-${p}-cpp`).value; x.cpWhy=g(`ss-${p}-cpw`).value; x.cpOther=g(`ss-${p}-cpo`).value.trim();
+    g(`ss-${p}-cpbox`).hidden=!x.cp; g(`ss-${p}-cporow`).hidden=x.cpWhy!=="Other"; g(`ss-${p}-cpbtn`).textContent=x.cp?"Remove custom price":"Custom price"; });
   S.neighborName=g("ss-nb-name").value.trim(); S.neighborAddr=g("ss-nb-addr").value.trim(); S.payUrl=(g("ss-payurl")?.value||"").trim();
   S.test=g("ss-test").checked; g("ss-real").hidden=S.test; g("ss-test-wl").hidden=!S.test; g("ss-go").hidden=S.test;
   ["ss-zone","ss-ptype","ss-prop","ss-areas","ss-pre"].forEach(id=>{ g(id).parentElement.hidden=S.test; });
@@ -1980,6 +1999,8 @@ function ssaErrors(){
   if(S.lights.on && !S.lights.pkg) e.push("lights package");
   if(S.lights.on && !S.lights.color) e.push("light color");
   if(S.snow.on && !S.snow.lot) e.push("snow lot type");
+  [["Fall Cleanup",S.fall,S.fall.on&&!wl],["Christmas Lights",S.lights,S.lights.on],["Snow Removal",S.snow,S.snow.on]].forEach(([n,x,on])=>{ if(!on||!x.cp) return;
+    if(!ssaCpOn(x)) e.push(`the ${n} custom price`); if(!x.cpWhy) e.push(`a reason for the ${n} custom price`); else if(x.cpWhy==="Other" && !x.cpOther) e.push(`the other reason for the ${n} custom price`); });
   if(((S.fall.on&&S.fall.nb)||(S.lights.on&&S.lights.nb)||(S.snow.on&&S.snow.nb)) && (!S.neighborName||!S.neighborAddr)) e.push("the neighbor's name and address for the credit");
   if(S.email && !/^\S+@\S+\.\S+$/.test(S.email)) e.push("a valid email, or leave it empty");
   if(S.email2 && !/^\S+@\S+\.\S+$/.test(S.email2)) e.push("a valid second email, or leave it empty");
@@ -2031,11 +2052,11 @@ function ssaDetails(S, k, agNo){
   const details = { agreementNo:agNo, version:SSA_VERSION, zone:S.zone, propertyType:S.ptype, serviceProperty:S.prop, serviceAreas:S.areas, preExisting:S.pre, email:S.email, email2:S.email2||"",
     total:k.total, dueNow:k.dueNow, dueInstall:k.dueInstall };
   if(nbAny) details.neighbor = { name:S.neighborName, address:S.neighborAddr, fall:fallOn&&S.fall.nb, lights:S.lights.on&&S.lights.nb, snow:S.snow.on&&S.snow.nb };
-  if(fallOn) details.fall = { lines:k.fl, total:k.fall, options:{ two:S.fall.two, corner:S.fall.corner, oak:S.fall.oak, gutters:S.fall.gutters, big:S.fall.big, bigPrice:S.fall.big?(+S.fall.bigPrice||0):0 } };
+  if(fallOn) details.fall = { lines:k.fl, total:k.fall, options:{ two:S.fall.two, corner:S.fall.corner, oak:S.fall.oak, gutters:S.fall.gutters, big:S.fall.big, bigPrice:S.fall.big?(+S.fall.bigPrice||0):0 }, customPrice:ssaCpDetail(S.fall) };
   if(S.lights.on) details.lights = { lines:k.ll, total:k.lights, gross:k.lightsGross, package:S.lights.pkg, color:S.lights.color, includesFallCleanup:ssaShowcaseFall(S),
     addons:Object.fromEntries(SSA_ADDONS.map(([a])=>[a,S.lights[a]||0]).filter(x=>x[1]>0)), options:{ two:S.lights.pkg!=="showcase"&&S.lights.two, twoShow:S.lights.pkg==="showcase"&&S.lights.twoShow, steep:S.lights.steep }, extraFeet:S.lights.ft||0,
-    serviceCall:{ included:1, noLadder:SSA_CALL.plain, ladder:SSA_CALL.ladder } };
-  if(S.snow.on) details.snow = { lines:k.sl, total:k.snow, lot:S.snow.lot, includedPushes:SSA_PUSHES, perPushAfter:ssaPerPush(S) };
+    serviceCall:{ included:1, noLadder:SSA_CALL.plain, ladder:SSA_CALL.ladder }, customPrice:ssaCpDetail(S.lights) };
+  if(S.snow.on) details.snow = { lines:k.sl, total:k.snow, lot:S.snow.lot, includedPushes:SSA_PUSHES, perPushAfter:ssaPerPush(S), customPrice:ssaCpDetail(S.snow) };
   return details;
 }
 const ssaSummary = (S,k) => { const fallOn=S.fall.on && S.zone!=="westland"; return [fallOn&&"Fall Cleanup "+money(k.fall), S.lights.on&&"Christmas Lights "+money(k.lights), S.snow.on&&"Snow Removal "+money(k.snow)].filter(Boolean).join(" · "); };
