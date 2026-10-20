@@ -561,6 +561,9 @@ function fmtStamp(ms){ if(!ms) return ""; const d=new Date(ms); return d.toLocal
 function ago(ms){ if(!ms) return "never"; const d=Math.floor((Date.now()-ms)/864e5); if(d<=0) return "today"; if(d===1) return "yesterday"; if(d<30) return d+"d ago"; const m=Math.floor(d/30); return m<12 ? m+"mo ago" : Math.floor(m/12)+"y ago"; }
 function money(v){ if(v===""||v==null||isNaN(+v)) return ""; const cents=Math.round(+v*100)%100!==0; return "$"+(+v).toLocaleString("en-US",{minimumFractionDigits:cents?2:0,maximumFractionDigits:2}); }
 const tel = p => p ? `<a href="tel:${esc(p.replace(/[^\d+]/g,""))}" style="color:inherit">${esc(p)}</a>` : "";
+// Returns a message when the phone is missing (and required) or not a full US number; "" when fine.
+// The Quo sync matches calls to clients by phone, so a record without one gets a duplicate lead.
+function phoneProblem(p, required){ const d=String(p||"").replace(/\D/g,""); if(!d) return required ? "Phone is required. Calls and texts are matched to clients by phone." : ""; if(d.length===10 || (d.length===11 && d[0]==="1")) return ""; return "That phone number needs 10 digits."; }
 // Phone key: the number in E.164 form (+1 and ten digits). Used for duplicate checks and Quo matching.
 function phoneKey(p){ const d=String(p||"").replace(/\D/g,""); if(d.length===10) return "+1"+d; if(d.length===11 && d[0]==="1") return "+"+d; return d.length>=10 ? "+"+d : ""; }
 
@@ -794,7 +797,7 @@ function renderLeads(m){
     <div class="card">
       <form class="quick" id="quickAdd" onsubmit="return false">
         <div><label>Name</label><input name="name" placeholder="Name" autocomplete="off"></div>
-        <div><label>Phone</label><input name="phone" type="tel" placeholder="734..."></div>
+        <div><label>Phone (required)</label><input name="phone" type="tel" placeholder="734..."></div>
         <div><label>Address</label><input name="address" placeholder="Street, City" autocomplete="off"></div>
         <div><label>Email</label><input name="email" type="email" inputmode="email" placeholder="name@example.com" autocomplete="off" autocapitalize="off"></div>
         <div><label>Region</label><select name="region"><option value="">Region</option>${opts(REGIONS,"")}</select></div>
@@ -820,6 +823,7 @@ function renderLeads(m){
     const d=Object.fromEntries(new FormData(form).entries());
     if(!d.name.trim()){ toast("Name is required"); form.name.focus(); return; }
     if(!d.source){ toast("Pick a lead source"); form.source.focus(); return; }
+    const pm=phoneProblem(d.phone, true); if(pm){ toast(pm); form.phone.focus(); return; }
     const hit=findByPhone(d.phone);
     if(hit && quickDupAck!==hit.id){ quickDupAck=hit.id; toast(`That number belongs to ${hit.c.name}. Open the record, or press Add again to add a second record.`); return; }
     if(d.email && !/^\S+@\S+\.\S+$/.test(d.email.trim())){ toast("That email does not look right."); form.email.focus(); return; }
@@ -1098,6 +1102,9 @@ $("#clientSave").onclick = async () => {
   if(!data.name){ toast("Name is required"); f.name.focus(); return; }
   if(!data.source){ toast("Pick a lead source"); f.source.focus(); return; }
   const prev = openId ? clients[openId] : null;
+  // A new record needs a phone; an existing record that already has one cannot have it cleared.
+  // Older imported records with no phone can still be edited.
+  { const pm=phoneProblem(data.phone, !prev || !!(prev.phone||"").trim()); if(pm){ toast(pm); f.phone.focus(); return; } }
   const upd = {};
   if(prev && data.status==="active" && prev.status!=="active" && !prev.wonAt) data.wonAt=Date.now();
   if(!prev && data.status==="active") data.wonAt=Date.now();
