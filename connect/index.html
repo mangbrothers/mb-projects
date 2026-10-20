@@ -1,0 +1,283 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Connect with Mangiapane Brothers</title>
+<meta name="description" content="Leave your information and Russel Mangiapane III will follow up personally.">
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#023A1D">
+<link rel="icon" href="logo-full.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Marcellus+SC&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&display=swap">
+<style>
+  /* Matches the MB one-page sheet: white page, split green stripe bars top and bottom,
+     Copperplate caps for the wordmark and labels, Source Serif for everything people read. */
+  :root {
+    color-scheme: light;
+    --forest: #023A1D;      /* wordmark, labels, buttons, callout */
+    --leaf: #156B3A;        /* second stripe, focus ring */
+    --paper: #FFFFFF;
+    --ink: #1C221E;
+    --muted: #59645C;
+    --rule: #023A1D;
+    --field: #B9C4BC;       /* input borders */
+    --wash: #F3F6F4;        /* selected option */
+    --error: #A3261C;
+    --caps: Copperplate, "Copperplate Gothic Bold", "Copperplate Gothic", "Marcellus SC", Georgia, serif;
+    --serif: "Source Serif 4", "Source Serif Pro", Georgia, "Times New Roman", serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body { background: var(--paper); color: var(--ink); font: 17px/1.5 var(--serif); -webkit-text-size-adjust: 100%; }
+
+  /* ===== Stripe bars: forest and leaf split on a slant, as on the sheet ===== */
+  .bar { height: 12px; background: linear-gradient(100deg, var(--leaf) 0 62%, var(--forest) 62% 100%); }
+  .bar.top { background: linear-gradient(100deg, var(--leaf) 0 58%, var(--forest) 58% 100%); }
+  .bar.top::after { content: ""; display: block; height: 5px; background: var(--forest); }
+  .bar.bottom { background: linear-gradient(100deg, var(--forest) 0 42%, var(--leaf) 42% 100%); margin-top: 32px; }
+
+  .wrap { max-width: 540px; margin: 0 auto; padding-block: 0;
+          padding-left: max(18px, env(safe-area-inset-left, 0px)); padding-right: max(18px, env(safe-area-inset-right, 0px)); }
+
+  /* ===== Masthead ===== */
+  .mast { text-align: center; padding-top: 22px; }
+  /* Logo and tagline share one width; the tagline scales to sit on a single line under the logo. */
+  .mast { max-width: 440px; margin: 0 auto; container-type: inline-size; }
+  .logo { margin: 0; }
+  .logo img { display: block; width: 100%; height: auto; }
+  .tag { margin: 10px 0 0; font-style: italic; color: var(--ink); white-space: nowrap; text-align: center;
+         font-size: calc(100cqi / 34.6); line-height: 1.3; }
+  @supports not (font-size: 1cqi) { .tag { white-space: normal; font-size: .92rem; text-wrap: balance; } }
+
+  /* ===== Callout: same block as "I am looking to connect…" ===== */
+  .callout { background: var(--forest); color: #EEF3EF; margin: 24px 0 26px; padding: 18px 20px 20px;
+             clip-path: polygon(0 0, 100% 0, 100% 100%, 16px 100%, 0 calc(100% - 16px)); }
+  .callout p { margin: 0; }
+  .callout .sig { display: block; margin-top: 10px; font-family: var(--caps); font-size: .72rem; letter-spacing: .2em; color: #C9D8CE; }
+
+  /* ===== Fields ===== */
+  .label, legend { display: block; font-family: var(--caps); font-weight: 700; font-size: .74rem; letter-spacing: .24em;
+                   color: var(--forest); margin: 0 0 7px; padding: 0; text-transform: uppercase; }
+  .label .opt, legend .opt { font-weight: 400; letter-spacing: .12em; color: var(--muted); }
+  .help { color: var(--muted); font-size: .88rem; margin: -2px 0 7px; }
+  .field { margin-bottom: 20px; }
+  input[type=text], input[type=email], input[type=tel], textarea {
+    width: 100%; font: inherit; font-size: 17px; padding: 11px 12px; color: var(--ink); background: var(--paper);
+    border: 1px solid var(--field); border-radius: 2px; transition: border-color .15s;
+  }
+  textarea { min-height: 96px; resize: vertical; }
+  input:focus, textarea:focus { outline: 2px solid var(--leaf); outline-offset: 1px; border-color: var(--forest); }
+  .rule { border: 0; border-top: 1px solid var(--rule); margin: 6px 0 22px; }
+
+  fieldset { border: 0; margin: 0 0 20px; padding: 0; min-width: 0; }
+  .choices { display: grid; gap: 6px; }
+  .choice { display: flex; align-items: center; gap: 12px; padding: 11px 12px; border: 1px solid var(--field);
+            border-radius: 2px; cursor: pointer; font-size: .98rem; }
+  .choice:has(input:checked) { border-color: var(--forest); background: var(--wash); }
+  .choice input { width: 18px; height: 18px; accent-color: var(--forest); flex: none; margin: 0; }
+  #otherText { margin-top: 6px; }
+
+  .err { color: var(--error); font-size: .88rem; margin-top: 5px; display: none; }
+  .field.bad .err { display: block; }
+  .field.bad input { border-color: var(--error); }
+  .hp { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; }
+
+  /* ===== Submit ===== */
+  button { width: 100%; font-family: var(--caps); font-weight: 700; font-size: .95rem; letter-spacing: .26em;
+           padding: 16px 12px 15px; border: 0; background: var(--forest); color: #FFFFFF; cursor: pointer;
+           clip-path: polygon(0 0, 100% 0, 100% 100%, 12px 100%, 0 calc(100% - 12px)); }
+  button:hover { background: #0A4A28; }
+  button:focus-visible { outline: 3px solid var(--leaf); outline-offset: 3px; }
+  button[disabled] { opacity: .65; cursor: default; }
+  .formerr { color: var(--error); margin: 12px 0 0; display: none; }
+
+  /* ===== Thank-you ===== */
+  .done { display: none; text-align: center; padding: 8px 0 4px; }
+  .done h2 { font-family: var(--caps); color: var(--forest); letter-spacing: .18em; font-size: 1.3rem; margin: 0 0 10px; }
+  .done p { margin: 0; }
+  .done .sig { display: block; margin-top: 14px; font-family: var(--caps); font-size: .74rem; letter-spacing: .22em; color: var(--forest); }
+  .sent .done { display: block; }
+  .sent form, .sent .callout { display: none; }
+
+  /* ===== Contact block: mirrors the sheet's signature ===== */
+  .contact { margin-top: 30px; padding-top: 16px; border-top: 1px solid var(--rule); }
+  .contact .name { font-family: var(--caps); font-weight: 700; color: var(--forest); letter-spacing: .16em; font-size: .9rem; margin: 0; }
+  .contact .role { font-family: var(--caps); font-size: .66rem; letter-spacing: .3em; margin: 3px 0 8px; }
+  .contact p { margin: 0; font-size: .95rem; }
+  .contact a { color: var(--forest); }
+
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+<div class="bar top" aria-hidden="true"></div>
+<div class="wrap">
+  <header class="mast">
+    <h1 class="logo"><img src="logo-full.png" alt="Mangiapane Brothers Lawn &amp; Snow LLC, Est. 2019" width="840" height="338"></h1>
+    <p class="tag">Full Service Property Maintenance for Those Who Take Pride in Their Home.</p>
+  </header>
+
+
+  <main id="card">
+    <div class="callout">
+      <p>Thank you for stopping by. Leave your information below and I will follow up personally.</p>
+      <span class="sig">Russel Mangiapane III, Founder</span>
+    </div>
+
+    <form id="f" novalidate>
+      <div class="field" data-k="name">
+        <label class="label" for="name">Name</label>
+        <input id="name" name="name" type="text" autocomplete="name" autocapitalize="words" maxlength="120" required>
+        <div class="err">Please enter your name.</div>
+      </div>
+
+      <div class="field" data-k="email">
+        <label class="label" for="email">Email</label>
+        <input id="email" name="email" type="email" autocomplete="email" inputmode="email" autocapitalize="off" spellcheck="false" maxlength="200" required>
+        <div class="err">Please enter a valid email address.</div>
+      </div>
+
+      <div class="field" data-k="phone">
+        <label class="label" for="phone">Phone <span class="opt">· optional</span></label>
+        <input id="phone" name="phone" type="tel" autocomplete="tel" inputmode="tel" maxlength="40">
+      </div>
+
+      <div class="field" data-k="role">
+        <label class="label" for="role">What do you do? <span class="opt">· optional</span></label>
+        <p class="help">Your role and company, if you would like to share.</p>
+        <input id="role" name="role" type="text" autocomplete="organization-title" maxlength="200">
+      </div>
+
+      <hr class="rule">
+
+      <fieldset>
+        <legend>What would you like to talk about? <span class="opt">· optional</span></legend>
+        <div class="choices">
+          <label class="choice"><input type="radio" name="topic" value="Lending or financing">Lending or financing</label>
+          <label class="choice"><input type="radio" name="topic" value="Business advice or mentorship">Business advice or mentorship</label>
+          <label class="choice"><input type="radio" name="topic" value="Partnership or referrals">Partnership or referrals</label>
+          <label class="choice"><input type="radio" name="topic" value="Property maintenance for my home or business">Property maintenance for my home or business</label>
+          <label class="choice"><input type="radio" name="topic" value="Just saying hello">Just saying hello</label>
+          <label class="choice"><input type="radio" name="topic" value="Other" id="otherRadio">Other</label>
+        </div>
+        <input id="otherText" type="text" maxlength="200" aria-label="Other topic" placeholder="Tell me more" hidden>
+      </fieldset>
+
+      <div class="field" data-k="notes">
+        <label class="label" for="notes">Anything else? <span class="opt">· optional</span></label>
+        <textarea id="notes" name="notes" maxlength="2000"></textarea>
+      </div>
+
+      <div class="hp" aria-hidden="true"><label>Website <input id="website" name="website" type="text" tabindex="-1" autocomplete="off"></label></div>
+
+      <button id="go" type="submit">Connect</button>
+      <p class="formerr" id="formerr" role="alert"></p>
+    </form>
+
+    <div class="done" role="status" aria-live="polite">
+      <h2>Thank You</h2>
+      <p>I will be in touch within a few days.</p>
+      <span class="sig">Russel Mangiapane III</span>
+    </div>
+
+    <div class="contact">
+      <p class="name">Russel Mangiapane III</p>
+      <p class="role">Founder</p>
+      <p>734-210-7329</p>
+      <p><a href="mailto:admin@mangbrothers.com">admin@mangbrothers.com</a></p>
+    </div>
+  </main>
+</div>
+<div class="bar bottom" aria-hidden="true"></div>
+
+<script>
+/* ===== CONFIG: paste the Apps Script web app URL here. Left blank = preview mode (no data sent). ===== */
+var ENDPOINT = "https://script.google.com/macros/s/AKfycby0VndkWXgNHUfHyO4i0g9_sZOBvxhgxX3gywyvfL3d0yV4mZFyNHkNruWc3PxIH73o/exec";
+/* Where the visitor came from. Each QR code or link gets its own ?src= tag, e.g.
+   apps.mangbrothers.com/connect?src=meet-the-kehoes-2026  ->  "meet the kehoes 2026".
+   No tag = "Website". */
+var SOURCE = (function () {
+  try {
+    var s = new URLSearchParams(location.search).get("src") || "";
+    return s.replace(/[-_]+/g, " ").replace(/[^\w .,'&]/g, "").trim().slice(0, 80) || "Website";
+  } catch (e) { return "Website"; }
+})();
+
+(function () {
+  var t0 = Date.now();
+  var f = document.getElementById("f");
+  var card = document.getElementById("card");
+  var go = document.getElementById("go");
+  var formerr = document.getElementById("formerr");
+  var otherText = document.getElementById("otherText");
+  var emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+
+  Array.prototype.forEach.call(document.querySelectorAll('input[name="topic"]'), function (r) {
+    r.addEventListener("change", function () {
+      var isOther = document.getElementById("otherRadio").checked;
+      otherText.hidden = !isOther;
+      if (isOther) otherText.focus();
+    });
+  });
+
+  function val(id) { return document.getElementById(id).value.trim(); }
+  function mark(k, bad) { document.querySelector('.field[data-k="' + k + '"]').classList.toggle("bad", bad); }
+
+  ["name", "email"].forEach(function (id) {
+    document.getElementById(id).addEventListener("input", function () { mark(id, false); });
+  });
+
+  function showError(msg) { formerr.textContent = msg; formerr.style.display = "block"; }
+
+  f.addEventListener("submit", function (e) {
+    e.preventDefault();
+    formerr.style.display = "none";
+
+    var bad = [];
+    if (!val("name")) bad.push("name");
+    if (!emailRe.test(val("email"))) bad.push("email");
+    ["name", "email"].forEach(function (k) { mark(k, bad.indexOf(k) > -1); });
+    if (bad.length) { document.getElementById(bad[0]).focus(); return; }
+
+    var picked = document.querySelector('input[name="topic"]:checked');
+    var topic = picked ? picked.value : "";
+    if (topic === "Other" && val("otherText")) topic = "Other: " + val("otherText");
+
+    var data = {
+      name: val("name"), email: val("email"), phone: val("phone"), role: val("role") || "(not given)",
+      topic: topic, notes: val("notes"),
+      website: val("website"), elapsed: Date.now() - t0, source: SOURCE
+    };
+
+    go.disabled = true; go.textContent = "Sending…";
+
+    if (!ENDPOINT) { // preview mode
+      setTimeout(function () { card.classList.add("sent"); card.scrollIntoView({block:"start"}); }, 400);
+      return;
+    }
+
+    // text/plain keeps this a "simple" request, so no CORS preflight to Apps Script
+    fetch(ENDPOINT, { method: "POST", body: JSON.stringify(data) })
+      .then(function (r) { return r.json(); })
+      .then(function (res) {
+        if (res && res.ok) { card.classList.add("sent"); card.scrollIntoView({block:"start"}); return; }
+        if (res && res.error === "busy") {
+          showError("The form is busy right now. Please try again in a few minutes.");
+        } else if (res && res.error === "closed") {
+          showError("This form is closed. Please email admin@mangbrothers.com and I will get back to you.");
+        } else {
+          showError("Something went wrong. Please check your entries and tap Connect again.");
+        }
+        go.disabled = false; go.textContent = "Connect";
+      })
+      .catch(function () {
+        showError("Could not send. Check your connection and tap Connect again. Your entries are still here.");
+        go.disabled = false; go.textContent = "Connect";
+      });
+  });
+})();
+</script>
+</body>
+</html>
