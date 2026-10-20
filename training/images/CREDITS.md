@@ -18,3 +18,8 @@ All photos are from Wikimedia Commons under the licenses shown. CC BY and CC BY-
 - crew-fall-cleanup/fall-bed-cleared.jpg: Unsplash (source ID not recorded) (Unsplash/Pexels license, free to use)
 - crew-lights/lights-finished-house.jpg: Unsplash photo-1664289342468 (Unsplash/Pexels license, free to use)
 - crew-fall-cleanup/fall-street-pile.jpg: Unsplash photo-1736546739346 (Unsplash license, free to use)
+
+## walker-job (placeholders, AI-generated with ChatGPT on 20 October 2026; Russel is replacing them with real photos)
+- walker-job/hanger-on-knob.jpg
+- walker-job/walk-the-sidewalk.jpg
+- walker-job/street-photo.jpg
