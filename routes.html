@@ -416,6 +416,13 @@ function render(){
 // condition that names a module not imported yet is waived until it is imported. Settings live in trainingSettings.
 const T2_DEFAULTS = {
   passMark: 80, retake: { mode:"unlimited", max:0, waitMinutes:0 }, walkerUnlock: "review",
+  // The practice route (Russel, October 20): five real houses in Livonia near the Joy Road McDonald's, picked by DI. No client is attached.
+  route: { name:"Practice route", service:"fall", fromName:"five houses near the Joy Road McDonald's (picked by DI)", on:"2026-10-20", stops:{
+    p1:{ name:"Practice house 1", address:"9102 Frederick St, Livonia, MI 48150", lat:42.357489, lon:-83.353101, order:1 },
+    p2:{ name:"Practice house 2", address:"9013 Denne St, Livonia, MI 48150", lat:42.356515, lon:-83.350758, order:2 },
+    p3:{ name:"Practice house 3", address:"31141 Westfield St, Livonia, MI 48150", lat:42.359216, lon:-83.348996, order:3 },
+    p4:{ name:"Practice house 4", address:"31225 Hathaway St, Livonia, MI 48150", lat:42.360711, lon:-83.349998, order:4 },
+    p5:{ name:"Practice house 5", address:"9331 Sunset Ave, Livonia, MI 48150", lat:42.359810, lon:-83.347408, order:5 } } },
   seasons: { always:{from:""}, fall:{from:"2026-10-20"}, lights:{from:"2026-10-20"}, snow:{from:"2026-10-20"}, lawn:{from:"2027-03-15"} },
   gates: {
     walker: ["offer_signed","quiz_passed:walker-job","viewed:systems-walker"],
@@ -426,7 +433,7 @@ const T2_PRACTICE = [["schedule","Open the practice day"],["checkoff","Check off
 let trainSet={}, trainQuiz={}, trainViewed={}, trainPractice={};
 function tset(){ const s=trainSet||{};
   return { passMark:Number(s.passMark ?? T2_DEFAULTS.passMark), retake:{ ...T2_DEFAULTS.retake, ...(s.retake||{}) }, walkerUnlock:s.walkerUnlock||T2_DEFAULTS.walkerUnlock,
-    seasons:{ ...T2_DEFAULTS.seasons, ...(s.seasons||{}) }, gates:{ ...T2_DEFAULTS.gates, ...(s.gates||{}) }, route:s.route||null }; }
+    seasons:{ ...T2_DEFAULTS.seasons, ...(s.seasons||{}) }, gates:{ ...T2_DEFAULTS.gates, ...(s.gates||{}) }, route:s.route||T2_DEFAULTS.route }; }
 const isModule = x => !!x && x.kind==="module";
 const t2Arr = v => Array.isArray(v) ? v : v && typeof v==="object" ? Object.keys(v).sort((a,b)=>a-b).map(i=>v[i]) : [];
 const seasonFrom = x => ((tset().seasons[(x&&x.season)||"always"])||{}).from || "";
