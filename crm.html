@@ -165,6 +165,13 @@
   @media(min-width:701px){.lead select{display:none}}
   @media(max-width:700px){.board{grid-auto-flow:row;grid-auto-columns:auto;grid-template-columns:1fr}.col{min-height:0}.lead{cursor:default}}
   .srcstrip{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+  .seasonbar{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:12px}
+  .seasonbar .sb{display:inline-flex;align-items:center;gap:6px;min-height:36px;padding:6px 12px;border-radius:999px;background:var(--card);border:1px solid var(--line);color:var(--ink2);font-weight:500}
+  .seasonbar .sb .dot{width:8px;height:8px;border-radius:50%}
+  .seasonbar .sb .n{color:var(--muted);font-size:12px}
+  .seasonbar .sb.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+  .seasonbar .sb.on .n{color:inherit;opacity:.75}
+  .seasonbar .pinbtn{margin-left:auto;min-height:36px}
   .srcstrip .pill{background:var(--card);border:1px solid var(--line);color:var(--ink2)}
   /* client dialog */
   .svc{border:1px solid var(--line);border-radius:var(--r);padding:8px 10px;margin-top:6px;background:var(--bg)}
@@ -316,11 +323,7 @@ details.ssamore summary{cursor:pointer;font-weight:600}
   <nav id="nav" hidden>
     <button data-view="leads" class="on">Leads</button>
     <button data-view="clients">Clients</button>
-    <button data-view="svc-lawn"><span class="dot" style="background:var(--s-lawn)"></span>Lawn</button>
-    <button data-view="svc-fall"><span class="dot" style="background:var(--s-fall)"></span>Fall</button>
-    <button data-view="svc-lights"><span class="dot" style="background:var(--s-lights)"></span>Lights</button>
-    <button data-view="svc-snow"><span class="dot" style="background:#9ec3f0"></span>Snow</button>
-    <button data-view="svc-landscaping"><span class="dot" style="background:var(--s-landscaping)"></span>Landscaping</button>
+    <span id="pinSlot" style="display:contents"></span>
     <button data-view="servicelog">Service log</button>
     <button data-view="charges">Charges</button>
     <div class="more" id="more">
@@ -897,24 +900,20 @@ function renderClients(m){
   const q=filters.q.toLowerCase();
   if(q) rows = rows.filter(([,c])=>[c.name,c.phone,c.address,c.email,c.interest].join(" ").toLowerCase().includes(q));
   if(filters.region) rows = rows.filter(([,c])=>c.region===filters.region);
-  if(filters.svc) rows = rows.filter(([,c])=>hasSvc(c,filters.svc));
   if(filters.status==="unsigned") rows = rows.filter(([,c])=>unsignedFor(c));
   else if(filters.status==="nocard") rows = rows.filter(([,c])=>c.payOnFile && !payOnFileOk(c));
   else if(filters.status) rows = rows.filter(([,c])=>c.status===filters.status);
   sortRows(rows);
-  const counts = {}; Object.keys(SERVICE_TYPES).forEach(t=>counts[t]=live().filter(([,c])=>c.status==="active"&&hasSvc(c,t)).length);
   const nUnsigned = live().filter(([,c])=>unsignedFor(c)).length, nNoCard = live().filter(([,c])=>c.payOnFile && !payOnFileOk(c)).length;
-  m.innerHTML = `
+  m.innerHTML = seasonBar("") + `
     <div class="filters">
       <input type="search" id="fq" placeholder="Search name, phone, address" value="${esc(filters.q)}">
       <select id="fregion"><option value="">All regions</option>${opts(REGIONS,filters.region)}</select>
-      <select id="fsvc"><option value="">All services</option>${Object.entries(SERVICE_TYPES).map(([k,v])=>`<option value="${k}"${filters.svc===k?" selected":""}>${esc(v.label)}</option>`).join("")}</select>
       <select id="fstatus"><option value="">Active, paused, former</option>${opts(["active","paused","former"],filters.status,STATUSES)}<option value="unsigned"${filters.status==="unsigned"?" selected":""}>Contract not signed (${nUnsigned})</option><option value="nocard"${filters.status==="nocard"?" selected":""}>No payment method on file (${nNoCard})</option></select>
       <select id="fsort" title="Sort">${Object.entries(SORTS).map(([k,l])=>`<option value="${k}"${sort.key===k?" selected":""}>Sort: ${esc(l)}</option>`).join("")}</select>
       <button class="small" id="fdir" title="Flip direction">${sort.dir===1?"↑ A to Z / oldest first":"↓ Z to A / newest first"}</button>
       <button class="primary" id="newClient">+ New client</button>
     </div>
-    <div class="srcstrip">${Object.entries(SERVICE_TYPES).map(([k,v])=>`<span class="tag ${k}">${esc(v.label)} ${counts[k]}</span>`).join("")}<span class="meta" style="margin-left:6px">active clients per service</span></div>
     <div class="card" style="padding:0 8px;overflow-x:auto">
     <table><thead><tr>${th("name","Name")}<th>Phone</th>${th("address","Address")}${th("region","Region")}${th("services","Services")}${th("status","Status")}${th("pay","Billing")}${th("last","Last contact")}</tr></thead>
     <tbody>${rows.map(([id,c])=>`<tr class="click" data-id="${id}">
@@ -923,7 +922,7 @@ function renderClients(m){
     </tbody></table></div>`;
   $("#fq").oninput = e => { filters.q=e.target.value; renderClients(m); const i=$("#fq"); i.focus(); i.setSelectionRange(i.value.length,i.value.length); };
   $("#fregion").onchange = e => { filters.region=e.target.value; renderClients(m); };
-  $("#fsvc").onchange = e => { filters.svc=e.target.value; renderClients(m); };
+  wireSeasonBar(m);
   $("#fstatus").onchange = e => { filters.status=e.target.value; renderClients(m); };
   $("#newClient").onclick = () => openClient(null, "active");
   $("#fsort").onchange = e => { sort={key:e.target.value, dir: e.target.value==="first"||e.target.value==="last" ? -1 : 1}; try{ localStorage.setItem("crmSort", JSON.stringify(sort)); }catch(x){} renderClients(m); };
@@ -975,8 +974,9 @@ function renderService(m, type){
       ${byG[g].sort((a,b)=>(a.s.install||"9").localeCompare(b.s.install||"9")||a.c.name.localeCompare(b.c.name)).map(r=>`<tr class="click" data-id="${r.id}">${nameCell(r)}<td>${fmtDate(r.s.install)}</td><td>${fmtDate(r.s.takedown)}</td><td class="num">${money(r.s.price)}</td><td>${r.s.gutters?"Bundled":""}</td><td>${payPill(r.c)}</td></tr>`).join("")}
       </tbody></table>`).join("");
   }
-  m.innerHTML = `<div class="card svcbar ${type}"><div class="row"><h2 style="margin:0"><span class="tag ${type}">${esc(T.label)}</span> ${rows.length} ${rows.length===1?"entry":"entries"}</h2><span class="meta">total ${money(total)}</span></div>
+  m.innerHTML = seasonBar(type) + `<div class="card svcbar ${type}"><div class="row"><h2 style="margin:0"><span class="tag ${type}">${esc(T.label)}</span> ${rows.length} ${rows.length===1?"entry":"entries"}</h2><span class="meta">total ${money(total)}</span></div>
     ${rows.length ? body : `<div class="empty">No one has a ${esc(T.label)} service yet. Open a client and use + Add service.</div>`}</div>`;
+  wireSeasonBar(m);
   m.querySelectorAll("tr.click").forEach(tr => tr.onclick = e => { if(!e.target.matches("input,a")) openClient(tr.dataset.id); });
   m.querySelectorAll("input[data-tick]").forEach(cb => cb.onchange = () => { const [id,sid,k]=cb.dataset.tick.split("/"); commit(`${clients[id].name}: ${k} ${cb.checked?"done":"not done"}`, { [`clients/${id}/services/${sid}/${k}`]: cb.checked, ...fieldUpdates("clients/"+id, stamp()) }); });
 }
@@ -2816,11 +2816,38 @@ function renderTrash(m){
   m.querySelectorAll("[data-purge]").forEach(b=> b.onclick = () => { if(confirm(`Delete ${clients[b.dataset.purge].name} and all notes permanently?`)) purgeClient(b.dataset.purge); });
 }
 
+// ---------- seasons (service views docked under Clients, pinnable to the main menu) ----------
+const SEASON_ORDER = [["lawn","var(--s-lawn)"],["fall","var(--s-fall)"],["lights","var(--s-lights)"],["snow","#9ec3f0"],["landscaping","var(--s-landscaping)"]];
+let pinnedSvc = []; try{ pinnedSvc = JSON.parse(localStorage.getItem("crmPinnedSvc")||"[]").filter(k=>SERVICE_TYPES[k]); }catch(e){}
+function seasonBar(active){
+  const n = k => live().filter(([,c])=>c.status==="active"&&hasSvc(c,k)).length;
+  const pinned = active && pinnedSvc.includes(active);
+  return `<div class="seasonbar" role="tablist" aria-label="Filter clients by season">
+    <button type="button" class="sb${active?"":" on"}" data-season="">All clients</button>
+    ${SEASON_ORDER.map(([k,col])=>`<button type="button" class="sb${active===k?" on":""}" data-season="${k}"><span class="dot" style="background:${col}"></span>${esc(SERVICE_TYPES[k].label)} <span class="n">${n(k)}</span></button>`).join("")}
+    ${active?`<button type="button" class="small pinbtn" data-pin="${active}" title="${pinned?"Take it off":"Put it on"} the main menu">${pinned?"Unpin from menu":"\u{1F4CC} Pin to menu"}</button>`:""}
+  </div>`;
+}
+function wireSeasonBar(m){
+  m.querySelectorAll("[data-season]").forEach(b=>b.onclick=()=>setNav(b.dataset.season?"svc-"+b.dataset.season:"clients"));
+  m.querySelectorAll("[data-pin]").forEach(b=>b.onclick=()=>{ const k=b.dataset.pin;
+    pinnedSvc = pinnedSvc.includes(k) ? pinnedSvc.filter(x=>x!==k) : SEASON_ORDER.map(x=>x[0]).filter(x=>x===k||pinnedSvc.includes(x));
+    try{ localStorage.setItem("crmPinnedSvc", JSON.stringify(pinnedSvc)); }catch(e){}
+    renderPins(); setNav(view); });
+}
+function renderPins(){
+  const slot=$("#pinSlot");
+  slot.innerHTML = SEASON_ORDER.filter(([k])=>pinnedSvc.includes(k)).map(([k,col])=>`<button data-view="svc-${k}"><span class="dot" style="background:${col}"></span>${esc(SERVICE_TYPES[k].label)}</button>`).join("");
+  slot.querySelectorAll("button[data-view]").forEach(b => b.onclick = () => setNav(b.dataset.view));
+}
+renderPins();
+
 // ---------- nav ----------
 const SECONDARY = { import:"Import CSV", tools:"QuickBooks and export", trash:"Trash", contracts:"Contracts" };
 function setNav(v){
   view=v; closeMore();
-  document.querySelectorAll("nav button[data-view]").forEach(x=>x.classList.toggle("on",x.dataset.view===v));
+  const navV = v.startsWith("svc-") && !pinnedSvc.includes(v.slice(4)) ? "clients" : v;
+  document.querySelectorAll("nav button[data-view]").forEach(x=>x.classList.toggle("on",x.dataset.view===navV));
   const mb=$("#moreBtn"); const sec=SECONDARY[v];
   mb.innerHTML = (sec||"More") + ' <span class="caret">&#9662;</span>'; mb.classList.toggle("on", !!sec);
   render();
