@@ -169,7 +169,7 @@ td strong{font-weight:650}
 
 <div class="page central" id="root">
 <header>
-  <span class="eyebrow">Mangiapane Brothers LLC · internal · drawn October 7, 2026 · last updated October 17, 2026 (night, zoom web)</span>
+  <span class="eyebrow">Mangiapane Brothers LLC · internal · drawn October 7, 2026 · last updated October 19, 2026 (2400 ported to Quo, Quo to CRM sync)</span>
   <h1>System Map</h1>
   <p class="lede">Where each kind of company data lives, which system owns it, and which tool carries it from one system to the next. A plain-language guide to every part follows the map. The first view is the central system for the next month. The second view adds everything planned after it.</p>
 </header>
@@ -237,6 +237,11 @@ td strong{font-weight:650}
   <div class="tw"><table>
     <thead><tr><th>Date</th><th>Change</th><th>State</th></tr></thead>
     <tbody>
+    <tr><td><strong>Oct 19</strong></td><td><strong>Quo to CRM sync, live (scheduled task).</strong> Every hour from 8am to 9pm, Claude pulls new calls, voicemails and texts on 2400 (and the temporary number until it is deleted) through the Quo connector, matches each one to a client by phone number, and writes it into that client's contact log with a <em>quo</em> tag and a new last-contact date. A real conversation from an unknown number (an answered call over 20 seconds, a voicemail, or a text that is not spam) becomes a new lead on the Leads board. Hang-ups with no voicemail and spam are only counted in the report. It never texts anyone and never changes status, billing or contracts. Each activity is logged once, by its Quo ID. First run October 20 at 8:37am, back-filling from the port. Quo webhooks for instant updates are deferred to the Christmas Break DI Update project.</td><td><span class="pill live">Live</span></td></tr>
+    <tr><td><strong>Oct 19</strong></td><td><strong>734-450-2400 ported to Quo.</strong> The main number moved from Verizon One Talk into Quo. Calls in and out and texts in and out tested and working; texting registration (A2P 10DLC) approved; caller ID name "Mangiapane Bros" approved; every call recorded with an AI transcript and summary. Texts, missed calls and voicemails now email admin@. Open: rename the 2400 inbox, add a missed-call auto-reply text, decide on the recording notice before a second person answers 2400, delete the temporary number after two weeks, and remove One Talk and the virtual lines from Verizon.</td><td><span class="pill live">Live</span></td></tr>
+    <tr><td><strong>Oct 18</strong></td><td><strong>Door hanger work counts as on file, live (f359d16).</strong> A door hanger who logged any day of work on the Routes page goes to Past, not Remove. The Past dialog shows the days and doors still to be paid, his archive keeps a copy of the route logs, and the Routes history is never deleted. The signing service code from earlier today is deployed.</td><td><span class="pill live">Live</span></td></tr>
+    <tr><td><strong>Oct 18</strong></td><td><strong>Team Manager: Leaving, live (e7ff119).</strong> Anyone moved to Not hired or Past comes off the Paperwork tab. Someone who never signed, uploaded, worked or was paid is <em>removed</em>: off the Team list, Paperwork and Training, his paperwork link stops working, and his applicant card goes back to Not hired with his notes and files (kept a year, privacy policy). Anyone with something on file goes to <em>Past</em> as before, and his paperwork link stops working too; signed forms stay sealed in the vault. Door hangers can be removed or moved to Past, and come back as door hangers. Both folders now go to Drive, Staff, <em>Past and Partial Hires</em>. Tests: 40 page checks; rules checked, no change needed.</td><td><span class="pill live">Live</span></td></tr>
+    <tr><td><strong>Oct 17, night</strong></td><td><strong>Projects: Import from Claude tab removed (f5826bb, live).</strong> Teammates' Claude now adds projects directly in the page, through the teammate's own signed-in browser, so every change is saved under his name and can be undone. The team brief says so and lists the field rules in plain words.</td><td><span class="pill live">Live</span></td></tr>
     <tr><td><strong>Oct 17, night</strong></td><td><strong>System map animated into a zoom web.</strong> Every card on the map zooms in to its parts, and each part zooms in again down to a single piece with its description, status, notes and connections. Moving dots show live data flow. The plain-language guide is now drawn from the same source as the map, so the two cannot drift apart. Deep links work: add #crm or #team to the link to open that part.</td><td><span class="pill live">Live</span></td></tr>
     <tr><td><strong>Oct 17, night</strong></td><td><strong>Training for door hangers.</strong> The Routes page has a Training tab for walkers: material assigned to door hangers or to everyone, his unsigned paperwork as cards (same link as the email), and Mark done. Until his distributor agreement is signed, it is the only tab he sees. In Team Manager, Training, door hangers are a role to assign to, they appear in Progress, and each one's row opens his own assignments. The office's practice route on Routes is now labeled Practice route. Rules: door hangers read the library and their own assignments and mark their own items done (230 tests).</td><td><span class="pill part">Pushed, deploy rules</span></td></tr>
     <tr><td><strong>Oct 17, night</strong></td><td><strong>Employee paperwork, the vault and Training, pushed (9d92d84, 8aefb35).</strong> New hires sign online from a private link: the offer, the Employee Information Privacy Policy, the official W-4, MI-W4 and I-9 (with the documents they will show), or the W-9 for contractors, and direct deposit. The page fills the real government PDFs and places the drawn signature. Tax, I-9 and bank forms are encrypted on the phone before they leave it; opening them takes the paperwork password, and the rules let only Russel and admins he names read them. Claude's own sign-in is shut out. Team Manager's Paperwork tab groups people by position and W-2 or 1099, with an Email button per form, I-9 Section 2 and paper I-9 tracking. Training: a library of decks, SOPs, videos and documents, assigned by role or person; the crew Training tab shows paperwork cards until signed, and a new hire sees only Training until his offer is signed. Hiring someone now sends his paperwork automatically. Tests: 223 rules, 13 service, 34 page, 40 tab, 32 training.</td><td><span class="pill part">Pushed, deploy rules and Code.gs</span></td></tr>
@@ -268,15 +273,15 @@ td strong{font-weight:650}
     <tr><td><strong>Oct 8</strong></td><td>Internal system given its own address, apps.mangbrothers.com.</td><td><span class="pill live">Done</span></td></tr>
     </tbody>
   </table></div>
-  <p class="lede"><strong>Next, in order:</strong> publish the October 17 rules and the latest Code.gs. Set the paperwork password and keep the recovery code on paper. Send Indeed application emails to admin@. Set each person's position and W-2 or 1099 on his profile, then email paperwork. Write the handbook policy modules and SOPs (Projects) and load them into Training. Register for Michigan new-hire reporting. Then schedules with Russel, the $1 test end to end, attorney answers on the charge authorization and typed signature, lawn billing, and Claude's scheduled Quo and QuickBooks transfers.</p>
+  <p class="lede"><strong>Next, in order:</strong> publish the October 17 rules. At the first payroll pass, pay archived door hangers with unpaid route work (Kamari Garth). Set the paperwork password and keep the recovery code on paper. Send Indeed application emails to admin@. Set each person's position and W-2 or 1099 on his profile, then email paperwork. Write the handbook policy modules and SOPs (Projects) and load them into Training. Register for Michigan new-hire reporting. Then schedules with Russel, the $1 test end to end, attorney answers on the charge authorization and typed signature, lawn billing, and the payroll push. Quo webhooks wait for the Christmas Break DI Update.</p>
 </section>
 
 <section>
   <h2>Checked October 7</h2>
   <div class="cols">
-    <div class="note found"><h3>Call summaries are not reaching email</h3><p>Quo account mail goes to admin@mangbrothers.com (on Outlook when checked, on Gmail since October 9). That inbox holds only Quo account and support mail. No call summary has arrived there or in Gmail in the last three weeks. The email copy has to be switched on in Quo before it can serve as a cross-check.</p></div>
-    <div class="note found"><h3>Transcripts do reach Claude</h3><p>The Quo connector returned full transcripts for calls on October 5 and 6. The Quo to CRM leg is ready to build. It is not running: nothing has been logged to the CRM from those calls automatically.</p></div>
-    <div class="note found"><h3>The 2400 number is not in Quo</h3><p>Quo holds one number, (947) 207-4963. Quo cancelled the port of 734-450-2400 on October 5 and sent an update on October 6 that is still unread. Any call that reaches 2400 without forwarding to Quo never enters this system.</p></div>
+    <div class="note found"><h3>Call summaries are not reaching email</h3><p>Quo account mail goes to admin@mangbrothers.com (on Outlook when checked, on Gmail since October 9). That inbox holds only Quo account and support mail. No call summary has arrived there or in Gmail in the last three weeks. The email copy has to be switched on in Quo before it can serve as a cross-check.</p><p>Update October 19: texts, missed calls and voicemails with transcripts now email admin@.</p></div>
+    <div class="note found"><h3>Transcripts do reach Claude</h3><p>The Quo connector returned full transcripts for calls on October 5 and 6. The Quo to CRM leg is ready to build. It is not running: nothing has been logged to the CRM from those calls automatically.</p><p>Update October 19: the hourly Quo to CRM sync is live.</p></div>
+    <div class="note found"><h3>The 2400 number is not in Quo</h3><p>Quo holds one number, (947) 207-4963. Quo cancelled the port of 734-450-2400 on October 5 and sent an update on October 6 that is still unread. Any call that reaches 2400 without forwarding to Quo never enters this system.</p><p>Resolved October 19: 2400 is ported and lives in Quo.</p></div>
   </div>
 </section>
 
@@ -287,7 +292,7 @@ td strong{font-weight:650}
     <thead><tr><th>Data</th><th>System of record</th><th>Copies go to</th><th>Carried by</th><th>State</th></tr></thead>
     <tbody>
     <tr><td><strong>Client and lead profiles</strong></td><td>CRM</td><td>QuickBooks customer, Quo contact name</td><td>Claude</td><td><span class="pill part">By hand</span></td></tr>
-    <tr><td><strong>Calls, texts, transcripts</strong></td><td>Quo</td><td>CRM contact log (summary per contact)</td><td>Claude, Quo connector</td><td><span class="pill plan">Planned</span></td></tr>
+    <tr><td><strong>Calls, texts, transcripts</strong></td><td>Quo</td><td>CRM contact log (summary per contact), new leads from unknown numbers</td><td>Claude, hourly scheduled task through the Quo connector</td><td><span class="pill live">Live, hourly</span></td></tr>
     <tr><td><strong>Services sold and prices</strong></td><td>CRM</td><td>QuickBooks invoice lines</td><td>Claude</td><td><span class="pill part">By hand</span></td></tr>
     <tr><td><strong>Signed agreements</strong></td><td>CRM, locked record</td><td>PDF in Google Drive, PDF emailed to the client</td><td>The CRM page itself</td><td><span class="pill live">Live</span></td></tr>
     <tr><td><strong>Invoices and money received</strong></td><td>QuickBooks</td><td>CRM billing status: billed, paid, past due, date</td><td>Card charges: the signing service, at signing and from the CRM. Everything else: Claude</td><td><span class="pill part">By hand</span></td></tr>
@@ -347,7 +352,7 @@ td strong{font-weight:650}
   <h2>Weak points in the plan, with a recommendation for each</h2>
   <div class="cols">
     <div class="note"><h3>Payroll authority is assigned to the wrong system</h3><p>The site cannot be the system of record for payroll. It does not calculate withholding, file taxes or issue pay stubs.</p><p class="rec">Make the site the system of record for time records. QuickBooks Payroll stays the system of record for pay. An admin approves hours before they leave the site.</p></div>
-    <div class="note"><h3>Claude is a single point of failure</h3><p>Every transfer depends on one personal account, one Mac and a Chrome window that must be open. Nothing runs unless someone asks. A missed session means a missed client record.</p><p class="rec">Give Claude its own limited sign-in to the database, which the access rules already allow for. Run the Quo and QuickBooks transfers as scheduled tasks. Keep a queue with receipts and a daily reconciliation count.</p></div>
+    <div class="note"><h3>Claude is a single point of failure</h3><p>Every transfer depends on one personal account, one Mac and a Chrome window that must be open. Nothing runs unless someone asks. A missed session means a missed client record.</p><p class="rec">Give Claude its own limited sign-in to the database, which the access rules already allow for. Run the Quo and QuickBooks transfers as scheduled tasks. Keep a queue with receipts and a daily reconciliation count.</p><p>Update October 19: Claude has its own sign-in, and both the QuickBooks queue and the Quo to CRM transfer run hourly as scheduled tasks.</p></div>
     <div class="note"><h3>Money received has two entry points</h3><p>An admin records a payment in the CRM at signing. QuickBooks records the same payment when the card clears or the deposit lands. The two will drift.</p><p class="rec">QuickBooks owns money received. The CRM entry at signing is a claim. Claude confirms it against QuickBooks and flags every mismatch.</p><p>Update October 15: once card mode is on, the card charge at signing is recorded in QuickBooks by the signing service itself, which closes this gap for card payments. Checks and bank payments still need the cross-check.</p></div>
     <div class="note"><h3>A password page on the site is a liability</h3><p>A home-built page in Firebase has no encryption at rest that you control, no audit trail and no safe way to rotate access. One rules mistake exposes bank logins.</p><p class="rec">Buy a password manager with shared vaults by tier. Link to it from the portal. Client door codes that crews need belong on the job record, not in the vault.</p></div>
     <div class="note"><h3>Drive cannot replace Firebase</h3><p>Drive stores files. The pages need a database. Moving "all data" to Drive would break every page.</p><p class="rec">Keep Firebase as the database. Move only documents to a company shared Drive: signed agreements, worker paperwork, templates.</p></div>
@@ -382,14 +387,15 @@ accountant:{t:'Accountant and CFO',k:'People',st:'live',web:[970,16,190,50],s:['
 
 quo:{t:'Quo (VoIP phone system)',gt:'Quo',k:'Outside service',st:'live',web:[20,150,210,90],s:['calls, texts, voicemail','transcripts and summaries','raw record of every contact'],
  g:'the company’s phone system for calls, texts, voicemail and transcripts.',
- d:['The company phone system for calls, texts, voicemail and transcripts. Every conversation with a client or lead starts here, which makes Quo the raw record of every contact.','The admin team reaches the company number through Quo. It is also the number used for two-step verification on the company Google account.'],
- kids:['quoCalls','quoTx','quoCrm']},
+ d:['The company phone system for calls, texts, voicemail and transcripts. Every conversation with a client or lead starts here, which makes Quo the raw record of every contact.','The admin team reaches the company number through Quo. It is also the number used for two-step verification on the company Google account.','The main number, 734-450-2400, was ported from Verizon into Quo on October 19.'],
+ kids:['quoCalls','quoTx','quoCrm','quoHook']},
 quoCalls:{t:'Calls, texts and voicemail',st:'live',d:'Every call and text on the company number, shared by the admin team.'},
 quoTx:{t:'Transcripts and summaries',st:'live',d:'Quo transcribes each call and writes a summary. These are what Claude reads to create and update client and lead records.'},
-quoCrm:{t:'Quo to CRM transfer',st:'plan',d:'Claude reads transcripts through the Quo connector and writes new leads and the contact log into the CRM. Today it happens only when someone asks in a session. A scheduled transfer is planned.'},
+quoCrm:{t:'Quo to CRM transfer',st:'live',d:'Every hour from 8am to 9pm, a scheduled task has Claude read new calls, voicemails and texts through the Quo connector and write them into each client’s contact log. Real conversations from unknown numbers become new leads.',facts:['Live since October 19. First run October 20, back-filling from the port.','Each activity is logged once, by its Quo ID.','Never texts anyone and never changes status, billing or contracts.']},
+quoHook:{t:'Instant updates (webhooks)',st:'plan',d:'Quo tells the system the moment a call ends or a text arrives, so leads show in seconds instead of within the hour. Deferred to the Christmas Break DI Update.'},
 
-email:{t:'Email inbox',k:'Planned',st:'plan',web:[20,290,210,70],s:['second copy of each call summary','none arriving yet'],
- d:['A planned second copy of every Quo call summary, sent to email, so Claude can cross-check that no call was missed.','No summaries arrive yet. The email copy has to be switched on in Quo before it can serve as a cross-check.']},
+email:{t:'Email inbox',k:'Outside service',st:'live',web:[20,290,210,70],s:['texts, missed calls, voicemails','to admin@ since Oct 19'],
+ d:['A second copy of every incoming text, missed call and voicemail (with its transcript), emailed by Quo to admin@mangbrothers.com.','It is switched on as of October 19. Claude does not use it as a cross-check yet.']},
 
 internal:{t:'Internal system',k:'System',st:'live',
  d:['One web app at apps.mangbrothers.com with one sign-in list. Owners, office staff, crew managers, crew members and door hanger distributors all come through the same front door, and each sees only the pages their role needs.','Behind the pages sit the database, which holds the records, and the signing service, which sends mail, files documents and charges cards.'],
@@ -450,7 +456,7 @@ ppPolicy:{t:'Privacy policy',st:'push',d:'The written policy Michigan law requir
 tmTrain:{t:'Training',st:'push',d:'The library of slide decks, how-to procedures (SOPs), videos and documents, assigned by role (crew managers, crew members, door hangers, everyone) or by person, with each person’s progress.'},
 tmRep:{t:'Reports',st:'push',d:'Every employee report by reference number, filed by crew managers from their daily log.'},
 tmPay:{t:'Payroll',st:'push',d:'Pay rates by job and role, pay periods and what was paid.'},
-tmPast:{t:'Past',st:'push',d:'Former employees, with their whole record archived and restorable.'},
+tmPast:{t:'Past',st:'push',d:'Former employees, with their whole record archived and restorable. Someone hired who leaves before filling anything out is removed instead and goes back to Not hired. Both kinds come off Paperwork, and their Drive folders move to Past and Partial Hires.'},
 
 crews:{t:'Crews',gt:'Crews (routes and schedules)',st:'live',web:[614,200,90,90],s:['routes, map,','schedules,','day approval'],
  d:['The page crews work from on their phones. The office sees every crew; a manager sees his crew; a member sees himself.'],
@@ -516,15 +522,15 @@ drive:{t:'Google Drive',gt:'Google Workspace',k:'Outside service',st:'live',web:
 claude:{t:'Claude on Russel’s account',gt:'Claude (AI assistant)',k:'Integration layer',st:'hand',web:[380,520,420,100],hub:1,
  s:['Integration layer: carries data between the systems','Quo connector · QuickBooks connector · Chrome · GitHub'],fs:'At the Team plan: split into a company account and a personal account',
  g:'builds and maintains the system, and carries data between systems that have no direct link yet (for example the phone system and the CRM). By design, it cannot open the employee paperwork vault on its own.',
- d:['Claude builds and maintains the system and carries data between systems that have no direct link yet, such as the phone system and the CRM.','Most transfers still run only when someone asks in a session, which makes Claude a single point of failure until the scheduled transfers exist. By design, it cannot open the employee paperwork vault.'],
+ d:['Claude builds and maintains the system and carries data between systems that have no direct link yet, such as the phone system and the CRM.','The Quo and QuickBooks transfers now run hourly as scheduled tasks. Other transfers still run only when someone asks in a session. By design, it cannot open the employee paperwork vault.'],
  ffact:'At the Team plan: split into a company account and a personal account.',
  kids:['clQuo','clQb','clDb','clChrome','clGit','clSched']},
-clQuo:{t:'Quo connector',st:'hand',d:'Reads call transcripts and texts. Writes clients, leads and the contact log into the CRM, on request for now.'},
+clQuo:{t:'Quo connector',st:'live',d:'Reads call transcripts, voicemails and texts. The hourly Quo to CRM sync writes them into the contact log and turns real conversations from unknown numbers into leads.'},
 clQb:{t:'QuickBooks connector',st:'hand',d:'Records customers, invoices and payments in QuickBooks, and brings who paid and when back to the CRM.'},
 clDb:{t:'Own database sign-in',st:'live',d:'Since October 16 Claude has its own admin sign-in to the database. It cannot add sign-ins, remove Russel, edit a signed contract or open the paperwork vault.'},
 clChrome:{t:'Chrome',st:'hand',d:'Works in Russel’s signed-in browser where no connector exists, such as editing records directly in the CRM.'},
 clGit:{t:'GitHub',st:'live',d:'Edits the page code and publishes it from Russel’s Mac.'},
-clSched:{t:'Scheduled QuickBooks push',st:'live',d:'A scheduled task pushes the QuickBooks queue on its own. The Quo transfer and the payroll push are next.'},
+clSched:{t:'Scheduled tasks',st:'live',d:'Two scheduled tasks run on their own every hour: the QuickBooks queue push and, since October 19, the Quo to CRM sync. The payroll push is next.'},
 
 github:{t:'GitHub',k:'Supporting service',st:'live',web:[450,660,280,52],s:['account mangbrothers · publishes the pages'],
  g:'where the application’s code lives and is published to the web. Every change is recorded and can be rolled back.',
@@ -552,9 +558,9 @@ var E=[
  {id:'e3',a:'walkers',b:'frontdoor',d:'M620 66V110',dir:1,lb:[[628,92,'sign in']]},
  {id:'e4',a:'crewsPeople',b:'frontdoor',d:'M810 66V110',dir:1,lb:[[818,92,'sign in']]},
  {id:'e5',a:'qb',b:'accountant',d:'M1065 150V66',dir:1,lb:[[1073,112,'reports']]},
- {id:'e6',a:'quo',b:'email',d:'M125 240V290',dir:1,kind:'plan',lb:[[133,269,'call summaries']]},
+ {id:'e6',a:'quo',b:'email',d:'M125 240V290',dir:1,lb:[[133,269,'notifications']]},
  {id:'e7',a:'email',b:'claude',d:'M230 325H262',dir:0,kind:'plan',lb:[]},
- {id:'e8',a:'quo',b:'claude',d:'M230 195H262V555H380',dir:1,kind:'hand',lb:[[270,547,'transcripts, texts'],[270,571,'on request today','s']]},
+ {id:'e8',a:'quo',b:'claude',d:'M230 195H262V555H380',dir:1,lb:[[270,547,'transcripts, texts'],[270,571,'hourly, scheduled','s']]},
  {id:'e9',a:'signing',b:'qb',d:'M900 340H970',dir:2,lb:[[935,332,'API','m']]},
  {id:'e10',a:'signing',b:'drive',d:'M920 430H970',dir:1,lb:[[945,422,'PDFs','m']]},
  {id:'e11',a:'claude',b:'firebase',d:'M520 520V420',dir:2,kind:'hand',lb:[[532,466,'writes clients, leads, contact log, billing status · reads the QuickBooks queue'],[532,482,'own database sign-in since Oct 16 · shut out of the paperwork vault','s']]},
@@ -831,4 +837,5 @@ if(gp){
 })();
 
 </script>
+
 </body></html>
