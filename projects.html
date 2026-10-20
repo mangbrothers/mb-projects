@@ -187,6 +187,11 @@
   .lggrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px} .lggrid .card{margin-bottom:0}
   .lghead{display:flex;gap:10px;align-items:center;margin-bottom:8px} .lgsite{font-size:16px} .lghost{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .lgopen{display:inline-flex;align-items:center;padding:8px 16px;border-radius:var(--r);background:var(--accent);color:var(--accent-ink);text-decoration:none;font-weight:600}
+  .lgpin{max-width:360px;margin:24px auto;text-align:center} .lgpin h2{margin-bottom:4px}
+  .lgdots{display:flex;gap:14px;justify-content:center;margin:20px 0 8px} .lgdots span{width:14px;height:14px;border-radius:50%;border:2px solid var(--ink)} .lgdots span.on{background:var(--ink)}
+  .lgmsg{min-height:20px;color:var(--danger,#a63b3b);font-size:14px;margin:4px 0 10px}
+  .lgpinin{position:absolute;opacity:0;width:1px;height:1px;font-size:16px;pointer-events:none}
+  .lgpad{display:grid;grid-template-columns:repeat(3,72px);gap:12px;justify-content:center} .lgpad button{height:72px;border-radius:50%;font-size:26px;font-weight:500} .lgpad button:disabled{opacity:.4}
   .lgrow{display:flex;gap:6px;align-items:center;margin-top:6px} .lgrow .meta{width:70px;flex:none;margin-left:0} .lgrow code{flex:1;min-width:0} .lgrow button{flex:none}
   .lgempty{flex:1;color:var(--muted);font-size:14px;font-style:italic} #lgNew{white-space:nowrap;flex:none}
   .lgnote{color:var(--ink2);font-size:14px;margin-top:8px;white-space:pre-wrap} .lgfoot{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:10px;flex-wrap:wrap}
@@ -1064,21 +1069,133 @@ function snapshot(){
   return out.join("\n");
 }
 function backupJson(){ return JSON.stringify({ exportedAt:new Date().toISOString(), exportedBy:me.email, allowed:team, projects, tasks, fileMeta:files, note:"File contents (fileData) are not included; download files individually from the Files tab." }, null, 2); }
-// ---------- Passwords (October 17, 2026) ----------
+// ---------- Passwords (October 17, 2026; 6-digit lock October 20, 2026) ----------
 // The admin team's logins for the company's outside accounts (QuickBooks, Canva, Quo, GoDaddy...). Admins only: the
-// database rules keep crews and walkers out. Passwords stay hidden until Show, and Copy puts one on the clipboard.
+// database rules keep crews and walkers out. Since October 20 the whole list is encrypted with a 6-digit team code
+// (PBKDF2-SHA256, 600,000 rounds, AES-256-GCM) and stored as one sealed blob at logins/_vault, so the database never
+// holds a password in plain text. The code is never stored or sent anywhere. Three wrong codes lock the tab with
+// growing waits (1, 5, 15, then 60 minutes), kept per person at logins/_lock and in this browser. The tab locks again
+// after 10 minutes without use, when the page is hidden, or on leaving the tab. Lose the code and the list is gone:
+// only Russel can wipe it and start over.
 let logins = {}, loginEdit = null, loginAdding = false, loginQ = "", loginShown = new Set();
+const LG = { key: null, items: {}, salt: null, iter: 600000, openedVer: null, idle: null, entry: "", busy: false, setup: null, msg: "" };
+const LG_WAITS = [60e3, 5*60e3, 15*60e3, 60*60e3], LG_IDLE = 10*60e3;
+const lgB64 = b => btoa(String.fromCharCode(...new Uint8Array(b)));
+const lgUnb64 = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
+const lgMeKey = () => me.email.toLowerCase().replace(/\./g, ",");
+async function lgDerive(code, saltB64, iter){
+  const base = await crypto.subtle.importKey("raw", new TextEncoder().encode("mb-logins:" + code), "PBKDF2", false, ["deriveKey"]);
+  return crypto.subtle.deriveKey({ name:"PBKDF2", salt: lgUnb64(saltB64), iterations: iter, hash:"SHA-256" }, base, { name:"AES-GCM", length:256 }, false, ["encrypt","decrypt"]);
+}
+async function lgSeal(key, obj){ const iv = crypto.getRandomValues(new Uint8Array(12));
+  return { iv: lgB64(iv), ct: lgB64(await crypto.subtle.encrypt({ name:"AES-GCM", iv }, key, new TextEncoder().encode(JSON.stringify(obj)))) }; }
+async function lgOpen(key, box){ return JSON.parse(new TextDecoder().decode(await crypto.subtle.decrypt({ name:"AES-GCM", iv: lgUnb64(box.iv) }, key, lgUnb64(box.ct)))); }
+// Entries saved in plain text (before the lock, or by a page still open from before the update).
+const lgPlain = () => Object.entries(logins).filter(([k,v]) => k[0] !== "_" && v && typeof v === "object");
+function lgLockState(){
+  let local = {}; try { local = JSON.parse(localStorage.getItem("mb-lg-lock") || "{}"); } catch(e){}
+  const remote = ((logins._lock || {})[lgMeKey()]) || {};
+  return { fails: Math.max(local.fails || 0, remote.fails || 0), until: Math.max(local.until || 0, remote.until || 0) };
+}
+async function lgSetLock(st){
+  try { localStorage.setItem("mb-lg-lock", JSON.stringify(st)); } catch(e){}
+  try { await db.ref("logins/_lock/" + lgMeKey()).set(st.fails || st.until ? { fails: st.fails, until: st.until, at: Date.now() } : null); } catch(e){}
+}
+function lgLock(why){ if(!LG.key) return; LG.key = null; LG.items = {}; LG.entry = ""; loginShown = new Set(); loginEdit = null; loginAdding = false; clearTimeout(LG.idle);
+  if(why) LG.msg = why; if(view === "logins") render(); }
+function lgTouch(){ clearTimeout(LG.idle); if(LG.key) LG.idle = setTimeout(() => lgLock("Locked after 10 minutes without use."), LG_IDLE); }
+document.addEventListener("visibilitychange", () => { if(document.hidden) lgLock("Locked when the page was put away."); });
+["pointerdown","keydown"].forEach(ev => document.addEventListener(ev, () => { if(LG.key && view === "logins") lgTouch(); }, true));
+// Writes the whole list, sealed, and removes any plain-text entries in the same update.
+async function lgSave(items, label){
+  const upd = { "logins/_vault/data": await lgSeal(LG.key, items), "logins/_vault/updatedAt": Date.now(), "logins/_vault/updatedBy": me.email };
+  lgPlain().forEach(([k]) => upd["logins/" + k] = null);
+  await db.ref().update(upd); LG.items = items; LG.openedVer = upd["logins/_vault/updatedAt"]; if(label) toast(label);
+}
+async function lgTry(code){
+  const v = logins._vault, st = lgLockState();
+  if(st.until > Date.now()) return;
+  LG.busy = true; render();
+  try {
+    const key = await lgDerive(code, v.salt, v.iter);
+    try { await lgOpen(key, v.check); }
+    catch(e){ const fails = st.fails + 1, until = fails >= 3 ? Date.now() + LG_WAITS[Math.min(fails - 3, LG_WAITS.length - 1)] : 0;
+      await lgSetLock({ fails, until }); LG.msg = fails >= 3 ? "" : `Wrong code. ${3 - fails} ${3 - fails === 1 ? "try" : "tries"} left.`; return; }
+    LG.key = key; LG.salt = v.salt; LG.iter = v.iter; LG.items = v.data ? await lgOpen(key, v.data) : {}; LG.openedVer = v.updatedAt || null; LG.msg = "";
+    await lgSetLock({ fails: 0, until: 0 }); lgTouch();
+    const stray = lgPlain(); if(stray.length){ const items = { ...LG.items }; stray.forEach(([k, val]) => items[k] = val); await lgSave(items, `Locked ${stray.length} older ${stray.length === 1 ? "entry" : "entries"} into the list`); }
+  } finally { LG.busy = false; LG.entry = ""; render(); }
+}
+// First time, or a new code: seals everything (current list plus any plain-text entries) under a fresh salt.
+async function lgSetCode(code){
+  LG.busy = true; render();
+  try {
+    const salt = lgB64(crypto.getRandomValues(new Uint8Array(16))), key = await lgDerive(code, salt, LG.iter);
+    const items = { ...(LG.key ? LG.items : {}) }; lgPlain().forEach(([k, val]) => items[k] = val);
+    const now = Date.now(), upd = { "logins/_vault": { v: 1, salt, iter: LG.iter, check: await lgSeal(key, { ok: true }), data: await lgSeal(key, items), updatedAt: now, updatedBy: me.email, codeSetAt: now, codeSetBy: me.email } };
+    lgPlain().forEach(([k]) => upd["logins/" + k] = null);
+    await db.ref().update(upd);
+    LG.key = key; LG.salt = salt; LG.items = items; LG.openedVer = now; LG.setup = null; LG.msg = ""; lgTouch();
+    toast("Code set. Give it to the team in person.");
+  } finally { LG.busy = false; LG.entry = ""; render(); }
+}
+function lgKeypad(m, title, sub, onDone){
+  const st = lgLockState(), wait = st.until - Date.now(), locked = wait > 0;
+  const mins = Math.ceil(wait / 60000);
+  m.innerHTML = `<div class="lg"><div class="card lgpin"><h2>${title}</h2><p class="meta" style="margin-left:0">${sub}</p>
+    <div class="lgdots">${[0,1,2,3,4,5].map(i => `<span class="${i < LG.entry.length ? "on" : ""}"></span>`).join("")}</div>
+    <p class="lgmsg">${locked ? `Too many wrong codes. Try again in ${mins} minute${mins === 1 ? "" : "s"}.` : LG.busy ? "Checking..." : esc(LG.msg)}</p>
+    <input id="lgPinIn" class="lgpinin" inputmode="numeric" pattern="[0-9]*" autocomplete="off" maxlength="6" aria-label="6-digit code" ${locked || LG.busy ? "disabled" : ""}>
+    <div class="lgpad">${[1,2,3,4,5,6,7,8,9,"",0,"del"].map(d => d === "" ? "<span></span>" : `<button data-pin="${d}" ${locked || LG.busy ? "disabled" : ""}>${d === "del" ? "&#9003;" : d}</button>`).join("")}</div>
+    ${LG.setup ? `<button id="lgPinCancel" style="margin-top:12px">Cancel</button>` : ""}
+    ${!LG.setup && logins._vault && isAdmin ? `<button class="small danger" id="lgWipe" style="margin-top:16px">Forgot the code: wipe the list</button>` : ""}</div></div>`;
+  const push = d => { if(LG.busy || lgLockState().until > Date.now()) return; LG.msg = "";
+    LG.entry = d === "del" ? LG.entry.slice(0, -1) : (LG.entry + d).slice(0, 6);
+    // update the dots in place so the phone keeps its number pad open between digits
+    m.querySelectorAll(".lgdots span").forEach((el, i) => el.classList.toggle("on", i < LG.entry.length));
+    const mg = m.querySelector(".lgmsg"); if(mg) mg.textContent = "";
+    if(LG.entry.length === 6){ const c = LG.entry; LG.entry = ""; onDone(c); } };
+  m.querySelectorAll("[data-pin]").forEach(b => b.onclick = () => push(b.dataset.pin));
+  const inp = $("#lgPinIn"); if(inp && !locked && !LG.busy){ setTimeout(() => { try { inp.focus({ preventScroll: true }); } catch(e){} }, 0);
+    inp.oninput = () => { const d = inp.value.replace(/\D/g, "").slice(-1); inp.value = ""; if(d) push(d); };
+    inp.onkeydown = e => { if(e.key === "Backspace"){ e.preventDefault(); push("del"); } }; }
+  const cx = $("#lgPinCancel"); if(cx) cx.onclick = () => { LG.setup = null; LG.entry = ""; LG.msg = ""; render(); };
+  const wp = $("#lgWipe"); if(wp) wp.onclick = async () => {
+    if(!confirm("Wipe every saved password? This cannot be undone. Only do this if nobody has the code.")) return;
+    if(prompt('Type WIPE to confirm') !== "WIPE") return;
+    await db.ref("logins").set(null); LG.key = null; LG.items = {}; toast("List wiped. Set a new code."); render(); };
+  if(locked){ clearTimeout(LG.unlockT); LG.unlockT = setTimeout(() => { if(view === "logins" && !LG.key) render(); }, Math.min(wait + 200, 30000)); }
+}
 function renderLogins(m){
-  const q=loginQ.toLowerCase(), all=Object.entries(logins).filter(([,l])=>l).sort((a,b)=>(a[1].site||"").localeCompare(b[1].site||""));
+  const v = logins._vault;
+  if(!LG.key){
+    if(!v){ // no code yet: first person in sets it
+      if(!LG.setup) LG.setup = { step: 1 };
+      return lgKeypad(m, LG.setup.step === 1 ? "Set the team code" : "Enter it again",
+        LG.setup.step === 1 ? `Choose a 6-digit code. Everything on this tab gets locked with it${lgPlain().length ? ` (${lgPlain().length} saved now)` : ""}. Write it down somewhere safe: if everyone forgets it, the list cannot be recovered.` : "Same 6 digits, to make sure.",
+        c => { if(LG.setup.step === 1){ LG.setup = { step: 2, first: c }; render(); } else if(c === LG.setup.first) lgSetCode(c); else { LG.setup = { step: 1 }; LG.msg = "The codes did not match. Start again."; render(); } });
+    }
+    return lgKeypad(m, "Passwords are locked", "Enter the 6-digit team code.", lgTry);
+  }
+  if(LG.setup) return lgKeypad(m, LG.setup.step === 1 ? "New team code" : "Enter it again", LG.setup.step === 1 ? "Choose the new 6-digit code. Tell the team in person." : "Same 6 digits, to make sure.",
+    c => { if(LG.setup.step === 1){ LG.setup = { step: 2, first: c }; render(); } else if(c === LG.setup.first) lgSetCode(c); else { LG.setup = { step: 1 }; LG.msg = "The codes did not match. Start again."; render(); } });
+  // a teammate saved a change while this tab was open: open the new version with the key in memory
+  if(v && v.updatedAt !== LG.openedVer){
+    if(v.salt !== LG.salt){ lgLock("The team code was changed. Enter the new one."); return; }
+    const ver = v.updatedAt; LG.openedVer = ver;
+    lgOpen(LG.key, v.data).then(items => { if(LG.key && logins._vault && logins._vault.updatedAt === ver){ LG.items = items; render(); } }).catch(() => lgLock("Could not open the latest list. Enter the code again."));
+  }
+  const items = LG.items;
+  const q=loginQ.toLowerCase(), all=Object.entries(items).filter(([,l])=>l).sort((a,b)=>(a[1].site||"").localeCompare(b[1].site||""));
   const list=all.filter(([,l])=>!q || [l.site,l.url,l.user,l.note].join(" ").toLowerCase().includes(q));
-  const e=loginEdit ? (logins[loginEdit]||{}) : {};
+  const e=loginEdit ? (items[loginEdit]||{}) : {};
   const href=u=>!u?"":/^https?:\/\//i.test(u)?u:"https://"+u;
   const host=u=>{ try{ return new URL(href(u)).hostname.replace(/^www\./,""); }catch(x){ return ""; } };
   const icon=u=>host(u)?`<img class="lgfav" src="https://www.google.com/s2/favicons?domain=${encodeURIComponent(host(u))}&sz=64" alt="" loading="lazy" onerror="this.style.visibility='hidden'">`:`<span class="lgfav lgnone">${esc((u||"?").slice(0,1))}</span>`;
   const formOpen = loginEdit || loginAdding;
   m.innerHTML=`<div class="lg">
-    <div class="card"><div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><h2 style="margin:0">Quick links</h2><span class="meta" style="margin-left:0">${all.length} saved &middot; admins only</span>
-      <span style="margin-left:auto;display:flex;gap:8px"><input id="lgQ" value="${esc(loginQ)}" placeholder="Search" autocomplete="off" style="width:180px">${formOpen?"":`<button class="primary" id="lgNew">+ Add</button>`}</span></div>
+    <div class="card"><div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><h2 style="margin:0">Quick links</h2><span class="meta" style="margin-left:0">${all.length} saved &middot; admins only &middot; encrypted</span>
+      <span style="margin-left:auto;display:flex;gap:8px;flex-wrap:wrap"><input id="lgQ" value="${esc(loginQ)}" placeholder="Search" autocomplete="off" style="width:160px">${formOpen?"":`<button class="primary" id="lgNew">+ Add</button>`}<button id="lgLockNow">Lock</button><button id="lgChange">Change code</button></span></div>
       <div class="lglinks">${all.filter(([,l])=>l.url).map(([id,l])=>`<a class="lglink" href="${esc(href(l.url))}" target="_blank" rel="noopener">${icon(l.url)}<span>${esc(l.site||host(l.url))}</span></a>`).join("")||'<p class="meta">Add a site with its web address and it shows here as one tap.</p>'}</div></div>
     ${formOpen?`<div class="card" id="lgForm"><h2>${loginEdit?"Change "+esc(e.site||"entry"):"Add a site"}</h2>
       <div class="grid2"><div><label for="lgSite">Site or service</label><input id="lgSite" value="${esc(e.site||"")}" placeholder="QuickBooks" autocomplete="off"></div>
@@ -1094,16 +1211,21 @@ function renderLogins(m){
       ${l.note?`<div class="lgnote">${esc(l.note)}</div>`:""}
       <div class="lgfoot"><span class="meta">${l.updatedBy?"Changed by "+esc(l.updatedBy.split("@")[0])+", ":""}${l.updatedAt?new Date(l.updatedAt).toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"}):""}</span><span style="display:flex;gap:6px"><button class="small" data-lgedit="${id}">Edit</button><button class="small danger" data-lgdel="${id}">Delete</button></span></div></div>`).join("")||`<div class="card"><p class="meta">${q?"Nothing matches.":"Nothing saved yet. Tap + Add."}</p></div>`}</div></div>`;
   const nb=$("#lgNew"); if(nb) nb.onclick=()=>{ loginAdding=true; render(); setTimeout(()=>{ const f=$("#lgSite"); f&&f.focus(); },0); };
+  $("#lgLockNow").onclick=()=>lgLock("");
+  $("#lgChange").onclick=()=>{ LG.setup={ step:1 }; LG.entry=""; LG.msg=""; render(); };
   const sv=$("#lgSave"); if(sv) sv.onclick=async()=>{ const site=$("#lgSite").value.trim(); if(!site) return toast("Name the site or service");
-    const id=loginEdit||db.ref("logins").push().key, v={ site, url:$("#lgUrl").value.trim()||null, user:$("#lgUser").value.trim()||null, pass:$("#lgPass").value||null, note:$("#lgNote").value.trim()||null, ...stamp() };
+    const id=loginEdit||db.ref("logins").push().key, old=LG.items[id]||{};
+    const v={ ...old, site, url:$("#lgUrl").value.trim()||null, user:$("#lgUser").value.trim()||null, pass:$("#lgPass").value||null, note:$("#lgNote").value.trim()||null, ...stamp() };
     if(!loginEdit){ v.createdAt=Date.now(); v.createdBy=me.email; }
-    await commit((loginEdit?"Changed":"Added")+" "+site, fieldUpdates("logins/"+id, v)); loginEdit=null; loginAdding=false; render(); };
+    Object.keys(v).forEach(k=>v[k]==null&&delete v[k]);
+    await lgSave({ ...LG.items, [id]: v }, (loginEdit?"Saved ":"Added ")+site); loginEdit=null; loginAdding=false; render(); };
   const c=$("#lgCancel"); if(c) c.onclick=()=>{ loginEdit=null; loginAdding=false; render(); };
   const qb=$("#lgQ"); qb.oninput=()=>{ loginQ=qb.value; const pos=qb.selectionStart; render(); const n=$("#lgQ"); n.focus(); try{ n.setSelectionRange(pos,pos); }catch(x){} };
   m.querySelectorAll("[data-lgedit]").forEach(b=>b.onclick=()=>{ loginEdit=b.dataset.lgedit; render(); const f=$("#lgForm"); f&&f.scrollIntoView({block:"start"}); });
-  m.querySelectorAll("[data-lgdel]").forEach(b=>b.onclick=()=>commit("Deleted "+(logins[b.dataset.lgdel]||{}).site, { ["logins/"+b.dataset.lgdel]: null }));
+  m.querySelectorAll("[data-lgdel]").forEach(b=>b.onclick=async()=>{ const id=b.dataset.lgdel, site=(LG.items[id]||{}).site||"entry";
+    if(!confirm("Delete "+site+"? This cannot be undone.")) return; const items={ ...LG.items }; delete items[id]; await lgSave(items, "Deleted "+site); render(); });
   m.querySelectorAll("[data-lgshow]").forEach(b=>b.onclick=()=>{ const id=b.dataset.lgshow; loginShown.has(id)?loginShown.delete(id):loginShown.add(id); render(); });
-  m.querySelectorAll("[data-lgcopy]").forEach(b=>b.onclick=async()=>{ const [id,f]=b.dataset.lgcopy.split("|"), v=(logins[id]||{})[f]||"";
+  m.querySelectorAll("[data-lgcopy]").forEach(b=>b.onclick=async()=>{ const [id,f]=b.dataset.lgcopy.split("|"), v=(LG.items[id]||{})[f]||"";
     try{ await navigator.clipboard.writeText(v); toast((f==="pass"?"Password":"Username")+" copied"); }catch(x){ toast("Copy did not work here. Tap Show and copy it by hand."); } });
 }
 
