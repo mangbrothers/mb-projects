@@ -12,13 +12,13 @@ description: How to sign in, find your routes, check off streets and send your d
 ---
 ---slide---
 ## Your page on the company site
-- Everything for your job is on one page on your phone {reveal}
+- Everything for your job is on one page on your device {reveal}
 - Your routes, the map, your day report and your training {reveal}
 - Bookmark it: **apps.mangbrothers.com** {reveal}
 ![The sign-in page](image:signin)
 ---slide---
 ## Signing in
-- Open **apps.mangbrothers.com** on your phone
+- Open **apps.mangbrothers.com** on your device
 - Tap **Sign in with Google**
 - Use the Google account the office has on file for you
 - You go straight to your page

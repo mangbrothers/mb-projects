@@ -13,7 +13,7 @@ description: How to sign in, read your schedule, check your hours and pay, and f
 ---slide---
 ## Your page on the company site
 - Your schedule, hours, pay and paperwork live on one page {reveal}
-- It works on your phone {reveal}
+- It works on any device {reveal}
 - Bookmark it: **apps.mangbrothers.com** {reveal}
 ![The sign-in page](image:signin)
 ---slide---

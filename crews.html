@@ -963,7 +963,7 @@ function mapPopup(ll, title, check, s){
   const b=el.querySelector("#mapTick"); if(b) b.onclick=()=>{ map.closePopup(pop); check.go(); };
 }
 function locate(){
-  if(!navigator.geolocation||!map) return toast("Location is not available on this phone");
+  if(!navigator.geolocation||!map) return toast("Location is not available on this device");
   navigator.geolocation.getCurrentPosition(p=>{ const ll=[p.coords.latitude,p.coords.longitude]; if(meMarker) meMarker.remove(); meMarker=L.circleMarker(ll,{radius:8,color:"#1f4e8c",fillColor:"#1f4e8c",fillOpacity:.9}).addTo(map); map.setView(ll,Math.max(map.getZoom(),17)); }, ()=>toast("Could not get your location"), {enableHighAccuracy:true,timeout:10000});
 }
 // Tapping a stop: checks it off with one tap. A lights stop asks once what was done (installed, or a service call
@@ -2195,7 +2195,7 @@ function paperCardsHtml(k){
   const left=paperLeft(k), link=paperLinkFor(k); if(!left.length || !link) return "";
   return left.sort((a,b)=>(a==="agreement"?-1:b==="agreement"?1:0)).map(f=>{ const F=PAPER.FORMS[f];
     return `<div class="card trcard paper"><div class="top"><span><span class="chip warn">To sign</span> <b>${esc(F.title)}</b></span></div>
-      <p class="meta">${f==="agreement"?"Your offer. Read it and sign it to get into the rest of the crew page.":F.optional?"Optional. Without it you are paid by check.":"Needed before your first paycheck. Tax and bank forms are locked on your phone before they are sent."}</p>
+      <p class="meta">${f==="agreement"?"Your offer. Read it and sign it to get into the rest of the crew page.":F.optional?"Optional. Without it you are paid by check.":"Needed before your first paycheck. Tax and bank forms are encrypted on your device before they are sent."}</p>
       <div class="actions"><a class="primary mapbtn" href="${esc(link)}">Sign now</a></div></div>`; }).join("");
 }
 function trainCardHtml(k, id, office){
@@ -2869,7 +2869,7 @@ function demoSeed(){
     "### Q2","The roof is frosty at 8 a.m. What do you do?","- [ ] Go up carefully","- [x] Stay off it until it is dry","- [ ] Go up with a spotter","explain: No one goes on a wet, frosty or icy roof.","slide: 2",
     "### Q3","A crew member falls off a ladder and hits his head. First step?","- [ ] Drive him to urgent care","- [x] Call 911","- [ ] Finish the house, then call the office","explain: Head injuries and roof falls are life threatening: call 911.","slide: 3"].join("\n");
   const md2 = ["---","id: systems-crew","title: Using the site: crew","roles: [member, manager]","category: Onboarding","order: 5","version: 1","completion: view","status: ready","---",
-    "---slide---","## Signing in","- Open apps.mangbrothers.com on your phone","- Sign in with the Google account the office has on file","{highlight: Sign in with Google}",
+    "---slide---","## Signing in","- Open apps.mangbrothers.com on your device","- Sign in with the Google account the office has on file","{highlight: Sign in with Google}",
     "---slide---","## Your Training tab","- Paperwork to sign sits at the top","- Modules open here; finish each one to the end"].join("\n");
   [md1, md2].forEach(m=>{ const p=parseModuleMd(m); upd[`trainingLib/${p.id}`]={ ...p.rec, createdAt:Date.now()-864e5 }; p.rec.roles.forEach(r=>{ upd[`trainingRoles/${r}/${p.id}`]=true; }); });
   Object.assign(upd, {

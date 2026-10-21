@@ -669,9 +669,9 @@ function renderLearn(app){
   const link=myPaper.token ? `paperwork.html?t=${encodeURIComponent(myPaper.token)}${myPaper.s?"&s="+encodeURIComponent(myPaper.s):""}` : "";
   const byCat={}; list.forEach(id=>{ const c=trainLib[id].category||"Other"; (byCat[c]=byCat[c]||[]).push(id); });
   const data={ done:trainDone||{}, viewed:trainViewed[me.key]||{} }, g=walkerGate(me.key), total=mods.length+list.length, n=mods.filter(done).length+list.filter(done).length;
-  app.innerHTML = (onboarding ? `<div class="card"><h2 style="margin:0 0 6px">Welcome to Mangiapane Brothers</h2><p>Sign your distributor agreement below to get started. Once it is signed, your routes open up. The rest of your paperwork can be done here any time before your first check.</p></div>` : "")
+  app.innerHTML = (onboarding ? `<div class="card"><h2 style="margin:0 0 6px">Welcome to Mangiapane Brothers</h2><p>Sign your distributor agreement below to get started. Once it is signed, your routes open up. The rest of your paperwork can be done here any time before your first payday.</p></div>` : "")
     + (left.length && link ? `<h2 style="margin:6px 0 8px">Paperwork to sign</h2>` + left.map(f=>`<div class="card" style="border-left:4px solid var(--amber)"><p style="margin:0 0 4px"><span class="chip warn">To sign</span> <b>${esc(PAPER_TITLES[f])}</b></p>
-        <p class="meta">${f==="agreement"?"Your offer. Sign it to get your routes.":f==="deposit"?"Optional. Without it you are paid by check.":"Needed before your first check. Tax and bank forms are locked on your phone before they are sent."}</p>
+        <p class="meta">${f==="agreement"?"Your offer. Sign it to get your routes.":f==="deposit"?"Optional. Without it you are paid by check.":"Needed before your first payday. Tax and bank forms are encrypted on your device before they are sent."}</p>
         <div class="actions"><a class="mapbtn" href="${esc(link)}">Sign now</a></div></div>`).join("") : "")
     + `<div class="card"><h2 style="margin:0 0 6px">${g.ok?"Ready for routes":"Before you get routes"}</h2>${g.ok?'<p class="meta">Your training is done. The office puts you on routes.</p>':`<p class="meta">The office cannot give you routes until these are done:</p>${gateList(g).replace(/<p class="muted"[\s\S]*$/,"")}`}</div>`
     + `<div class="bar"><span class="date">Training</span>${total?`<span class="chip ${n===total?"ok":"warn"}">${n} of ${total} done</span>`:""}</div>`
@@ -802,7 +802,7 @@ function mapPopup(ll, title, check){
   const b=el.querySelector("#mapTick"); if(b) b.onclick=()=>{ map.closePopup(pop); check.go(); };
 }
 function locate(){
-  if(!navigator.geolocation||!map) return toast("Location is not available on this phone");
+  if(!navigator.geolocation||!map) return toast("Location is not available on this device");
   navigator.geolocation.getCurrentPosition(p=>{ const ll=[p.coords.latitude,p.coords.longitude]; if(meMarker) meMarker.remove(); meMarker=L.circleMarker(ll,{radius:8,color:"#1f4e8c",fillColor:"#1f4e8c",fillOpacity:.9}).addTo(map); map.setView(ll,Math.max(map.getZoom(),17)); }, ()=>toast("Could not get your location"), {enableHighAccuracy:true,timeout:10000});
 }
 async function toggleStreet(rid,sid){

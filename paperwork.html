@@ -408,7 +408,7 @@ function list(){
     </div>
     ${offerDone ? next : ""}
     ${pkt.vaultNotSet ? `<div class="banner">The office is still setting up secure storage for tax and bank forms. You can sign your agreement now; the other forms open as soon as that is done.</div>` : ""}
-    <div class="lock">🔒 Tax, I-9 and bank forms are locked on this phone before they are sent. Only the owner can open them. Nothing you type is saved in this browser.</div>
+    <div class="lock">🔒 Tax, I-9 and bank forms are encrypted on this device before they are sent. Only the owner can open them. Nothing you type is saved in this browser.</div>
     <div class="card">${forms.map(f=>`<div class="formrow"><div class="t"><b>${esc(off[f.id].title)}</b><span>${f.done?"Signed"+(f.at?" "+new Date(f.at).toLocaleDateString():""):(off[f.id].optional?"Optional. Without it you are paid by check.":"To sign")}</span></div>
       ${f.done ? (copies[f.id] ? `<a class="btn" href="${copies[f.id]}" download="${esc(off[f.id].short)}.pdf">Your copy</a>` : `<span class="pill ok">Done</span>`)
                : `<button class="primary" data-open="${f.id}" ${pkt.vaultNotSet && isSealed(f.id) ? "disabled" : ""}>Start</button>`}</div>`).join("")}</div>
