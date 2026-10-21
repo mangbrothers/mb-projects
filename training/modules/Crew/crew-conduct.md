@@ -13,7 +13,7 @@ status: ready
 ---slide---
 ## You are the company on that property
 - The client sees you, not the office. {reveal}
-- Our tagline is Reliable Service. Uncompromising Standards. You are how we keep it. {reveal}
+- Our tagline is Full-Service Property Maintenance for Those Who Take Pride in Their Home. Our clients take pride in their homes. Treat every yard that way. {reveal}
 - This module and the handbook set the rules. The quiz covers both. {reveal}
 - You must pass this quiz before you can be scheduled. {reveal}
 
