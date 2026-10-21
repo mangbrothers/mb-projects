@@ -81,7 +81,7 @@ status: ready
 ---slide---
 ## Setting up Strava
 - Download the free Strava app and make an account. {reveal}
-- Put your Strava username on your agreement. {reveal}
+- Text your Strava username to 734-450-2400. The office adds it to your account. {reveal}
 - The company sends you a follow request. Approve it. {reveal}
 - Set your activities to Followers only: Settings, Privacy Controls, Activities. {reveal}
 note: Strava menu names change. Check this path on a phone before each hiring round.

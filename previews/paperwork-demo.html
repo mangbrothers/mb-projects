@@ -453,7 +453,7 @@ const SPEC = {
     <p>Read the whole agreement before you sign. It covers your pay (Schedule A), your hours and the rules of the job.</p>
     <p><button id="readAgr" type="button">📄 Read the agreement</button> <span class="meta" id="readNote"></span></p>
     ${nameBlock()}<div class="g2">${inp("phone","Phone",{type:"tel",ac:"tel"})}${inp("email","Email",{type:"email",ac:"email"})}</div>
-    ${["walker","walkerpt"].includes(pkt.position) ? inp("strava","Strava username",{help:"You add the company as a follower so finished routes show up."}) : inp("startDate","Start date",{type:"date"})}
+    ${["walker","walkerpt"].includes(pkt.position) ? "" : inp("startDate","Start date",{type:"date"})}
     ${cbox("read","I have read the whole agreement, including Schedule A, and agree to it.")}`,
   privacy: () => `
     <p class="meta">How the company collects, uses, protects and destroys your information, and the rules you follow for anyone else's. Read it, then sign that you received it.</p>
