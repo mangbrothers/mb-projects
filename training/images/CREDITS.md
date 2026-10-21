@@ -19,7 +19,11 @@ All photos are from Wikimedia Commons under the licenses shown. CC BY and CC BY-
 - crew-lights/lights-finished-house.jpg: Unsplash photo-1664289342468 (Unsplash/Pexels license, free to use)
 - crew-fall-cleanup/fall-street-pile.jpg: Unsplash photo-1736546739346 (Unsplash license, free to use)
 
-## walker-job (placeholders, AI-generated with ChatGPT on 20 October 2026; Russel is replacing them with real photos)
-- walker-job/hanger-on-knob.jpg
-- walker-job/walk-the-sidewalk.jpg
-- walker-job/street-photo.jpg
+## walker-job (placeholders until Russel replaces them with real photos)
+- AI-generated with ChatGPT, 20 October 2026: walk-the-sidewalk.jpg, street-photo.jpg
+- AI-generated with Google Gemini, 20 October 2026: job-overview.jpg, hanger-pickup.jpg, hanger-on-knob.jpg, hanger-screen-door.jpg, homeowner-door.jpg
+- Drawn for the company (Claude, 20 October 2026): hours-daylight, never-list, strava-what, strava-record, dates-weather, ends-agreement, questions
+- Screenshots of the company site in demo mode: route-before-start, strava-setup, day-report, office-check
+
+## systems-walker
+- Screenshots of the company site in demo mode (made up names and data), 20 October 2026

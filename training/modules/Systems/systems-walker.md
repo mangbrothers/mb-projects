@@ -5,17 +5,17 @@ roles: [walker]
 category: Onboarding
 season: always
 order: 5
-version: 1
+version: 2
 completion: view
 status: ready
-description: How to sign in, find your routes, check off streets and send your day report. About 5 minutes.
+description: Start here. How to sign in, what opens when, your routes, the map, checking off streets and your day report. About 5 minutes.
 ---
 ---slide---
-## Your page on the company site
+## Your job, on one page
 - Everything for your job is on one page on your device {reveal}
 - Your routes, the map, your day report and your training {reveal}
 - Bookmark it: **apps.mangbrothers.com** {reveal}
-![The sign-in page](image:signin)
+![Your page on the company site](image:site-overview)
 ---slide---
 ## Signing in
 - Open **apps.mangbrothers.com** on your device
@@ -23,39 +23,42 @@ description: How to sign in, find your routes, check off streets and send your d
 - Use the Google account the office has on file for you
 - You go straight to your page
 {highlight: Sign in with Google}
+![The sign-in page](image:signin)
 note: If it says the email is not on the team list, he signed in with a different Google account. Have him sign out and use the one he gave the office.
 ---slide---
-## Not on the list?
-- The page says your email is not on the team list
+## Wrong Google account?
+- The page says your email is not on the list
 - You signed in with a different Google account
 - Tap **Sign out and use another account**, then pick the right one
-- Still stuck: call or text the office number on your flyer
+- Still stuck: call or text the office at 734-450-2400
+![The message you see with the wrong account](image:not-on-list)
 ---slide---
-## Training comes first
-- Until your agreement is signed, the **Training** tab is all you see
-- Sign your agreement from the card at the top
-- Finish the job module and pass its quiz
-- Then the office gives you routes
-![The Training tab](image:walker-training)
+## Start here: three steps before routes
+- Until you finish this deck, the **Training** tab is all you see {reveal}
+- Step 2: sign your paperwork from the cards at the top of Training {reveal}
+- Step 3: do "Hanging door hangers" and pass its quiz {reveal}
+- When all three are done, the office gives you routes {reveal}
+![Day one: only the Training tab, with this deck first](image:training-first)
 ---slide---
 ## Today
 - **Today** shows the routes you walk today
 - Each card shows the flyer, the area and about how many hours
 - Tap a route card to open it
-![Today with one route](image:walker-today)
+![Today with one route](image:today)
 ---slide---
 ## The route map
 - Your streets are drawn on the map in route order {reveal}
 - Green is done {reveal}
 - **Show where I am** puts you on the map {reveal}
 - **Directions** opens your phone's maps app {reveal}
-![A route on the map](image:walker-route)
+![A route on the map](image:route-map)
 ---slide---
 ## Checking off a street
 - Finish the whole street, then tap it to check it off
 - Add the photo the page asks for
 - Tapped the wrong street? Tap it again to take it back
 {highlight: Tap a street}
+![The street list under the map](image:check-off)
 ---slide---
 ## Your day report
 - At the end of the day, fill in **Day report** at the bottom of Today
@@ -63,8 +66,10 @@ note: If it says the email is not on the team list, he signed in with a differen
 - A screenshot of your Strava walk for each route
 - Last address hung (required), then any notes
 - Tap **Save report**; you can change it until the office closes the week
+![The day report form](image:report-form)
 ---slide---
 ## Week and My days
 - **Week** shows the routes coming up
 - **My days** shows the reports you have sent
 - Questions about a route: call or text the office
+![Week: the routes coming up](image:week)

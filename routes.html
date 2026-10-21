@@ -121,18 +121,26 @@
   .pgdrawer .pdfoot{margin-top:auto;font-size:12px;color:var(--muted);padding:8px 4px 0}
 
   /* Training modules: slide player and quiz (October 20, 2026) */
-  dialog.modplayer{width:min(720px,100vw);max-width:100vw;height:min(100dvh,860px);max-height:100dvh;padding:0;display:flex;flex-direction:column}
+  dialog.modplayer{width:min(880px,100vw);max-width:100vw;height:min(100dvh,860px);max-height:100dvh;padding:0;display:flex;flex-direction:column}
   dialog.modplayer:not([open]){display:none}
   .mp-head{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--line)}
   .mp-head .t{font-weight:700;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .mp-bar{height:4px;background:var(--surface2)}.mp-bar i{display:block;height:100%;background:var(--accent)}
-  .mp-body{flex:1;overflow:auto;padding:18px 16px 10px;font-size:17px;line-height:1.5}
+  .mp-prog{display:flex;align-items:center;gap:10px;padding:8px 14px;border-bottom:1px solid var(--line)}
+  .mp-bar{flex:1;height:10px;border-radius:999px;background:var(--surface2);overflow:hidden}.mp-bar i{display:block;height:100%;background:var(--accent);border-radius:999px;transition:width .2s}
+  .mp-prog b{font-size:14px;min-width:40px;text-align:right;color:var(--ink)}
+  .mp-body{flex:1;overflow:auto;padding:18px 18px 12px;font-size:17px;line-height:1.5;display:flex;flex-direction:column}
+  .mp-body>*{flex:none}
   .mp-body h2{font-size:22px;margin:0 0 12px}
   .mp-body ul{padding-left:22px;margin:0 0 12px}.mp-body li{margin:0 0 8px}
   .mp-body li.hid{visibility:hidden}
   .mp-body p.para{margin:0 0 10px}
-  .mp-img{display:block;width:100%;max-height:46vh;object-fit:contain;border-radius:var(--r);border:1px solid var(--line);margin:8px 0}
+  .mp-img{display:block;width:100%;flex:1 1 0!important;min-height:200px;max-height:none;object-fit:contain;border-radius:var(--r);border:1px solid var(--line);margin:8px 0;background:var(--surface2)}
+  .mp-end{align-items:center;text-align:center;justify-content:center}
+  .mp-check{width:72px;height:72px;border-radius:50%;background:var(--accent);color:#fff;font-size:40px;line-height:72px;font-weight:700;margin:0 auto 14px}
+  .mp-next{text-align:left;border:1px solid var(--line);border-radius:var(--r);background:var(--surface2);padding:12px 16px;margin:14px auto 0;max-width:520px;width:100%}
+  .mp-next h3{margin:0 0 6px;font-size:16px}.mp-next ol{margin:0;padding-left:22px}.mp-next li{margin:0 0 6px}
   .mp-ph{display:flex;align-items:center;justify-content:center;min-height:150px;border:2px dashed var(--line);border-radius:var(--r);background:var(--surface2);color:var(--ink2);text-align:center;padding:12px;margin:8px 0;font-size:14px}
+  .card.locked{opacity:.75;border-style:dashed}
   .mp-hl{display:inline-block;border:2px solid var(--amber);border-radius:999px;padding:2px 10px;font-weight:700;color:var(--ink)}
   .mp-note{border-left:4px solid var(--accent);background:var(--accent-soft);padding:8px 10px;border-radius:var(--r);font-size:14px;margin-top:10px}
   .mp-todo{border-left:4px solid var(--amber);background:var(--amber-soft);padding:8px 10px;border-radius:var(--r);font-size:14px;margin-bottom:10px}
@@ -261,6 +269,16 @@ let unsub=[];
 // A walker sees it on his Training tab with his unsigned paperwork, and marks each piece done. Until his offer is signed
 // he sees only that tab.
 let trainLib={}, trainRoles={}, trainAssign={}, trainDone={}, myPaper={}, onboarding=false;
+// October 20, 2026 (Russel): a new door hanger does "Using the site: door hangers" first. Until he finishes it he sees
+// only the Training tab, with his paperwork and the other modules waiting behind it, so he does not get lost. After it
+// the rest of the site opens. Routes still wait on the gate: paperwork signed and the job module passed.
+const SITE_DECK = "systems-walker";
+function siteDeckPending(){
+  if(isAdmin || !me || (viewAs && viewAs!=="__training")) return false;
+  const m=trainLib[SITE_DECK]; if(!isModule(m) || m.status==="draft" || !t2Got.done || !t2Got.viewed) return onboarding;
+  const v=((trainViewed[me.key]||{})[SITE_DECK])||{}; return !((trainDone||{})[SITE_DECK] || v.finished);
+}
+let sitePendingWas=null, t2Got={};
 
 // ---------- auth ----------
 $("#signin").onclick = async () => {
@@ -306,8 +324,8 @@ function attach(){
     walkers = { [me.key]: { name:me.name, email:me.email } };
     bind("routeLogsByWalker/"+me.key, v=>{ logs={}; Object.entries(v).forEach(([d,L])=>{ logs[d]={[me.key]:L}; }); });
     bind("trainingLib", v=>trainLib=v); bind("trainingRoles", v=>trainRoles=v); bind("trainingSettings", v=>trainSet=v);
-    bind("trainingQuiz/"+me.key, v=>{ trainQuiz={ [me.key]:v }; }); bind("trainingViewed/"+me.key, v=>{ trainViewed={ [me.key]:v }; });
-    bind("trainingAssign/"+me.key, v=>trainAssign=v); bind("trainingDone/"+me.key, v=>trainDone=v);
+    bind("trainingQuiz/"+me.key, v=>{ trainQuiz={ [me.key]:v }; }); bind("trainingViewed/"+me.key, v=>{ trainViewed={ [me.key]:v }; t2Got.viewed=true; });
+    bind("trainingAssign/"+me.key, v=>trainAssign=v); bind("trainingDone/"+me.key, v=>{ trainDone=v; t2Got.done=true; });
     bind("paper/"+me.key, v=>{ myPaper=v; if(onboarding && !offerPending()){ onboarding=false; toast("Offer signed. Your routes are open."); } });
   }
 }
@@ -361,8 +379,8 @@ const parseGeo = s => { try { return JSON.parse(s.geo||"[]"); } catch(e){ return
 // ---------- navigation ----------
 function tabs(){
   const t = isAdmin ? [["today","Day"],["week","Week"],["schedule","Schedule"],["review","Review"],["setup","Setup"]].concat(Object.values(routes).some(r=>r.training)?[["training","Practice route"]]:[])
-    : onboarding && !viewAs ? [["learn","Training"]] : [["today","Today"],["week","Week"],["learn","Training"],["mylog","My days"]];
-  $("#nav").innerHTML = t.map(([k,l])=>`<button data-v="${k}" class="${view===k&&!openRoute?"on":""}">${l}</button>`).join("")
+    : siteDeckPending() ? [["learn","Training"]] : [["today","Today"],["week","Week"],["learn","Training"],["mylog","My days"]];
+  $("#nav").innerHTML = t.map(([k,l])=>`<button data-v="${k}" class="${(view===k||t.length===1)&&!openRoute?"on":""}">${l}</button>`).join("")
     + (realAdmin && seatList().length ? `<select id="viewAs" class="viewas" aria-label="See the page as a walker"><option value="">Office view</option>${seatList().map(s=>`<option value="${esc(s)}" ${viewAs===s?"selected":""}>See as ${esc(s)}</option>`).join("")}${Object.values(routes).some(r=>r.training)?`<option value="__training" ${viewAs==="__training"?"selected":""}>Training route</option>`:""}</select>` : "");
   const pb=$("#previewBar"); pb.hidden=!viewAs;
   if(viewAs==="__training"){ pb.innerHTML=`Training mode: you are a walker on the practice route. Check-offs, photos and the report save for real. <button class="small" id="resetTraining">Clear training data</button> <button class="small" id="exitPreview">Back to office view</button>`; $("#resetTraining").onclick=resetTraining; }
@@ -401,7 +419,10 @@ function render(){
   const app=$("#app");
   if(openRoute && routes[openRoute]) return renderRoute(app);
   openRoute=null;
-  if(onboarding && !viewAs && !isAdmin) view="learn";
+  const sp=siteDeckPending();
+  if(sitePendingWas===true && !sp && !isAdmin){ view="learn"; toast(`Done with "Using the site". Your paperwork, the job module and the rest of the site are open.`); }
+  if(trainLib[SITE_DECK] && t2Got.done && t2Got.viewed) sitePendingWas=sp;
+  if(sp) return renderLearn(app);
   ({today:renderToday, week:renderWeek, schedule:renderSchedule, review:renderReview, setup:renderSetup, mylog:renderMyLog, learn:renderLearn}[view]||renderToday)(app);
 }
 
@@ -460,8 +481,8 @@ function gateCheck(which, ctx, seen){
     else { const i=c.indexOf(":"), kind=c.slice(0,i), id=c.slice(i+1), m=trainLib[id];
       if(!isModule(m)){ out.waived.push(id); return; }
       const d=(ctx.done||{})[id], v=(ctx.viewed||{})[id];
-      if(kind==="quiz_passed"){ ok=!!(d && d.via==="quiz"); label="Pass "+m.title; }
-      else { ok=!!(d || (v && v.finished)); label="View "+m.title; } }
+      if(kind==="quiz_passed"){ ok=!!(d && d.via==="quiz"); label=`Pass "${m.title}"`; }
+      else { ok=!!(d || (v && v.finished)); label=`Finish "${m.title}"`; } }
     if(!ok){ out.ok=false; out.need.push(label); } });
   return out;
 }
@@ -515,6 +536,7 @@ async function openModule(id, o){
   const save = async (obj) => { if(preview) return; try { await store.update(obj); } catch(e){ toast("Not saved: "+(e.message||e)); } };
   const mark = (n, finished) => { const cur=((trainViewed[k]||{})[id])||{}; const rec={ at:Date.now(), lastSlide:n, version:x.version||1, finished:!!(finished||cur.finished) };
     const upd={ [`trainingViewed/${k}/${id}`]:rec }; if(finished && x.completion!=="quiz" && !t2DoneMap(k)[id]) upd[`trainingDone/${k}/${id}`]={ at:Date.now(), version:x.version||1, via:"view" }; save(upd); };
+  const bar = pct => `<div class="mp-prog"><div class="mp-bar" role="progressbar" aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100"><i style="width:${pct}%"></i></div><b>${pct}%</b></div>`;
   function head(){ return `<div class="mp-head"><span class="t">${esc(x.title)}</span>${preview?'<span class="chip">Preview</span>':""}<button class="small" data-close aria-label="Close">Close</button></div>`; }
   function slideHtml(s){
     let r=0; const items=t2Arr(s.items).map(it=>{ const hid=it.r && (r++>=shown); return it.p ? `<p class="para ${hid?"hid":""}">${t2Txt(it.t)}</p>` : `<li class="${hid?"hid":""}">${t2Txt(it.t)}</li>`; });
@@ -528,7 +550,7 @@ async function openModule(id, o){
   function paint(){
     if(i>=slides.length) return quiz.length && x.completion==="quiz" ? startQuiz() : finish();
     const s=slides[i], left=reveals(s)-shown, last=i===slides.length-1;
-    dl.innerHTML=`${head()}<div class="mp-bar"><i style="width:${Math.round((i+1)/slides.length*100)}%"></i></div><div class="mp-body">${slideHtml(s)}</div>
+    dl.innerHTML=`${head()}${bar(Math.round((i+1)/slides.length*100))}<div class="mp-body">${slideHtml(s)}</div>
       <div class="mp-foot"><button id="mpBack" ${i===0?"disabled":""}>Back</button><span class="grow">${i+1} of ${slides.length}</span>
       <button class="primary" id="mpNext">${left>0?"Next point":last?(x.completion==="quiz"&&quiz.length?"Take the quiz":"Finish"):"Next"}</button></div>`;
     dl.querySelector("[data-close]").onclick=()=>dl.close();
@@ -536,9 +558,16 @@ async function openModule(id, o){
     dl.querySelector("#mpNext").onclick=()=>{ if(left>0){ shown++; return paint(); } if(last){ mark(i,true); i++; shown=0; return paint(); } i++; shown=0; mark(i,false); paint(); };
     dl.querySelector(".mp-body").onclick=e=>{ if(e.target.closest("a,button")) return; if(left>0){ shown++; paint(); } };
   }
+  // The ending page (October 20, 2026): what he finished and what is next.
+  const nextHtml = () => { const nx = typeof t2NextSteps==="function" && !preview ? t2NextSteps(k, id) : [];
+    return nx.length ? `<div class="mp-next"><h3>What is next</h3><ol>${nx.map(t=>`<li>${t2Txt(t)}</li>`).join("")}</ol></div>` : ""; };
   function finish(){
-    dl.innerHTML=`${head()}<div class="mp-body"><h2>Done</h2><p>${esc(x.title)} is finished.${preview?" This was a preview, so nothing was saved.":""}</p></div><div class="mp-foot"><span class="grow"></span><button class="primary" data-close>Close</button></div>`;
+    if(typeof render==="function") render();
+    dl.innerHTML=`${head()}${bar(100)}<div class="mp-body mp-end"><div class="mp-check" aria-hidden="true">&#10003;</div><h2>You finished "${esc(x.title)}"</h2>
+      <p class="meta">${preview?"This was a preview, so nothing was saved.":"It is saved to your training record. You can open it again any time from Training."}</p>${nextHtml()}</div>
+      <div class="mp-foot"><button id="mpAgain">Start over</button><span class="grow"></span><button class="primary" data-close>Back to Training</button></div>`;
     dl.querySelectorAll("[data-close]").forEach(b=>b.onclick=()=>dl.close());
+    dl.querySelector("#mpAgain").onclick=()=>{ i=0; shown=0; paint(); };
   }
   function startQuiz(){
     const block=preview?"":retakeBlock(k,id);
@@ -547,7 +576,7 @@ async function openModule(id, o){
     let n=0, right=0; const answers=[];
     function paintQ(picked){
       const q=qs[n], done=picked!=null;
-      dl.innerHTML=`${head()}<div class="mp-bar"><i style="width:${Math.round((n+(done?1:0))/qs.length*100)}%"></i></div><div class="mp-body">
+      dl.innerHTML=`${head()}${bar(Math.round((n+(done?1:0))/qs.length*100))}<div class="mp-body">
         <p class="meta">Question ${n+1} of ${qs.length}</p><h2>${t2Txt(q.q)}</h2>
         ${q.opts.map(o=>`<button class="qopt ${done?(o.oi===q.ans?"right":o.oi===picked?"wrong":""):""}" data-oi="${o.oi}" ${done?"disabled":""}>${t2Txt(o.t)}</button>`).join("")}
         ${done?`<div class="qexp"><b>${picked===q.ans?"Right.":"Not quite."}</b> ${t2Txt(q.explain||"")}${picked!==q.ans&&q.slide?` <button class="small" id="qRev">Review slide ${esc(q.slide)}</button>`:""}</div>`:""}</div>
@@ -566,9 +595,9 @@ async function openModule(id, o){
       await save(upd);
       const wrong=answers.filter(a=>!a.ok).map(a=>quiz[a.q]);
       const again=!passed && !preview ? retakeBlock(k,id) : "";
-      dl.innerHTML=`${head()}<div class="mp-body"><h2>${passed?"Passed":"Not passed yet"}</h2><p><b>${right} of ${qs.length}</b> (${pct}%). You need ${tset().passMark}% to pass.${preview?" Preview: nothing was saved.":""}</p>
+      dl.innerHTML=`${head()}${bar(100)}<div class="mp-body ${passed?"mp-end":""}">${passed?'<div class="mp-check" aria-hidden="true">&#10003;</div>':""}<h2>${passed?`You passed "${esc(x.title)}"`:"Not passed yet"}</h2><p><b>${right} of ${qs.length}</b> (${pct}%). You need ${tset().passMark}% to pass.${preview?" Preview: nothing was saved.":""}</p>
         ${wrong.length?`<h3>To go over</h3>${wrong.map(q=>`<div class="qexp" style="margin-bottom:8px"><b>${t2Txt(q.q)}</b><br>${t2Txt(q.explain||"")}</div>`).join("")}`:""}
-        ${again?`<p class="meta">${esc(again)}</p>`:""}</div>
+        ${again?`<p class="meta">${esc(again)}</p>`:""}${passed?nextHtml():""}</div>
         <div class="mp-foot">${!passed&&!again?`<button id="qAgain">Try again</button>`:""}<span class="grow"></span><button class="primary" data-close>Close</button></div>`;
       dl.querySelectorAll("[data-close]").forEach(b=>b.onclick=()=>dl.close());
       const ag=dl.querySelector("#qAgain"); if(ag) ag.onclick=()=>{ i=0; shown=0; startQuiz(); };
@@ -636,7 +665,23 @@ function parseModuleMd(src){
 // in auto mode he goes into the first seat that has no one.
 let doneAll={}, paperAll={};
 const t2DoneMap = k => (!isAdmin && me && k===me.key) ? (trainDone||{}) : (doneAll[k]||{});
-function walkerGate(k){ return gateCheck("walker", { offerSigned:offerSignedOf(k, paperAll[k]||(k===me.key?myPaper:null), allowedWalkers[k]), done:t2DoneMap(k), viewed:trainViewed[k]||{}, practice:{} }); }
+const PAPER_SHORT = { agreement:"distributor agreement", privacy:"privacy policy", w9:"W-9", w4:"W-4", miw4:"MI-W4", i9:"I-9" };
+// Every form in his packet but direct deposit (optional) has to be signed before routes (Russel, October 20, 2026).
+function paperLeftOf(p, signed){ p=p||{}; const list=Array.isArray(p.list)?p.list:Object.keys(p.forms||{});
+  return list.filter(f=>f!=="deposit" && PAPER_SHORT[f] && !(f==="agreement" && signed) && ((p.forms||{})[f]||{}).status!=="done"); }
+function walkerGate(k){
+  const paper=paperAll[k]||(me&&k===me.key?myPaper:null), signed=offerSignedOf(k, paper, allowedWalkers[k]);
+  const g=gateCheck("walker", { offerSigned:signed, done:t2DoneMap(k), viewed:trainViewed[k]||{}, practice:{} });
+  if(paper && (paper.token || paper.list || paper.forms)){
+    g.need=g.need.filter(n=>n!=="Sign the offer"); const left=paperLeftOf(paper, signed);
+    if(left.length) g.need.push("Sign your paperwork: "+left.map(f=>PAPER_SHORT[f]).join(", ")); }
+  else if(g.need.includes("Sign the offer")) g.need=g.need.map(n=>n==="Sign the offer"?"Sign your distributor agreement":n);
+  const rank = n => /"Using the site/.test(n) ? 0 : /^Sign /.test(n) ? 1 : 2;
+  g.need.sort((a,b)=>rank(a)-rank(b)); g.ok=!g.need.length; return g;
+}
+// For the ending page of a module or quiz: what he still has to do before routes.
+function t2NextSteps(k, id){ const g=walkerGate(k), open=id===SITE_DECK ? ["The rest of the site is open now: **Today**, **Week** and **My days**."] : [];
+  return g.ok ? ["You are ready for routes. The office puts you on your first route and it shows on **Today**."] : open.concat(g.need.map(n=>n.replace(/^Sign your paperwork:/, "Sign your paperwork on the Training tab:"))); }
 function readyCard(){
   const seated=new Set(seatList().map(seatPerson).filter(Boolean)), list=Object.entries(walkers).filter(([k])=>!seated.has(k)).map(([k,w])=>({ k, w, g:walkerGate(k) }));
   const ready=list.filter(x=>x.g.ok), waiting=list.filter(x=>!x.g.ok);
@@ -669,9 +714,16 @@ function renderLearn(app){
   const link=myPaper.token ? `paperwork.html?t=${encodeURIComponent(myPaper.token)}${myPaper.s?"&s="+encodeURIComponent(myPaper.s):""}` : "";
   const byCat={}; list.forEach(id=>{ const c=trainLib[id].category||"Other"; (byCat[c]=byCat[c]||[]).push(id); });
   const data={ done:trainDone||{}, viewed:trainViewed[me.key]||{} }, g=walkerGate(me.key), total=mods.length+list.length, n=mods.filter(done).length+list.filter(done).length;
-  app.innerHTML = (onboarding ? `<div class="card"><h2 style="margin:0 0 6px">Welcome to Mangiapane Brothers</h2><p>Sign your distributor agreement below to get started. Once it is signed, your routes open up. The rest of your paperwork can be done here any time before your first payday.</p></div>` : "")
+  if(siteDeckPending() && trainLib[SITE_DECK]){
+    const later=[...left.map(f=>PAPER_TITLES[f]), ...mods.filter(id=>id!==SITE_DECK).map(id=>`"${trainLib[id].title}"`), ...list.map(id=>trainLib[id].title)];
+    app.innerHTML = `<div class="card"><h2 style="margin:0 0 6px">Welcome to Mangiapane Brothers</h2><p>Start here. <b>"${esc(trainLib[SITE_DECK].title)}"</b> shows you how this site works in about five minutes. When you finish it, your paperwork, the job module and the rest of the site open up.</p></div>
+      <h3 style="margin:14px 0 6px">Step 1</h3>${moduleCardHtml(me.key,SITE_DECK,data,false)}
+      ${later.length?`<div class="card locked"><h2 style="margin:0 0 6px">Opens after step 1</h2><ul style="margin:0;padding-left:20px">${later.map(t=>`<li>${esc(t)}</li>`).join("")}</ul></div>`:""}`;
+    wireModuleCards(app, me.key, false); return;
+  }
+  app.innerHTML = (onboarding ? `<div class="card"><h2 style="margin:0 0 6px">Your paperwork</h2><p>Sign your distributor agreement first, then the rest of the forms below. The office gives you routes when your paperwork is signed and "Hanging door hangers" is passed.</p></div>` : "")
     + (left.length && link ? `<h2 style="margin:6px 0 8px">Paperwork to sign</h2>` + left.map(f=>`<div class="card" style="border-left:4px solid var(--amber)"><p style="margin:0 0 4px"><span class="chip warn">To sign</span> <b>${esc(PAPER_TITLES[f])}</b></p>
-        <p class="meta">${f==="agreement"?"Your offer. Sign it to get your routes.":f==="deposit"?"Optional. Without it you are paid by check.":"Needed before your first payday. Tax and bank forms are encrypted on your device before they are sent."}</p>
+        <p class="meta">${f==="agreement"?"Your offer. Sign this one first.":f==="deposit"?"Optional. Without it you are paid by check.":"Needed before you get routes."+(["w9","w4","miw4","i9"].includes(f)?" Tax forms are encrypted on your device before they are sent.":"")}</p>
         <div class="actions"><a class="mapbtn" href="${esc(link)}">Sign now</a></div></div>`).join("") : "")
     + `<div class="card"><h2 style="margin:0 0 6px">${g.ok?"Ready for routes":"Before you get routes"}</h2>${g.ok?'<p class="meta">Your training is done. The office puts you on routes.</p>':`<p class="meta">The office cannot give you routes until these are done:</p>${gateList(g).replace(/<p class="muted"[\s\S]*$/,"")}`}</div>`
     + `<div class="bar"><span class="date">Training</span>${total?`<span class="chip ${n===total?"ok":"warn"}">${n} of ${total} done</span>`:""}</div>`
@@ -1044,22 +1096,26 @@ if(DEMO){
       "trainingLib/w3":{ title:"Customer at the door", category:"Customers", kind:"sop", body:"Smile and introduce yourself and the company.\nDo not quote prices. Give them the office number: 734-450-2400." },
       "trainingRoles/walker":{ w1:true, w2:true }, "trainingRoles/all":{ w3:true },
       "trainingDone/walker,one@example,com/w1":{ at:Date.now()-864e5 },
-      "paper/walker,one@example,com":{ token:"p_demo_w1", s:"DEMO", position:"walker", type:"1099", list:["agreement","privacy","w9","deposit"], offerSigned:Date.now()-5*864e5, forms:{ agreement:{ status:"done", at:Date.now()-5*864e5 } } }};
+      "paper/walker,one@example,com":{ token:"p_demo_w1", s:"DEMO", position:"walker", type:"1099", list:["agreement","privacy","w9","deposit"], offerSigned:Date.now()-5*864e5, forms:{ agreement:{ status:"done", at:Date.now()-5*864e5 }, privacy:{ status:"done", at:Date.now()-5*864e5 }, w9:{ status:"done", at:Date.now()-5*864e5 } } }};
     Object.entries(s.areas||{}).forEach(([k,v])=>upd["routeAreas/"+k]=v);
     Object.entries(s.routes||{}).forEach(([k,v],i)=>upd["routes/"+k]={...v,walker:v.training?v.walker:v.seat==="Walker 2"?"walker,two@example,com":v.seat==="Walker 1"?"walker,one@example,com":""});
-    // Training modules (October 20, 2026): a sample door hanger job module with a quiz, and a third walker still in training.
-    const wm=parseModuleMd(["---","id: walker-job","title: Hanging door hangers","roles: [walker]","category: Door hangers","order: 10","version: 1","completion: quiz","status: ready","---",
-      "---slide---","## Where the hanger goes","- Doorknob first {reveal}","- Then the screen door sill {reveal}","- Never in a mailbox {reveal}","![A hanger on a doorknob](image:knob)",
-      "---slide---","## Stay off the lawn","- Walks and sidewalks only","- Loose dog: skip the house",
-      "---quiz---","### Q1","Where does a hanger never go?","- [ ] On the doorknob","- [x] In the mailbox","- [ ] In the screen door sill","explain: Mailboxes are federal property. Never put anything in one.","slide: 1",
-      "### Q2","A loose dog is in the front yard. What do you do?","- [x] Skip the house","- [ ] Walk fast to the door","- [ ] Wait for the owner","explain: A loose dog means skip the house.","slide: 2"].join("\n"));
-    upd["trainingLib/walker-job"]={ ...wm.rec, createdAt:Date.now()-864e5 }; upd["trainingRoles/walker/walker-job"]=true;
+    // Training modules: the real door hanger decks from training/modules, with their pictures from training/images.
+    // demo=newwalker is a door hanger on day one (nothing done); add &step=2 for after "Using the site".
+    const md=async f=>{ try { const r=await fetch("training/modules/"+f); return r.ok?await r.text():""; } catch(e){ return ""; } };
+    const pics=(id,names)=>Object.fromEntries(names.map(n=>[n,`training/images/${id}/${n}.jpg`]));
+    for(const [f,id] of [["Walker/walker-job.md","walker-job"],["Systems/systems-walker.md","systems-walker"]]){ const t=await md(f); const x=t?parseModuleMd(t):null; if(!x||!x.rec) continue;
+      upd["trainingLib/"+id]={ ...x.rec, createdAt:Date.now()-864e5 }; upd["trainingRoles/walker/"+id]=true;
+      upd["trainingImages/"+id]=pics(id, x.rec.slides.map(sl=>sl.img&&sl.img.name).filter(Boolean)); }
+    upd["trainingDone/walker,one@example,com/systems-walker"]={ at:Date.now()-2*864e5, version:1, via:"view" };
+    upd["allowed/walker,four@example,com"]={name:"New Walker",email:"walker.four@example.com",tier:"walker"};
+    upd["paper/walker,four@example,com"]={ token:"p_demo_w4", s:"DEMO", position:"walker", type:"1099", list:["agreement","privacy","w9","deposit"], forms:{} };
+    if(new URLSearchParams(location.search).get("step")==="2") upd["trainingViewed/walker,four@example,com/systems-walker"]={ at:Date.now(), lastSlide:8, version:1, finished:true };
     upd["trainingDone/walker,one@example,com/walker-job"]={ at:Date.now()-864e5, version:1, via:"quiz", score:100 };
     upd["allowed/walker,three@example,com"]={name:"Walker Three",email:"walker.three@example.com",tier:"walker"};
     upd["paper/walker,three@example,com"]={ token:"p_demo_w3", position:"walker", type:"1099", list:["agreement"], forms:{ agreement:{ status:"done", at:Date.now()-864e5 } } };
     await store.update(upd);
     const first=Object.values(s.routes||{}).map(r=>r.start).filter(Boolean).sort()[0]; if(first && first>curDate) curDate=first;
-    enter(DEMO==="walker" ? {email:"walker.one@example.com",displayName:"Walker One"} : {email:ADMIN_EMAIL,displayName:"Russel"});
+    enter(DEMO==="walker" ? {email:"walker.one@example.com",displayName:"Walker One"} : DEMO==="newwalker" ? {email:"walker.four@example.com",displayName:"New Walker"} : {email:ADMIN_EMAIL,displayName:"Russel"});
   });
 } else {
   store.auth.onAuthStateChanged(u => { if(u) return enter(u); leave(); location.replace("./?to=routes.html"); });  // signed out: the front page signs people in
