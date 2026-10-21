@@ -285,7 +285,15 @@ function showPay(A){
     let R;
     try{ R = await call("paydetails", { ...body, attempt }); }
     catch(e){ return recheck(attempt, btn); }
-    if(!R || !R.ok){ btn.disabled=false; lockOthers(false); btn.textContent=was; return err((R && R.error) || "Not saved."); }
+    if(!R || !R.ok){
+      // Before showing any failure, read the real outcome back: a garbled or misrouted reply ("Unknown request") must never
+      // show an error after the card was saved and charged (Oct 21, 2026: Paul Darke saw one after a good $500 charge).
+      try{ const V = await call("get"); const last = V && V.ok && V.payLast && V.payLast.attempt===attempt ? V.payLast.result : "";
+        if(V && V.ok && (last==="saved" || (V.pay && V.pay.detailsAt))) return route({ ...A, ...V });
+        if(V && V.ok && V.payBusy) return recheck(attempt, btn); }catch(e){ return recheck(attempt, btn); }
+      if(R && /unknown request/i.test(R.error||"")) return recheck(attempt, btn);
+      btn.disabled=false; lockOthers(false); btn.textContent=was; return err((R && R.error) || "Not saved.");
+    }
     route({ ...A, ...R });
   };
   const recheck = async (attempt, btn) => {
