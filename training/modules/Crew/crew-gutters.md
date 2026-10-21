@@ -5,7 +5,7 @@ roles: [member, manager]
 category: Fall cleanup
 season: fall
 order: 60
-version: 1
+version: 2
 completion: quiz
 status: ready
 ---
@@ -28,7 +28,7 @@ status: ready
 ---slide---
 ## Roof rules
 - No one on a wet, frosty or icy roof. {reveal}
-- The manager makes the final call on a steep roof. {reveal}
+- Your manager makes the call when a roof is too slippery to go on. {reveal}
 - You may refuse a roof you think is unsafe, with no penalty. {reveal}
 - Stay back from the edge except to work the gutter. {reveal}
 
@@ -48,7 +48,7 @@ status: ready
 ---slide---
 ## Two-story and steep roofs
 - Two-story homes and roofs too steep to walk mean the ladder has to be moved along the house. {reveal}
-- Tell your manager before you start. He decides how it gets done. {reveal}
+- Tell your manager before you start, so the extra work is recorded. {reveal}
 - Never stand on the top rungs to reach farther. Move the ladder. {reveal}
 
 ---slide---
@@ -86,10 +86,10 @@ explain: No one goes on a wet, frosty or icy roof.
 slide: 3
 
 ### Q4
-You think a roof is too steep, but your partner wants to go up anyway. What can you do?
-- [ ] Nothing, majority rules
-- [x] Refuse it, with no penalty, and let the manager make the call
+The roof still has morning frost on it, and your partner wants to go up anyway. What happens?
+- [ ] Majority rules
+- [x] Nobody goes up. The manager makes the call when a roof is too slippery
 - [ ] Go up and be careful
 - [ ] Let the client decide
-explain: The manager makes the final call on steep roofs, and crew can refuse a roof without penalty.
+explain: No one goes on a wet, frosty or icy roof, and the manager makes the call when a roof is too slippery to go on.
 slide: 3

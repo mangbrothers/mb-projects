@@ -140,6 +140,7 @@
   .mp-next{text-align:left;border:1px solid var(--line);border-radius:var(--r);background:var(--surface2);padding:12px 16px;margin:14px auto 0;max-width:520px;width:100%}
   .mp-next h3{margin:0 0 6px;font-size:16px}.mp-next ol{margin:0;padding-left:22px}.mp-next li{margin:0 0 6px}
   .mp-ph{display:flex;align-items:center;justify-content:center;min-height:150px;border:2px dashed var(--line);border-radius:var(--r);background:var(--surface2);color:var(--ink2);text-align:center;padding:12px;margin:8px 0;font-size:14px}
+  .card.locked{opacity:.75;border-style:dashed}
   .mp-hl{display:inline-block;border:2px solid var(--amber);border-radius:999px;padding:2px 10px;font-weight:700;color:var(--ink)}
   .mp-note{border-left:4px solid var(--accent);background:var(--accent-soft);padding:8px 10px;border-radius:var(--r);font-size:14px;margin-top:10px}
   .mp-todo{border-left:4px solid var(--amber);background:var(--amber-soft);padding:8px 10px;border-radius:var(--r);font-size:14px;margin-bottom:10px}
@@ -718,7 +719,7 @@ function attach(){
     bind("routeLogsByWalker", v=>walkLogs=v);
   } else {
     // An employee's own record. The office preview reads the office's copy instead.
-    const own = (path, map) => unsub.push(store.on(path+"/"+me.key, v=>{ map[me.key]=v||{}; render(); }));
+    const own = (path, map) => unsub.push(store.on(path+"/"+me.key, v=>{ map[me.key]=v||{}; t2GotC[path]=true; render(); }));
     own("timeEntries", timeAll); own("staff", staffAll); own("staffPrivate", privAll); own("staffDocs", docsAll); own("shifts", shiftsAll); own("payLog", payLogAll);
     own("trainingAssign", trainAssign); own("trainingDone", trainDone);
     own("trainingQuiz", trainQuiz); own("trainingViewed", trainViewed); own("trainingPractice", trainPractice);
@@ -797,7 +798,7 @@ function tabs(){
   // A "See as" link from Team Manager lands here as crews.html#seeas=emp:<key>.
   if(pendingSeeAs && realAdmin && PAGE==="crews" && (team[pendingSeeAs.slice(4)] || crews[pendingSeeAs])){ const v=pendingSeeAs; pendingSeeAs=""; history.replaceState(null,"",location.pathname+location.search); setTimeout(()=>setViewAs(v),0); }
   const t = isAdmin ? OFFICE_TABS
-    : onboarding && !viewAs ? [["training","Training"]]
+    : (onboarding || crewSitePending()) && !viewAs ? [["training","Training"]]
     : role==="manager" ? [["today","Today"],["week","Week"],["crewlog","Crew log"],["crew","Crew"],["training","Training"],["me","Me"]]
     : [["schedule","Schedule"],["training","Training"],["hours","Hours"],["pay","Pay"],["files","Files"],["info","My info"]];
   $("#nav").innerHTML = t.map(([k,l])=>`<button data-v="${k}" class="${view===k&&!openRoute&&!editing?"on":""}">${l}</button>`).join("")
@@ -836,7 +837,10 @@ function render(){
   if(editing) return renderEditRoute(app);
   if(openRoute && routes[openRoute]) return renderRoute(app);
   openRoute=null;
-  if(onboarding && !viewAs && !isAdmin) view="training";
+  const csp=crewSitePending();
+  if(crewSiteWas===true && !csp && !isAdmin){ view="training"; toast(onboarding?`Done with "Using the site". Your paperwork is open: sign your offer next.`:`Done with "Using the site". The rest of the page is open.`); }
+  if(trainLib[SITE_DECK_CREW] && t2GotC.trainingDone && t2GotC.trainingViewed) crewSiteWas=csp;
+  if((onboarding || csp) && !viewAs && !isAdmin) view="training";
   if(role==="member" && !["schedule","training","hours","pay","files","info"].includes(view)) view="schedule";
   if(isAdmin && !OFFICE_TABS.some(([k])=>k===view)) view=OFFICE_TABS[0][0];
   ({today:renderToday, week:renderWeek, crewlog:renderCrewLog, crew:renderCrewTab, me:renderMe, schedule:renderMySchedule, hours:renderHours, pay:renderPay, files:renderFiles, info:renderInfo,
@@ -2182,6 +2186,14 @@ const TRAIN_KINDS = { deck:"Slide deck", sop:"SOP", video:"Video", doc:"Document
 const TRAIN_ROLES = { manager:"Crew managers", member:"Crew members", walker:"Door hangers", all:"Everyone" };
 const TRAIN_CATS = ["Safety","Lawn","Snow","Fall cleanup","Lights","Landscaping","Equipment","Customers","Company policy","Onboarding"];
 let trainLib={}, trainRoles={}, trainAssign={}, trainDone={}, onboarding=false, trainQ="", trainCat="";
+// October 21, 2026 (Russel): a new crew member does "Using the site: crew" first, the same as door hangers. Until he
+// finishes it he sees only Training; his paperwork and the other modules wait behind it so he does not get lost.
+const SITE_DECK_CREW = "systems-crew"; let t2GotC={}, crewSiteWas=null;
+function crewSitePending(){
+  if(isAdmin || !me || viewAs || practice) return false;
+  const m=trainLib[SITE_DECK_CREW]; if(!isModule(m) || m.status==="draft" || !t2GotC.trainingDone || !t2GotC.trainingViewed) return false;
+  const k=me.key; return !((trainDone[k]||{})[SITE_DECK_CREW] || (((trainViewed[k]||{})[SITE_DECK_CREW])||{}).finished);
+}
 const trainItems = () => Object.entries(trainLib).filter(([,x])=>x && x.title).sort((a,b)=>(a[1].category||"").localeCompare(b[1].category||"")||(a[1].title||"").localeCompare(b[1].title||""));
 function roleKeyOf(k){ const t=team[k]||{}; return t.tier==="walker" ? "walker" : t.crewRole==="manager" ? "manager" : "member"; }
 // Everyone who can be given training: crew and door hangers (October 17, 2026).
@@ -2202,7 +2214,7 @@ function paperCardsHtml(k){
   const left=paperLeft(k), link=paperLinkFor(k); if(!left.length || !link) return "";
   return left.sort((a,b)=>(a==="agreement"?-1:b==="agreement"?1:0)).map(f=>{ const F=PAPER.FORMS[f];
     return `<div class="card trcard paper"><div class="top"><span><span class="chip warn">To sign</span> <b>${esc(F.title)}</b></span></div>
-      <p class="meta">${f==="agreement"?"Your offer. Read it and sign it to get into the rest of the crew page.":F.optional?"Optional. Without it you are paid by check.":"Needed before your first paycheck. Tax and bank forms are encrypted on your device before they are sent."}</p>
+      <p class="meta">${f==="agreement"?"Your offer. Read it and sign it to get into the rest of the crew page.":F.optional?"Optional. Without it you are paid by check.":"Needed before your first shift."+(["w4","miw4","i9","w9"].includes(f)?" Tax forms are encrypted on your device before they are sent.":"")}</p>
       <div class="actions"><a class="primary mapbtn" href="${esc(link)}">Sign now</a></div></div>`; }).join("");
 }
 function trainCardHtml(k, id, office){
@@ -2220,7 +2232,7 @@ function myPaperHtml(k){
   const list=Array.isArray(p.list)?p.list:Object.keys(p.forms||{}), link=paperLinkFor(k);
   return `<div class="card"><h2>Paperwork</h2>${list.filter(f=>PAPER.FORMS[f]).map(f=>{ const st=(p.forms||{})[f]||{};
     return `<div class="logrow"><span class="w"><b>${esc(PAPER.FORMS[f].title)}</b></span><span>${st.status==="done"?`<span class="chip ok">Signed ${st.at?fmtShort(iso(new Date(st.at))):""}</span>`:`<a class="mapbtn" href="${esc(link)}">Sign</a>`}</span></div>`; }).join("")}
-    <p class="muted">Signed tax and bank forms are locked; only the owner can open them. Your signed agreement is in Files.</p></div>`;
+    <p class="muted">Signed tax and bank forms are encrypted; only the owner can open them. Your signed agreement is in Files.</p></div>`;
 }
 
 // ---------- office: the library, assignments and progress ----------
@@ -2558,7 +2570,24 @@ let meRec={}, incidents={}, routesReal={}, checksReal={}, practice=false, practi
 const PRAC = "__practice", PRAC_RID = "__practice";
 const t2DoneMap = k => trainDone[k]||{};
 function gateCtx(k){ const rec = team[k] || (me && k===(meReal||me).key ? meRec : {}); return { offerSigned:offerSignedOf(k, paperAll[k], rec), done:trainDone[k]||{}, viewed:trainViewed[k]||{}, practice:trainPractice[k]||{} }; }
-const gateOf = (k, which) => gateCheck(which, gateCtx(k));
+const PAPER_SHORT = { agreement:"offer", privacy:"privacy policy", w4:"W-4", miw4:"MI-W4", i9:"I-9", w9:"W-9" };
+// Crew and managers: every form in the packet but direct deposit is signed before the first shift (Russel, October 21, 2026).
+function gateOf(k, which){
+  const g=gateCheck(which, gateCtx(k)); if(which!=="crew" && which!=="manager") return g;
+  const p=paperAll[k]; if(p && (p.token || p.list || p.forms)){
+    const signed=offerSignedOf(k, p, team[k] || (me && k===(meReal||me).key ? meRec : {})), left=paperLeft(k).filter(f=>f!=="deposit" && !(f==="agreement" && signed));
+    g.need=g.need.filter(n=>n!=="Sign the offer"); if(left.length) g.need.push("Sign your paperwork: "+left.map(f=>PAPER_SHORT[f]||f).join(", ")); }
+  const rank = n => /"Using the site/.test(n) ? 0 : /^Sign /.test(n) ? 1 : /practice run/i.test(n) ? 3 : 2;
+  g.need.sort((a,b)=>rank(a)-rank(b)); g.ok=!g.need.length; return g;
+}
+// For the ending page of a module or quiz: what he still has to do.
+function t2NextSteps(k, id){
+  const c=gateOf(k,"crew"), open=id===SITE_DECK_CREW && !onboarding ? ["The rest of your page is open now."] : [];
+  if(!c.ok) return open.concat(c.need.map(n=>n.replace(/^Sign your paperwork:/, "Sign your paperwork on the Training tab:")));
+  const mgr=(practiceSaved?practiceSaved.role:role)==="manager" || !!(trainPractice[k]||{}).open;
+  if(mgr){ const m=gateOf(k,"manager"); if(!m.ok) return open.concat(m.need); return open.concat(["Manager training is done. The office can make you a crew manager."]); }
+  return open.concat(["You are ready for the schedule. Your shifts show on **Schedule** when the office adds them."]);
+}
 const t2Data = k => ({ done:trainDone[k]||{}, viewed:trainViewed[k]||{}, practice:trainPractice[k]||{} });
 const modSort = (a,b) => (trainLib[a].order||0)-(trainLib[b].order||0) || (trainLib[a].title||"").localeCompare(trainLib[b].title||"");
 const liveModule = id => isModule(trainLib[id]) && trainLib[id].status!=="draft";
@@ -2664,7 +2693,14 @@ function renderTraining(app){
   const total=mods.length+other.length, done=mods.filter(id=>data.done[id]).length+other.filter(id=>isDone(k,id)).length;
   const byCat={}; other.forEach(id=>{ const c=trainLib[id].category||"Other"; (byCat[c]=byCat[c]||[]).push(id); });
   const pc=paperCardsHtml(k), g=gateOf(k,"crew"), mgr=roleK==="manager" || !!(trainPractice[k]||{}).open, gm=mgr?gateOf(k,"manager"):null;
-  app.innerHTML = (onboarding ? `<div class="card welcome"><h2>Welcome to Mangiapane Brothers</h2><p>Sign your offer below to get started. Once it is signed, your schedule, hours and the rest of this page open up. Your other paperwork can be done here any time before your first paycheck.</p></div>` : "")
+  if(crewSitePending() && trainLib[SITE_DECK_CREW] && ids.includes(SITE_DECK_CREW)){
+    const later=[...paperLeft(k).map(f=>PAPER.FORMS[f].title), ...mods.filter(id=>id!==SITE_DECK_CREW).map(id=>`"${trainLib[id].title}"`), ...other.map(id=>trainLib[id].title)];
+    app.innerHTML = `<div class="card welcome"><h2>Welcome to Mangiapane Brothers</h2><p>Start here. <b>"${esc(trainLib[SITE_DECK_CREW].title)}"</b> shows you how this site works in about five minutes. When you finish it, your paperwork and the rest of your training open up.</p></div>
+      <h3 style="margin:14px 0 6px">Step 1</h3>${moduleCardHtml(k,SITE_DECK_CREW,data,false)}
+      ${later.length?`<div class="card locked"><h2>Opens after step 1</h2><ul style="margin:0;padding-left:20px">${later.map(t=>`<li>${esc(t)}</li>`).join("")}</ul></div>`:""}`;
+    wireModuleCards(app, k, !!viewAs); return;
+  }
+  app.innerHTML = (onboarding ? `<div class="card welcome"><h2>Your paperwork</h2><p>Sign your offer first; that opens the rest of this page. Then sign the other forms below. The office schedules you when your paperwork is signed and the safety and conduct quizzes are passed.</p></div>` : "")
     + (pc ? `<h2 style="margin:6px 0 8px">Paperwork to sign</h2>${pc}` : "")
     + `<div class="card"><h2>${g.ok?"Ready for the schedule":"Before you can be scheduled"}</h2>${g.ok?'<p class="meta">Your required training is done. The office can put you on the schedule.</p>':`<p class="meta">The office cannot schedule you until these are done:</p>${gateList(g).replace(/<p class="muted"[\s\S]*$/,"")}`}</div>`
     + (gm ? (gm.ok ? `<div class="card"><h2>Ready to manage a crew</h2><p class="meta">Manager training and the practice run are done.</p></div>` : "") + practiceCardHtml(k) : "")
@@ -2893,6 +2929,8 @@ function demoSeed(){
     [`trainingQuiz/${S("m1")}/crew-safety/q2`]:{ at:Date.now()-864e5, version:1, score:3, total:3, pct:100, passed:true, answers:[] },
     [`trainingViewed/${S("m1")}/systems-crew`]:{ at:Date.now()-2*864e5, lastSlide:1, version:1, finished:true },
     [`trainingDone/${S("m1")}/systems-crew`]:{ at:Date.now()-2*864e5, version:1, via:"view" },
+    // The crew already working has done the site deck; Luis Park (the new hire) has not.
+    ...Object.fromEntries(["boss","boss2","m2"].map(x=>[`trainingDone/${S(x)}/systems-crew`, { at:Date.now()-9*864e5, version:1, via:"view" }])),
     [`trainingPractice/${S("m1")}/open`]:{ at:Date.now()-864e5, by:ADMIN_EMAIL },
     "trainingSettings/route":{ name:"Practice route", service:"fall", fromName:"Livonia snow route", from:"snow1", on:addDays(d,-1),
       stops:{ p1:{ name:"Practice house 1", address:cl[0][1], lat:cl[0][2], lon:cl[0][3], order:1 }, p2:{ name:"Practice house 2", address:cl[1][1], lat:cl[1][2], lon:cl[1][3], order:2 }, p3:{ name:"Practice house 3", address:cl[2][1], lat:cl[2][2], lon:cl[2][3], order:3 } } },

@@ -5,7 +5,7 @@ roles: [member, manager]
 category: Company policy
 season: always
 order: 30
-version: 3
+version: 4
 completion: view
 status: ready
 ---
@@ -85,8 +85,11 @@ note: Draft timing is meet 7:45, a 10-minute brief, first house by 8:00. Start t
 ---slide---
 ## Firing offenses
 - Three unexcused absences in a season.
-- Hiding damage on a property.
-- Gross negligence or a serious offense on the job.
+- Hiding damage on a property, or gross negligence on the job.
+- Working under the influence of alcohol or drugs, or running equipment unsafely.
+- Taking work, cash or side jobs from a client without the owner's approval.
+- Running equipment before 7 a.m. or after 11 p.m.
+note: Matches section 7 of the employment agreements. The snow firing offenses (route order, salting before clearing) are in the Snow module.
 
 ---slide---
 ## Questions

@@ -5,7 +5,7 @@ roles: [member, manager]
 category: Snow
 season: snow
 order: 80
-version: 1
+version: 2
 completion: quiz
 status: ready
 ---
@@ -40,11 +40,20 @@ note: Pay for each push is in the crew agreement, not here.
 - Reply "confirmed" to the group text within 30 minutes. {reveal}
 - No reply means a call from the operations manager. {reveal}
 - Confirming tells the operations manager the crew is covered. {reveal}
+- Cannot make it? Tell the operations manager before the dispatch time. An unexcused missed dispatch costs you. {reveal}
+note: The cost of a missed dispatch is in the crew agreement, not here.
 
 ---slide---
 ## Snow hours
 - No snow work between 11:00 p.m. and 7:00 a.m. {reveal}
 - Alerts may come overnight so you are ready for a 7:00 a.m. start. {reveal}
+- Running equipment before 7:00 a.m. or after 11:00 p.m. ends employment. {reveal}
+
+---slide---
+## Route order, then clear, then salt
+- Clear the houses in the route order set in the system. Never skip ahead. {reveal}
+- Clear first, then salt. Never salt before clearing. {reveal}
+- Leaving route order or salting before clearing ends employment. {reveal}
 
 ---slide---
 ## What gets cleared at every house
@@ -89,7 +98,7 @@ What do you clear at every house?
 - [ ] The driveway only
 - [ ] Whatever the client points to
 explain: Driveway up to the back gate, never the backyard, plus the front porch, the walk to the porch and the public sidewalk.
-slide: 7
+slide: 8
 
 ### Q3
 A snow alert comes in. How fast must you reply "confirmed"?
@@ -107,7 +116,7 @@ What ice melt goes down after every visit?
 - [x] Calcium chloride
 - [ ] Whatever is on the truck
 explain: Salt after every visit using calcium chloride ice melt, never sodium chloride rock salt.
-slide: 9
+slide: 10
 
 ### Q5
 Can crews start clearing at 5:30 a.m. to get ahead?

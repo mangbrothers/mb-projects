@@ -5,7 +5,7 @@ roles: [member, manager]
 category: Safety
 season: always
 order: 10
-version: 3
+version: 4
 completion: quiz
 status: ready
 ---
@@ -49,7 +49,7 @@ status: ready
 - No one goes on a wet, frosty or icy roof. {reveal}
 - The ladder is held or spotted while anyone climbs. {reveal}
 - The ladder extends three feet above the roof edge. {reveal}
-- The manager makes the final call on steep roofs. {reveal}
+- Your manager makes the call when a roof is too slippery to go on. {reveal}
 - You may refuse a roof you think is unsafe, with no penalty. {reveal}
 ![Ladder extending three feet above the roof edge](image:ladder-three-feet)
 

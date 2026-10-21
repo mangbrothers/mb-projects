@@ -27,3 +27,10 @@ All photos are from Wikimedia Commons under the licenses shown. CC BY and CC BY-
 
 ## systems-walker
 - Screenshots of the company site in demo mode (made up names and data), 20 October 2026
+
+## Manager packet (placeholders until the crew photographer's shots replace them, same file names)
+- AI-generated with Google Gemini, 21 October 2026: mgr-day/trailer-hitch-check.jpg, mgr-quality/finished-job-photo.jpg, mgr-complaints/damage-photo.jpg, mgr-snow-calls/snow-measure-ruler.jpg, mgr-eod/eod-equipment-loaded.jpg
+
+## systems-crew and systems-manager
+- Screenshots of the company site in demo mode (made up names and data), 21 October 2026; crew-phone drawn for the company (Claude)
+
