@@ -58,9 +58,8 @@
   .err{color:var(--red);font-weight:600;margin:10px 0 0}
   .banner{background:var(--amber-soft);color:var(--amber);border:1px solid var(--amber-line);border-radius:10px;padding:12px 14px;margin:0 0 12px;font-size:15px}
   .lock{background:var(--brand-soft);border:1px solid var(--brand);border-radius:10px;padding:10px 14px;font-size:14px;margin:0 0 14px}
-  .sigwrap{border:1px solid var(--line);border-bottom:2px solid var(--ink);border-radius:8px 8px 0 0;background:#fff;position:relative;touch-action:none}
-  .sigwrap canvas{display:block;width:100%;height:150px;touch-action:none}
-  .sigwrap .x{position:absolute;left:12px;bottom:10px;color:#9aa39a;font-size:20px;pointer-events:none}
+  .sigprev{border:1px solid var(--line);border-bottom:2px solid var(--ink);border-radius:8px 8px 0 0;background:#fff;color:#0b1a4a;min-height:72px;padding:10px 14px;margin-top:10px;font:34px/1.4 "Dancing Script",cursive;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+  .sigprev:empty::before{content:"Your signature shows here";font:15px/50px -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;color:#9aa39a}
   .center{text-align:center;padding:40px 16px;color:var(--ink2)}
   .back{background:none;border:0;color:var(--brand);font-weight:600;padding:0;min-height:36px}
   .done{border-color:var(--brand);background:var(--brand-soft)}
@@ -74,6 +73,8 @@
 <body>
 <header><div class="in"><img src="mb-logo.png" alt="Mangiapane Brothers Lawn &amp; Snow"><div class="tag">Full-Service Property Maintenance for Those Who Take Pride in Their Home</div></div></header>
 <main id="main"><div class="center">Loading your paperwork…</div></main>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@600&display=swap" rel="stylesheet">
 <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
 <script>
 // ===== Employee paperwork: shared by the employee signing page (paperwork.html) and Team Manager (team.html) =====
@@ -527,9 +528,9 @@ function openForm(id){
   main.innerHTML = `<p><button class="back" id="back">‹ All forms</button></p>
     <div class="card"><h1>${esc(F.title)}</h1><div id="fields">${SPEC[id]()}</div>
       <div class="sec"><h3>Sign</h3>
-      <p class="help" style="margin-bottom:8px">Sign with your finger or mouse. By signing you agree to sign this form electronically, and that your electronic signature is the same as your handwritten one.</p>
-      <div class="sigwrap"><canvas id="sig"></canvas><span class="x">✕</span></div>
-      <div class="row" style="margin-top:6px;justify-content:space-between"><span class="meta">${esc(new Date().toLocaleDateString())}</span><button id="clear" type="button">Clear</button></div></div>
+      <div class="f" style="margin:0"><label for="sigName">Type your full legal name to sign</label><input id="sigName" autocomplete="name" autocapitalize="words" spellcheck="false"></div>
+      <div class="sigprev" id="sigPrev" aria-hidden="true"></div>
+      <p class="help">By typing your name you sign this form electronically, and your typed signature is the same as your handwritten one. ${esc(new Date().toLocaleDateString())}</p></div>
       <p class="err" id="err"></p>
       <button class="primary wide" id="go" style="margin-top:12px">${isSealed(id)?"🔒 Sign, lock, and send":"Sign and send"}</button>
     </div>`;
@@ -539,7 +540,7 @@ function openForm(id){
   fields.addEventListener("change", e=>{ const el=e.target, k=el.dataset.k; if(!k) return; me[k] = el.type==="checkbox" ? el.checked : el.value; toggles(); });
   // Fields whose defaults show as selected count as answered.
   fields.querySelectorAll("select[data-k]").forEach(s=>{ if(me[s.dataset.k]==null || me[s.dataset.k]==="") me[s.dataset.k]=s.value; });
-  pad = sigPad($("sig")); $("clear").onclick = ()=>pad.clear();
+  pad = typedSig($("sigName"), $("sigPrev"));
   if(id==="agreement"){ $("readAgr").onclick = ()=>{ if(!pkt.agreement){ $("readNote").textContent = pkt.agreementError || "The agreement is not attached to this link. Call the office."; return; }
       if(!agrUrl) agrUrl = URL.createObjectURL(new Blob([PAPER.unb64(pkt.agreement)], { type:"application/pdf" }));
       window.open(agrUrl, "_blank"); $("readNote").textContent = "Opened in a new tab."; }; }
@@ -551,21 +552,20 @@ function toggles(){
   t("ex8", ["b","c"].includes(me.exempt8)); t("st3", me.status==="3"||me.status==="4"); t("st4", me.status==="4");
   t("tSsn", me.tinType!=="ein"); t("tEin", me.tinType==="ein"); t("docA", me.docWhich==="A"); t("docBC", me.docWhich==="BC");
 }
-function sigPad(cv){
-  const ctx = cv.getContext("2d"); let drawing=false, last=null, marks=0;
-  const fit = ()=>{ const r=cv.getBoundingClientRect(), d=window.devicePixelRatio||1; cv.width=Math.round(r.width*d); cv.height=Math.round(r.height*d); ctx.setTransform(d,0,0,d,0,0); ctx.lineWidth=2.4; ctx.lineCap="round"; ctx.lineJoin="round"; ctx.strokeStyle="#0b1a4a"; };
-  fit();
-  const pt = e => { const r=cv.getBoundingClientRect(); return { x:e.clientX-r.left, y:e.clientY-r.top }; };
-  cv.addEventListener("pointerdown", e=>{ e.preventDefault(); cv.setPointerCapture(e.pointerId); drawing=true; last=pt(e); ctx.beginPath(); ctx.arc(last.x,last.y,1.1,0,7); ctx.fillStyle="#0b1a4a"; ctx.fill(); marks++; });
-  cv.addEventListener("pointermove", e=>{ if(!drawing) return; e.preventDefault(); const p=pt(e); ctx.beginPath(); ctx.moveTo(last.x,last.y); ctx.lineTo(p.x,p.y); ctx.stroke(); last=p; marks++; });
-  const up = ()=>{ drawing=false; }; cv.addEventListener("pointerup", up); cv.addEventListener("pointercancel", up);
-  return { clear(){ ctx.clearRect(0,0,cv.width,cv.height); marks=0; }, empty:()=>marks<8,
-    // The signature cropped to its ink, as a PNG.
-    png(){ const d=ctx.getImageData(0,0,cv.width,cv.height).data; let x0=cv.width,y0=cv.height,x1=0,y1=0;
-      for(let y=0;y<cv.height;y+=2) for(let x=0;x<cv.width;x+=2){ if(d[(y*cv.width+x)*4+3]>20){ if(x<x0)x0=x; if(y<y0)y0=y; if(x>x1)x1=x; if(y>y1)y1=y; } }
-      if(x1<=x0) return ""; const m=6; x0=Math.max(0,x0-m); y0=Math.max(0,y0-m); x1=Math.min(cv.width,x1+m); y1=Math.min(cv.height,y1+m);
-      const c=document.createElement("canvas"); c.width=x1-x0; c.height=y1-y0; c.getContext("2d").drawImage(cv,x0,y0,c.width,c.height,0,0,c.width,c.height); return c.toDataURL("image/png"); } };
+// The signature is typed (Russel, October 20, 2026): his full legal name, shown and stamped in a script font.
+function typedSig(inp, prev){
+  const val = () => String(inp.value||"").replace(/\s+/g," ").trim();
+  inp.addEventListener("input", ()=>{ prev.textContent = val(); inp.removeAttribute("aria-invalid"); });
+  return { empty:()=>val().length<3, name:val,
+    // The typed name drawn in the script font, cropped, as a PNG for the form's signature line.
+    async png(){ const t=val(); try { await document.fonts.load('600 64px "Dancing Script"'); } catch(e){}
+      const c=document.createElement("canvas"), x=c.getContext("2d"), font='600 64px "Dancing Script", cursive';
+      x.font=font; const w=Math.ceil(x.measureText(t).width)+24; c.width=Math.min(Math.max(w,40),2400); c.height=96;
+      x.font=font; x.fillStyle="#0b1a4a"; x.textBaseline="middle"; x.fillText(t,12,50); return c.toDataURL("image/png"); } };
 }
+// His typed name has to be the name on the form: first and last, in any case.
+function sigMatches(typed){ const n=v=>String(v||"").toLowerCase().replace(/[^a-z\s'-]/g,"").replace(/\s+/g," ").trim(), t=" "+n(typed)+" ";
+  const first=n(me.first).split(" ")[0], last=n(me.last); return !!first && !!last && t.includes(" "+first+" ") && t.trim().endsWith(last); }
 const blankCache = {};
 async function blank(id){ if(id==="agreement") return PAPER.unb64(pkt.agreement||""); if(!PAPER.FORMS[id].file) return null;
   if(!blankCache[id]){ const r = await fetch(PAPER.FORMS[id].file); if(!r.ok) throw new Error("The blank form did not load. Check your connection."); blankCache[id] = new Uint8Array(await r.arrayBuffer()); }
@@ -575,12 +575,13 @@ async function submit(id){
   let miss = null; document.querySelectorAll("#fields [data-req]").forEach(el=>{ if(el.closest(".hide")) return; if(!String(el.value||"").trim()){ el.setAttribute("aria-invalid","true"); miss = miss || el; } });
   if(miss){ err.textContent = "Fill in the boxes marked in red."; miss.focus(); return; }
   const x = extraCheck(id); if(x){ err.textContent = x; return; }
-  if(pad.empty()){ err.textContent = "Sign in the box above."; return; }
+  if(pad.empty()){ err.textContent = "Type your full legal name to sign."; $("sigName").setAttribute("aria-invalid","true"); $("sigName").focus(); return; }
+  if(!sigMatches(pad.name())){ err.textContent = `Type your name the way it is on this form: ${[me.first, me.last].filter(Boolean).join(" ")}.`; $("sigName").setAttribute("aria-invalid","true"); $("sigName").focus(); return; }
   if(id==="agreement" && !pkt.agreement){ err.textContent = pkt.agreementError || "The agreement did not load. Call the office."; return; }
   if(isSealed(id) && !pkt.pub){ err.textContent = "The office has not finished setting up secure storage. Try again later."; return; }
   go.disabled = true; go.textContent = "Filling in the form…";
   try {
-    const f = Object.assign({}, me, { sig: pad.png(), mi:(me.mi||"").slice(0,1).toUpperCase() });
+    const f = Object.assign({}, me, { sig: await pad.png(), mi:(me.mi||"").slice(0,1).toUpperCase() });
     const a = { name:[f.first,f.mi,f.last].filter(Boolean).join(" "), email:me.email||pkt.email, at:Date.now(), id:(TOKEN.slice(-6)+"-"+id).toUpperCase(), date:PAPER.todayIso() };
     const pdf = await PAPER.build(id, await blank(id), f, a, { companySig: pkt.companySig });
     let res;
