@@ -67,10 +67,10 @@
   .pill.event{background:var(--accent-soft);color:var(--accent);border:1px solid var(--accent)}
   .conn{width:18px;flex:none;border-top:2px solid var(--line)}
   .pill.essential{background:var(--accent);color:var(--accent-ink)}
-  :root{--cat-hiring:#534AB7;--cat-hiring-soft:#EEEDFE;--cat-sales:#0F6E56;--cat-sales-soft:#E1F5EE;--cat-order:#854F0B;--cat-order-soft:#FAEEDA;--cat-equipment:#5F5E5A;--cat-equipment-soft:#F1EFE8;--cat-service:#993C1D;--cat-service-soft:#FAECE7;--cat-digital:#185FA5;--cat-digital-soft:#E6F1FB;--cat-internal:#993556;--cat-internal-soft:#FBEAF0}
-  @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--cat-hiring:#AFA9EC;--cat-hiring-soft:#26215C;--cat-sales:#5DCAA5;--cat-sales-soft:#04342C;--cat-order:#EF9F27;--cat-order-soft:#412402;--cat-equipment:#B4B2A9;--cat-equipment-soft:#2C2C2A;--cat-service:#F0997B;--cat-service-soft:#4A1B0C;--cat-digital:#85B7EB;--cat-digital-soft:#042C53;--cat-internal:#ED93B1;--cat-internal-soft:#4B1528}}
-  :root[data-theme="dark"]{--cat-hiring:#AFA9EC;--cat-hiring-soft:#26215C;--cat-sales:#5DCAA5;--cat-sales-soft:#04342C;--cat-order:#EF9F27;--cat-order-soft:#412402;--cat-equipment:#B4B2A9;--cat-equipment-soft:#2C2C2A;--cat-service:#F0997B;--cat-service-soft:#4A1B0C;--cat-digital:#85B7EB;--cat-digital-soft:#042C53;--cat-internal:#ED93B1;--cat-internal-soft:#4B1528}
-  .cat-hiring{--cat:var(--cat-hiring);--cat-soft:var(--cat-hiring-soft)} .cat-sales{--cat:var(--cat-sales);--cat-soft:var(--cat-sales-soft)} .cat-order{--cat:var(--cat-order);--cat-soft:var(--cat-order-soft)} .cat-equipment{--cat:var(--cat-equipment);--cat-soft:var(--cat-equipment-soft)} .cat-service{--cat:var(--cat-service);--cat-soft:var(--cat-service-soft)} .cat-digital{--cat:var(--cat-digital);--cat-soft:var(--cat-digital-soft)} .cat-internal{--cat:var(--cat-internal);--cat-soft:var(--cat-internal-soft)}
+  :root{--cat-hiring:#534AB7;--cat-hiring-soft:#EEEDFE;--cat-sales:#0F6E56;--cat-sales-soft:#E1F5EE;--cat-marketing:#854F0B;--cat-marketing-soft:#FAEEDA;--cat-equipment:#5F5E5A;--cat-equipment-soft:#F1EFE8;--cat-service:#993C1D;--cat-service-soft:#FAECE7;--cat-digital:#185FA5;--cat-digital-soft:#E6F1FB;--cat-internal:#993556;--cat-internal-soft:#FBEAF0}
+  @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--cat-hiring:#AFA9EC;--cat-hiring-soft:#26215C;--cat-sales:#5DCAA5;--cat-sales-soft:#04342C;--cat-marketing:#EF9F27;--cat-marketing-soft:#412402;--cat-equipment:#B4B2A9;--cat-equipment-soft:#2C2C2A;--cat-service:#F0997B;--cat-service-soft:#4A1B0C;--cat-digital:#85B7EB;--cat-digital-soft:#042C53;--cat-internal:#ED93B1;--cat-internal-soft:#4B1528}}
+  :root[data-theme="dark"]{--cat-hiring:#AFA9EC;--cat-hiring-soft:#26215C;--cat-sales:#5DCAA5;--cat-sales-soft:#04342C;--cat-marketing:#EF9F27;--cat-marketing-soft:#412402;--cat-equipment:#B4B2A9;--cat-equipment-soft:#2C2C2A;--cat-service:#F0997B;--cat-service-soft:#4A1B0C;--cat-digital:#85B7EB;--cat-digital-soft:#042C53;--cat-internal:#ED93B1;--cat-internal-soft:#4B1528}
+  .cat-hiring{--cat:var(--cat-hiring);--cat-soft:var(--cat-hiring-soft)} .cat-sales{--cat:var(--cat-sales);--cat-soft:var(--cat-sales-soft)} .cat-marketing{--cat:var(--cat-marketing);--cat-soft:var(--cat-marketing-soft)} .cat-equipment{--cat:var(--cat-equipment);--cat-soft:var(--cat-equipment-soft)} .cat-service{--cat:var(--cat-service);--cat-soft:var(--cat-service-soft)} .cat-digital{--cat:var(--cat-digital);--cat-soft:var(--cat-digital-soft)} .cat-internal{--cat:var(--cat-internal);--cat-soft:var(--cat-internal-soft)}
   .pill.cat{background:var(--cat-soft);color:var(--cat);border:1px solid var(--cat)}
   .catdot{display:inline-block;width:9px;height:9px;border-radius:2px;background:var(--cat);margin-right:6px;vertical-align:0}
   .catkey{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
@@ -348,7 +348,7 @@ The page is a single file hosted on GitHub Pages. All data lives in a database o
 
 ## What is in the tool
 
-Projects have a name, description, owner, deadline, status, a category, an "essential to the yearly goal" flag, and an "event or launch" flag. Category is optional and one of: hiring, sales, order, equipment, service; it colors the project everywhere, and its tasks inherit it unless a task sets its own. Status is one of: idea, planned, active, done.
+Projects have a name, description, owner, deadline, status, a category, an "essential to the yearly goal" flag, and an "event or launch" flag. Category is optional and is the business function the work belongs to, one of: marketing (flyers, door hangers, print, brand, ads), sales (pitching, deadlines, closing), service (shown as Operations: delivering the work, seasonal starts, supplies for jobs), hiring (shown as People: hiring, pay, training, crew policies), equipment (trucks, tools, machines), digital (shown as Digital Infrastructure: software, phones, website), internal (shown as Admin & Finance: banking, legal, contracts, filings); it colors the project everywhere, and its tasks inherit it unless a task sets its own. Status is one of: idea, planned, active, done.
 
 Tasks belong to a project and have a title, assignee, due date, status, notes, and the same two flags as a project: essential, and event or launch. Task status is one of: todo, doing, done. A checkbox on each task marks it done. A task can be moved to a different project from its edit dialog, or reassigned by dragging it between columns in By person.
 
@@ -773,7 +773,8 @@ function render(){
 // date, with the project name under it), a "today" marker separates past from ahead, the
 // strip scrolls sideways by mouse drag, and it opens at today. Clicking "Timeline" jumps back.
 // Categories (Oct 17, 2026): a color per kind of work, set on a project (tasks inherit it, or set their own).
-const CATS=[["hiring","Hiring"],["sales","Sales"],["order","Order"],["equipment","Equipment"],["service","Service"],["digital","Digital Infrastructure"],["internal","Admin & Finance"]];
+// Categories are business functions, not actions (October 22, 2026). Keys stay stable; "hiring" shows as People and "service" as Operations.
+const CATS=[["marketing","Marketing"],["sales","Sales"],["service","Operations"],["hiring","People"],["equipment","Equipment"],["digital","Digital Infrastructure"],["internal","Admin & Finance"]];
 const catName = c => (CATS.find(x=>x[0]===c)||[])[1]||"";
 const catCls = c => catName(c) ? " has-cat cat-"+c : "";
 const catPill = c => catName(c) ? `<span class="pill cat cat-${c}" title="Category">${catName(c)}</span>` : "";
