@@ -74,6 +74,11 @@
   .pill.cat{background:var(--cat-soft);color:var(--cat);border:1px solid var(--cat)}
   .catdot{display:inline-block;width:9px;height:9px;border-radius:2px;background:var(--cat);margin-right:6px;vertical-align:0}
   .catkey{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+  button.pill.cat{cursor:pointer;font:inherit;font-size:inherit;line-height:inherit}
+  .catkey.filtering button.pill.cat:not(.on){opacity:.4}
+  .catkey.filtering button.pill.cat:not(.on):hover{opacity:.8}
+  button.pill.cat.on{box-shadow:0 0 0 2px currentColor}
+  .catclear{font-size:12px;padding:3px 10px}
   .dl-wk{font-size:13px;color:var(--muted);font-weight:600;margin:18px 0 4px}
   .dl-wk:first-child{margin-top:0}
   .dl-wk.overdue{color:var(--red)}
@@ -773,6 +778,9 @@ const catName = c => (CATS.find(x=>x[0]===c)||[])[1]||"";
 const catCls = c => catName(c) ? " has-cat cat-"+c : "";
 const catPill = c => catName(c) ? `<span class="pill cat cat-${c}" title="Category">${catName(c)}</span>` : "";
 const catDot = c => catName(c) ? `<span class="catdot cat-${c}" title="${catName(c)}"></span>` : "";
+// One category filter: click a colored tag to filter, click it again or Clear to remove (October 22, 2026).
+const catBar = () => `<span class="catkey${catFilter?" filtering":""}">${CATS.map(([c,n])=>`<button type="button" class="pill cat cat-${c}${catFilter===c?" on":""}" data-catf="${c}" aria-pressed="${catFilter===c}" title="${catFilter===c?"Remove this filter":"Show only "+n}">${n}</button>`).join("")}${catFilter?`<button type="button" class="small catclear" data-catf="">\u2715 Clear filter</button>`:""}</span>`;
+function wireCatBar(){ document.querySelectorAll("[data-catf]").forEach(b=>b.onclick=()=>{ const c=b.dataset.catf; catFilter=(c&&catFilter!==c)?c:""; render(); }); }
 const catOptions = (sel, blank) => `<option value="">${blank}</option>`+CATS.map(([v,n])=>`<option value="${v}" ${sel===v?"selected":""}>${n}</option>`).join("");
 const abbr = (s,n=26) => s.length>n ? s.slice(0,n-2).trimEnd()+"\u2026" : s;
 const essentialProjects = () => openProjects().map(([id,p])=>({id,...p})).filter(p=>(p.essential||p.event) && p.status!=="done").sort((a,b)=>(a.deadline||"9").localeCompare(b.deadline||"9"));
@@ -837,7 +845,7 @@ function renderBoard(m){
   const folded=loadFolded();
   const list=boardList().filter(p=>(!statusFilter||p.status===statusFilter)&&(!catFilter||(p.category||"")===catFilter));
   m.innerHTML = `<div class="filters"><button class="primary" id="newProj">+ New project</button>
-    <select id="statusFilter"><option value="">All statuses</option>${["idea","planned","active","done"].map(s=>`<option value="${s}" ${statusFilter===s?"selected":""}>${s[0].toUpperCase()+s.slice(1)}</option>`).join("")}</select><select id="catFilter">${catOptions(catFilter,"All categories")}</select><span class="catkey">${CATS.map(([c])=>catPill(c)).join("")}</span><span class="meta">Sorted by the nearest date, a deadline or an open task. Pin keeps a project at the top.</span></div>` +
+    <select id="statusFilter"><option value="">All statuses</option>${["idea","planned","active","done"].map(s=>`<option value="${s}" ${statusFilter===s?"selected":""}>${s[0].toUpperCase()+s.slice(1)}</option>`).join("")}</select>${catBar()}<span class="meta">Sorted by the nearest date, a deadline or an open task. Pin keeps a project at the top.</span></div>` +
     `<div class="board">` + (list.length? list.map(p=>{
       const ts=tasksFor(p.id); const done=ts.filter(t=>t.status==="done").length; const isF=folded.has(p.id);
       const others=new Set(ts.map(t=>t.assignee||p.owner||"").filter(n=>n && n!==(p.owner||""))); // people other than the owner working on it
@@ -849,7 +857,7 @@ function renderBoard(m){
     }).join("") : `<div class="empty">${statusFilter?"No projects with that status.":"No projects yet. Create one with New project."}${archivedProjects().length?` <span class="meta">(${archivedProjects().length} in Archive)</span>`:""}</div>`) + `</div>`;
   $("#newProj").onclick=()=>openProject(null);
   $("#statusFilter").onchange=e=>{statusFilter=e.target.value;render();};
-  $("#catFilter").onchange=e=>{catFilter=e.target.value;render();};
+  wireCatBar();
   wire(m);
   m.querySelectorAll("[data-fold]").forEach(b=>b.onclick=()=>toggleFold(b.dataset.fold));
   m.querySelectorAll("[data-pin]").forEach(b=>b.onclick=()=>pinProject(b.dataset.pin));
@@ -958,9 +966,9 @@ function renderDeadlines(m){
   const day = d => { const [y,mo,dd]=d.split("-").map(Number); const dt=new Date(y,mo-1,dd); return d<td ? fmtDate(d) : `${DOW[dt.getDay()]} ${dd}`; };
   const tag = c => `<span class="dl-tag${catName(c)?" cat-"+c:""}">${catName(c)||"Other"}</span>`;
   const row = i => `<div class="dl-row"><span class="dl-date ${dueClass(i.date)}">${day(i.date)}</span>${tag(i.cat)}<div class="dl-what">${i.kind==="Event"?'<span class="dl-ev" title="Event or launch">◆</span> ':""}${esc(i.title)}${i.sub?`<div class="meta">${esc(i.sub)}</div>`:""}</div><span class="dl-who" title="Responsible">${i.who?esc(i.who):"Unassigned"}</span><span class="dl-act">${i.cal} <button class="small" ${i.edit}>Edit</button></span></div>`;
-  m.innerHTML = `<div class="filters"><select id="dlCat">${catOptions(catFilter,"All categories")}</select><span class="catkey">${CATS.map(([c])=>catPill(c)).join("")}</span></div>` +
+  m.innerHTML = `<div class="filters">${catBar()}</div>` +
     `<div class="card">${groups.length ? groups.map(g=>`<div class="dl-wk${g.key==="over"?" overdue":""}">${g.label}</div>${g.rows.map(row).join("")}`).join("") : `<div class="meta">No open deadlines${catFilter?" in this category":""}.</div>`}</div>`;
-  $("#dlCat").onchange=e=>{ catFilter=e.target.value; render(); };
+  wireCatBar();
   wire(m);
 }
 
