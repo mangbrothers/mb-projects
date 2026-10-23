@@ -678,6 +678,7 @@ async function enter(user){
     const mine = await store.get("allowed/"+me.key).catch(()=>null);
     const tier = mine?.tier || (me.email===ADMIN_EMAIL.toLowerCase() ? "admin" : "");
     if(tier==="walker"){ location.replace(TIER_HOME.walker); return; }
+    if(tier==="crew"){ const pos=await store.get("staff/"+me.key+"/position").catch(()=>null); if(isWalkerPos(pos)){ location.replace(TIER_HOME.walker); return; } }
     if(PAGE==="team" && tier!=="admin"){ location.replace("crews.html"); return; }
     if(tier!=="admin" && tier!=="crew") return deny(`${me.email} is not on the team list. Ask Russel to add it, then sign out and back in.`);
     if(tier==="crew" && mine.active===false) return deny(`${me.email} is not active on the team list. Ask Russel.`);
@@ -758,6 +759,7 @@ function setViewAs(c){
   if(!realAdmin) return;
   viewAs=c||""; isAdmin=!viewAs;
   if(!meReal) meReal={...me};
+  if(viewAs.startsWith("emp:") && isWalkerKey(viewAs.slice(4))){ location.href="routes.html#seeas="+encodeURIComponent(viewAs); return; }
   if(viewAs.startsWith("emp:")){ const k=viewAs.slice(4), t=team[k]||{}; role="member"; myCrew=t.crew||""; me={...meReal, key:k, name:t.name||k}; view="schedule"; }
   else if(viewAs){ const mk=(crews[viewAs]||{}).manager; role="manager"; myCrew=viewAs; me={...meReal, key:mk||"preview", name:mk?personName(mk):viewAs}; view="today"; }
   else { role=""; myCrew=""; if(meReal) me=meReal; view="today"; }
@@ -1245,11 +1247,15 @@ function renderSchedule(app){
 }
 
 // ---------- people: schedule, hours, pay, files, info (October 17, 2026) ----------
-const people = () => Object.entries(team).filter(([,t])=>t && t.tier==="crew").sort((a,b)=>(a[1].name||"").localeCompare(b[1].name||""));
+const people = () => Object.entries(team).filter(([k,t])=>t && t.tier==="crew" && !isWalkerPos((staffAll[k]||{}).position)).sort((a,b)=>(a[1].name||"").localeCompare(b[1].name||""));
 const money = n => "$"+(Math.round((+n||0)*100)/100).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2});
 const fmtShort = d => { if(!d) return ""; const x=pd(d); return `${MON[x.getUTCMonth()]} ${x.getUTCDate()}`; };
 const crewOfPerson = k => (team[k]||{}).crew || (k===me.key ? myCrew : Object.keys(crews).find(c=>(crewMembers(c)||{})[k]) || "");
 const staffOf = k => staffAll[k]||{};
+// Door hanger hires (Russel, October 22, 2026): the Personnel position decides. Any walker position is a door hanger,
+// and a door hanger never gets the crew page, crew training, crew gates or crew pay. The team-list tier follows it.
+const isWalkerPos = p => /^walker/.test(p||"");
+const isWalkerKey = k => isWalkerPos(staffOf(k).position) || (team[k]||{}).tier==="walker";
 const minWage = () => +payRates.minWage || MIN_WAGE_DEFAULT;
 // Pay periods run every two weeks from the start date set on the Pay tab.
 const periodAnchor = () => payRates.periodStart || "2026-10-05";
@@ -1403,11 +1409,11 @@ function renderPerson(app, k){
     <div class="card"><h2>Leaving</h2><p class="meta">${onFile(k).length?`${esc(firstName(t.name))} has ${esc(onFile(k).join(", "))}, so his whole record moves to the archive (Past).`:`${esc(firstName(t.name))} has not filled anything out, so he is removed and his applicant card goes to Not hired.`} Either way he comes off the Team list and the Paperwork tab. It asks first.</p><div class="actions"><button class="danger" id="toPast">${onFile(k).length?"Move to Past":"Remove"}</button></div></div>`;
   $("#back").onclick=()=>{ personOpen=null; render(); };
   $("#toPast").onclick=()=>leaveDialog(k); wirePfile(app, k); wirePersonTrain(app, k); wirePersonTrainExtra(app, k);
-  $("#seeAs").onclick=()=>{ if(PAGE==="team") location.href="crews.html#seeas="+encodeURIComponent("emp:"+k); else setViewAs("emp:"+k); };
+  $("#seeAs").onclick=()=>{ if(isWalkerKey(k)) location.href="routes.html#seeas="+encodeURIComponent("emp:"+k); else if(PAGE==="team") location.href="crews.html#seeas="+encodeURIComponent("emp:"+k); else setViewAs("emp:"+k); };
   $("#pfForm").onsubmit=async e=>{ e.preventDefault();
     try { await store.update({ [`staff/${k}/phone`]:$("#pfPhone").value.trim()||null, [`staff/${k}/address`]:$("#pfAddr").value.trim()||null,
       [`staff/${k}/emergency`]:{ name:$("#pfEmName").value.trim(), phone:$("#pfEmPhone").value.trim(), relation:$("#pfEmRel").value.trim() },
-      [`staff/${k}/startDate`]:$("#pfStart").value||null, [`staff/${k}/type`]:$("#pfType").value, [`staff/${k}/position`]:$("#pfPos").value }); toast("Profile saved"); }
+      [`staff/${k}/startDate`]:$("#pfStart").value||null, [`staff/${k}/type`]:$("#pfType").value, [`staff/${k}/position`]:$("#pfPos").value, ...tierForPosition(k, $("#pfPos").value) }); toast("Profile saved"); }
     catch(err){ toast("Not saved: "+(err.message||err)); } };
   $("#upKind").onchange=()=>{ if(!$("#upLabel").value) $("#upLabel").placeholder=DOC_KINDS[$("#upKind").value]; };
   $("#upGo").onclick=()=>uploadDoc(k);
@@ -1516,6 +1522,7 @@ function earnings(k, p){
 // The winter: November 1 to March 15. Storms called, missed, the season bonus and the guarantee.
 function winterOf(d){ const [y,m]=d.split("-").map(Number); const y0 = m>=7 ? y : y-1; return { from:`${y0}-11-01`, to:`${y0+1}-03-15`, bonus1:`${y0+1}-01-15`, bonus2:`${y0+1}-03-20` }; }
 function winterCard(k){
+  if(isWalkerKey(k)) return "";
   const W=winterOf(today()), T=tableFor(k), crew=crewOfPerson(k), t=today();
   if(t<addDays(W.from,-14) || t>addDays(W.to,10)) return "";
   const dates=Object.keys(storms).filter(d=>d>=W.from&&d<=W.to&&d<=t&&stormOf(d,crew)).sort();
@@ -1754,24 +1761,40 @@ function sweepSigned(){
   if(!isAdmin || viewAs || Date.now()-hiredSweepAt<15000) return; hiredSweepAt=Date.now();
   Object.entries(applicants||{}).forEach(([aid,a])=>{ if(a && a.stage==="offer" && a.hiredKey && team[a.hiredKey] && offerSignedOf(a.hiredKey, paperAll[a.hiredKey], team[a.hiredKey])) markHired(aid); });
 }
+// The team-list record that goes with a position: door hangers are tier walker with no crew; crew positions move a
+// door hanger back to tier crew. Admins and the office position are left alone.
+function tierForPosition(k, pos){
+  const t=team[k]||{}, upd={}; if(!t.tier || t.tier==="admin") return upd;
+  if(isWalkerPos(pos)){
+    if(t.tier!=="walker") upd[`allowed/${k}/tier`]="walker"; if(t.crewRole) upd[`allowed/${k}/crewRole`]=null; if(t.crew) upd[`allowed/${k}/crew`]=null;
+    Object.entries(crews).forEach(([c,cr])=>{ if((cr.members||{})[k]) upd[`crews/${c}/members/${k}`]=null; if(cr.manager===k) upd[`crews/${c}/manager`]=null; });
+  } else if((pos==="member"||pos==="manager") && t.tier==="walker"){ upd[`allowed/${k}/tier`]="crew"; upd[`allowed/${k}/crewRole`]="member"; }
+  return upd;
+}
+// An applicant who came in for door hangers: his role, the Indeed post, or the door hanger channels (HANGER text, Nextdoor, Facebook).
+const hangerApplicant = a => isWalkerPos(a.role) || /door ?hanger|flyer|distribut/i.test((a.job||"")+" "+(a.appliedFor||"")) || /hanger|nextdoor|facebook/i.test((a.source||"")+" "+(a.tags?Object.keys(a.tags).join(" "):""));
 function hireDialog(aid){
   const a=applicants[aid]; if(!a) return;
+  const defRole = a.role==="walkerpt" ? "walkerpt" : hangerApplicant(a) ? "walker" : a.role==="manager" ? "manager" : "member";
   const dl=openDlg(`<h2>Send ${esc(firstName(a.name))} his offer?</h2>
     <p class="meta">This emails his offer: his confirmation after the phone screen, with the link to read and sign it. It also puts him on the Team list so he can sign in (until he signs, he sees only Training), makes his profile under Personnel and moves his applicant file and Drive folder into Staff. He moves to Hired by himself when he signs the offer.</p>
     <label for="hEmail">His Google account (the email he signs in with)</label><input id="hEmail" type="email" autocapitalize="off" value="${esc(/@indeedemail\.com$/i.test(a.email||"")?"":(a.email||""))}" placeholder="name@gmail.com">
-    <div class="grid2"><div><label for="hRole">Position</label><select id="hRole"><option value="member" ${a.role!=="manager"&&a.role!=="walker"?"selected":""}>Crew member</option><option value="manager" ${a.role==="manager"?"selected":""}>Crew manager</option><option value="walker" ${a.role==="walker"?"selected":""}>Door hanger distributor</option><option value="walkerpt">Door hanger (part-time)</option></select></div>
+    <div class="grid2"><div><label for="hRole">Position</label><select id="hRole"><option value="member" ${defRole==="member"?"selected":""}>Crew member</option><option value="manager" ${defRole==="manager"?"selected":""}>Crew manager</option><option value="walker" ${defRole==="walker"?"selected":""}>Door hanger distributor</option><option value="walkerpt" ${defRole==="walkerpt"?"selected":""}>Door hanger (part-time)</option></select></div>
       <div><label for="hCrew">Crew</label><select id="hCrew"><option value="">Not on a crew yet</option>${crewList().map(c=>`<option>${esc(c)}</option>`).join("")}</select></div>
-      <div><label for="hType">Paid as</label><select id="hType"><option value="W-2" ${a.role!=="walker"?"selected":""}>Employee (W-2)</option><option value="1099" ${a.role==="walker"?"selected":""}>Contractor (1099)</option></select></div>
+      <div><label for="hType">Paid as</label><select id="hType"><option value="W-2" ${!isWalkerPos(defRole)?"selected":""}>Employee (W-2)</option><option value="1099" ${isWalkerPos(defRole)?"selected":""}>Contractor (1099)</option></select></div>
       <div><label for="hStart">Start date</label><input id="hStart" type="date" value="${esc(today())}"></div></div>
     <p class="muted">He cannot open his schedule until he is on a crew. You can put him on one later under Crews.</p>
+    <p class="meta" id="hSays" style="border-left:4px solid var(--amber);padding-left:8px"></p>
     <div class="actions"><button data-close>Cancel</button><button class="primary" id="hGo">Send the offer</button></div>`);
-  const rs=dl.querySelector("#hRole"), wk=()=>/^walker/.test(rs.value); rs.onchange=()=>{ dl.querySelector("#hCrew").disabled=wk(); if(wk()) dl.querySelector("#hType").value="1099"; }; rs.onchange();
+  const rs=dl.querySelector("#hRole"), ty=dl.querySelector("#hType"), wk=()=>isWalkerPos(rs.value);
+  const says=()=>{ const lbl=`${PAPER.POSITIONS[rs.value]||rs.value}, ${ty.value}`; dl.querySelector("#hSays").innerHTML=`This offer is for <b>${esc(lbl)}</b>. ${wk()?"He signs in to the Routes page and sees door hanger training only.":"He signs in to the Crews page with crew training and crew pay."}`; dl.querySelector("#hGo").textContent=`Send the offer: ${lbl}`; };
+  rs.onchange=()=>{ dl.querySelector("#hCrew").disabled=wk(); ty.value=wk()?"1099":"W-2"; says(); }; ty.onchange=says; dl.querySelector("#hCrew").disabled=wk(); says();
   dl.querySelector("#hGo").onclick=async()=>{
     const email=$("#hEmail").value.trim().toLowerCase(); if(!/^\S+@\S+\.\S+$/.test(email)) return toast("Enter his Google account email");
     const k=emailKey(email); if(archive[k]) return toast("That person is in Past. Drag his Past card to Hired to bring him back.");
     if(team[k] && team[k].tier==="admin") return toast("That email is an admin.");
     if(previewOnly()) return dl.close();
-    const role=$("#hRole").value, walker=/^walker/.test(role), crew=walker?"":$("#hCrew").value, now=Date.now(), upd={};
+    const role=$("#hRole").value, walker=isWalkerPos(role), crew=walker?"":$("#hCrew").value, now=Date.now(), upd={};
     upd[`allowed/${k}`]= walker ? { ...(team[k]||{}), name:a.name, email, tier:"walker", crewRole:null, crew:null } : { ...(team[k]||{}), name:a.name, email, tier:"crew", crewRole:role, ...(crew?{crew}:{}) };
     if(crew){ upd[`crews/${crew}/members/${k}`]=a.name; const cr=crews[crew]||{};
       if(role==="manager"){ upd[`crews/${crew}/manager`]=k; if(cr.manager&&cr.manager!==k&&team[cr.manager]) upd[`allowed/${cr.manager}/crewRole`]="member"; } }
@@ -1867,8 +1890,8 @@ function restoreDialog(k){
   const dl=openDlg(`<h2>Bring ${esc(x.name)} back?</h2><p class="meta">This puts ${esc(firstName(x.name))} back on the Team list${crewOk?` and on ${esc(x.crew)}`:""} and restores his profile, files, shifts, hours and pay log from the archive. Email him his paperwork again from the Paperwork tab if any is left.</p>
     <div class="actions"><button data-close>Cancel</button><button class="primary" id="rGo">Yes, bring him back</button></div>`);
   dl.querySelector("#rGo").onclick=async()=>{ if(previewOnly()) return dl.close(); const now=Date.now();
-    const walker=(x.allowed||{}).tier==="walker";
-    const al={ ...(x.allowed||{}), name:x.name, email:x.email, tier:walker?"walker":"crew" }; if(!walker) al.crewRole=x.crewRole==="manager"&&crewOk&&!(crews[x.crew]||{}).manager?"manager":"member"; if(crewOk&&!walker) al.crew=x.crew; else delete al.crew;
+    const walker=(x.allowed||{}).tier==="walker" || isWalkerPos((x.staff||{}).position);
+    const al={ ...(x.allowed||{}), name:x.name, email:x.email, tier:walker?"walker":"crew" }; if(walker){ delete al.crewRole; delete al.crew; } if(!walker) al.crewRole=x.crewRole==="manager"&&crewOk&&!(crews[x.crew]||{}).manager?"manager":"member"; if(crewOk&&!walker) al.crew=x.crew; else delete al.crew;
     const upd={ [`allowed/${k}`]:al, [`staffArchive/${k}`]:null, [`personFile/${k}/${store.key()}`]:{ type:"hired", text:"Brought back from Past.", at:now, by:me.email, byName:me.name },
       [`sync/staffMove/${store.key()}`]:{ action:"restore", k, name:x.name, at:now }, ...fileDirty(k) };
     [["staff","staff"],["staffPrivate","staffPrivate"],["staffDocs","staffDocs"],["payLog","payLog"],["timeEntries","timeEntries"],["shifts","shifts"]].forEach(([node,f])=>{ if(x[f]) upd[`${node}/${k}`]=x[f]; });
@@ -2195,7 +2218,7 @@ function crewSitePending(){
   const k=me.key; return !((trainDone[k]||{})[SITE_DECK_CREW] || (((trainViewed[k]||{})[SITE_DECK_CREW])||{}).finished);
 }
 const trainItems = () => Object.entries(trainLib).filter(([,x])=>x && x.title).sort((a,b)=>(a[1].category||"").localeCompare(b[1].category||"")||(a[1].title||"").localeCompare(b[1].title||""));
-function roleKeyOf(k){ const t=team[k]||{}; return t.tier==="walker" ? "walker" : t.crewRole==="manager" ? "manager" : "member"; }
+function roleKeyOf(k){ const t=team[k]||{}; return isWalkerKey(k) ? "walker" : t.crewRole==="manager" ? "manager" : "member"; }
 // Everyone who can be given training: crew and door hangers (October 17, 2026).
 const trainPeople = () => Object.entries(team).filter(([,t])=>t && (t.tier==="crew" || t.tier==="walker")).sort((a,b)=>(a[1].name||"").localeCompare(b[1].name||""));
 // Everything assigned to a person: by his role, to everyone, or to him by name.

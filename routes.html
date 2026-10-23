@@ -250,15 +250,20 @@ const store = DEMO ? demoStore() : fbStore();
 // ---------- state ----------
 let me=null, isAdmin=false;
 // Walker preview: the office can look at the page exactly as a walker seat sees it. Nothing saves while it is on.
-let realAdmin=false, viewAs="", meReal=null;
+let realAdmin=false, viewAs="", meReal=null, assignAll={};
+let pendingSeeAs = /^#seeas=emp:/.test(location.hash) ? decodeURIComponent(location.hash.slice(7)) : "";
+const empKey = () => viewAs.startsWith("emp:") ? viewAs.slice(4) : "";
+// A preview shows that person's own training, paperwork and gate (read from the office copies).
+function previewData(){ const k=viewAs&&viewAs!=="__training"?me.key:""; trainDone=k?(doneAll[k]||{}):{}; trainAssign=k?(assignAll[k]||{}):{}; myPaper=k?(paperAll[k]||{}):{}; }
 function setViewAs(s){
   if(!realAdmin) return;
   if(!meReal) meReal=me;
   viewAs=s||""; isAdmin=!viewAs;
   if(viewAs==="__training") me=meReal;
+  else if(viewAs.startsWith("emp:")){ const k=viewAs.slice(4); me={...meReal, key:k, name:walkerName(k)}; }
   else if(viewAs){ const k=seatPerson(viewAs); me={...meReal, key:k||"preview", name:k?walkerName(k):viewAs}; }
   else me=meReal;
-  view="today"; openRoute=null; walkerFilter=""; render(); window.scrollTo(0,0);
+  previewData(); view="today"; openRoute=null; walkerFilter=""; render(); window.scrollTo(0,0);
 }
 const previewOnly = () => { if(viewAs && viewAs!=="__training"){ toast("Walker preview. Nothing is saved."); return true; } return false; };
 let areas={}, routes={}, checks={}, logs={}, walkers={}, supply={};
@@ -319,6 +324,7 @@ function attach(){
     bind("allowed", v=>{ allowedWalkers=v; mergeWalkers(); });
     bind("walkers", v=>{ legacyWalkers=v; mergeWalkers(); });
     bind("trainingLib", v=>trainLib=v); bind("trainingSettings", v=>trainSet=v); bind("trainingDone", v=>doneAll=v); bind("trainingViewed", v=>trainViewed=v); bind("paper", v=>paperAll=v);
+    bind("trainingRoles", v=>trainRoles=v); bind("trainingAssign", v=>assignAll=v);
   } else {
     // A walker reads only his own reports, from the copy kept under his key.
     walkers = { [me.key]: { name:me.name, email:me.email } };
@@ -358,7 +364,7 @@ const stravaLink = s => s ? `<a href="https://www.strava.com/athletes/${encodeUR
 const whoLabel = r => r.seat ? `${r.seat} &middot; ${r.walker?esc(walkerName(r.walker)):"no one assigned"}` : esc(walkerName(r.walker));
 const streetsOf = r => { const a=areas[r.areaId]; return a&&a.streets ? Object.entries(a.streets).map(([id,s])=>({id,...s})).sort((x,y)=>(x.order??999)-(y.order??999)||x.name.localeCompare(y.name)) : []; };
 function progress(rid){ const r=routes[rid]; const st=streetsOf(r); const c=checks[rid]||{}; const done=st.filter(s=>c[s.id]).length; return {done,total:st.length,pct:st.length?Math.round(done/st.length*100):0}; }
-const mineOrAll = r => viewAs ? r.seat===viewAs : isAdmin ? (!walkerFilter || (walkerFilter.startsWith("seat:") ? r.seat===walkerFilter.slice(5) : r.walker===walkerFilter)) : r.walker===me.key;
+const mineOrAll = r => empKey() ? r.walker===empKey() : viewAs ? r.seat===viewAs : isAdmin ? (!walkerFilter || (walkerFilter.startsWith("seat:") ? r.seat===walkerFilter.slice(5) : r.walker===walkerFilter)) : r.walker===me.key;
 // Doors still owed from days before today: what the plan said should be hung by last night, less what was hung.
 // "Hung" is the walker's day reports (split across his routes that day by planned hours). With no report at all it falls back to the share of streets checked off.
 function behindDoors(id,r,d){
@@ -378,12 +384,14 @@ const parseGeo = s => { try { return JSON.parse(s.geo||"[]"); } catch(e){ return
 
 // ---------- navigation ----------
 function tabs(){
+  if(pendingSeeAs && realAdmin && (walkers[pendingSeeAs.slice(4)]||allowedWalkers[pendingSeeAs.slice(4)])){ const v=pendingSeeAs; pendingSeeAs=""; history.replaceState(null,"",location.pathname+location.search); setTimeout(()=>setViewAs(v),0); }
   const t = isAdmin ? [["today","Day"],["week","Week"],["schedule","Schedule"],["review","Review"],["setup","Setup"]].concat(Object.values(routes).some(r=>r.training)?[["training","Practice route"]]:[])
     : siteDeckPending() ? [["learn","Training"]] : [["today","Today"],["week","Week"],["learn","Training"],["mylog","My days"]];
   $("#nav").innerHTML = t.map(([k,l])=>`<button data-v="${k}" class="${(view===k||t.length===1)&&!openRoute?"on":""}">${l}</button>`).join("")
     + (realAdmin && seatList().length ? `<select id="viewAs" class="viewas" aria-label="See the page as a walker"><option value="">Office view</option>${seatList().map(s=>`<option value="${esc(s)}" ${viewAs===s?"selected":""}>See as ${esc(s)}</option>`).join("")}${Object.values(routes).some(r=>r.training)?`<option value="__training" ${viewAs==="__training"?"selected":""}>Training route</option>`:""}</select>` : "");
   const pb=$("#previewBar"); pb.hidden=!viewAs;
   if(viewAs==="__training"){ pb.innerHTML=`Training mode: you are a walker on the practice route. Check-offs, photos and the report save for real. <button class="small" id="resetTraining">Clear training data</button> <button class="small" id="exitPreview">Back to office view</button>`; $("#resetTraining").onclick=resetTraining; }
+  else if(empKey()) pb.innerHTML=`Door hanger preview: this is what <b>${esc(walkerName(empKey()))}</b> sees. Nothing is saved. <button class="small" id="exitPreview">Back to office view</button>`;
   else if(viewAs) pb.innerHTML=`Walker preview: this is what <b>${esc(viewAs)}</b>${seatPerson(viewAs)?" ("+esc(walkerName(seatPerson(viewAs)))+")":""} sees. Nothing is saved. <button class="small" id="exitPreview">Back to office view</button>`;
   if(viewAs) $("#exitPreview").onclick=()=>setViewAs("");
   const va=$("#viewAs"); if(va) va.onchange=()=>setViewAs(va.value);
@@ -741,7 +749,13 @@ function renderLearn(app){
     try { await store.update({ [`trainingDone/${me.key}/${id}`]: b.dataset.done ? { at:Date.now() } : null }); } catch(e){ toast("Not saved: "+(e.message||e)); } });
 }
 
+// Russel, October 22, 2026: a door hanger who is signed and trained but has no routes yet sees a clear holding screen.
+const hasAnyRoute = () => Object.values(routes).some(r=>r && !r.training && (empKey() ? r.walker===empKey() : viewAs && viewAs!=="__training" ? r.seat===viewAs : r.walker===me.key));
 function renderToday(app){
+  if(!isAdmin && viewAs!=="__training" && !hasAnyRoute() && walkerGate(me.key).ok){
+    app.innerHTML=`<div class="card" style="border-left:4px solid var(--green,#2e7d32)"><h2 style="margin:0 0 6px">You are all set.</h2><p>Your paperwork and training are done. This page will be updated when your routes are assigned. We will text you from (734) 450-2400 when they are ready.</p></div>`;
+    return;
+  }
   const rs=routesOn(curDate);
   let h = dateBar();
   const seats = seatList();
@@ -1111,11 +1125,16 @@ if(DEMO){
     upd["paper/walker,four@example,com"]={ token:"p_demo_w4", s:"DEMO", position:"walker", type:"1099", list:["agreement","privacy","w9","deposit"], forms:{} };
     if(new URLSearchParams(location.search).get("step")==="2") upd["trainingViewed/walker,four@example,com/systems-walker"]={ at:Date.now(), lastSlide:8, version:1, finished:true };
     upd["trainingDone/walker,one@example,com/walker-job"]={ at:Date.now()-864e5, version:1, via:"quiz", score:100 };
+    upd["allowed/walker,five@example,com"]={name:"Ready Walker",email:"walker.five@example.com",tier:"walker",offerSigned:Date.now()-864e5};
+    upd["paper/walker,five@example,com"]={ token:"p_demo_w5", s:"DEMO", position:"walker", type:"1099", list:["agreement","privacy","w9","deposit"], offerSigned:Date.now()-864e5, forms:{ agreement:{ status:"done", at:Date.now()-864e5 }, privacy:{ status:"done", at:Date.now()-864e5 }, w9:{ status:"done", at:Date.now()-864e5 } } };
+    upd["trainingDone/walker,five@example,com/systems-walker"]={ at:Date.now()-864e5, version:1, via:"view" };
+    upd["trainingDone/walker,five@example,com/walker-job"]={ at:Date.now()-864e5, version:1, via:"quiz", score:100 };
+    upd["trainingViewed/walker,five@example,com/systems-walker"]={ at:Date.now()-864e5, lastSlide:8, version:1, finished:true };
     upd["allowed/walker,three@example,com"]={name:"Walker Three",email:"walker.three@example.com",tier:"walker"};
     upd["paper/walker,three@example,com"]={ token:"p_demo_w3", position:"walker", type:"1099", list:["agreement"], forms:{ agreement:{ status:"done", at:Date.now()-864e5 } } };
     await store.update(upd);
     const first=Object.values(s.routes||{}).map(r=>r.start).filter(Boolean).sort()[0]; if(first && first>curDate) curDate=first;
-    enter(DEMO==="walker" ? {email:"walker.one@example.com",displayName:"Walker One"} : DEMO==="newwalker" ? {email:"walker.four@example.com",displayName:"New Walker"} : {email:ADMIN_EMAIL,displayName:"Russel"});
+    enter(DEMO==="walker" ? {email:"walker.one@example.com",displayName:"Walker One"} : DEMO==="newwalker" ? {email:"walker.four@example.com",displayName:"New Walker"} : DEMO==="readywalker" ? {email:"walker.five@example.com",displayName:"Ready Walker"} : {email:ADMIN_EMAIL,displayName:"Russel"});
   });
 } else {
   store.auth.onAuthStateChanged(u => { if(u) return enter(u); leave(); location.replace("./?to=routes.html"); });  // signed out: the front page signs people in
