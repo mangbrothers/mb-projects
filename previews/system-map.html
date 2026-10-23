@@ -171,11 +171,11 @@ td strong{font-weight:650}
 .pfoot,.pexit{display:none}
 html.plock,html.plock body{overflow:hidden;overscroll-behavior:none}
 .present .vp{position:fixed;inset:0;z-index:9000;border:0;border-radius:0;min-height:0;height:100%!important;background:var(--surface)}
-.present .wscroll{overflow:hidden;bottom:30px}
+.present .wscroll{overflow:hidden;bottom:24px}
 .present .layer{z-index:2}
 .present .nd.future{display:flex!important;pointer-events:none;cursor:default;opacity:.72;animation:none}
 .present .cap.future{display:inline!important}
-.present .pfoot{display:flex;position:absolute;left:0;right:0;bottom:0;height:30px;align-items:center;justify-content:center;flex-wrap:wrap;gap:4px 20px;font-size:12px;color:var(--muted);border-top:1px solid var(--line);background:var(--surface);z-index:1}
+.present .pfoot{display:flex;position:absolute;left:0;right:0;bottom:0;height:24px;align-items:center;justify-content:center;flex-wrap:wrap;gap:4px 20px;font-size:12px;color:var(--muted);border-top:1px solid var(--line);background:var(--surface);z-index:1}
 .present .pfoot span{display:inline-flex;align-items:center;gap:6px}
 .present .pexit{display:flex;align-items:center;justify-content:center;position:absolute;top:calc(10px + env(safe-area-inset-top,0px));left:calc(10px + env(safe-area-inset-left,0px));width:40px;height:40px;padding:0;border:1px solid var(--line);border-radius:50%;background:var(--surface);color:var(--muted);font:400 24px/1 var(--sans);cursor:pointer;z-index:9999;opacity:.75;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
 .present .pexit:hover,.present .pexit:focus-visible{opacity:1;color:var(--ink)}
@@ -810,7 +810,7 @@ document.addEventListener('keydown',function(e){if(e.key!=='Escape')return;if(st
 /* ---------- fit and scope toggle ---------- */
 function fit(){
   if(presenting){
-    var PW=vp.clientWidth,PH=vp.clientHeight-30,M=24,ps=Math.max(.2,Math.min((PW-2*M)/1180,(PH-2*M)/866));
+    var PW=vp.clientWidth,PH=vp.clientHeight-24,M=8,ps=Math.max(.2,Math.min((PW-2*M)/1180,(PH-2*M)/866));
     world.style.transform='scale('+ps+')';world.style.left=Math.round((PW-1180*ps)/2)+'px';world.style.top=Math.round((PH-866*ps)/2)+'px';
     wsize.style.width=PW+'px';wsize.style.height=PH+'px';return;
   }
