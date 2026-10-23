@@ -421,6 +421,7 @@ const wireCards = () => document.querySelectorAll("[data-open]").forEach(el=>el.
 // ---------- views ----------
 function render(){
   if(!me) return;
+  if(viewAs && viewAs!=="__training") previewData(); // a preview always shows that person's latest training and paperwork
   const ae=document.activeElement, fk=ae&&ae.form&&ae.form.id==="report"&&ae.name?ae.name:null; let ss=null,se=null; try{ ss=ae.selectionStart; se=ae.selectionEnd; }catch(e){}
   if(fk) setTimeout(()=>{ const f=$("#report"), el=f&&f.elements[fk]; if(el&&document.activeElement!==el){ el.focus({preventScroll:true}); try{ if(ss!=null) el.setSelectionRange(ss,se); }catch(e){} } },0);
   tabs();
