@@ -251,7 +251,8 @@ const store = DEMO ? demoStore() : fbStore();
 let me=null, isAdmin=false;
 // Walker preview: the office can look at the page exactly as a walker seat sees it. Nothing saves while it is on.
 let realAdmin=false, viewAs="", meReal=null, assignAll={};
-let pendingSeeAs = /^#seeas=emp:/.test(location.hash) ? decodeURIComponent(location.hash.slice(7)) : "";
+// Team Manager encodes the whole value (emp%3A...), so decode before testing.
+let pendingSeeAs = (()=>{ let h=location.hash||""; try{ h=decodeURIComponent(h); }catch(e){} return /^#seeas=emp:/.test(h) ? h.slice(7) : ""; })();
 const empKey = () => viewAs.startsWith("emp:") ? viewAs.slice(4) : "";
 // A preview shows that person's own training, paperwork and gate (read from the office copies).
 function previewData(){ const k=viewAs&&viewAs!=="__training"?me.key:""; trainDone=k?(doneAll[k]||{}):{}; trainAssign=k?(assignAll[k]||{}):{}; myPaper=k?(paperAll[k]||{}):{}; }
