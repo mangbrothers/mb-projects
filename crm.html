@@ -1783,7 +1783,7 @@ const SSA_TYPES = ["fall","lights","snow"];
 const SSA_ZONES = { south:"South Livonia", north:"North Livonia", westland:"Westland" };
 const ssaCol = S => S.zone==="north" ? "north" : "south";
 const SSA_FALL = { south:450, north:615 };
-const SSA_FALL_DESC = "Two leaf visits timed to the city curbside pickup for the Property's section; gutters cleared on the final visit; a look at the roof from the ladder; flower beds cleared of leaves and debris; sticks and branches gathered; everything blown to the curb for city pickup. Not included: bed cleanouts, mulch, bagging or hauling, and written roof inspections. Fall Cleanup is available in Livonia only.";
+const SSA_FALL_DESC = "Two leaf visits timed to the city curbside pickup for the Property's section; gutters cleared on the final visit; a look at the roof from the ladder; flower beds cleared of leaves and debris; sticks and branches gathered; everything blown to the curb for city pickup. Not included: bed cleanouts, mulch, bagging or hauling, and written roof inspections.";
 const SSA_FALL_WL = 450; // same as two Livonia visits; gutters not included
 const SSA_FALL_WL_DESC = "One visit in November, after most of the leaves have fallen: leaves raked or blown from the lawn and flower beds, sticks and branches gathered, and everything hauled away by the Company. Not included: gutter cleaning, roof checks, bed cleanouts, mulch, and leaves that fall after the visit.";
 const SSA_FALL_WL_ADJ = [["corner","Corner lot",85],["oak","Heavy oak lot",60]];
@@ -2080,7 +2080,7 @@ function ssaSetup(){
       <div id="ss-lights-box" class="ssabox">
         <div class="grid2"><div><label>Package</label><select id="ss-l-pkg"><option value="">Choose</option>${SSA_PKG.map(P=>`<option value="${P.k}"${S.lights.pkg===P.k?" selected":""}>${P.n} ($${P.sw.toLocaleString()} South and Westland, $${P.n2.toLocaleString()} North)</option>`).join("")}</select></div>
           <div><label>Light color</label><select id="ss-l-color"><option value="">Choose</option>${opts(["Warm white","Multicolor"],S.lights.color)}</select></div></div>
-        <div class="warnline" id="ss-l-wl" hidden>Showcase includes the Fall Cleanup, which is not offered in Westland. Sell Full Front plus add-ons instead.</div>
+        <div class="warnline" id="ss-l-wl" hidden>Showcase includes the two-visit Livonia Fall Cleanup, so it is not sold in Westland. Sell Full Front plus add-ons, and add the Westland Fall Cleanup separately.</div>
         <label>Add-ons (quantity)</label>
         <div class="row">${SSA_ADDONS.map(([k,n,p])=>`<span class="ssaqty"><input id="ss-a-${k}" type="number" inputmode="numeric" min="0" value="${S.lights[k]||0}"> ${n} $${p}</span>`).join("")}</div>
         <div id="ss-la-two-row">${ck("ss-la-two",`Two-storey home +$${SSA_L_ADJ[0][2]}`,S.lights.two)}</div>
