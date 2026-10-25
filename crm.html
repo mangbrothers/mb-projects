@@ -1778,19 +1778,19 @@ const SSA_TYPES = ["fall","lights","snow"];
 // no snow season maximum, three areas, neighbor credit. Policy source: claude/contracts-v2-2026-10-13.md.
 // Three pricing areas. Westland is priced at the South column for lights and snow.
 // Version 3 (Oct 25, 2026): Westland Fall Cleanup is sold by exception on its own terms: one visit, no gutters,
-// leaves bagged by the crew and set at the street for city collection. Choosing Fall Cleanup on a Westland account applies it automatically.
+// leaves hauled away by the Company. Choosing Fall Cleanup on a Westland account applies it automatically.
 // Same crew pay as Livonia fall work; custom pricing works as on any service.
 const SSA_ZONES = { south:"South Livonia", north:"North Livonia", westland:"Westland" };
 const ssaCol = S => S.zone==="north" ? "north" : "south";
 const SSA_FALL = { south:450, north:615 };
 const SSA_FALL_DESC = "Two leaf visits timed to the city curbside pickup for the Property's section; gutters cleared on the final visit; a look at the roof from the ladder; flower beds cleared of leaves and debris; sticks and branches gathered; everything blown to the curb for city pickup. Not included: bed cleanouts, mulch, bagging or hauling, and written roof inspections. Fall Cleanup is available in Livonia only.";
 const SSA_FALL_WL = 450; // same as two Livonia visits; gutters not included
-const SSA_FALL_WL_DESC = "One visit in November, after most of the leaves have fallen: leaves raked or blown from the lawn and flower beds, sticks and branches gathered, and everything bagged and set at the street for city pickup. Not included: gutter cleaning, roof checks, bed cleanouts, mulch, hauling, and leaves that fall after the visit.";
+const SSA_FALL_WL_DESC = "One visit in November, after most of the leaves have fallen: leaves raked or blown from the lawn and flower beds, sticks and branches gathered, and everything hauled away by the Company. Not included: gutter cleaning, roof checks, bed cleanouts, mulch, and leaves that fall after the visit.";
 const SSA_FALL_WL_ADJ = [["corner","Corner lot",85],["oak","Heavy oak lot",60]];
 const SSA_FALL_WL_TERM = ["Fall Cleanup","One visit in November, scheduled by the Company after most of the leaves have fallen"];
 const SSA_FALL_WL_ITEMS = [
   ["3.1","Scheduling.","The Company schedules one visit in November, after most of the leaves have fallen, and sets the date of the visit. Leaves that fall after the visit are not included."],
-  ["3.2","Debris Disposal.","Leaves and yard waste are bagged by the Company and set at the street for the city's collection service. The Company does not haul bags away from the Property."],
+  ["3.2","Debris Disposal.","Leaves and yard waste gathered during the visit are hauled away by the Company."],
   ["3.3","Gutters.","Gutter cleaning is not included in the Westland Fall Cleanup."],
   ["3.4","Concealed Items.","The Company is not responsible for damage to items concealed by leaves or vegetation, including hoses, toys, unmarked sprinkler heads and low-voltage wiring."]];
 const ssaTerm = (S,x) => x==="fall" && S.zone==="westland" ? SSA_FALL_WL_TERM : SSA_TERM[x];
@@ -2072,7 +2072,7 @@ function ssaSetup(){
     <div id="ss-real">
     <div class="sect">Services</div>
     <div class="svc svcbar fall">${ck("ss-fall",`<b>Fall Cleanup</b> <span class="meta" id="ss-fall-p"></span>`,S.fall.on)}
-      <div class="warnline" id="ss-fall-wl" hidden>Westland Fall Cleanup: one visit, no gutters, leaves bagged and set at the street for city pickup. The Westland terms go into the agreement automatically.</div>
+      <div class="warnline" id="ss-fall-wl" hidden>Westland Fall Cleanup: one visit, no gutters, leaves hauled away. The Westland terms go into the agreement automatically.</div>
       <div id="ss-fall-box" class="ssabox">${SSA_FALL_ADJ.map(([k,n,p])=>ck("ss-f-"+k,`${n} +$${p}`,S.fall[k])).join("")}
         <div class="row">${ck("ss-f-big","Turf over 10,000 sq ft, walked price $",S.fall.big)}<input id="ss-f-bigp" type="number" inputmode="decimal" min="0" style="width:110px" value="${esc(S.fall.bigPrice)}"></div>
         ${nb("ss-f-nb",S.fall.nb)}${cp("f",S.fall,"Fall Cleanup")}</div></div>
