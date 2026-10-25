@@ -165,6 +165,13 @@
   @media(min-width:701px){.lead select{display:none}}
   @media(max-width:700px){.board{grid-auto-flow:row;grid-auto-columns:auto;grid-template-columns:1fr}.col{min-height:0}.lead{cursor:default}}
   .srcstrip{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+  .seasonbar{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:12px}
+  .seasonbar .sb{display:inline-flex;align-items:center;gap:6px;min-height:36px;padding:6px 12px;border-radius:999px;background:var(--card);border:1px solid var(--line);color:var(--ink2);font-weight:500}
+  .seasonbar .sb .dot{width:8px;height:8px;border-radius:50%}
+  .seasonbar .sb .n{color:var(--muted);font-size:12px}
+  .seasonbar .sb.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+  .seasonbar .sb.on .n{color:inherit;opacity:.75}
+  .seasonbar .pinbtn{margin-left:auto;min-height:36px}
   .srcstrip .pill{background:var(--card);border:1px solid var(--line);color:var(--ink2)}
   /* client dialog */
   .svc{border:1px solid var(--line);border-radius:var(--r);padding:8px 10px;margin-top:6px;background:var(--bg)}
@@ -182,6 +189,19 @@
   #refundDlg .actions{justify-content:flex-end}
   #refundDlg textarea{min-height:70px}
   .ribbon{position:sticky;bottom:0;z-index:5;margin:12px -4px 0;background:var(--amber-soft);border:1px solid var(--amber);border-radius:var(--r);padding:10px 12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  .ribbon[hidden]{display:none}
+  .svcfiles{margin-top:10px}
+  .svcfiles .lbl{font-size:12px;color:var(--muted);margin-bottom:4px}
+  .svcfiles .thumbs{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+  .svcfiles .thumb{width:76px;height:76px;border-radius:8px;border:1px solid var(--line);background:var(--surface2,#eef0f2);object-fit:cover;cursor:pointer;padding:0;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:650;color:var(--ink2);overflow:hidden}
+  .svcfiles .thumb img{width:100%;height:100%;object-fit:cover;display:block}
+  .svcfiles .addf{width:76px;height:76px;border-radius:8px;border:1px dashed var(--line);display:flex;align-items:center;justify-content:center;text-align:center;font-size:12px;color:var(--ink2);cursor:pointer;margin:0;line-height:1.2}
+  .svcfiles .busy{font-size:12px;color:var(--muted)}
+  #fileView{width:min(900px,96vw)}
+  #fileView .fvbtn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:7px 12px;border-radius:var(--r);font-weight:500;text-decoration:none;font-size:14px}
+  #fileView .body{display:grid;gap:10px}
+  #fileView .fv{display:flex;justify-content:center;align-items:center;min-height:120px;background:var(--surface2,#eef0f2);border-radius:8px;overflow:hidden}
+  #fileView .fv img{max-width:100%;max-height:72vh;display:block}
   .ribbon .t{flex:1;min-width:200px;font-size:14px;color:var(--ink)}
   .ribbon .t ul{margin:4px 0 0;padding-left:18px}
   .recgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin:6px 0}
@@ -204,6 +224,8 @@
   .log .e{padding:6px 0;border-top:1px solid var(--line);font-size:14px}
   .log .e:first-child{border-top:0}
   .log .e .when{font-size:12px;color:var(--muted)}
+  .svcbar textarea[name$="/notes"],.svcbar textarea[name$="/privateNotes"]{width:100%;white-space:pre-wrap}
+  .svcbar textarea[name$="/privateNotes"]{background:var(--surface2,#f3f4f6)}
   .addnote{display:grid;grid-template-columns:1fr auto;gap:8px;margin-top:8px;align-items:start}
   .kv{display:grid;grid-template-columns:auto 1fr;gap:2px 12px;font-size:13px}
   .kv b{color:var(--muted);font-weight:500}
@@ -316,11 +338,7 @@ details.ssamore summary{cursor:pointer;font-weight:600}
   <nav id="nav" hidden>
     <button data-view="leads" class="on">Leads</button>
     <button data-view="clients">Clients</button>
-    <button data-view="svc-lawn"><span class="dot" style="background:var(--s-lawn)"></span>Lawn</button>
-    <button data-view="svc-fall"><span class="dot" style="background:var(--s-fall)"></span>Fall</button>
-    <button data-view="svc-lights"><span class="dot" style="background:var(--s-lights)"></span>Lights</button>
-    <button data-view="svc-snow"><span class="dot" style="background:#9ec3f0"></span>Snow</button>
-    <button data-view="svc-landscaping"><span class="dot" style="background:var(--s-landscaping)"></span>Landscaping</button>
+    <span id="pinSlot" style="display:contents"></span>
     <button data-view="servicelog">Service log</button>
     <button data-view="charges">Charges</button>
     <div class="more" id="more">
@@ -397,6 +415,8 @@ details.ssamore summary{cursor:pointer;font-weight:600}
 </dialog>
 
 <!-- Refund? pop-up: a card charge refunded with a reason. The X closes it and saves nothing. -->
+<dialog id="fileView"><div class="body"><div class="row" style="justify-content:space-between;align-items:center"><b id="fvName"></b><span class="meta" id="fvMeta"></span></div><div class="fv" id="fvBox"></div>
+  <div class="actions" style="margin-top:0"><button type="button" class="small danger left" id="fvDel">Delete</button><a class="fvbtn" id="fvOpen" target="_blank" rel="noopener" download>Download</a><button type="button" class="primary" id="fvClose">Close</button></div></div></dialog>
 <dialog id="refundDlg">
   <div class="body">
     <button type="button" class="rfx" id="rfX" aria-label="Close without refunding">&times;</button>
@@ -483,7 +503,7 @@ details.ssamore summary{cursor:pointer;font-weight:600}
     contractTemplates: { _signing: { url:"https://script.google.com/macros/s/AKfyDEMO/exec", deploy:"AKfyDEMO", savedAt:D } },
     clients: {
       c5: C({ name:"Diane Fischer", phone:"734-555-0123", email:"diane@example.com", address:"14200 Merriman Rd, Livonia", region:"Other Livonia", status:"new", source:"Door hanger", lastContactAt:D-day }),
-      c6: C({ name:"Tom Reyes", phone:"734-555-0164", address:"8830 Cardwell St, Westland", region:"Westland", status:"contacted", source:"Website", lastContactAt:D-8*day }),
+      c6: C({ name:"Tom Reyes", phone:"734-555-0164", email:"tom@example.com", address:"8830 Cardwell St, Westland", region:"Westland", status:"contacted", source:"Website", lastContactAt:D-8*day }),
       c4: C({ name:"Gary Kowalski", phone:"(248) 555-0111", email:"gary@example.com", address:"15800 Newburgh Rd, Livonia", region:"Newburgh / 7 Mile", status:"quoted", source:"Angi", lastContactAt:D-2*day,
         signReq:{ token:"demo-open", status:"sent", sentAt:D-2*H, openedAt:D-H, to:["gary@example.com"], agreementNo:"MB-20261015-K7QX", amount:1020, dueNow:1020 } }),
       t1: C({ name:"Russel Test", phone:"734-450-2400", email:"russel.test@example.com", address:"Test only", region:"Other Livonia", status:"quoted", source:"Referral", lastContactAt:D-H, payOnFile:pofApi, payStatus:"paid",
@@ -568,7 +588,8 @@ const SERVICE_TYPES = {
     {k:"freq",l:"Frequency",t:"select",o:["Weekly","Biweekly"]},
     {k:"price",l:"Price per cut",t:"money"},
     {k:"season",l:"Season",t:"select",o:["On","Off"]},
-    {k:"notes",l:"Notes",t:"text"} ],
+    {k:"notes",l:"Public notes (crew and managers see these)",t:"note",w:3},
+    {k:"privateNotes",l:"Private notes (admins only)",t:"note",w:3,ph:"Prices, billing, job history. Only admins see this."} ],
     summary:s=>[s.day, s.freq, money(s.price), s.season==="Off"?"off season":""].filter(Boolean).join(" · ") },
   fall: { label:"Fall Cleanup", fields:[
     {k:"package",l:"Package",t:"select",o:["Two passes","One pass"]},
@@ -576,21 +597,24 @@ const SERVICE_TYPES = {
     {k:"price",l:"Price",t:"money"},
     {k:"pass1",l:"Pass 1 done",t:"check"},
     {k:"pass2",l:"Pass 2 done",t:"check"},
-    {k:"notes",l:"Notes",t:"text"} ],
+    {k:"notes",l:"Public notes (crew and managers see these)",t:"note",w:3},
+    {k:"privateNotes",l:"Private notes (admins only)",t:"note",w:3,ph:"Prices, billing, job history. Only admins see this."} ],
     summary:s=>[s.package, s.route, money(s.price), s.pass1?"P1 ✓":"", s.pass2?"P2 ✓":""].filter(Boolean).join(" · ") },
   snow: { label:"Snow", fields:[
     {k:"price",l:"Seasonal price",t:"money"},
     {k:"crew",l:"Crew",t:"select",o:["","Crew 1","Crew 2"]},
     {k:"start",l:"Contract start",t:"date",d:"2026-11-01"},
     {k:"end",l:"Contract end",t:"date",d:"2027-03-15"},
-    {k:"notes",l:"Notes",t:"text"} ],
+    {k:"notes",l:"Public notes (crew and managers see these)",t:"note",w:3},
+    {k:"privateNotes",l:"Private notes (admins only)",t:"note",w:3,ph:"Prices, billing, job history. Only admins see this."} ],
     summary:s=>[money(s.price), s.crew, s.start?fmtDate(s.start)+" to "+fmtDate(s.end):""].filter(Boolean).join(" · ") },
   landscaping: { label:"Landscaping", fields:[
     {k:"desc",l:"Job",t:"text",w:2},
     {k:"jobStatus",l:"Status",t:"select",o:["Quoted","Scheduled","Done"]},
     {k:"date",l:"Date",t:"date"},
     {k:"price",l:"Price / quote",t:"money"},
-    {k:"notes",l:"Notes",t:"text"} ],
+    {k:"notes",l:"Public notes (crew and managers see these)",t:"note",w:3},
+    {k:"privateNotes",l:"Private notes (admins only)",t:"note",w:3,ph:"Prices, billing, job history. Only admins see this."} ],
     summary:s=>[s.desc, s.jobStatus, s.date?fmtDate(s.date):"", money(s.price)].filter(Boolean).join(" · ") },
   lights: { label:"Christmas Lights", fields:[
     {k:"install",l:"Install date",t:"date"},
@@ -598,7 +622,8 @@ const SERVICE_TYPES = {
     {k:"takedown",l:"Takedown date",t:"date"},
     {k:"price",l:"Price",t:"money"},
     {k:"gutters",l:"Bundled with gutters",t:"check"},
-    {k:"notes",l:"Notes",t:"text"} ],
+    {k:"notes",l:"Public notes (crew and managers see these)",t:"note",w:3},
+    {k:"privateNotes",l:"Private notes (admins only)",t:"note",w:3,ph:"Prices, billing, job history. Only admins see this."} ],
     summary:s=>[s.install?"install "+fmtDate(s.install):"", s.installed?"installed ✓":"", s.takedown?"down "+fmtDate(s.takedown):"", money(s.price), s.gutters?"w/ gutters":""].filter(Boolean).join(" · ") }
 };
 // ================================================================
@@ -621,6 +646,9 @@ function fmtStamp(ms){ if(!ms) return ""; const d=new Date(ms); return d.toLocal
 function ago(ms){ if(!ms) return "never"; const d=Math.floor((Date.now()-ms)/864e5); if(d<=0) return "today"; if(d===1) return "yesterday"; if(d<30) return d+"d ago"; const m=Math.floor(d/30); return m<12 ? m+"mo ago" : Math.floor(m/12)+"y ago"; }
 function money(v){ if(v===""||v==null||isNaN(+v)) return ""; const cents=Math.round(+v*100)%100!==0; return "$"+(+v).toLocaleString("en-US",{minimumFractionDigits:cents?2:0,maximumFractionDigits:2}); }
 const tel = p => p ? `<a href="tel:${esc(p.replace(/[^\d+]/g,""))}" style="color:inherit">${esc(p)}</a>` : "";
+// Returns a message when the phone is missing (and required) or not a full US number; "" when fine.
+// The Quo sync matches calls to clients by phone, so a record without one gets a duplicate lead.
+function phoneProblem(p, required){ const d=String(p||"").replace(/\D/g,""); if(!d) return required ? "Phone is required. Calls and texts are matched to clients by phone." : ""; if(d.length===10 || (d.length===11 && d[0]==="1")) return ""; return "That phone number needs 10 digits."; }
 // Phone key: the number in E.164 form (+1 and ten digits). Used for duplicate checks and Quo matching.
 function phoneKey(p){ const d=String(p||"").replace(/\D/g,""); if(d.length===10) return "+1"+d; if(d.length===11 && d[0]==="1") return "+"+d; return d.length>=10 ? "+"+d : ""; }
 
@@ -674,7 +702,7 @@ auth.onAuthStateChanged(async user => {
       if(TIER_HOME[myTier]){ location.replace(TIER_HOME[myTier]); return; }
       return gateMsg(`${user.email} is on the list but has no access level yet. Ask Russel to open the Projects page once, then try again.`);
     }
-    $("#gate").hidden=true; $("#app").hidden=false; $("#nav").hidden=false; attach();
+    $("#gate").hidden=true; $("#app").hidden=false; $("#nav").hidden=false; attach(); watchPins();
   } catch(e){
     gateMsg(`${user.email} could not be checked against the team list (${e.code||e.message}). Ask Russel.`);
   }
@@ -684,7 +712,9 @@ auth.onAuthStateChanged(async user => {
 const refs = {}; let backfilled=false;
 function attach(){
   refs.c = db.ref("clients"); refs.l = db.ref("clientLog"); refs.t = db.ref("contractTemplates"); refs.q = db.ref("sync/qb");
-  refs.c.on("value", s => { clients = s.val()||{}; render(); if(openId) refreshDialogLive(); if(!backfilled){ backfilled=true; backfillPhones(); } driveNag(); });
+  refs.fm = db.ref("fileMeta"); refs.fm.on("value", s => { fileMetaAll = s.val()||{}; if(openId) renderSvcFiles(); }, ()=>{});
+  refs.cr = db.ref("crewRoutes"); refs.cr.on("value", s => { crewRoutesAll = s.val()||{}; queueStopSync(); }, ()=>{});
+  refs.c.on("value", s => { clients = s.val()||{}; queueStopSync(); render(); if(openId) refreshDialogLive(); if(!backfilled){ backfilled=true; backfillPhones(); } driveNag(); });
   refs.l.on("value", s => { logs = s.val()||{}; render(); if(openId) renderLog(); });
   refs.t.on("value", s => { templates = s.val()||{}; render(); if(openId) renderContracts(); });
   refs.q.on("value", s => { qbRows = s.val()||{}; if(view==="tools"||view==="servicelog"||view==="charges") render(); if(openId) { renderSvcBills(); renderStamps(); renderRecord(); } });
@@ -808,6 +838,95 @@ function contractNeeds(c){
 const unsignedFor = (c, sid) => (c.status==="active"||c.status==="quoted") && (contractNeeds(c).some(x=>!x.signed && (!sid || x.sid===sid)) || ssaOpen(c, sid));
 const unsignedPill = (c, sid) => unsignedFor(c, sid) ? ` <span class="pill unsigned" title="A required contract is not signed">unsigned</span>` : "";
 
+// ---------- service notes: what the crew sees ----------
+// Each service has Public notes (crew and managers) and Private notes (admins only). The Quo scheduled tasks
+// fill both from calls, texts and typed log notes. Every crew route stop carries a copy of the Public notes
+// only (svcNote); Private notes never leave the CRM.
+const noteDay = t => new Date(t||Date.now()).toLocaleDateString("en-US",{month:"short",day:"numeric",timeZone:TZ});
+// ---------- photos and files on a service ----------
+// Same storage as the Projects page files: metadata at fileMeta/{id} (with clientId and sid), bytes as base64 at
+// fileData/{id}/data, fetched only when shown. Photos are shrunk on the device first. Admins only.
+let fileMetaAll={};
+const FILE_LIMIT = 8*1024*1024;
+const fmtSize = b => b>=1048576 ? (b/1048576).toFixed(1)+" MB" : Math.max(1,Math.round(b/1024))+" KB";
+const svcFiles = (cid, sid) => Object.entries(fileMetaAll).filter(([,f])=>f && f.clientId===cid && f.sid===sid && !f.deletedAt).sort((a,b)=>a[1].uploadedAt-b[1].uploadedAt);
+async function shrinkImage(file){
+  if(!/^image\/(jpeg|png|webp|heic|heif)$/.test(file.type) || file.size<600*1024) return file;
+  const img = await createImageBitmap(file).catch(()=>null); if(!img) return file;
+  const sc=Math.min(1,1800/Math.max(img.width,img.height)); const c=document.createElement("canvas"); c.width=Math.round(img.width*sc); c.height=Math.round(img.height*sc);
+  c.getContext("2d").drawImage(img,0,0,c.width,c.height);
+  const blob=await new Promise(r=>c.toBlob(r,"image/jpeg",.82));
+  return blob && blob.size<file.size ? new File([blob], (file.name||"photo").replace(/\.\w+$/,"")+".jpg", {type:"image/jpeg"}) : file;
+}
+const toB64 = f => new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>res(String(r.result).split(",")[1]); r.onerror=rej; r.readAsDataURL(f); });
+const blobUrls = new Map();
+async function fileUrl(id){
+  if(blobUrls.has(id)) return blobUrls.get(id);
+  const f=fileMetaAll[id]; const b64=(await db.ref("fileData/"+id+"/data").once("value")).val(); if(!b64||!f) return null;
+  const bin=atob(b64), arr=new Uint8Array(bin.length); for(let i=0;i<bin.length;i++) arr[i]=bin.charCodeAt(i);
+  const url=URL.createObjectURL(new Blob([arr],{type:f.type||"application/octet-stream"})); blobUrls.set(id,url); return url;
+}
+const isImg = f => /^image\//.test(f.type||"");
+const extOf = f => ((f.name||"").split(".").pop()||"FILE").toUpperCase().slice(0,4);
+function renderSvcFiles(){
+  document.querySelectorAll("#svcList [data-files]").forEach(box=>{
+    const sid=box.dataset.files, saved=!!(openId && clients[openId]?.services?.[sid]);
+    if(box.dataset.busy) return;
+    if(!saved){ box.innerHTML=`<div class="lbl">Photos and files</div><div class="meta">Save first, then add photos here.</div>`; return; }
+    const list=svcFiles(openId, sid);
+    box.innerHTML=`<div class="lbl">Photos and files${list.length?` (${list.length})`:""}</div><div class="thumbs">${list.map(([id,f])=>`<button type="button" class="thumb" data-fv="${id}" title="${esc(f.name)}">${isImg(f)?`<img alt="" data-thumb="${id}">`:esc(extOf(f))}</button>`).join("")}
+      <label class="addf">+ Photo<br>or file<input type="file" multiple accept="image/*,application/pdf,.heic,.doc,.docx,.xls,.xlsx,.csv,.txt" hidden data-up="${sid}"></label></div>`;
+    box.querySelectorAll("img[data-thumb]").forEach(async im=>{ const u=await fileUrl(im.dataset.thumb).catch(()=>null); if(u) im.src=u; });
+    box.querySelectorAll("[data-fv]").forEach(b=>b.onclick=()=>openFileView(b.dataset.fv));
+    box.querySelector("[data-up]").onchange=e=>uploadSvcFiles(openId, sid, [...e.target.files], box);
+  });
+}
+async function uploadSvcFiles(cid, sid, list, box){
+  if(!list.length) return; box.dataset.busy="1"; let ok=0;
+  const st=document.createElement("div"); st.className="busy"; box.appendChild(st);
+  try{
+    for(const [i,raw] of list.entries()){
+      st.textContent=`Uploading ${i+1} of ${list.length}\u2026`;
+      const f=await shrinkImage(raw);
+      if(f.size>FILE_LIMIT){ toast(`${raw.name} is ${fmtSize(f.size)}; the limit is 8 MB.`); continue; }
+      const id=db.ref("fileMeta").push().key, data=await toB64(f), now=Date.now();
+      await db.ref().update({ ["fileData/"+id]:{data}, ["fileMeta/"+id]:{ clientId:cid, sid, svcType:clients[cid]?.services?.[sid]?.type||"", name:f.name||"photo.jpg", type:f.type||"application/octet-stream", size:f.size, kind:"file", uploadedAt:now, uploadedBy:me.email } });
+      ok++;
+    }
+    if(ok) toast(`Added ${ok} file${ok===1?"":"s"}.`);
+  }catch(e){ toast("Upload failed: "+(e.code||e.message)); }
+  finally{ delete box.dataset.busy; renderSvcFiles(); }
+}
+let fvId=null;
+async function openFileView(id){
+  const f=fileMetaAll[id]; if(!f) return; fvId=id;
+  $("#fvName").textContent=f.name; $("#fvMeta").textContent=`${fmtSize(f.size||0)} \u00b7 ${fmtStamp(f.uploadedAt)} \u00b7 ${(f.uploadedBy||"").split("@")[0]}`;
+  $("#fvBox").innerHTML=`<div class="meta" style="padding:30px">Loading\u2026</div>`; $("#fvOpen").removeAttribute("href");
+  if(!$("#fileView").open) $("#fileView").showModal();
+  const u=await fileUrl(id).catch(()=>null); if(fvId!==id) return;
+  if(!u){ $("#fvBox").innerHTML=`<div class="meta" style="padding:30px">This file's data is missing.</div>`; return; }
+  $("#fvOpen").href=u; $("#fvOpen").setAttribute("download", f.name);
+  $("#fvBox").innerHTML = isImg(f) ? `<img src="${u}" alt="">` : `<div style="padding:30px;text-align:center"><b>${esc(extOf(f))}</b><div class="meta">Tap Download to open it.</div></div>`;
+}
+$("#fvClose").onclick=()=>$("#fileView").close();
+$("#fileView").addEventListener("click", e=>{ if(e.target===$("#fileView")){ const r=$("#fileView").getBoundingClientRect(); if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom) $("#fileView").close(); } });
+$("#fvDel").onclick=async()=>{ const f=fileMetaAll[fvId]; if(!f || !confirm(`Delete ${f.name}?`)) return;
+  await db.ref("fileMeta/"+fvId).update({ deletedAt:Date.now(), deletedBy:me.email }); $("#fileView").close(); toast("Deleted."); };
+
+let crewRoutesAll={}, stopSyncTimer=null;
+function queueStopSync(){ clearTimeout(stopSyncTimer); stopSyncTimer=setTimeout(syncStopNotes, 1500); }
+function syncStopNotes(){
+  if(myTier!=="admin") return;
+  const upd={};
+  for(const [rid,r] of Object.entries(crewRoutesAll||{})) for(const [stid,st] of Object.entries(r?.stops||{})){
+    if(!st || !st.clientId) continue; const c=clients[st.clientId]; if(!c) continue;
+    const sv = (st.svcId && c.services?.[st.svcId]) || Object.values(c.services||{}).find(x=>x && x.type===r.service);
+    const want = String(sv?.notes||"").trim() || null, have = st.svcNote ?? null;
+    if(want!==have) upd[`crewRoutes/${rid}/stops/${stid}/svcNote`]=want;
+  }
+  if(Object.keys(upd).length) db.ref().update(upd).catch(e=>console.warn("stop note sync", e));
+}
+
 // ---------- render ----------
 function render(){
   renderUndoBtn();
@@ -854,7 +973,7 @@ function renderLeads(m){
     <div class="card">
       <form class="quick" id="quickAdd" onsubmit="return false">
         <div><label>Name</label><input name="name" placeholder="Name" autocomplete="off"></div>
-        <div><label>Phone</label><input name="phone" type="tel" placeholder="734..."></div>
+        <div><label>Phone (required)</label><input name="phone" type="tel" placeholder="734..."></div>
         <div><label>Address</label><input name="address" placeholder="Street, City" autocomplete="off"></div>
         <div><label>Email</label><input name="email" type="email" inputmode="email" placeholder="name@example.com" autocomplete="off" autocapitalize="off"></div>
         <div><label>Region</label><select name="region"><option value="">Region</option>${opts(REGIONS,"")}</select></div>
@@ -880,6 +999,7 @@ function renderLeads(m){
     const d=Object.fromEntries(new FormData(form).entries());
     if(!d.name.trim()){ toast("Name is required"); form.name.focus(); return; }
     if(!d.source){ toast("Pick a lead source"); form.source.focus(); return; }
+    const pm=phoneProblem(d.phone, true); if(pm){ toast(pm); form.phone.focus(); return; }
     const hit=findByPhone(d.phone);
     if(hit && quickDupAck!==hit.id){ quickDupAck=hit.id; toast(`That number belongs to ${hit.c.name}. Open the record, or press Add again to add a second record.`); return; }
     if(d.email && !/^\S+@\S+\.\S+$/.test(d.email.trim())){ toast("That email does not look right."); form.email.focus(); return; }
@@ -953,24 +1073,20 @@ function renderClients(m){
   const q=filters.q.toLowerCase();
   if(q) rows = rows.filter(([,c])=>[c.name,c.phone,c.address,c.email,c.interest].join(" ").toLowerCase().includes(q));
   if(filters.region) rows = rows.filter(([,c])=>c.region===filters.region);
-  if(filters.svc) rows = rows.filter(([,c])=>hasSvc(c,filters.svc));
   if(filters.status==="unsigned") rows = rows.filter(([,c])=>unsignedFor(c));
   else if(filters.status==="nocard") rows = rows.filter(([,c])=>c.payOnFile && !payOnFileOk(c));
   else if(filters.status) rows = rows.filter(([,c])=>c.status===filters.status);
   sortRows(rows);
-  const counts = {}; Object.keys(SERVICE_TYPES).forEach(t=>counts[t]=live().filter(([,c])=>c.status==="active"&&hasSvc(c,t)).length);
   const nUnsigned = live().filter(([,c])=>unsignedFor(c)).length, nNoCard = live().filter(([,c])=>c.payOnFile && !payOnFileOk(c)).length;
-  m.innerHTML = `
+  m.innerHTML = seasonBar("") + `
     <div class="filters">
       <input type="search" id="fq" placeholder="Search name, phone, address" value="${esc(filters.q)}">
       <select id="fregion"><option value="">All regions</option>${opts(REGIONS,filters.region)}</select>
-      <select id="fsvc"><option value="">All services</option>${Object.entries(SERVICE_TYPES).map(([k,v])=>`<option value="${k}"${filters.svc===k?" selected":""}>${esc(v.label)}</option>`).join("")}</select>
       <select id="fstatus"><option value="">Active, paused, former</option>${opts(["active","paused","former"],filters.status,STATUSES)}<option value="unsigned"${filters.status==="unsigned"?" selected":""}>Contract not signed (${nUnsigned})</option><option value="nocard"${filters.status==="nocard"?" selected":""}>No payment method on file (${nNoCard})</option></select>
       <select id="fsort" title="Sort">${Object.entries(SORTS).map(([k,l])=>`<option value="${k}"${sort.key===k?" selected":""}>Sort: ${esc(l)}</option>`).join("")}</select>
       <button class="small" id="fdir" title="Flip direction">${sort.dir===1?"↑ A to Z / oldest first":"↓ Z to A / newest first"}</button>
       <button class="primary" id="newClient">+ New client</button>
     </div>
-    <div class="srcstrip">${Object.entries(SERVICE_TYPES).map(([k,v])=>`<span class="tag ${k}">${esc(v.label)} ${counts[k]}</span>`).join("")}<span class="meta" style="margin-left:6px">active clients per service</span></div>
     <div class="card" style="padding:0 8px;overflow-x:auto">
     <table><thead><tr>${th("name","Name")}<th>Phone</th>${th("address","Address")}${th("region","Region")}${th("services","Services")}${th("status","Status")}${th("pay","Billing")}${th("last","Last contact")}</tr></thead>
     <tbody>${rows.map(([id,c])=>`<tr class="click" data-id="${id}">
@@ -979,7 +1095,7 @@ function renderClients(m){
     </tbody></table></div>`;
   $("#fq").oninput = e => { filters.q=e.target.value; renderClients(m); const i=$("#fq"); i.focus(); i.setSelectionRange(i.value.length,i.value.length); };
   $("#fregion").onchange = e => { filters.region=e.target.value; renderClients(m); };
-  $("#fsvc").onchange = e => { filters.svc=e.target.value; renderClients(m); };
+  wireSeasonBar(m);
   $("#fstatus").onchange = e => { filters.status=e.target.value; renderClients(m); };
   $("#newClient").onclick = () => openClient(null, "active");
   $("#fsort").onchange = e => { sort={key:e.target.value, dir: e.target.value==="first"||e.target.value==="last" ? -1 : 1}; try{ localStorage.setItem("crmSort", JSON.stringify(sort)); }catch(x){} renderClients(m); };
@@ -1031,8 +1147,9 @@ function renderService(m, type){
       ${byG[g].sort((a,b)=>(a.s.install||"9").localeCompare(b.s.install||"9")||a.c.name.localeCompare(b.c.name)).map(r=>`<tr class="click" data-id="${r.id}">${nameCell(r)}<td>${fmtDate(r.s.install)}</td><td>${fmtDate(r.s.takedown)}</td><td class="num">${money(r.s.price)}</td><td>${r.s.gutters?"Bundled":""}</td><td>${payPill(r.c)}</td></tr>`).join("")}
       </tbody></table>`).join("");
   }
-  m.innerHTML = `<div class="card svcbar ${type}"><div class="row"><h2 style="margin:0"><span class="tag ${type}">${esc(T.label)}</span> ${rows.length} ${rows.length===1?"entry":"entries"}</h2><span class="meta">total ${money(total)}</span></div>
+  m.innerHTML = seasonBar(type) + `<div class="card svcbar ${type}"><div class="row"><h2 style="margin:0"><span class="tag ${type}">${esc(T.label)}</span> ${rows.length} ${rows.length===1?"entry":"entries"}</h2><span class="meta">total ${money(total)}</span></div>
     ${rows.length ? body : `<div class="empty">No one has a ${esc(T.label)} service yet. Open a client and use + Add service.</div>`}</div>`;
+  wireSeasonBar(m);
   m.querySelectorAll("tr.click").forEach(tr => tr.onclick = e => { if(!e.target.matches("input,a")) openClient(tr.dataset.id); });
   m.querySelectorAll("input[data-tick]").forEach(cb => cb.onchange = () => { const [id,sid,k]=cb.dataset.tick.split("/"); commit(`${clients[id].name}: ${k} ${cb.checked?"done":"not done"}`, { [`clients/${id}/services/${sid}/${k}`]: cb.checked, ...fieldUpdates("clients/"+id, stamp()) }); });
 }
@@ -1072,6 +1189,7 @@ function fieldInput(sid, fld, val){
   if(fld.t==="check") return `<div style="padding-top:6px"><input type="checkbox" name="${n}" ${val?"checked":""}></div>`;
   if(fld.t==="money") return `<input name="${n}" type="number" step="0.01" min="0" value="${esc(val ?? "")}" placeholder="$">`;
   if(fld.t==="date") return `<input name="${n}" type="date" value="${esc(val ?? fld.d ?? "")}">`;
+  if(fld.t==="note") return `<textarea name="${n}" rows="${Math.min(8, Math.max(2, String(val||"").split("\n").length+1))}" placeholder="${esc(fld.ph||"What the crew needs at this property that is not already in the agreement.")}">${esc(val ?? "")}</textarea>`;
   return `<input name="${n}" value="${esc(val ?? "")}">`;
 }
 let svcRendering=false;
@@ -1087,10 +1205,11 @@ function renderSvcsInner(){
     <div class="hd"><span class="tag ${s.type}">${esc(T.label)}</span><span class="sum">${esc(T.summary(s))}</span><button type="button" class="small danger" data-rm="${sid}">Remove</button></div>
     <div class="fields grid3">${T.fields.map(fld=>`<div${fld.w?` style="grid-column:span ${fld.w}"`:""}><label>${esc(fld.l)}</label>${fieldInput(sid,fld,s[fld.k])}</div>`).join("")}</div>
     <div class="svcbill" data-bill="${sid}" hidden></div>
+    <div class="svcfiles" data-files="${sid}"></div>
   </div>`; }).join("") || `<div class="meta">No services yet.</div>`;
-  renderSvcBills();
+  renderSvcBills(); renderSvcFiles();
   $("#svcList").querySelectorAll("[data-rm]").forEach(b=> b.onclick = () => { readSvcForm(); removedServices.add(b.dataset.rm); delete draftServices[b.dataset.rm]; renderSvcs(); renderContracts(); });
-  $("#svcList").querySelectorAll("input,select").forEach(i=> i.onchange = () => { readSvcForm(); renderSvcs(); renderContracts(); renderRibbon(); });
+  $("#svcList").querySelectorAll("input,select,textarea").forEach(i=> i.onchange = () => { readSvcForm(); renderSvcs(); renderContracts(); renderRibbon(); });
 }
 function readSvcForm(){
   const f=$("#clientForm");
@@ -1141,7 +1260,7 @@ $("#addSvcSel").onchange = e => {
 function renderLog(){
   const l = openId ? Object.entries(logs[openId]||{}).sort((a,b)=>b[1].at-a[1].at) : [];
   $("#logCount").textContent = l.length ? `(${l.length})` : "";
-  $("#logList").innerHTML = l.map(([,e])=>`<div class="e"><div class="when">${fmtStamp(e.at)} · ${esc((e.by||"").split("@")[0])}${e.source&&e.source!=="crm"?` · <span class="pill" style="font-size:11px;padding:0 6px">${esc(e.source)}</span>`:""}</div>${esc(e.text)}</div>`).join("") || `<div class="meta">No notes yet. ${openId?"":"Save the client first, then add notes."}</div>`;
+  $("#logList").innerHTML = l.map(([k,e])=>`<div class="e" data-e="${k}"><div class="when">${fmtStamp(e.at)} · ${esc((e.by||"").split("@")[0])}${e.source&&e.source!=="crm"?` · <span class="pill" style="font-size:11px;padding:0 6px">${esc(e.source)}</span>`:""}</div>${esc(e.text)}</div>`).join("") || `<div class="meta">No notes yet. ${openId?"":"Save the client first, then add notes."}</div>`;
 }
 $("#noteAdd").onclick = async () => {
   const t=$("#noteText").value.trim(); if(!t || !openId) return;
@@ -1150,6 +1269,13 @@ $("#noteAdd").onclick = async () => {
 $("#noteText").onkeydown = e => { if((e.metaKey||e.ctrlKey) && e.key==="Enter") $("#noteAdd").click(); };
 $("#clientTrash").onclick = async () => { if(!openId) return; await trashClient(openId); $("#clientDlg").close(); };
 $("#clientCancel").onclick = () => $("#clientDlg").close();
+// Tap the empty space around the lead/client card to close it without saving (same as Cancel).
+// Only closes when the press both starts and ends outside the card, so dragging to select text never closes it.
+(()=>{ const d=$("#clientDlg"); let downOut=false;
+  const outside=e=>{ if(e.target!==d) return false; const r=d.getBoundingClientRect(); return e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom; };
+  d.addEventListener("pointerdown", e=>{ downOut=outside(e); });
+  d.addEventListener("click", e=>{ if(downOut && outside(e)) d.close(); downOut=false; });
+})();
 $("#clientForm").onkeydown = e => { if(e.key==="Enter" && e.target.tagName==="INPUT"){ e.preventDefault(); } };
 $("#clientSave").onclick = async () => {
   const f=$("#clientForm"); readSvcForm();
@@ -1158,6 +1284,9 @@ $("#clientSave").onclick = async () => {
   if(!data.name){ toast("Name is required"); f.name.focus(); return; }
   if(!data.source){ toast("Pick a lead source"); f.source.focus(); return; }
   const prev = openId ? clients[openId] : null;
+  // A new record needs a phone; an existing record that already has one cannot have it cleared.
+  // Older imported records with no phone can still be edited.
+  { const pm=phoneProblem(data.phone, !prev || !!(prev.phone||"").trim()); if(pm){ toast(pm); f.phone.focus(); return; } }
   const upd = {};
   if(prev && data.status==="active" && prev.status!=="active" && !prev.wonAt) data.wonAt=Date.now();
   if(!prev && data.status==="active") data.wonAt=Date.now();
@@ -1176,9 +1305,10 @@ $("#clientSave").onclick = async () => {
     await db.ref().update(B.upd); staged=[];
     toast(B.lines.length ? `Saved and sent to billing: ${B.lines.map(l=>l.text).join("; ")}.${apiCard(clients[id])?" A saved card is charged within 5 minutes.":" Charge it in QuickBooks, then mark it in Charges to run."}` : "Saved. Service logged; nothing to charge."); }
   // Stay open when a contract is now waiting, so it can be signed right away.
+  // Oct 20, 2026: Save never closes the client card, so the contract can be set up right after saving. Close and Cancel close it.
   const saved = clients[id];
-  if(saved && contractNeeds(saved).some(x=>!x.signed)){ openClient(id); toast("Saved. The contract is ready to sign below."); }
-  else $("#clientDlg").close();
+  openClient(id);
+  if(!pend.length) toast(saved && contractNeeds(saved).some(x=>!x.signed) ? "Saved. The contract is ready to sign below." : "Saved.");
 };
 $("#clientDlg").onclose = () => { openId=null; };
 
@@ -1701,16 +1831,29 @@ cache.contractTemplates = () => templates;
 // The admin sets it up (services, options, property details), then hands the iPad over. The customer sees a
 // finished agreement that holds only the services chosen, and signs at the bottom. Nothing else to fill in.
 // Prices and clause text come from the company's Seasonal Services Agreement. Changing either: raise SSA_VERSION.
-const SSA_VERSION = 2;
+const SSA_VERSION = 3;
 const SSA_NAME = "Seasonal Services Agreement";
 const SSA_TYPES = ["fall","lights","snow"];
 // Version 2 (Oct 13, 2026): prices from the Oct 13 price book, card on file, no card fee, no late fee,
 // no snow season maximum, three areas, neighbor credit. Policy source: claude/contracts-v2-2026-10-13.md.
-// Three pricing areas. Westland is priced at the South column for lights and snow and has no Fall Cleanup.
+// Three pricing areas. Westland is priced at the South column for lights and snow.
+// Version 3 (Oct 25, 2026): Westland Fall Cleanup is sold by exception on its own terms: one visit, no gutters,
+// leaves hauled away by the Company. Choosing Fall Cleanup on a Westland account applies it automatically.
+// Same crew pay as Livonia fall work; custom pricing works as on any service.
 const SSA_ZONES = { south:"South Livonia", north:"North Livonia", westland:"Westland" };
 const ssaCol = S => S.zone==="north" ? "north" : "south";
 const SSA_FALL = { south:450, north:615 };
-const SSA_FALL_DESC = "Two leaf visits timed to the city curbside pickup for the Property's section; gutters cleared on the final visit; a look at the roof from the ladder; flower beds cleared of leaves and debris; sticks and branches gathered; everything blown to the curb for city pickup. Not included: bed cleanouts, mulch, bagging or hauling, and written roof inspections. Fall Cleanup is available in Livonia only.";
+const SSA_FALL_DESC = "Two leaf visits timed to the city curbside pickup for the Property's section; gutters cleared on the final visit; a look at the roof from the ladder; flower beds cleared of leaves and debris; sticks and branches gathered; everything blown to the curb for city pickup. Not included: bed cleanouts, mulch, bagging or hauling, and written roof inspections.";
+const SSA_FALL_WL = 450; // same as two Livonia visits; gutters not included
+const SSA_FALL_WL_DESC = "One visit in November, after most of the leaves have fallen: leaves raked or blown from the lawn and flower beds, sticks and branches gathered, and everything hauled away by the Company. Not included: gutter cleaning, roof checks, bed cleanouts, mulch, and leaves that fall after the visit.";
+const SSA_FALL_WL_ADJ = [["corner","Corner lot",85],["oak","Heavy oak lot",60]];
+const SSA_FALL_WL_TERM = ["Fall Cleanup","One visit in November, scheduled by the Company after most of the leaves have fallen"];
+const SSA_FALL_WL_ITEMS = [
+  ["3.1","Scheduling.","The Company schedules one visit in November, after most of the leaves have fallen, and sets the date of the visit. Leaves that fall after the visit are not included."],
+  ["3.2","Debris Disposal.","Leaves and yard waste gathered during the visit are hauled away by the Company."],
+  ["3.3","Gutters.","Gutter cleaning is not included in the Westland Fall Cleanup."],
+  ["3.4","Concealed Items.","The Company is not responsible for damage to items concealed by leaves or vegetation, including hoses, toys, unmarked sprinkler heads and low-voltage wiring."]];
+const ssaTerm = (S,x) => x==="fall" && S.zone==="westland" ? SSA_FALL_WL_TERM : SSA_TERM[x];
 const SSA_FALL_ADJ = [["two","Two-storey home",80],["corner","Corner lot",85],["oak","Heavy oak lot",60],["gutters","Gutters not cleaned in three or more years",50]];
 const SSA_PKG = [
   {k:"showcase",n:"Showcase",d:"Everything in Full Front, plus 2 more shrubs (6 total), 1 medium tree wrapped, and a full season Fall Cleanup.",sw:1650,n2:1960},
@@ -1722,6 +1865,16 @@ const SSA_L_ADJ = [["two","Two-storey home",155],["twoShow","Two-storey home (Sh
 // sw / n2: season price South (and Westland) / North. ppSw / ppN: per-visit rate after the sixteenth visit.
 const SSA_SNOW = [{k:"standard",n:"Standard lot",sw:570,n2:610,ppSw:45,ppN:50},{k:"corner",n:"Corner lot",sw:775,n2:820,ppSw:60,ppN:65}];
 const SSA_NEIGHBOR = 50;
+// Custom price (Oct 20, 2026): a manager sets the final price of a service in setup and picks a reason.
+// The customer never sees that the price differs from normal or why (Oct 20, 2026): the first line carries the price,
+// the other option lines read "Included", a neighbor credit stays as its own line, and the reason stays internal.
+const SSA_CP_REASONS = ["Repeat or loyal customer","Matched a competitor's quote","Several services bundled","Larger or harder property than standard","Smaller or easier property than standard","Friends and family","Promotion or referral","Making good on a past service issue","Other"];
+const ssaCpWhy = x => String(x.cpWhy==="Other" ? (x.cpOther||"Other") : (x.cpWhy||"")).replace(/[|\r\n]+/g," ").trim();
+const ssaCpOn = x => !!(x.cp && x.cpPrice!=="" && x.cpPrice!=null && isFinite(+x.cpPrice) && +x.cpPrice>=0);
+const ssaCpDetail = (x, std) => ssaCpOn(x) ? { price:+x.cpPrice, standard:std, reason:x.cpWhy||"", other:x.cpWhy==="Other"?(x.cpOther||""):"", by:(typeof me!=="undefined"&&me?me.email:"") } : null;
+// Rewrites a service's lines for a custom price. Returns the new lines; the credit row is kept by reference.
+const ssaCpLines = (x, lines, credit) => { const nb=lines.includes(credit), rest=lines.slice(1).filter(r=>r!==credit);
+  return [[lines[0][0], r2(+x.cpPrice+(nb?SSA_NEIGHBOR:0))], ...rest.map(r=>[r[0],null]), ...(nb?[credit]:[])]; };
 const SSA_CALL = { plain:40, ladder:65 };
 const SSA_TERM = { fall:["Fall Cleanup","Two visits, October to November, timed to the city leaf pickup for the Property's section"], lights:["Holiday Lighting","Installed by November 26; removed by the end of January"], snow:["Snow & Ice Removal","November 1 to March 15"] };
 const SSA_ART = [
@@ -1790,34 +1943,38 @@ const ssaBlank = c => ({
   zone: ssaZoneOf(c.region),
   ptype:"Residential", prop:c.address||"", areas:"", pre:"", email:c.email||"", email2:c.email2||"",
   neighborName:"", neighborAddr:"",
-  fall:{ on:hasSvc(c,"fall"), two:false, corner:false, oak:false, gutters:false, big:false, bigPrice:"", nb:false },
-  lights:{ on:hasSvc(c,"lights"), pkg:"", color:"", shrub:0, medTree:0, lgTree:0, wreath:0, two:false, twoShow:false, steep:false, ft:0, nb:false },
-  snow:{ on:hasSvc(c,"snow"), lot:"", nb:false } });
+  fall:{ on:hasSvc(c,"fall"), two:false, corner:false, oak:false, gutters:false, big:false, bigPrice:"", nb:false, cp:false, cpPrice:"", cpWhy:"", cpOther:"" },
+  lights:{ on:hasSvc(c,"lights"), pkg:"", color:"", shrub:0, medTree:0, lgTree:0, wreath:0, two:false, twoShow:false, steep:false, ft:0, nb:false, cp:false, cpPrice:"", cpWhy:"", cpOther:"" },
+  snow:{ on:hasSvc(c,"snow"), lot:"", nb:false, cp:false, cpPrice:"", cpWhy:"", cpOther:"" } });
 // Showcase carries a full season Fall Cleanup inside its price. It is sold only in Livonia (South or North).
 const ssaShowcaseFall = S => S.lights.on && S.lights.pkg==="showcase" && S.zone!=="westland";
 const r2 = n => Math.round(n*100)/100;
 // Prices, the neighbor credit, and the payment schedule: what is charged at signing, and what on install day.
 function ssaCalc(S){
   const f=S.fall, l=S.lights, s=S.snow, north=S.zone==="north", area=SSA_ZONES[S.zone]||"", fl=[], ll=[], sl=[];
-  let fall=0, lights=0, snow=0, lightsGross=0;
+  let fall=0, lights=0, snow=0, lightsGross=0; const std={};
   const credit = ["Neighbor credit (Section 6.9)", -SSA_NEIGHBOR];
-  if(f.on && S.zone!=="westland"){ fall+=SSA_FALL[S.zone]; fl.push([`Full Fall Cleanup, ${area}`,SSA_FALL[S.zone]]);
-    SSA_FALL_ADJ.forEach(([k,n,p])=>{ if(f[k]){ fall+=p; fl.push([n,p]); } });
+  if(f.on){ const wlf=S.zone==="westland", base=wlf?SSA_FALL_WL:SSA_FALL[S.zone];
+    fall+=base; fl.push([wlf?"Westland Fall Cleanup, one visit":`Full Fall Cleanup, ${area}`,base]);
+    (wlf?SSA_FALL_WL_ADJ:SSA_FALL_ADJ).forEach(([k,n,p])=>{ if(f[k]){ fall+=p; fl.push([n,p]); } });
     if(f.big){ const p=+f.bigPrice||0; fall+=p; fl.push(["Turf over 10,000 sq ft (walked)",p]); }
-    if(f.nb){ fall-=SSA_NEIGHBOR; fl.push(credit); } }
+    if(f.nb){ fall-=SSA_NEIGHBOR; fl.push(credit); }
+    if(ssaCpOn(f)){ std.fall=fall; fl.splice(0,fl.length,...ssaCpLines(f,fl,credit)); fall=r2(+f.cpPrice); } }
   if(l.on && l.pkg){ const P=SSA_PKG.find(x=>x.k===l.pkg); const p = north?P.n2:P.sw;
     lights+=p; ll.push([`${P.n}, ${area}`,p]);
     SSA_ADDONS.forEach(([k,n,pr])=>{ if(l[k]>0){ lights+=l[k]*pr; ll.push([`${n} × ${l[k]}`,l[k]*pr]); } });
     SSA_L_ADJ.forEach(([k,n,pr])=>{ if(!l[k]) return; if(k==="two"&&l.pkg==="showcase") return; if(k==="twoShow"&&l.pkg!=="showcase") return; lights+=pr; ll.push([n,pr]); });
     if(l.ft>0){ lights+=l.ft*6; ll.push([`Roofline beyond 120 ft: ${l.ft} ft × $6`,l.ft*6]); }
     lightsGross=lights;
-    if(l.nb){ lights-=SSA_NEIGHBOR; ll.push(credit); } }
+    if(l.nb){ lights-=SSA_NEIGHBOR; ll.push(credit); }
+    if(ssaCpOn(l)){ std.lights=lights; ll.splice(0,ll.length,...ssaCpLines(l,ll,credit)); lights=r2(+l.cpPrice); lightsGross=r2(lights+(l.nb?SSA_NEIGHBOR:0)); } }
   if(s.on && s.lot){ const P=SSA_SNOW.find(x=>x.k===s.lot); snow=north?P.n2:P.sw; sl.push([`${P.n}, season, ${area}`,snow]);
-    if(s.nb){ snow-=SSA_NEIGHBOR; sl.push(credit); } }
+    if(s.nb){ snow-=SSA_NEIGHBOR; sl.push(credit); }
+    if(ssaCpOn(s)){ std.snow=snow; sl.splice(0,sl.length,...ssaCpLines(s,sl,credit)); snow=r2(+s.cpPrice); } }
   // Lights: half of the price before the credit at signing; the credit comes off the install-day balance.
   const lightsHalf = r2(lightsGross/2);
   const dueNow = r2(fall + snow + lightsHalf), dueInstall = r2(lights - lightsHalf);
-  return { fall, lights, snow, total:r2(fall+lights+snow), fl, ll, sl, lightsGross, dueNow, dueInstall };
+  return { fall, lights, snow, total:r2(fall+lights+snow), fl, ll, sl, lightsGross, dueNow, dueInstall, std };
 }
 // Newest signed, not voided agreement on a client, and whether a seasonal service is still not covered by one.
 function ssaSigned(c){ return Object.entries(c.contracts||{}).filter(([,m])=>m.tpl==="seasonal"&&m.status==="signed"&&!m.voided).sort((a,b)=>b[1].signedAt-a[1].signedAt)[0]||null; }
@@ -1849,11 +2006,11 @@ function ssaTable(lines, inline){
 function ssaText(c, S, k, agNo){
   const t = v => String(v||"").replace(/[|\r\n]+/g," ").trim();
   const sm = v => v<0 ? "−"+(money(-v)||"$0") : (money(v)||"$0");
-  const on = { fall:S.fall.on && S.zone!=="westland", lights:S.lights.on, snow:S.snow.on }, termFall = on.fall || ssaShowcaseFall(S);
+  const on = { fall:S.fall.on, lights:S.lights.on, snow:S.snow.on }, termFall = on.fall || ssaShowcaseFall(S);
   const pp = ssaPerPush(S), nbAny = (on.fall&&S.fall.nb)||(on.lights&&S.lights.nb)||(on.snow&&S.snow.nb);
-  const md = today().slice(5), bundle = on.lights && termFall && md<="10-15";
+  const md = today().slice(5), bundle = on.lights && termFall && md<="10-15" && S.zone!=="westland";
   const o=[]; const P = (...x) => o.push(x.join("\n"));
-  const lineTable = (rows, label, total) => ["|= Item | Price", ...rows.map(r=>`| ${r[0]} | ${sm(r[1])}`), `|+ ${label} | ${sm(total)}`].join("\n");
+  const lineTable = (rows, label, total) => ["|= Item | Price", ...rows.map(r=>`| ${r[0]} | ${r[1]==null?"Included":sm(r[1])}`), `|+ ${label} | ${sm(total)}`].join("\n");
   P("# SEASONAL SERVICES AGREEMENT");
   P([termFall&&"Fall Cleanup", on.lights&&"Holiday Lighting", on.snow&&"Snow & Ice Removal"].filter(Boolean).join(" • "));
   P(`**Agreement No.:** ${agNo}`, `**Effective Date:** ${fmtLong(today())}`);
@@ -1864,10 +2021,10 @@ function ssaText(c, S, k, agNo){
   P(`**1.2 Property Type.** ${t(S.ptype)}`);
   P(`**1.3 Service Areas.** ${t(S.areas) || (on.snow ? "Driveway, apron, front walk to the door, porch steps, and the public sidewalk across the front of the lot." : "As walked with the Customer at signing.")}`);
   P("**1.4 Term.** This Agreement begins on the Effective Date and covers the season(s) below. It ends when the last selected season ends unless renewed in writing.");
-  P("|= Service | Timeframe", ...[termFall&&"fall", on.lights&&"lights", on.snow&&"snow"].filter(Boolean).map(x=>`| ${SSA_TERM[x][0]} | ${SSA_TERM[x][1]}`));
+  P("|= Service | Timeframe", ...[termFall&&"fall", on.lights&&"lights", on.snow&&"snow"].filter(Boolean).map(x=>`| ${ssaTerm(S,x)[0]} | ${ssaTerm(S,x)[1]}`));
   P("## Article 2: Services and Pricing");
   P("The Customer purchases only the services listed below at the prices stated. All prices include card processing; there is no separate card fee.");
-  if(on.fall){ P("### 2.1 Fall Cleanup"); P(`**Full Fall Cleanup.** ${SSA_FALL_DESC}`); P(lineTable(k.fl,"Fall Cleanup Total",k.fall)); }
+  if(on.fall){ P("### 2.1 Fall Cleanup"); P(S.zone==="westland" ? `**Westland Fall Cleanup.** ${SSA_FALL_WL_DESC}` : `**Full Fall Cleanup.** ${SSA_FALL_DESC}`); P(lineTable(k.fl,"Fall Cleanup Total",k.fall)); }
   if(on.lights){ const pk=SSA_PKG.find(x=>x.k===S.lights.pkg);
     P("### 2.2 Holiday Lighting"); P(`**${pk.n}.** ${pk.d}`); P(SSA_LIGHTS_NOTE); P(`**Light Color:** ${t(S.lights.color)}`); P(lineTable(k.ll,"Holiday Lighting Total",k.lights)); }
   if(on.snow){ P("### 2.3 Snow Removal"); P([...lineTable(k.sl,"Snow Removal Season Total",k.snow).split("\n"), `| Each visit after the sixteenth (Section 4.8) | ${money(pp)}`].join("\n")); }
@@ -1876,7 +2033,7 @@ function ssaText(c, S, k, agNo){
     if(A.svc && !(A.svc==="fall" ? termFall : on[A.svc])) continue;
     P(`## Article ${A.n}: ${A.title}`);
     if(A.n===7) P("The Customer shall:");
-    for(const [num,head,body] of A.items){
+    for(const [num,head,body] of (A.n===3 && S.zone==="westland" ? SSA_FALL_WL_ITEMS : A.items)){
       if(num==="4.8"){ P(`**4.8 Season Limit.** The season price covers up to sixteen (${SSA_PUSHES}) visits, counted under Section 4.2. Each visit after the sixteenth is charged to the payment method on file after that visit, at the per-visit rate in Section 2.3 (${money(pp)}).`); continue; }
       P(head ? `**${num} ${head}** ${body}` : `**${num}** ${body}`);
     }
@@ -1952,6 +2109,11 @@ function ssaSetup(){
   const X=signCtx, S=X.S, c=clients[X.clientId]; X.mode="ssa-setup"; X.pad=null; ssaBarOff();
   const ck=(id,label,on)=>`<label class="row ssack"><input type="checkbox" id="${id}" ${on?"checked":""}> <span>${label}</span></label>`;
   const nb=(id,on)=>ck(id,`Neighbor credit −$${SSA_NEIGHBOR} (same street, same service, both signed by the deadline)`,on);
+  const cp=(p,x,label)=>`<div class="sscp"><button type="button" class="small" id="ss-${p}-cpbtn" data-cp="${p}">${x.cp?"Remove custom price":"Custom price"}</button>
+    <div id="ss-${p}-cpbox" class="grid2" ${x.cp?"":"hidden"} style="margin-top:6px">
+      <div><label>Final ${label} price, $ (after any neighbor credit)</label><input id="ss-${p}-cpp" type="number" inputmode="decimal" min="0" step="0.01" value="${esc(x.cpPrice??"")}"></div>
+      <div><label>Reason</label><select id="ss-${p}-cpw"><option value="">Choose</option>${SSA_CP_REASONS.map(r=>`<option${x.cpWhy===r?" selected":""}>${esc(r)}</option>`).join("")}</select></div>
+      <div id="ss-${p}-cporow" style="grid-column:1/-1" ${x.cpWhy==="Other"?"":"hidden"}><label>Other reason</label><input id="ss-${p}-cpo" value="${esc(x.cpOther||"")}" autocomplete="off" placeholder="Internal only, never shown to the customer"></div></div></div>`;
   $("#signTitle").textContent = SSA_NAME+": setup";
   $("#signBody").innerHTML = `<div class="signpanel" id="ssaForm" style="margin-top:0">
     <h4>${esc(c.name)}</h4>
@@ -1970,25 +2132,25 @@ function ssaSetup(){
     <div id="ss-real">
     <div class="sect">Services</div>
     <div class="svc svcbar fall">${ck("ss-fall",`<b>Fall Cleanup</b> <span class="meta" id="ss-fall-p"></span>`,S.fall.on)}
-      <div class="warnline" id="ss-fall-wl" hidden>Fall Cleanup is not offered in Westland.</div>
+      <div class="warnline" id="ss-fall-wl" hidden>Westland Fall Cleanup: one visit, no gutters, leaves hauled away. The Westland terms go into the agreement automatically.</div>
       <div id="ss-fall-box" class="ssabox">${SSA_FALL_ADJ.map(([k,n,p])=>ck("ss-f-"+k,`${n} +$${p}`,S.fall[k])).join("")}
         <div class="row">${ck("ss-f-big","Turf over 10,000 sq ft, walked price $",S.fall.big)}<input id="ss-f-bigp" type="number" inputmode="decimal" min="0" style="width:110px" value="${esc(S.fall.bigPrice)}"></div>
-        ${nb("ss-f-nb",S.fall.nb)}</div></div>
+        ${nb("ss-f-nb",S.fall.nb)}${cp("f",S.fall,"Fall Cleanup")}</div></div>
     <div class="svc svcbar lights">${ck("ss-lights",`<b>Christmas Lights</b> <span class="meta" id="ss-lights-p"></span>`,S.lights.on)}
       <div id="ss-lights-box" class="ssabox">
         <div class="grid2"><div><label>Package</label><select id="ss-l-pkg"><option value="">Choose</option>${SSA_PKG.map(P=>`<option value="${P.k}"${S.lights.pkg===P.k?" selected":""}>${P.n} ($${P.sw.toLocaleString()} South and Westland, $${P.n2.toLocaleString()} North)</option>`).join("")}</select></div>
           <div><label>Light color</label><select id="ss-l-color"><option value="">Choose</option>${opts(["Warm white","Multicolor"],S.lights.color)}</select></div></div>
-        <div class="warnline" id="ss-l-wl" hidden>Showcase includes the Fall Cleanup, which is not offered in Westland. Sell Full Front plus add-ons instead.</div>
+        <div class="warnline" id="ss-l-wl" hidden>Showcase includes the two-visit Livonia Fall Cleanup, so it is not sold in Westland. Sell Full Front plus add-ons, and add the Westland Fall Cleanup separately.</div>
         <label>Add-ons (quantity)</label>
         <div class="row">${SSA_ADDONS.map(([k,n,p])=>`<span class="ssaqty"><input id="ss-a-${k}" type="number" inputmode="numeric" min="0" value="${S.lights[k]||0}"> ${n} $${p}</span>`).join("")}</div>
         <div id="ss-la-two-row">${ck("ss-la-two",`Two-storey home +$${SSA_L_ADJ[0][2]}`,S.lights.two)}</div>
         <div id="ss-la-twoShow-row">${ck("ss-la-twoShow",`Two-storey home (Showcase) +$${SSA_L_ADJ[1][2]}`,S.lights.twoShow)}</div>
         ${ck("ss-la-steep",`Steep roof over 7/12 pitch +$${SSA_L_ADJ[2][2]}`,S.lights.steep)}
         <div class="row"><span>Roofline beyond 120 ft, $6 per ft:</span><input id="ss-l-ft" type="number" inputmode="numeric" min="0" style="width:100px" value="${S.lights.ft||""}"><span>ft</span></div>
-        ${nb("ss-l-nb",S.lights.nb)}</div></div>
+        ${nb("ss-l-nb",S.lights.nb)}${cp("l",S.lights,"Christmas Lights")}</div></div>
     <div class="svc svcbar snow">${ck("ss-snow",`<b>Snow Removal</b> <span class="meta" id="ss-snow-p"></span>`,S.snow.on)}
       <div id="ss-snow-box" class="ssabox"><label>Lot</label><select id="ss-s-lot"><option value="">Choose</option>${SSA_SNOW.map(P=>`<option value="${P.k}"${S.snow.lot===P.k?" selected":""}>${P.n} ($${P.sw} South and Westland, $${P.n2} North)</option>`).join("")}</select>
-        ${nb("ss-s-nb",S.snow.nb)}</div></div>
+        ${nb("ss-s-nb",S.snow.nb)}${cp("s",S.snow,"Snow Removal")}</div></div>
     <div id="ss-nb-box" class="grid2" hidden>
       <div><label>Neighbor's name</label><input id="ss-nb-name" value="${esc(S.neighborName||"")}" autocomplete="off"></div>
       <div><label>Neighbor's address</label><input id="ss-nb-addr" value="${esc(S.neighborAddr||"")}" autocomplete="off"></div></div>
@@ -2001,6 +2163,8 @@ function ssaSetup(){
     <p class="meta" style="margin:8px 0 0">${svcReady()?`<b>Email contract to sign</b> sends one link to ${esc([S.email,S.email2].filter(Boolean).join(" and ")||"the customer's email")}: the quote, the agreement, a typed-name signature, then their card on the next screen.`:`Emailing the contract needs the signing service: More, Contracts, Signing service.`} <b>Sign here</b> is for door to door and landscaping: the customer signs on this screen, then you take the card.</p>
   </div>`;
   const form=$("#ssaForm"); form.oninput=ssaSync; form.onchange=ssaSync; ssaSync();
+  const CPK={f:"fall",l:"lights",s:"snow"};
+  form.querySelectorAll("[data-cp]").forEach(b=>b.onclick=()=>{ ssaSync(); const p=b.dataset.cp, x=S[CPK[p]]; x.cp=!x.cp; ssaSync(); if(x.cp){ const el=document.getElementById(`ss-${p}-cpp`); if(el) el.focus(); } });
   $("#ss-later").onclick = async () => { ssaSync(); try{ await ssaSaveDraft(); toast("Setup saved on the client."); $("#signDlg").close(); }catch(e){ toast("Not saved: "+(e.code||e.message)); } };
   $("#ss-go").onclick = () => { ssaSync(); const e=ssaErrors(); $("#ss-err").textContent = e.length ? "Still needed: "+e.join(", ")+"." : ""; if(!e.length) ssaShow(); };
   $("#ss-send").onclick = () => { ssaSync(); const e=ssaErrors(); if(!S.email) e.unshift("the customer's email"); $("#ss-err").textContent = e.length ? "Still needed: "+e.join(", ")+"." : ""; if(!e.length) ssaSend(); };
@@ -2013,16 +2177,21 @@ function ssaSync(){
   S.lights.on=g("ss-lights").checked; S.lights.pkg=g("ss-l-pkg").value; S.lights.color=g("ss-l-color").value; S.lights.nb=g("ss-l-nb").checked;
   SSA_ADDONS.forEach(([k])=>S.lights[k]=n("ss-a-"+k)); SSA_L_ADJ.forEach(([k])=>S.lights[k]=g("ss-la-"+k).checked); S.lights.ft=n("ss-l-ft");
   S.snow.on=g("ss-snow").checked; S.snow.lot=g("ss-s-lot").value; S.snow.nb=g("ss-s-nb").checked;
+  [["f",S.fall],["l",S.lights],["s",S.snow]].forEach(([p,x])=>{ x.cpPrice=g(`ss-${p}-cpp`).value; x.cpWhy=g(`ss-${p}-cpw`).value; x.cpOther=g(`ss-${p}-cpo`).value.trim();
+    g(`ss-${p}-cpbox`).hidden=!x.cp; g(`ss-${p}-cporow`).hidden=x.cpWhy!=="Other"; g(`ss-${p}-cpbtn`).textContent=x.cp?"Remove custom price":"Custom price"; });
   S.neighborName=g("ss-nb-name").value.trim(); S.neighborAddr=g("ss-nb-addr").value.trim(); S.payUrl=(g("ss-payurl")?.value||"").trim();
   S.test=g("ss-test").checked; g("ss-real").hidden=S.test; g("ss-test-wl").hidden=!S.test; g("ss-go").hidden=S.test;
   ["ss-zone","ss-ptype","ss-prop","ss-areas","ss-pre"].forEach(id=>{ g(id).parentElement.hidden=S.test; });
   if(S.test){ g("ss-now").textContent="$1"; g("ss-later-amt").textContent="A second $1 is charged later, from Charges to run."; g("ss-warn").hidden=true; return; }
-  const wl=S.zone==="westland", k=ssaCalc(S), show=S.lights.pkg==="showcase";
-  g("ss-fall-wl").hidden=!(wl && S.fall.on); g("ss-fall-box").hidden=!S.fall.on || wl;
+  const wl=S.zone==="westland", show=S.lights.pkg==="showcase";
+  if(wl){ S.fall.two=false; S.fall.gutters=false; }
+  const k=ssaCalc(S);
+  g("ss-fall-wl").hidden=!(wl && S.fall.on); g("ss-fall-box").hidden=!S.fall.on;
+  ["two","gutters"].forEach(x=>{ const el=g("ss-f-"+x); el.closest("label").hidden=wl; if(wl){ el.checked=false; S.fall[x]=false; } });
   g("ss-lights-box").hidden=!S.lights.on; g("ss-snow-box").hidden=!S.snow.on;
   g("ss-l-wl").hidden=!(wl && show); g("ss-la-two-row").hidden=show; g("ss-la-twoShow-row").hidden=!show;
   g("ss-nb-box").hidden=!((S.fall.on&&S.fall.nb)||(S.lights.on&&S.lights.nb)||(S.snow.on&&S.snow.nb));
-  g("ss-fall-p").textContent = wl ? "" : S.fall.on ? money(k.fall) : "$"+SSA_FALL[S.zone];
+  g("ss-fall-p").textContent = S.fall.on ? money(k.fall) : "$"+(wl?SSA_FALL_WL:SSA_FALL[S.zone]);
   g("ss-lights-p").textContent = S.lights.on&&S.lights.pkg ? money(k.lights) : ""; g("ss-snow-p").textContent = S.snow.on&&S.snow.lot ? money(k.snow) : "";
   g("ss-now").textContent = money(k.dueNow)||"$0";
   g("ss-later-amt").textContent = [S.lights.on&&S.lights.pkg ? `${money(k.dueInstall)} more is charged when the lights are installed.` : "", S.snow.on&&S.snow.lot ? `Snow visits after the sixteenth: ${money(ssaPerPush(S))} each, charged after the visit.` : ""].filter(Boolean).join(" ");
@@ -2034,12 +2203,13 @@ function ssaErrors(){
   if(S.test){ if(S.email && !/^\S+@\S+\.\S+$/.test(S.email)) e.push("a valid email"); return e; }
   if(!S.prop) e.push("service property");
   if(!S.fall.on && !S.lights.on && !S.snow.on) e.push("at least one service");
-  if(wl && S.fall.on) e.push("untick Fall Cleanup (not offered in Westland)");
   if(wl && S.lights.on && S.lights.pkg==="showcase") e.push("a lights package other than Showcase (Westland)");
   if(S.fall.on && S.fall.big && !(+S.fall.bigPrice>0)) e.push("the walked price for the large lawn");
   if(S.lights.on && !S.lights.pkg) e.push("lights package");
   if(S.lights.on && !S.lights.color) e.push("light color");
   if(S.snow.on && !S.snow.lot) e.push("snow lot type");
+  [["Fall Cleanup",S.fall,S.fall.on],["Christmas Lights",S.lights,S.lights.on],["Snow Removal",S.snow,S.snow.on]].forEach(([n,x,on])=>{ if(!on||!x.cp) return;
+    if(!ssaCpOn(x)) e.push(`the ${n} custom price`); if(!x.cpWhy) e.push(`a reason for the ${n} custom price`); else if(x.cpWhy==="Other" && !x.cpOther) e.push(`the other reason for the ${n} custom price`); });
   if(((S.fall.on&&S.fall.nb)||(S.lights.on&&S.lights.nb)||(S.snow.on&&S.snow.nb)) && (!S.neighborName||!S.neighborAddr)) e.push("the neighbor's name and address for the credit");
   if(S.email && !/^\S+@\S+\.\S+$/.test(S.email)) e.push("a valid email, or leave it empty");
   if(S.email2 && !/^\S+@\S+\.\S+$/.test(S.email2)) e.push("a valid second email, or leave it empty");
@@ -2086,25 +2256,25 @@ async function ssaShow(){
 }
 // What the signed agreement stores about the services chosen. Shared by the iPad signing and the emailed link.
 function ssaDetails(S, k, agNo){
-  const fallOn=S.fall.on && S.zone!=="westland";
+  const fallOn=S.fall.on;
   const nbAny=(fallOn&&S.fall.nb)||(S.lights.on&&S.lights.nb)||(S.snow.on&&S.snow.nb);
   const details = { agreementNo:agNo, version:SSA_VERSION, zone:S.zone, propertyType:S.ptype, serviceProperty:S.prop, serviceAreas:S.areas, preExisting:S.pre, email:S.email, email2:S.email2||"",
     total:k.total, dueNow:k.dueNow, dueInstall:k.dueInstall };
   if(nbAny) details.neighbor = { name:S.neighborName, address:S.neighborAddr, fall:fallOn&&S.fall.nb, lights:S.lights.on&&S.lights.nb, snow:S.snow.on&&S.snow.nb };
-  if(fallOn) details.fall = { lines:k.fl, total:k.fall, options:{ two:S.fall.two, corner:S.fall.corner, oak:S.fall.oak, gutters:S.fall.gutters, big:S.fall.big, bigPrice:S.fall.big?(+S.fall.bigPrice||0):0 } };
+  if(fallOn) details.fall = { lines:k.fl, total:k.fall, options:{ two:S.fall.two, corner:S.fall.corner, oak:S.fall.oak, gutters:S.fall.gutters, big:S.fall.big, bigPrice:S.fall.big?(+S.fall.bigPrice||0):0 }, customPrice:ssaCpDetail(S.fall,k.std.fall) };
   if(S.lights.on) details.lights = { lines:k.ll, total:k.lights, gross:k.lightsGross, package:S.lights.pkg, color:S.lights.color, includesFallCleanup:ssaShowcaseFall(S),
     addons:Object.fromEntries(SSA_ADDONS.map(([a])=>[a,S.lights[a]||0]).filter(x=>x[1]>0)), options:{ two:S.lights.pkg!=="showcase"&&S.lights.two, twoShow:S.lights.pkg==="showcase"&&S.lights.twoShow, steep:S.lights.steep }, extraFeet:S.lights.ft||0,
-    serviceCall:{ included:1, noLadder:SSA_CALL.plain, ladder:SSA_CALL.ladder } };
-  if(S.snow.on) details.snow = { lines:k.sl, total:k.snow, lot:S.snow.lot, includedPushes:SSA_PUSHES, perPushAfter:ssaPerPush(S) };
+    serviceCall:{ included:1, noLadder:SSA_CALL.plain, ladder:SSA_CALL.ladder }, customPrice:ssaCpDetail(S.lights,k.std.lights) };
+  if(S.snow.on) details.snow = { lines:k.sl, total:k.snow, lot:S.snow.lot, includedPushes:SSA_PUSHES, perPushAfter:ssaPerPush(S), customPrice:ssaCpDetail(S.snow,k.std.snow) };
   return details;
 }
-const ssaSummary = (S,k) => { const fallOn=S.fall.on && S.zone!=="westland"; return [fallOn&&"Fall Cleanup "+money(k.fall), S.lights.on&&"Christmas Lights "+money(k.lights), S.snow.on&&"Snow Removal "+money(k.snow)].filter(Boolean).join(" · "); };
-const ssaCovers = S => { const fallOn=S.fall.on && S.zone!=="westland", c={}; if(fallOn||ssaShowcaseFall(S)) c.fall=true; if(S.lights.on) c.lights=true; if(S.snow.on) c.snow=true; return c; };
+const ssaSummary = (S,k) => { const fallOn=S.fall.on; return [fallOn&&"Fall Cleanup "+money(k.fall), S.lights.on&&"Christmas Lights "+money(k.lights), S.snow.on&&"Snow Removal "+money(k.snow)].filter(Boolean).join(" · "); };
+const ssaCovers = S => { const fallOn=S.fall.on, c={}; if(fallOn||ssaShowcaseFall(S)) c.fall=true; if(S.lights.on) c.lights=true; if(S.snow.on) c.snow=true; return c; };
 // The client changes a signed agreement makes: services at the agreement price, Active status, emails, payment
 // method missing until recorded, and the charges on the payment schedule. cid is "{{CID}}" for an emailed link
 // (the signing service fills in the contract id when the customer signs).
 function ssaApply(c, id, S, k, agNo, now, cid){
-  const fallOn=S.fall.on && S.zone!=="westland", incFall=ssaShowcaseFall(S) && !fallOn, upd={};
+  const fallOn=S.fall.on, incFall=ssaShowcaseFall(S) && !fallOn, upd={};
   if(S.email && S.email!==(c.email||"")) upd["clients/"+id+"/email"]=S.email;
   if((S.email2||"")!==(c.email2||"")) upd["clients/"+id+"/email2"]=S.email2||null;
   if(!payOnFileOk(c)) upd["clients/"+id+"/payOnFile"] = { status:"missing", since:now };
@@ -2116,7 +2286,7 @@ function ssaApply(c, id, S, k, agNo, now, cid){
     const all = { ...(e?{}:{ type, createdAt:now, ...fresh }), ...fields, notes: e&&e[1].notes && !String(e[1].notes).includes(note) ? e[1].notes+"; "+note : note };
     for(const [f,v] of Object.entries(all)) upd[`clients/${id}/services/${sid}/${f}`]=v; };
   const noteOf = lines => lines.map(r=>r[0]).join(", ")+` (${agNo})`;
-  if(fallOn) put("fall", { package:"Two passes", price:k.fall }, { route:"Route 1", pass1:false, pass2:false }, noteOf(k.fl));
+  if(fallOn) put("fall", { package:S.zone==="westland"?"One visit":"Two passes", price:k.fall }, { route:"Route 1", pass1:false, pass2:false }, noteOf(k.fl));
   else if(incFall) put("fall", { package:"Two passes" }, { route:"Route 1", price:0, pass1:false, pass2:false }, `Included in the Showcase lights package (${agNo})`);
   if(S.lights.on) put("lights", { price:k.lights }, { install:"", installed:false, takedown:"", gutters:false }, S.lights.color+": "+noteOf(k.ll));
   if(S.snow.on) put("snow", { price:k.snow }, { crew:"", start:"2026-11-01", end:"2027-03-15" }, noteOf(k.sl));
@@ -2191,7 +2361,7 @@ async function ssaSend(){
     const noticeT = ssaNotice(X.agNo).split(CB).join("{{CANCEL_BY_LONG}}").split(L).join("{{SIGNED_LONG}}");
     const token = randToken(), svc=svcInfo();
     const link = `${SIGN_PAGE}?t=${token}&s=${svcDeploy(svc.url)}`;
-    const fallOn=S.fall.on && S.zone!=="westland";
+    const fallOn=S.fall.on;
     const lines = [fallOn&&["Fall Cleanup",k.fall], S.lights.on&&[`Christmas Lights (${S.lights.color})`,k.lights], S.snow.on&&["Snow Removal, season",k.snow]].filter(Boolean);
     const apply = Object.entries(ssaApply(c, id, S, k, X.agNo, now, "{{CID}}"));
     const req = { status:"queued", clientId:id, tplName:SSA_NAME, tplVersion:SSA_VERSION, agreementNo:X.agNo, amount:k.total, dueNow:k.dueNow, dueInstall:k.dueInstall,
@@ -2837,11 +3007,57 @@ function renderTrash(m){
   m.querySelectorAll("[data-purge]").forEach(b=> b.onclick = () => { if(confirm(`Delete ${clients[b.dataset.purge].name} and all notes permanently?`)) purgeClient(b.dataset.purge); });
 }
 
+// ---------- seasons (service views docked under Clients, pinnable to the main menu) ----------
+const SEASON_ORDER = [["lawn","var(--s-lawn)","Lawn"],["fall","var(--s-fall)","Fall"],["lights","var(--s-lights)","Lights"],["snow","#9ec3f0","Snow"],["landscaping","var(--s-landscaping)","Landscaping"]];
+let pinnedSvc = []; try{ pinnedSvc = JSON.parse(localStorage.getItem("crmPinnedSvc")||"[]").filter(k=>SERVICE_TYPES[k]); }catch(e){}
+function seasonBar(active){
+  const n = k => live().filter(([,c])=>c.status==="active"&&hasSvc(c,k)).length;
+  const pinned = active && pinnedSvc.includes(active);
+  return `<div class="seasonbar" role="tablist" aria-label="Filter clients by season">
+    <button type="button" class="sb${active?"":" on"}" data-season="">All clients</button>
+    ${SEASON_ORDER.map(([k,col,lb])=>`<button type="button" class="sb${active===k?" on":""}" data-season="${k}"><span class="dot" style="background:${col}"></span>${esc(lb)} <span class="n">${n(k)}</span></button>`).join("")}
+    ${active?`<button type="button" class="small pinbtn" data-pin="${active}" title="${pinned?"Take it off":"Put it on"} the main menu">${pinned?"Unpin from menu":"\u{1F4CC} Pin to menu"}</button>`:""}
+  </div>`;
+}
+function wireSeasonBar(m){
+  m.querySelectorAll("[data-season]").forEach(b=>b.onclick=()=>setNav(b.dataset.season?"svc-"+b.dataset.season:"clients"));
+  m.querySelectorAll("[data-pin]").forEach(b=>b.onclick=()=>{ const k=b.dataset.pin;
+    pinnedSvc = pinnedSvc.includes(k) ? pinnedSvc.filter(x=>x!==k) : SEASON_ORDER.map(x=>x[0]).filter(x=>x===k||pinnedSvc.includes(x));
+    savePins(); renderPins(); setNav(view); });
+}
+// Pins follow the signed-in account (saved on the person's team-list entry), so they match on the Mac, iPad and phone.
+// This browser keeps a copy only so the menu draws right away while the database loads.
+const pinsRef = () => db.ref("allowed/"+emailKey(me.email)+"/crmPins");
+function savePins(){
+  try{ localStorage.setItem("crmPinnedSvc", JSON.stringify(pinnedSvc)); }catch(e){}
+  if(me) pinsRef().set(pinnedSvc.length ? pinnedSvc : null).catch(e=>toast("Pin not saved to your account: "+(e.code||e.message)));
+}
+let pinsWatched=false;
+function watchPins(){
+  if(pinsWatched || !me) return; pinsWatched=true; let first=true;
+  pinsRef().on("value", snap => {
+    const v = snap.val();
+    if(v==null && first && pinnedSvc.length){ first=false; savePins(); return; } // first sign-in since this change: carry this device's pins up to the account
+    first=false;
+    const next = (Array.isArray(v) ? v : Object.values(v||{})).filter(k=>SERVICE_TYPES[k]);
+    if(JSON.stringify(next)===JSON.stringify(pinnedSvc)) return;
+    pinnedSvc = next; try{ localStorage.setItem("crmPinnedSvc", JSON.stringify(pinnedSvc)); }catch(e){}
+    renderPins(); setNav(view);
+  });
+}
+function renderPins(){
+  const slot=$("#pinSlot");
+  slot.innerHTML = SEASON_ORDER.filter(([k])=>pinnedSvc.includes(k)).map(([k,col,lb])=>`<button data-view="svc-${k}"><span class="dot" style="background:${col}"></span>${esc(lb)}</button>`).join("");
+  slot.querySelectorAll("button[data-view]").forEach(b => b.onclick = () => setNav(b.dataset.view));
+}
+renderPins();
+
 // ---------- nav ----------
 const SECONDARY = { import:"Import CSV", tools:"QuickBooks and export", trash:"Trash", contracts:"Contracts" };
 function setNav(v){
   view=v; closeMore();
-  document.querySelectorAll("nav button[data-view]").forEach(x=>x.classList.toggle("on",x.dataset.view===v));
+  const navV = v.startsWith("svc-") && !pinnedSvc.includes(v.slice(4)) ? "clients" : v;
+  document.querySelectorAll("nav button[data-view]").forEach(x=>x.classList.toggle("on",x.dataset.view===navV));
   const mb=$("#moreBtn"); const sec=SECONDARY[v];
   mb.innerHTML = (sec||"More") + ' <span class="caret">&#9662;</span>'; mb.classList.toggle("on", !!sec);
   render();
@@ -2859,7 +3075,7 @@ document.addEventListener("keydown", e => { if(e.key==="Escape") closeMore(); })
 <div class="pgdrawer-bg" id="pgDrawerBg"></div>
 <nav class="pgdrawer" id="pgDrawer" aria-label="Pages" aria-hidden="true">
   <div class="pdhead"><b>Mangiapane Brothers</b><button type="button" class="pdx" id="pgDrawerX" aria-label="Close page menu">&times;</button></div>
-  <a href="./projects.html">Projects<span>Admin task dashboard</span></a><a href="./crm.html" class="here" aria-current="page">CRM<span>Leads, clients, contracts</span></a><a href="./crews.html">Crews<span>Routes, schedules, day logs</span></a><a href="./team.html">Team Manager<span>Personnel, hiring, payroll, paperwork</span></a><a href="./routes.html">Routes<span>Door hanger routes</span></a>
+  <p class="pdsec" style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted,#768276);padding:12px 12px 2px;margin:0">Admin</p><a href="./projects.html">Projects<span>Admin task dashboard</span></a><a href="./crm.html" class="here" aria-current="page">CRM<span>Leads, clients, contracts</span></a><a href="./team.html">Team Manager<span>Personnel, hiring, paperwork, training, payroll</span></a><a href="./previews.html">Previews<span>What customers and crews see, with sample data</span></a><p class="pdsec" style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted,#768276);padding:12px 12px 2px;margin:0">Employee</p><a href="./crews.html">Crews<span>Routes, schedules, training</span></a><a href="./routes.html">Routes<span>Door hanger routes</span></a>
   <div class="pdfoot">Full-Service Property Maintenance for Those Who Take Pride in Their Home</div>
 </nav>
 <script>
