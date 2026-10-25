@@ -1771,16 +1771,28 @@ cache.contractTemplates = () => templates;
 // The admin sets it up (services, options, property details), then hands the iPad over. The customer sees a
 // finished agreement that holds only the services chosen, and signs at the bottom. Nothing else to fill in.
 // Prices and clause text come from the company's Seasonal Services Agreement. Changing either: raise SSA_VERSION.
-const SSA_VERSION = 2;
+const SSA_VERSION = 3;
 const SSA_NAME = "Seasonal Services Agreement";
 const SSA_TYPES = ["fall","lights","snow"];
 // Version 2 (Oct 13, 2026): prices from the Oct 13 price book, card on file, no card fee, no late fee,
 // no snow season maximum, three areas, neighbor credit. Policy source: claude/contracts-v2-2026-10-13.md.
-// Three pricing areas. Westland is priced at the South column for lights and snow and has no Fall Cleanup.
+// Three pricing areas. Westland is priced at the South column for lights and snow.
+// Version 3 (Oct 25, 2026): Westland Fall Cleanup is sold by exception on its own terms: one visit, no gutters,
+// leaves removed from the Property by the Company. Choosing Fall Cleanup on a Westland account applies it automatically.
 const SSA_ZONES = { south:"South Livonia", north:"North Livonia", westland:"Westland" };
 const ssaCol = S => S.zone==="north" ? "north" : "south";
 const SSA_FALL = { south:450, north:615 };
 const SSA_FALL_DESC = "Two leaf visits timed to the city curbside pickup for the Property's section; gutters cleared on the final visit; a look at the roof from the ladder; flower beds cleared of leaves and debris; sticks and branches gathered; everything blown to the curb for city pickup. Not included: bed cleanouts, mulch, bagging or hauling, and written roof inspections. Fall Cleanup is available in Livonia only.";
+const SSA_FALL_WL = 450; // same as two Livonia visits; gutters not included
+const SSA_FALL_WL_DESC = "One visit in November, after most of the leaves have fallen: leaves raked or blown from the lawn and flower beds, sticks and branches gathered, and everything removed from the Property by the Company. Not included: gutter cleaning, roof checks, bed cleanouts, mulch, and leaves that fall after the visit.";
+const SSA_FALL_WL_ADJ = [["corner","Corner lot",85],["oak","Heavy oak lot",60]];
+const SSA_FALL_WL_TERM = ["Fall Cleanup","One visit in November, scheduled by the Company after most of the leaves have fallen"];
+const SSA_FALL_WL_ITEMS = [
+  ["3.1","Scheduling.","The Company schedules one visit in November, after most of the leaves have fallen, and sets the date of the visit. Leaves that fall after the visit are not included."],
+  ["3.2","Debris Removal.","Leaves, sticks and yard waste gathered during the visit are removed from the Property by the Company. The Company does not leave them at the curb for city collection."],
+  ["3.3","Gutters.","Gutter cleaning is not included in the Westland Fall Cleanup."],
+  ["3.4","Concealed Items.","The Company is not responsible for damage to items concealed by leaves or vegetation, including hoses, toys, unmarked sprinkler heads and low-voltage wiring."]];
+const ssaTerm = (S,x) => x==="fall" && S.zone==="westland" ? SSA_FALL_WL_TERM : SSA_TERM[x];
 const SSA_FALL_ADJ = [["two","Two-storey home",80],["corner","Corner lot",85],["oak","Heavy oak lot",60],["gutters","Gutters not cleaned in three or more years",50]];
 const SSA_PKG = [
   {k:"showcase",n:"Showcase",d:"Everything in Full Front, plus 2 more shrubs (6 total), 1 medium tree wrapped, and a full season Fall Cleanup.",sw:1650,n2:1960},
@@ -1881,8 +1893,9 @@ function ssaCalc(S){
   const f=S.fall, l=S.lights, s=S.snow, north=S.zone==="north", area=SSA_ZONES[S.zone]||"", fl=[], ll=[], sl=[];
   let fall=0, lights=0, snow=0, lightsGross=0; const std={};
   const credit = ["Neighbor credit (Section 6.9)", -SSA_NEIGHBOR];
-  if(f.on && S.zone!=="westland"){ fall+=SSA_FALL[S.zone]; fl.push([`Full Fall Cleanup, ${area}`,SSA_FALL[S.zone]]);
-    SSA_FALL_ADJ.forEach(([k,n,p])=>{ if(f[k]){ fall+=p; fl.push([n,p]); } });
+  if(f.on){ const wlf=S.zone==="westland", base=wlf?SSA_FALL_WL:SSA_FALL[S.zone];
+    fall+=base; fl.push([wlf?"Westland Fall Cleanup, one visit, leaves hauled away":`Full Fall Cleanup, ${area}`,base]);
+    (wlf?SSA_FALL_WL_ADJ:SSA_FALL_ADJ).forEach(([k,n,p])=>{ if(f[k]){ fall+=p; fl.push([n,p]); } });
     if(f.big){ const p=+f.bigPrice||0; fall+=p; fl.push(["Turf over 10,000 sq ft (walked)",p]); }
     if(f.nb){ fall-=SSA_NEIGHBOR; fl.push(credit); }
     if(ssaCpOn(f)){ std.fall=fall; fl.splice(0,fl.length,...ssaCpLines(f,fl,credit)); fall=r2(+f.cpPrice); } }
@@ -1932,9 +1945,9 @@ function ssaTable(lines, inline){
 function ssaText(c, S, k, agNo){
   const t = v => String(v||"").replace(/[|\r\n]+/g," ").trim();
   const sm = v => v<0 ? "−"+(money(-v)||"$0") : (money(v)||"$0");
-  const on = { fall:S.fall.on && S.zone!=="westland", lights:S.lights.on, snow:S.snow.on }, termFall = on.fall || ssaShowcaseFall(S);
+  const on = { fall:S.fall.on, lights:S.lights.on, snow:S.snow.on }, termFall = on.fall || ssaShowcaseFall(S);
   const pp = ssaPerPush(S), nbAny = (on.fall&&S.fall.nb)||(on.lights&&S.lights.nb)||(on.snow&&S.snow.nb);
-  const md = today().slice(5), bundle = on.lights && termFall && md<="10-15";
+  const md = today().slice(5), bundle = on.lights && termFall && md<="10-15" && S.zone!=="westland";
   const o=[]; const P = (...x) => o.push(x.join("\n"));
   const lineTable = (rows, label, total) => ["|= Item | Price", ...rows.map(r=>`| ${r[0]} | ${r[1]==null?"Included":sm(r[1])}`), `|+ ${label} | ${sm(total)}`].join("\n");
   P("# SEASONAL SERVICES AGREEMENT");
@@ -1947,10 +1960,10 @@ function ssaText(c, S, k, agNo){
   P(`**1.2 Property Type.** ${t(S.ptype)}`);
   P(`**1.3 Service Areas.** ${t(S.areas) || (on.snow ? "Driveway, apron, front walk to the door, porch steps, and the public sidewalk across the front of the lot." : "As walked with the Customer at signing.")}`);
   P("**1.4 Term.** This Agreement begins on the Effective Date and covers the season(s) below. It ends when the last selected season ends unless renewed in writing.");
-  P("|= Service | Timeframe", ...[termFall&&"fall", on.lights&&"lights", on.snow&&"snow"].filter(Boolean).map(x=>`| ${SSA_TERM[x][0]} | ${SSA_TERM[x][1]}`));
+  P("|= Service | Timeframe", ...[termFall&&"fall", on.lights&&"lights", on.snow&&"snow"].filter(Boolean).map(x=>`| ${ssaTerm(S,x)[0]} | ${ssaTerm(S,x)[1]}`));
   P("## Article 2: Services and Pricing");
   P("The Customer purchases only the services listed below at the prices stated. All prices include card processing; there is no separate card fee.");
-  if(on.fall){ P("### 2.1 Fall Cleanup"); P(`**Full Fall Cleanup.** ${SSA_FALL_DESC}`); P(lineTable(k.fl,"Fall Cleanup Total",k.fall)); }
+  if(on.fall){ P("### 2.1 Fall Cleanup"); P(S.zone==="westland" ? `**Westland Fall Cleanup.** ${SSA_FALL_WL_DESC}` : `**Full Fall Cleanup.** ${SSA_FALL_DESC}`); P(lineTable(k.fl,"Fall Cleanup Total",k.fall)); }
   if(on.lights){ const pk=SSA_PKG.find(x=>x.k===S.lights.pkg);
     P("### 2.2 Holiday Lighting"); P(`**${pk.n}.** ${pk.d}`); P(SSA_LIGHTS_NOTE); P(`**Light Color:** ${t(S.lights.color)}`); P(lineTable(k.ll,"Holiday Lighting Total",k.lights)); }
   if(on.snow){ P("### 2.3 Snow Removal"); P([...lineTable(k.sl,"Snow Removal Season Total",k.snow).split("\n"), `| Each visit after the sixteenth (Section 4.8) | ${money(pp)}`].join("\n")); }
@@ -1959,7 +1972,7 @@ function ssaText(c, S, k, agNo){
     if(A.svc && !(A.svc==="fall" ? termFall : on[A.svc])) continue;
     P(`## Article ${A.n}: ${A.title}`);
     if(A.n===7) P("The Customer shall:");
-    for(const [num,head,body] of A.items){
+    for(const [num,head,body] of (A.n===3 && S.zone==="westland" ? SSA_FALL_WL_ITEMS : A.items)){
       if(num==="4.8"){ P(`**4.8 Season Limit.** The season price covers up to sixteen (${SSA_PUSHES}) visits, counted under Section 4.2. Each visit after the sixteenth is charged to the payment method on file after that visit, at the per-visit rate in Section 2.3 (${money(pp)}).`); continue; }
       P(head ? `**${num} ${head}** ${body}` : `**${num}** ${body}`);
     }
@@ -2058,7 +2071,7 @@ function ssaSetup(){
     <div id="ss-real">
     <div class="sect">Services</div>
     <div class="svc svcbar fall">${ck("ss-fall",`<b>Fall Cleanup</b> <span class="meta" id="ss-fall-p"></span>`,S.fall.on)}
-      <div class="warnline" id="ss-fall-wl" hidden>Fall Cleanup is not offered in Westland.</div>
+      <div class="warnline" id="ss-fall-wl" hidden>Westland Fall Cleanup: one visit, no gutters, leaves hauled away. The Westland terms go into the agreement automatically.</div>
       <div id="ss-fall-box" class="ssabox">${SSA_FALL_ADJ.map(([k,n,p])=>ck("ss-f-"+k,`${n} +$${p}`,S.fall[k])).join("")}
         <div class="row">${ck("ss-f-big","Turf over 10,000 sq ft, walked price $",S.fall.big)}<input id="ss-f-bigp" type="number" inputmode="decimal" min="0" style="width:110px" value="${esc(S.fall.bigPrice)}"></div>
         ${nb("ss-f-nb",S.fall.nb)}${cp("f",S.fall,"Fall Cleanup")}</div></div>
@@ -2109,12 +2122,15 @@ function ssaSync(){
   S.test=g("ss-test").checked; g("ss-real").hidden=S.test; g("ss-test-wl").hidden=!S.test; g("ss-go").hidden=S.test;
   ["ss-zone","ss-ptype","ss-prop","ss-areas","ss-pre"].forEach(id=>{ g(id).parentElement.hidden=S.test; });
   if(S.test){ g("ss-now").textContent="$1"; g("ss-later-amt").textContent="A second $1 is charged later, from Charges to run."; g("ss-warn").hidden=true; return; }
-  const wl=S.zone==="westland", k=ssaCalc(S), show=S.lights.pkg==="showcase";
-  g("ss-fall-wl").hidden=!(wl && S.fall.on); g("ss-fall-box").hidden=!S.fall.on || wl;
+  const wl=S.zone==="westland", show=S.lights.pkg==="showcase";
+  if(wl){ S.fall.two=false; S.fall.gutters=false; }
+  const k=ssaCalc(S);
+  g("ss-fall-wl").hidden=!(wl && S.fall.on); g("ss-fall-box").hidden=!S.fall.on;
+  ["two","gutters"].forEach(x=>{ const el=g("ss-f-"+x); el.closest("label").hidden=wl; if(wl){ el.checked=false; S.fall[x]=false; } });
   g("ss-lights-box").hidden=!S.lights.on; g("ss-snow-box").hidden=!S.snow.on;
   g("ss-l-wl").hidden=!(wl && show); g("ss-la-two-row").hidden=show; g("ss-la-twoShow-row").hidden=!show;
   g("ss-nb-box").hidden=!((S.fall.on&&S.fall.nb)||(S.lights.on&&S.lights.nb)||(S.snow.on&&S.snow.nb));
-  g("ss-fall-p").textContent = wl ? "" : S.fall.on ? money(k.fall) : "$"+SSA_FALL[S.zone];
+  g("ss-fall-p").textContent = S.fall.on ? money(k.fall) : "$"+(wl?SSA_FALL_WL:SSA_FALL[S.zone]);
   g("ss-lights-p").textContent = S.lights.on&&S.lights.pkg ? money(k.lights) : ""; g("ss-snow-p").textContent = S.snow.on&&S.snow.lot ? money(k.snow) : "";
   g("ss-now").textContent = money(k.dueNow)||"$0";
   g("ss-later-amt").textContent = [S.lights.on&&S.lights.pkg ? `${money(k.dueInstall)} more is charged when the lights are installed.` : "", S.snow.on&&S.snow.lot ? `Snow visits after the sixteenth: ${money(ssaPerPush(S))} each, charged after the visit.` : ""].filter(Boolean).join(" ");
@@ -2126,13 +2142,12 @@ function ssaErrors(){
   if(S.test){ if(S.email && !/^\S+@\S+\.\S+$/.test(S.email)) e.push("a valid email"); return e; }
   if(!S.prop) e.push("service property");
   if(!S.fall.on && !S.lights.on && !S.snow.on) e.push("at least one service");
-  if(wl && S.fall.on) e.push("untick Fall Cleanup (not offered in Westland)");
   if(wl && S.lights.on && S.lights.pkg==="showcase") e.push("a lights package other than Showcase (Westland)");
   if(S.fall.on && S.fall.big && !(+S.fall.bigPrice>0)) e.push("the walked price for the large lawn");
   if(S.lights.on && !S.lights.pkg) e.push("lights package");
   if(S.lights.on && !S.lights.color) e.push("light color");
   if(S.snow.on && !S.snow.lot) e.push("snow lot type");
-  [["Fall Cleanup",S.fall,S.fall.on&&!wl],["Christmas Lights",S.lights,S.lights.on],["Snow Removal",S.snow,S.snow.on]].forEach(([n,x,on])=>{ if(!on||!x.cp) return;
+  [["Fall Cleanup",S.fall,S.fall.on],["Christmas Lights",S.lights,S.lights.on],["Snow Removal",S.snow,S.snow.on]].forEach(([n,x,on])=>{ if(!on||!x.cp) return;
     if(!ssaCpOn(x)) e.push(`the ${n} custom price`); if(!x.cpWhy) e.push(`a reason for the ${n} custom price`); else if(x.cpWhy==="Other" && !x.cpOther) e.push(`the other reason for the ${n} custom price`); });
   if(((S.fall.on&&S.fall.nb)||(S.lights.on&&S.lights.nb)||(S.snow.on&&S.snow.nb)) && (!S.neighborName||!S.neighborAddr)) e.push("the neighbor's name and address for the credit");
   if(S.email && !/^\S+@\S+\.\S+$/.test(S.email)) e.push("a valid email, or leave it empty");
@@ -2180,7 +2195,7 @@ async function ssaShow(){
 }
 // What the signed agreement stores about the services chosen. Shared by the iPad signing and the emailed link.
 function ssaDetails(S, k, agNo){
-  const fallOn=S.fall.on && S.zone!=="westland";
+  const fallOn=S.fall.on;
   const nbAny=(fallOn&&S.fall.nb)||(S.lights.on&&S.lights.nb)||(S.snow.on&&S.snow.nb);
   const details = { agreementNo:agNo, version:SSA_VERSION, zone:S.zone, propertyType:S.ptype, serviceProperty:S.prop, serviceAreas:S.areas, preExisting:S.pre, email:S.email, email2:S.email2||"",
     total:k.total, dueNow:k.dueNow, dueInstall:k.dueInstall };
@@ -2192,13 +2207,13 @@ function ssaDetails(S, k, agNo){
   if(S.snow.on) details.snow = { lines:k.sl, total:k.snow, lot:S.snow.lot, includedPushes:SSA_PUSHES, perPushAfter:ssaPerPush(S), customPrice:ssaCpDetail(S.snow,k.std.snow) };
   return details;
 }
-const ssaSummary = (S,k) => { const fallOn=S.fall.on && S.zone!=="westland"; return [fallOn&&"Fall Cleanup "+money(k.fall), S.lights.on&&"Christmas Lights "+money(k.lights), S.snow.on&&"Snow Removal "+money(k.snow)].filter(Boolean).join(" · "); };
-const ssaCovers = S => { const fallOn=S.fall.on && S.zone!=="westland", c={}; if(fallOn||ssaShowcaseFall(S)) c.fall=true; if(S.lights.on) c.lights=true; if(S.snow.on) c.snow=true; return c; };
+const ssaSummary = (S,k) => { const fallOn=S.fall.on; return [fallOn&&"Fall Cleanup "+money(k.fall), S.lights.on&&"Christmas Lights "+money(k.lights), S.snow.on&&"Snow Removal "+money(k.snow)].filter(Boolean).join(" · "); };
+const ssaCovers = S => { const fallOn=S.fall.on, c={}; if(fallOn||ssaShowcaseFall(S)) c.fall=true; if(S.lights.on) c.lights=true; if(S.snow.on) c.snow=true; return c; };
 // The client changes a signed agreement makes: services at the agreement price, Active status, emails, payment
 // method missing until recorded, and the charges on the payment schedule. cid is "{{CID}}" for an emailed link
 // (the signing service fills in the contract id when the customer signs).
 function ssaApply(c, id, S, k, agNo, now, cid){
-  const fallOn=S.fall.on && S.zone!=="westland", incFall=ssaShowcaseFall(S) && !fallOn, upd={};
+  const fallOn=S.fall.on, incFall=ssaShowcaseFall(S) && !fallOn, upd={};
   if(S.email && S.email!==(c.email||"")) upd["clients/"+id+"/email"]=S.email;
   if((S.email2||"")!==(c.email2||"")) upd["clients/"+id+"/email2"]=S.email2||null;
   if(!payOnFileOk(c)) upd["clients/"+id+"/payOnFile"] = { status:"missing", since:now };
@@ -2210,7 +2225,7 @@ function ssaApply(c, id, S, k, agNo, now, cid){
     const all = { ...(e?{}:{ type, createdAt:now, ...fresh }), ...fields, notes: e&&e[1].notes && !String(e[1].notes).includes(note) ? e[1].notes+"; "+note : note };
     for(const [f,v] of Object.entries(all)) upd[`clients/${id}/services/${sid}/${f}`]=v; };
   const noteOf = lines => lines.map(r=>r[0]).join(", ")+` (${agNo})`;
-  if(fallOn) put("fall", { package:"Two passes", price:k.fall }, { route:"Route 1", pass1:false, pass2:false }, noteOf(k.fl));
+  if(fallOn) put("fall", { package:S.zone==="westland"?"One visit, haul away":"Two passes", price:k.fall }, { route:"Route 1", pass1:false, pass2:false }, noteOf(k.fl));
   else if(incFall) put("fall", { package:"Two passes" }, { route:"Route 1", price:0, pass1:false, pass2:false }, `Included in the Showcase lights package (${agNo})`);
   if(S.lights.on) put("lights", { price:k.lights }, { install:"", installed:false, takedown:"", gutters:false }, S.lights.color+": "+noteOf(k.ll));
   if(S.snow.on) put("snow", { price:k.snow }, { crew:"", start:"2026-11-01", end:"2027-03-15" }, noteOf(k.sl));
@@ -2285,7 +2300,7 @@ async function ssaSend(){
     const noticeT = ssaNotice(X.agNo).split(CB).join("{{CANCEL_BY_LONG}}").split(L).join("{{SIGNED_LONG}}");
     const token = randToken(), svc=svcInfo();
     const link = `${SIGN_PAGE}?t=${token}&s=${svcDeploy(svc.url)}`;
-    const fallOn=S.fall.on && S.zone!=="westland";
+    const fallOn=S.fall.on;
     const lines = [fallOn&&["Fall Cleanup",k.fall], S.lights.on&&[`Christmas Lights (${S.lights.color})`,k.lights], S.snow.on&&["Snow Removal, season",k.snow]].filter(Boolean);
     const apply = Object.entries(ssaApply(c, id, S, k, X.agNo, now, "{{CID}}"));
     const req = { status:"queued", clientId:id, tplName:SSA_NAME, tplVersion:SSA_VERSION, agreementNo:X.agNo, amount:k.total, dueNow:k.dueNow, dueInstall:k.dueInstall,
