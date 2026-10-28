@@ -165,18 +165,16 @@ td strong{font-weight:650}
 .nd.left{padding:8px 10px;gap:1px}.nd.left span{font-size:10.5px;line-height:1.3}
 .layer{cursor:zoom-out}
 
-/* Presenter mode: the map alone, filling the screen, sized so every card fits. Future add-ons are hidden while presenting (Russel, October 22, 2026). Leave with the X in the top-left corner. On iPad and iPhone it does not use Safari full screen, so a swipe down cannot end it. */
+/* Presenter mode: the map alone, filling the screen, sized so every card fits. Future add-ons are hidden while presenting (Russel, October 22, 2026). Leave with the Escape key (Russel, October 27, 2026: no X). On iPad and iPhone it does not use Safari full screen, so a swipe down cannot end it; without a keyboard, reload the page. */
 .pbtn{font:inherit;font-weight:600;padding:8px 14px;border:1.5px solid var(--navy);border-radius:8px;background:transparent;color:var(--navy);cursor:pointer}
 .pbtn:focus-visible{outline:3px solid var(--amber);outline-offset:2px}
-.pfoot,.pexit{display:none}
+.pfoot{display:none}
 html.plock,html.plock body{overflow:hidden;overscroll-behavior:none}
 .present .vp{position:fixed;inset:0;z-index:9000;border:0;border-radius:0;min-height:0;height:100%!important;background:var(--surface)}
 .present .wscroll{overflow:hidden;bottom:24px}
 .present .layer{z-index:2}
 .present .pfoot{display:flex;position:absolute;left:0;right:0;bottom:0;height:24px;align-items:center;justify-content:center;flex-wrap:wrap;gap:4px 20px;font-size:12px;color:var(--muted);border-top:1px solid var(--line);background:var(--surface);z-index:1}
 .present .pfoot span{display:inline-flex;align-items:center;gap:6px}
-.present .pexit{display:flex;align-items:center;justify-content:center;position:absolute;top:calc(6px + env(safe-area-inset-top,0px));left:calc(6px + env(safe-area-inset-left,0px));width:34px;height:34px;padding:0;border:1px solid var(--line);border-radius:50%;background:var(--surface);color:var(--muted);font:400 21px/1 var(--sans);cursor:pointer;z-index:9999;opacity:.75;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
-.present .pexit:hover,.present .pexit:focus-visible{opacity:1;color:var(--ink)}
 .chip:disabled{opacity:.5;cursor:default;border-color:var(--line)}
 
 </style>
@@ -203,7 +201,7 @@ html.plock,html.plock body{overflow:hidden;overscroll-behavior:none}
 
 <figure>
 <div class="webbar"><nav class="crumbs" id="crumbs" aria-label="Zoom path"></nav><span class="hint">Click any card to zoom in. Click any empty space to zoom back out.</span></div>
-<div class="vp" id="vp"><div class="wscroll" id="wscroll"><div class="wsize" id="wsize"><div class="world" id="world" role="group" aria-label="System map: every card zooms in to its parts"></div></div></div><div class="pfoot" aria-hidden="true"><span><i class="sw"></i>Live</span><span><i class="sw part"></i>Works by hand</span><span><i class="sw plan"></i>Planned</span></div><button type="button" class="pexit" id="pexit" aria-label="Leave presenter mode" title="Leave presenter mode">&times;</button></div>
+<div class="vp" id="vp"><div class="wscroll" id="wscroll"><div class="wsize" id="wsize"><div class="world" id="world" role="group" aria-label="System map: every card zooms in to its parts"></div></div></div><div class="pfoot" aria-hidden="true"><span><i class="sw"></i>Live</span><span><i class="sw part"></i>Works by hand</span><span><i class="sw plan"></i>Planned</span></div></div>
 <figcaption>Every card zooms in. A number on a card is how many parts sit inside it; parts zoom in again, down to the single piece. Click any empty space to zoom back out. Moving dots show where data flows on its own (navy) or only when someone asks Claude (amber). Dotted lines are planned. The signing service is the first piece that runs on its own: it sends contract mail, retries failed sends every 5 minutes, refreshes the QuickBooks connection every day, charges cards at signing straight through the QuickBooks API, and bills approved work. A card number goes from the customer's browser to Intuit only. Claude is still the only bridge for everything else between Quo, the CRM and QuickBooks. Correct any status that is wrong.</figcaption>
 </figure>
 
@@ -808,7 +806,7 @@ document.addEventListener('keydown',function(e){if(e.key!=='Escape')return;if(st
 /* ---------- fit and scope toggle ---------- */
 function fit(){
   if(presenting){
-    var PW=vp.clientWidth,PH=vp.clientHeight-24,M=4,XT=44,ps=Math.max(.2,Math.min((PW-2*M)/1180,(PH-XT-M)/730));
+    var PW=vp.clientWidth,PH=vp.clientHeight-24,M=4,XT=0,ps=Math.max(.2,Math.min((PW-2*M)/1180,(PH-XT-M)/730));
     world.style.transform='scale('+ps+')';world.style.left=Math.round((PW-1180*ps)/2)+'px';world.style.top=Math.round(XT+(PH-XT-M-730*ps)/2)+'px';
     wsize.style.width=PW+'px';wsize.style.height=PH+'px';return;
   }
@@ -840,7 +838,6 @@ function present(on,cb){
   fit();requestAnimationFrame(fit);setTimeout(fit,350);
 }
 window.mbPresent=present;
-document.getElementById('pexit').addEventListener('click',function(e){e.preventDefault();present(false);});
 function fsChange(){if(!fsEl()&&presenting&&window.parent===window)present(false);setTimeout(fit,60);}
 document.addEventListener('fullscreenchange',fsChange);document.addEventListener('webkitfullscreenchange',fsChange);
 document.getElementById('b-present').addEventListener('click',function(){

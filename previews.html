@@ -168,7 +168,7 @@ function show(){
   if($("#present")) $("#present").onclick = () => window.mbPresentFrame();
   $("#reload").onclick = () => { const f = $("#fr"); f.src = x.src + (x.src.includes("?") ? "&" : "?") + "r=" + Date.now(); };
 }
-// Presenter mode for the map: the frame fills the screen; the map inside leaves with its X in the top-left corner.
+// Presenter mode for the map: the frame fills the screen; Escape leaves it (no X, Russel, October 27, 2026).
 // On iPad and iPhone it skips Safari full screen, whose swipe down ends the presentation (Russel, October 22, 2026).
 const TOUCH_APPLE = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
 function fsEl(){ return document.fullscreenElement || document.webkitFullscreenElement; }
@@ -183,6 +183,8 @@ window.mbPresentFrame = () => {
   if(rq) try{ const p = rq.call(f); if(p && p.catch) p.catch(()=>{}); }catch(e){}
   f.contentWindow.mbPresent(true, endPresent);
 };
+// Escape pressed while this page has focus (not the map inside the frame) still leaves presenter mode.
+document.addEventListener("keydown", e => { if(e.key==="Escape" && document.body.classList.contains("presenting")){ e.preventDefault(); try{ $("#fr").contentWindow.mbPresent(false); }catch(x){ endPresent(); } } });
 function fsChange(){ if(!fsEl() && document.body.classList.contains("presenting")){ try{ $("#fr").contentWindow.mbPresent(false); }catch(e){ endPresent(); } } }
 document.addEventListener("fullscreenchange", fsChange); document.addEventListener("webkitfullscreenchange", fsChange);
 function start(email){
