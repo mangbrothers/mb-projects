@@ -71,7 +71,7 @@
     <p class="tag">Full-Service Property Maintenance for Those Who Take Pride in Their Home.</p>
     <hr class="rule">
 
-    <div class="state" id="sLoading"><div class="spin" aria-hidden="true"></div><p class="lede" style="margin:0">Checking your sign-in</p></div>
+    <div class="state" id="sLoading"><div class="spin" aria-hidden="true"></div><p class="lede" style="margin:0" id="loadStep">Checking your sign-in</p><div id="stuck" hidden><p class="msg" id="stuckMsg" style="margin:12px 0 8px"></p><button class="gbtn" id="stuckRetry" type="button">Try again</button> <button class="ghost" id="stuckOut" type="button">Sign out</button></div></div>
 
     <div class="state" id="sOut">
       <p class="lede">Sign in with the Google account on the team list. You go straight to your page.</p>
@@ -159,13 +159,24 @@ $("#signin").onclick = async () => {
 const signOut = () => auth.signOut();
 $("#noOut").onclick = signOut; $("#adOut").onclick = signOut;
 
-show("sLoading");
+// Never spin forever (October 27, 2026): say which step is running, and after 15 seconds offer a way out.
+let step = "auth", stepAt = Date.now();
+const STEPS = { auth:"Checking your sign-in", list:"Signed in. Checking the team list" };
+function setStep(k){ step = k; stepAt = Date.now(); $("#loadStep").textContent = STEPS[k] || k; $("#stuck").hidden = true; }
+setInterval(() => { if(!$("#sLoading").classList.contains("on")) return; const secs = Math.round((Date.now() - stepAt) / 1000); if(secs < 15) return;
+  $("#stuckMsg").textContent = step === "auth" ? `Your browser has not finished the sign-in check after ${secs} seconds. Try again. If it keeps happening, close the browser completely and open the site again.`
+    : `The team list has not answered after ${secs} seconds. Check your connection and try again.`;
+  $("#stuck").hidden = false; }, 1000);
+$("#stuckRetry").onclick = () => location.reload();
+$("#stuckOut").onclick = () => { try { auth.signOut(); } catch(e){} setTimeout(() => location.reload(), 300); };
+const within = (p, ms, what) => Promise.race([p, new Promise((_, no) => setTimeout(() => no(new Error(what + " timed out")), ms))]);
+show("sLoading"); setStep("auth");
 auth.onAuthStateChanged(async user => {
   if(!user){ $("#signin").disabled = false; show("sOut"); return; }
   const email = (user.email || "").toLowerCase();
-  show("sLoading");
+  show("sLoading"); setStep("list");
   try {
-    let entry = await db.ref("allowed/" + emailKey(email)).once("value").then(s => s.val()).catch(() => null);
+    let entry = await within(db.ref("allowed/" + emailKey(email)).once("value"), 20000, "team list").then(s => s.val()).catch(e => { if(/timed out/.test(e.message)) throw e; return null; });
     let tier = entry && entry.tier || (email === ADMIN_EMAIL ? "admin" : "");
     // Walkers added before the tiers still sit on the old walkers list.
     if(!tier){ const w = await db.ref("walkers/" + emailKey(email)).once("value").then(s => s.val()).catch(() => null); if(w) tier = "walker"; }
