@@ -121,6 +121,7 @@ const money = v => { if(v===""||v==null||isNaN(+v)) return ""; const n=+v, neg=n
 const fmtStamp = ms => ms ? new Date(ms).toLocaleString("en-US",{timeZone:"America/Detroit",month:"long",day:"numeric",year:"numeric",hour:"numeric",minute:"2-digit"}) : "";
 const first = A => String(A.signerName||"").split(" ")[0];
 const contact = `Questions: call <a href="tel:+17344502400">${PHONE}</a> or email <a href="mailto:${EMAIL}">${EMAIL}</a>.`;
+const LAWN = A => A.tplName === "Lawn Service Agreement";
 const TEST_TEXT = "TEST AGREEMENT. No service will be performed. Charges are $1.00 and can be refunded.";
 let IS_TEST = false;
 const testBar = () => IS_TEST ? `<div class="testbar" role="note">${TEST_TEXT}</div>` : "";
@@ -266,7 +267,7 @@ function showPay(A){
       <button type="button" class="more" id="moreBtn" aria-expanded="false">More options ▾</button>
       <div id="more" hidden>
         <div class="opt"><h3>Bank account (ACH)</h3><p>Use a checking or savings account instead of a card. We email you a secure QuickBooks page to add it, so your bank details go straight to QuickBooks Payments.</p><button type="button" class="wide" data-choice="ach">Email me the bank account page</button></div>
-        <div class="opt"><h3>Prepay by check</h3><p>Pay the full ${esc(money(A.total))} by check instead of keeping a payment method on file. Your spot is not confirmed until we receive the check.</p><button type="button" class="wide" data-choice="check">Pay by check</button></div>
+        ${LAWN(A)?"":`<div class="opt"><h3>Prepay by check</h3><p>Pay the full ${esc(money(A.total))} by check instead of keeping a payment method on file. Your spot is not confirmed until we receive the check.</p><button type="button" class="wide" data-choice="check">Pay by check</button></div>`}
       </div></div>
     <p class="meta">${contact}</p>`;
   $("#moreBtn").onclick = () => { const m=$("#more"); m.hidden=!m.hidden; $("#moreBtn").setAttribute("aria-expanded",String(!m.hidden)); $("#moreBtn").textContent = m.hidden ? "More options ▾" : "Fewer options ▴"; };
@@ -356,7 +357,7 @@ function showPayLink(A){
       <button type="button" class="more" id="moreBtn" aria-expanded="false">More options ▾</button>
       <div id="more" hidden>
         <div class="opt"><h3>Bank account (ACH)</h3><p>Use a checking or savings account instead. We email you the same secure QuickBooks page.</p><button type="button" class="wide" data-choice="ach">Use my bank account</button></div>
-        <div class="opt"><h3>Prepay by check</h3><p>Pay the full ${esc(money(A.total))} by check instead of keeping a payment method on file. Your spot is not confirmed until we receive the check.</p><button type="button" class="wide" data-choice="check">Pay by check</button></div>
+        ${LAWN(A)?"":`<div class="opt"><h3>Prepay by check</h3><p>Pay the full ${esc(money(A.total))} by check instead of keeping a payment method on file. Your spot is not confirmed until we receive the check.</p><button type="button" class="wide" data-choice="check">Pay by check</button></div>`}
       </div>
       <div class="err" id="err" hidden></div></div>
     <p class="meta">${contact}</p>`;
