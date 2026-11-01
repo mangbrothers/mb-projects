@@ -2282,7 +2282,7 @@ async function lockSeasonal(){
 // Nothing is charged at signing: the first cut is charged after it is done (lawn billing system, Oct 2026).
 // The signing service files it like the Seasonal agreement (kind "seasonal"); the name tells the two apart.
 // Changing the text: raise LSA_VERSION.
-const LSA_VERSION = 2;
+const LSA_VERSION = 3;
 const LSA_SEASON = "2027";
 const LSA_START = "April 14, 2027";
 function lsaSigned(c){ return Object.entries(c.contracts||{}).filter(([,m])=>m.name===LSA_NAME&&m.status==="signed"&&!m.voided).sort((a,b)=>b[1].signedAt-a[1].signedAt)[0]||null; }
@@ -2308,10 +2308,10 @@ function lsaText(c, S, s, agNo){
   P("## Article 1: Parties, Property and Term");
   P("|= | Customer Information", `| Name | ${t(c.name)}`, `| Address | ${t(c.address)}`, `| Phone | ${t(c.phone)}`, `| Email | ${t(S.email)||"Not provided"}`, ...(S.email2?[`| Second email | ${t(S.email2)}`]:[]));
   P(`**1.1 Service Property.** The services will be performed at: ${t(S.prop)}`);
-  P(`**1.2 Term.** This Agreement covers the ${LSA_SEASON} lawn season. Service begins about ${LSA_START} and runs through the end of the growing season, as weather allows. The Company sets the first and last cut dates and tells the Customer when they are scheduled.`);
+  P(`**1.2 Term.** This Agreement covers the ${LSA_SEASON} lawn season. Service begins about ${LSA_START} and runs through the end of the growing season, as weather allows. The Company sets the service day and the first and last cut dates and tells the Customer when they are scheduled.`);
   P("**1.3 Reserved Spot.** The Customer’s spot on the route is reserved once this Agreement is signed and a payment method is on file.");
   P("## Article 2: Service and Price");
-  P("|= Service | Detail", "| Service | Lawn mowing", `| Frequency | ${freq}`, `| Service day | ${({Mon:"Monday",Tue:"Tuesday",Wed:"Wednesday",Thu:"Thursday",Fri:"Friday",Sat:"Saturday"})[s.day]||t(s.day)||"Set by the Company before the first cut"}`, `| Price per cut | ${price}`);
+  P("|= Service | Detail", "| Service | Lawn mowing", `| Frequency | ${freq}`, `| Price per cut | ${price}`);
   P("**2.1 Each Visit.** Each visit includes mowing, string trimming, edging along hard surfaces, and blowing clippings off the driveway, walks, and porch.");
   P(`**2.2 Price.** The price per cut above (${price}) holds for the entire ${LSA_SEASON} season. All prices include card processing; there is no separate card fee.`);
   P("**2.3 Added Work.** Mulch, landscaping, cleanups, and any other added work are quoted separately, billed when the work is done, and never added to the monthly lawn charge.");
@@ -2445,7 +2445,7 @@ async function lsaSend(){
     const textT = lsaText(c,S,s,X.agNo).split(L).join("{{SIGNED_LONG}}");
     const noticeT = ssaNotice(X.agNo).split(CB).join("{{CANCEL_BY_LONG}}").split(L).join("{{SIGNED_LONG}}");
     const token = randToken(), svc=svcInfo(), link = `${SIGN_PAGE}?t=${token}&s=${svcDeploy(svc.url)}`;
-    const summary = `Lawn, ${s.freq==="Biweekly"?"bi-weekly":"weekly"}${s.day?" on "+s.day:""}, ${money(price)} per cut`;
+    const summary = `Lawn, ${s.freq==="Biweekly"?"bi-weekly":"weekly"}, ${money(price)} per cut`;
     const apply = Object.entries(lsaApply(c, id, S, s, X.agNo, now));
     const req = { status:"queued", kind:"lawn", clientId:id, tplName:LSA_NAME, tplVersion:LSA_VERSION, agreementNo:X.agNo, amount:price, dueNow:0, dueInstall:0, perVisit:null, lines:[],
       serviceSummary:summary, details:{ kind:"lawn", agreementNo:X.agNo, version:LSA_VERSION, season:LSA_SEASON, sid:s.sid, frequency:s.freq||"Weekly", day:s.day||"", pricePerCut:price, serviceProperty:S.prop, email:S.email, email2:S.email2||"", total:price, dueNow:0, dueInstall:0 },
