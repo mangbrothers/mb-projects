@@ -2282,7 +2282,8 @@ async function lockSeasonal(){
 // Nothing is charged at signing: the first cut is charged after it is done (lawn billing system, Oct 2026).
 // The signing service files it like the Seasonal agreement (kind "seasonal"); the name tells the two apart.
 // Changing the text: raise LSA_VERSION.
-const LSA_VERSION = 3;
+const LSA_VERSION = 4;
+const LSA_CLEANUP_MAX = 200; // first-cut cleanup cap; internal rate $50 an hour ($25 labor, $25 everything else), never printed
 const LSA_SEASON = "2027";
 const LSA_START = "April 14, 2027";
 function lsaSigned(c){ return Object.entries(c.contracts||{}).filter(([,m])=>m.name===LSA_NAME&&m.status==="signed"&&!m.voided).sort((a,b)=>b[1].signedAt-a[1].signedAt)[0]||null; }
@@ -2315,6 +2316,7 @@ function lsaText(c, S, s, agNo){
   P("**2.1 Each Visit.** Each visit includes mowing, string trimming, edging along hard surfaces, and blowing clippings off the driveway, walks, and porch.");
   P(`**2.2 Price.** The price per cut above (${price}) holds for the entire ${LSA_SEASON} season. All prices include card processing; there is no separate card fee.`);
   P("**2.3 Added Work.** Mulch, landscaping, cleanups, and any other added work are quoted separately, billed when the work is done, and never added to the monthly lawn charge.");
+  P(`**2.4 First-Cut Cleanup.** If the lawn needs extra work before the first cut of the season, such as overgrowth, leaves, sticks, or debris left from winter, the Company may charge a one-time cleanup fee with the first cut, at its discretion, of no more than $${LSA_CLEANUP_MAX}. The Company sends photos of the condition with the receipt for that charge. This fee does not apply to a Customer who had lawn service with the Company in the previous season.`);
   P("## Article 3: Weather and Visits");
   P("**3.1 Every Week.** Every scheduled week gets a visit, and every visit is billed.");
   P("**3.2 Rain.** A visit missed because of rain is made up by the end of that weekend and is billed as normal.");
@@ -2322,16 +2324,16 @@ function lsaText(c, S, s, agNo){
   P("**3.4 One Rule for Every Lawn.** The Company does not pause or adjust service for individual watering, shade, or growth conditions.");
   P("## Article 4: Charges");
   P("**4.1 At Signing.** The Company keeps a payment method on file. Nothing is charged at signing.");
-  P("**4.2 First Month.** The first cut is charged after it is completed. On that same day, the Company charges for the remaining scheduled cuts in that month.");
+  P("**4.2 First Month.** The first cut is charged after it is completed, together with any cleanup fee under Section 2.4. On that same day, the Company charges for the remaining scheduled cuts in that month.");
   P("**4.3 Each Month After.** On the 1st of each month after that, the Company charges the price per cut times the number of scheduled service days in that month. Some months have five service weeks, so some monthly charges are higher than others.");
-  P("|= Payment Summary | Amount", "|+ Charged at signing | $0", `| After the first cut | ${price}, plus that month’s remaining scheduled cuts`, `| The 1st of each month after | ${price} for each scheduled service day that month`);
+  P("|= Payment Summary | Amount", "|+ Charged at signing | $0", `| After the first cut | ${price}, plus that month’s remaining scheduled cuts`, `| First-cut cleanup, only if needed (Section 2.4) | Up to $${LSA_CLEANUP_MAX}, with the first cut`, `| The 1st of each month after | ${price} for each scheduled service day that month`);
   P("**4.4 Receipts.** The Company emails a receipt for every charge to the email address(es) in Article 1. The Company does not send notice before a charge; the receipt is the Customer’s record. Charges appear on statements as Mangiapane Brothers.");
   P("## Article 5: Skipped Visits and Credits");
   P("**5.1 Credits.** Credits are issued in only two cases, and each is applied to the next month’s charge: (a) the Company misses the scheduled week and cannot make it up by Sunday of that week; or (b) the Customer asks to skip a visit, for any reason, at least 48 hours before the scheduled service day. A skip requested with less notice is not credited.");
   P("**5.2 Bi-weekly Service.** A Customer who skips two visits in the same calendar month is moved to bi-weekly service at the Company’s bi-weekly price per cut for the Property. The Company confirms that price in writing before the change.");
   P("## Article 6: Payment Method and Authorization");
   P("**6.1 Payment Method on File.** The Customer shall keep a valid credit or debit card on file with the Company for the length of this Agreement. With the Company’s approval, the Customer may instead keep a bank account on file for electronic (ACH) payment. Payment information is stored by the Company’s payment processor, QuickBooks Payments (Intuit Inc.). The Company keeps only the card brand and last four digits.");
-  P("**6.2 Authorization to Charge.** By signing this Agreement, the Customer authorizes Mangiapane Brothers LLC to charge the payment method on file, without a separate approval each time, for: (a) each charge under Article 4 when it comes due; and (b) any additional service the Customer requests in writing (text or email is acceptable) at the price agreed for it. This authorization remains in effect until this Agreement ends and every amount owed under it has been paid. The Customer may replace the payment method on file at any time.");
+  P("**6.2 Authorization to Charge.** By signing this Agreement, the Customer authorizes Mangiapane Brothers LLC to charge the payment method on file, without a separate approval each time, for: (a) each charge under Article 4 when it comes due; (b) any first-cut cleanup fee under Section 2.4; and (c) any additional service the Customer requests in writing (text or email is acceptable) at the price agreed for it. This authorization remains in effect until this Agreement ends and every amount owed under it has been paid. The Customer may replace the payment method on file at any time.");
   P("**6.3 Declined Payments.** If a charge to the payment method on file is declined or fails for any reason, including an expired card or insufficient funds, the amount is past due as of that day. The Company will notify the Customer, and the Customer shall pay the amount or provide a working payment method. While any amount is past due, the Company may retry the charge and suspend service. Suspension does not reduce the amount owed.");
   P("**6.4 Reversed Payments.** If a payment is reversed, charged back, or returned after the Company has performed the service it paid for, the amount remains due, and the Customer shall also pay any fees the Company is charged for the reversal.");
   P("**6.5 Billing Disputes.** The Customer must dispute any charge in writing (text or email is acceptable) within 30 days of the receipt for it. Undisputed amounts remain due when payable.");
