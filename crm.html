@@ -527,11 +527,10 @@ const SERVICE_TYPES = {
     {k:"day",l:"Day",t:"select",o:["",...DAYS]},
     {k:"freq",l:"Frequency",t:"select",o:["Weekly","Biweekly"]},
     {k:"price",l:"Price per cut",t:"money"},
-    {k:"comm",l:"Communication",t:"select",o:["","Limited"],lb:{"":"Full","Limited":"Limited"}},
     {k:"season",l:"Season",t:"select",o:["On","Off"]},
     {k:"notes",l:"Public notes (crew and managers see these)",t:"note",w:3},
     {k:"privateNotes",l:"Private notes (admins only)",t:"note",w:3,ph:"Prices, billing, job history. Only admins see this."} ],
-    summary:s=>[s.day, s.freq, money(s.price), s.comm==="Limited"?"limited contact":"", s.season==="Off"?"off season":""].filter(Boolean).join(" · ") },
+    summary:s=>[s.day, s.freq, money(s.price), s.season==="Off"?"off season":""].filter(Boolean).join(" · ") },
   fall: { label:"Fall Cleanup", fields:[
     {k:"package",l:"Package",t:"select",o:["Two passes","One pass"]},
     {k:"route",l:"Route",t:"select",o:["Route 1","Route 2","Route 3"]},
@@ -2279,11 +2278,11 @@ async function lockSeasonal(){
 }
 
 // ---------- Lawn Service Agreement: the lawn contract, emailed on the same signing system ----------
-// The admin picks the Lawn service and the communication plan; the customer reads, types a name, and adds a card.
+// The admin picks the Lawn service; the customer reads, types a name, and adds a card.
 // Nothing is charged at signing: the first cut is charged after it is done (lawn billing system, Oct 2026).
 // The signing service files it like the Seasonal agreement (kind "seasonal"); the name tells the two apart.
 // Changing the text: raise LSA_VERSION.
-const LSA_VERSION = 1;
+const LSA_VERSION = 2;
 const LSA_SEASON = "2027";
 const LSA_START = "April 14, 2027";
 function lsaSigned(c){ return Object.entries(c.contracts||{}).filter(([,m])=>m.name===LSA_NAME&&m.status==="signed"&&!m.voided).sort((a,b)=>b[1].signedAt-a[1].signedAt)[0]||null; }
@@ -2292,16 +2291,15 @@ const lsaReq = c => c.signReq && c.signReq.kind==="lawn" ? c.signReq : null;
 function lsaRowHtml(c, dirty){
   const sg=lsaSigned(c), has=svcList(c).some(s=>s.type==="lawn"), r=lsaReq(c);
   if(!sg && !has) return "";
-  return `<div class="ctr"><div class="t"><b>${LSA_NAME}</b><div class="meta">${sg ? `Signed for the ${LSA_SEASON} lawn season${sg[1].agreementNo?" ("+esc(sg[1].agreementNo)+")":""}.` : `Lawn mowing for the ${LSA_SEASON} season at the Lawn service price per cut. You choose the communication plan; the customer only signs and adds a card.`}</div></div>
+  return `<div class="ctr"><div class="t"><b>${LSA_NAME}</b><div class="meta">${sg ? `Signed for the ${LSA_SEASON} lawn season${sg[1].agreementNo?" ("+esc(sg[1].agreementNo)+")":""}.` : `Lawn mowing for the ${LSA_SEASON} season at the Lawn service price per cut. The customer only signs and adds a card.`}</div></div>
     ${sg?`<span class="pill signed">Signed ${fmtDate(new Date(sg[1].signedAt).toLocaleDateString("en-CA",{timeZone:TZ}))}</span><button type="button" class="small" data-view-ctr="${sg[0]}">View</button>`:`<span class="pill unsigned">Not signed</span>`}
     ${!sg&&r&&OPEN_REQ.includes(r.status)?`<span class="pill open" title="${esc((r.to||[]).join(", "))}">${esc(reqStatusText(r,c))}</span>`:""}
     <button type="button" class="small ${sg?"":"primary"}" data-lsa="1" ${dirty?"disabled":""}>${sg?"New agreement":"Set up and email"}</button></div>`;
 }
 function lsaService(c, sid){ const l=svcList(c).filter(s=>s.type==="lawn"); return l.find(s=>s.sid===sid) || l.find(s=>s.season!=="Off") || l[0] || null; }
-const lsaComm = v => v==="Limited" ? "Limited" : "Full";
 function lsaText(c, S, s, agNo){
   const t = v => String(v||"").replace(/[|\r\n]+/g," ").trim();
-  const price = money(s.price), freq = s.freq==="Biweekly" ? "Bi-weekly" : "Weekly", full = S.comm!=="Limited";
+  const price = money(s.price), freq = s.freq==="Biweekly" ? "Bi-weekly" : "Weekly";
   const o=[]; const P = (...x) => o.push(x.join("\n"));
   P("# LAWN SERVICE AGREEMENT");
   P(`${LSA_SEASON} Lawn Season`);
@@ -2313,7 +2311,7 @@ function lsaText(c, S, s, agNo){
   P(`**1.2 Term.** This Agreement covers the ${LSA_SEASON} lawn season. Service begins about ${LSA_START} and runs through the end of the growing season, as weather allows. The Company sets the first and last cut dates and tells the Customer when they are scheduled.`);
   P("**1.3 Reserved Spot.** The Customer’s spot on the route is reserved once this Agreement is signed and a payment method is on file.");
   P("## Article 2: Service and Price");
-  P("|= Service | Detail", "| Service | Lawn mowing", `| Frequency | ${freq}`, `| Service day | ${({Mon:"Monday",Tue:"Tuesday",Wed:"Wednesday",Thu:"Thursday",Fri:"Friday",Sat:"Saturday"})[s.day]||t(s.day)||"Set by the Company before the first cut"}`, `| Communication plan | ${full?"Full":"Limited"} (Article 4)`, `| Price per cut | ${price}`);
+  P("|= Service | Detail", "| Service | Lawn mowing", `| Frequency | ${freq}`, `| Service day | ${({Mon:"Monday",Tue:"Tuesday",Wed:"Wednesday",Thu:"Thursday",Fri:"Friday",Sat:"Saturday"})[s.day]||t(s.day)||"Set by the Company before the first cut"}`, `| Price per cut | ${price}`);
   P("**2.1 Each Visit.** Each visit includes mowing, string trimming, edging along hard surfaces, and blowing clippings off the driveway, walks, and porch.");
   P(`**2.2 Price.** The price per cut above (${price}) holds for the entire ${LSA_SEASON} season. All prices include card processing; there is no separate card fee.`);
   P("**2.3 Added Work.** Mulch, landscaping, cleanups, and any other added work are quoted separately, billed when the work is done, and never added to the monthly lawn charge.");
@@ -2322,65 +2320,60 @@ function lsaText(c, S, s, agNo){
   P("**3.2 Rain.** A visit missed because of rain is made up by the end of that weekend and is billed as normal.");
   P("**3.3 Dry Weather.** Service continues during dry weather. The Company mows at a higher setting, trims, edges, and blows, and the visit is billed as normal.");
   P("**3.4 One Rule for Every Lawn.** The Company does not pause or adjust service for individual watering, shade, or growth conditions.");
-  P("## Article 4: Communication");
-  P(`**4.1 Communication Plan.** The Customer has chosen the **${full?"Full":"Limited"}** communication plan. The service itself is the same under either plan.`);
-  P(full ? "**4.2 Full Communication.** The Company sends a text before each visit, a text with photos after each visit, and a message whenever a visit is rescheduled."
-         : "**4.2 Limited Communication.** The Company performs the service and contacts the Customer only when it needs something from the Customer or when something out of the ordinary comes up.");
-  P(`**4.3 Changing Plans.** The Customer may switch to the ${full?"Limited":"Full"} plan at any time by text or email.`);
-  P("## Article 5: Charges");
-  P("**5.1 At Signing.** The Company keeps a payment method on file. Nothing is charged at signing.");
-  P("**5.2 First Month.** The first cut is charged after it is completed. On that same day, the Company charges for the remaining scheduled cuts in that month.");
-  P("**5.3 Each Month After.** On the 1st of each month after that, the Company charges the price per cut times the number of scheduled service days in that month. Some months have five service weeks, so some monthly charges are higher than others.");
+  P("## Article 4: Charges");
+  P("**4.1 At Signing.** The Company keeps a payment method on file. Nothing is charged at signing.");
+  P("**4.2 First Month.** The first cut is charged after it is completed. On that same day, the Company charges for the remaining scheduled cuts in that month.");
+  P("**4.3 Each Month After.** On the 1st of each month after that, the Company charges the price per cut times the number of scheduled service days in that month. Some months have five service weeks, so some monthly charges are higher than others.");
   P("|= Payment Summary | Amount", "|+ Charged at signing | $0", `| After the first cut | ${price}, plus that month’s remaining scheduled cuts`, `| The 1st of each month after | ${price} for each scheduled service day that month`);
-  P("**5.4 Receipts.** The Company emails a receipt for every charge to the email address(es) in Article 1. The Company does not send notice before a charge; the receipt is the Customer’s record. Charges appear on statements as Mangiapane Brothers.");
-  P("## Article 6: Skipped Visits and Credits");
-  P("**6.1 Credits.** Credits are issued in only two cases, and each is applied to the next month’s charge: (a) the Company misses the scheduled week and cannot make it up by Sunday of that week; or (b) the Customer asks to skip a visit, for any reason, at least 48 hours before the scheduled service day. A skip requested with less notice is not credited.");
-  P("**6.2 Bi-weekly Service.** A Customer who skips two visits in the same calendar month is moved to bi-weekly service at the Company’s bi-weekly price per cut for the Property. The Company confirms that price in writing before the change.");
-  P("## Article 7: Payment Method and Authorization");
-  P("**7.1 Payment Method on File.** The Customer shall keep a valid credit or debit card on file with the Company for the length of this Agreement. With the Company’s approval, the Customer may instead keep a bank account on file for electronic (ACH) payment. Payment information is stored by the Company’s payment processor, QuickBooks Payments (Intuit Inc.). The Company keeps only the card brand and last four digits.");
-  P("**7.2 Authorization to Charge.** By signing this Agreement, the Customer authorizes Mangiapane Brothers LLC to charge the payment method on file, without a separate approval each time, for: (a) each charge under Article 5 when it comes due; and (b) any additional service the Customer requests in writing (text or email is acceptable) at the price agreed for it. This authorization remains in effect until this Agreement ends and every amount owed under it has been paid. The Customer may replace the payment method on file at any time.");
-  P("**7.3 Declined Payments.** If a charge to the payment method on file is declined or fails for any reason, including an expired card or insufficient funds, the amount is past due as of that day. The Company will notify the Customer, and the Customer shall pay the amount or provide a working payment method. While any amount is past due, the Company may retry the charge and suspend service. Suspension does not reduce the amount owed.");
-  P("**7.4 Reversed Payments.** If a payment is reversed, charged back, or returned after the Company has performed the service it paid for, the amount remains due, and the Customer shall also pay any fees the Company is charged for the reversal.");
-  P("**7.5 Billing Disputes.** The Customer must dispute any charge in writing (text or email is acceptable) within 30 days of the receipt for it. Undisputed amounts remain due when payable.");
-  P("**7.6 Collection Costs.** To the extent permitted by Michigan law, the Customer shall pay reasonable collection costs and attorney fees incurred by the Company to collect any unpaid balance.");
-  P("## Article 8: Cancellation and Termination");
-  P("**8.1 By Customer.** The Customer may cancel this Agreement at any time, for any reason, by text, email, or phone call to the Company. There is no cancellation fee.");
-  P("**8.2 Refund of Prepaid Cuts.** Any cuts that were paid for but not performed are refunded to the original payment method within 10 business days.");
-  P("**8.3 Customer’s Three-Day Right to Cancel.** The Customer may also cancel this Agreement, without any penalty or obligation, at any time before midnight of the third business day after the date of this Agreement, by written notice to the Company. Every payment made under this Agreement is then refunded to the original payment method within 10 business days after the Company receives the notice. See the Notice of Cancellation at the end of this Agreement.");
-  P("**8.4 By Company.** The Company may terminate this Agreement on 3 days’ written notice, or immediately for non-payment, unsafe conditions, or abusive conduct toward Company personnel. The Company will refund prepaid amounts for cuts not performed, to the original payment method.");
-  P("**8.5 No Automatic Renewal.** This Agreement does not renew automatically. The Company may offer renewal in writing before the next season.");
-  P("## Article 9: Customer Obligations");
+  P("**4.4 Receipts.** The Company emails a receipt for every charge to the email address(es) in Article 1. The Company does not send notice before a charge; the receipt is the Customer’s record. Charges appear on statements as Mangiapane Brothers.");
+  P("## Article 5: Skipped Visits and Credits");
+  P("**5.1 Credits.** Credits are issued in only two cases, and each is applied to the next month’s charge: (a) the Company misses the scheduled week and cannot make it up by Sunday of that week; or (b) the Customer asks to skip a visit, for any reason, at least 48 hours before the scheduled service day. A skip requested with less notice is not credited.");
+  P("**5.2 Bi-weekly Service.** A Customer who skips two visits in the same calendar month is moved to bi-weekly service at the Company’s bi-weekly price per cut for the Property. The Company confirms that price in writing before the change.");
+  P("## Article 6: Payment Method and Authorization");
+  P("**6.1 Payment Method on File.** The Customer shall keep a valid credit or debit card on file with the Company for the length of this Agreement. With the Company’s approval, the Customer may instead keep a bank account on file for electronic (ACH) payment. Payment information is stored by the Company’s payment processor, QuickBooks Payments (Intuit Inc.). The Company keeps only the card brand and last four digits.");
+  P("**6.2 Authorization to Charge.** By signing this Agreement, the Customer authorizes Mangiapane Brothers LLC to charge the payment method on file, without a separate approval each time, for: (a) each charge under Article 4 when it comes due; and (b) any additional service the Customer requests in writing (text or email is acceptable) at the price agreed for it. This authorization remains in effect until this Agreement ends and every amount owed under it has been paid. The Customer may replace the payment method on file at any time.");
+  P("**6.3 Declined Payments.** If a charge to the payment method on file is declined or fails for any reason, including an expired card or insufficient funds, the amount is past due as of that day. The Company will notify the Customer, and the Customer shall pay the amount or provide a working payment method. While any amount is past due, the Company may retry the charge and suspend service. Suspension does not reduce the amount owed.");
+  P("**6.4 Reversed Payments.** If a payment is reversed, charged back, or returned after the Company has performed the service it paid for, the amount remains due, and the Customer shall also pay any fees the Company is charged for the reversal.");
+  P("**6.5 Billing Disputes.** The Customer must dispute any charge in writing (text or email is acceptable) within 30 days of the receipt for it. Undisputed amounts remain due when payable.");
+  P("**6.6 Collection Costs.** To the extent permitted by Michigan law, the Customer shall pay reasonable collection costs and attorney fees incurred by the Company to collect any unpaid balance.");
+  P("## Article 7: Cancellation and Termination");
+  P("**7.1 By Customer.** The Customer may cancel this Agreement at any time, for any reason, by text, email, or phone call to the Company. There is no cancellation fee.");
+  P("**7.2 Refund of Prepaid Cuts.** Any cuts that were paid for but not performed are refunded to the original payment method within 10 business days.");
+  P("**7.3 Customer’s Three-Day Right to Cancel.** The Customer may also cancel this Agreement, without any penalty or obligation, at any time before midnight of the third business day after the date of this Agreement, by written notice to the Company. Every payment made under this Agreement is then refunded to the original payment method within 10 business days after the Company receives the notice. See the Notice of Cancellation at the end of this Agreement.");
+  P("**7.4 By Company.** The Company may terminate this Agreement on 3 days’ written notice, or immediately for non-payment, unsafe conditions, or abusive conduct toward Company personnel. The Company will refund prepaid amounts for cuts not performed, to the original payment method.");
+  P("**7.5 No Automatic Renewal.** This Agreement does not renew automatically. The Company may offer renewal in writing before the next season.");
+  P("## Article 8: Customer Obligations");
   P("The Customer shall:");
-  P("**9.1** Provide access to all service areas, including unlocked gates.");
-  P("**9.2** Keep the lawn clear of vehicles, toys, hoses, pet waste, and other objects. Blocked areas may be skipped or serviced around and will still be charged.");
-  P("**9.3** Identify or mark concealed or fragile items before the first cut, including sprinkler heads, landscape lighting, buried cables, invisible pet fencing, and decorative stones.");
-  P("**9.4** Keep pets secured during service visits.");
-  P("**9.5** Report any problem with a cut, or any damage, in writing (text or email is acceptable) within forty-eight (48) hours of the visit, with photographs when possible. Late claims may be denied.");
-  P("## Article 10: Insurance and Liability");
-  P("**10.1 Insurance.** The Company maintains general liability insurance related to the services provided.");
-  P("**10.2 Repair of Damage.** If the Company’s negligence damages the Property, the Company will, at its option, repair the damage or pay the reasonable cost of repair, provided the Customer gives timely notice under Section 9.5.");
-  P("**10.3 Exclusions.** The Company is not responsible for: damage to concealed, unmarked or undisclosed items; pre-existing conditions; ordinary wear to turf from regular mowing; or lawn conditions caused by weather, drought, insects, disease, or watering.");
-  P(`**10.4 Limitation of Liability.** Except for gross negligence or willful misconduct, the Company’s total liability under this Agreement shall not exceed the amount paid by the Customer for the ${LSA_SEASON} season. Neither Party is liable for indirect, incidental or consequential damages.`);
-  P("**10.5 Force Majeure.** The Company is not in breach for delays or failures caused by severe weather, equipment failure, illness, road closures or other events beyond its reasonable control. Service will resume as soon as reasonably practicable.");
-  P("## Article 11: General Provisions");
-  P("**11.1 Independent Contractor.** The Company is an independent contractor and controls the means, methods, equipment, and personnel used to perform the services, and may use subcontractors.");
-  P("**11.2 Photographs.** The Company may photograph the Property before and after service. Photos may be sent to the Customer and are kept as the Company’s service records.");
-  P("**11.3 Entire Agreement; Amendments.** This Agreement is the entire agreement of the Parties and supersedes all prior discussions. Amendments must be in writing and signed or confirmed by email by both Parties.");
-  P("**11.4 Governing Law; Venue.** This Agreement is governed by the laws of the State of Michigan. Any dispute shall be brought in the courts of Wayne County, Michigan, including small claims court where eligible.");
-  P("**11.5 Severability.** If any provision is held unenforceable, the remaining provisions remain in full force and effect.");
-  P("**11.6 Electronic Signatures and Records.** This Agreement may be signed by electronic signature, which is deemed an original. The Customer agrees to receive this Agreement, the Notice of Cancellation, receipts, and other notices electronically at the email address(es) in Article 1, and may ask for a paper copy at any time at no charge.");
+  P("**8.1** Provide access to all service areas, including unlocked gates.");
+  P("**8.2** Keep the lawn clear of vehicles, toys, hoses, pet waste, and other objects. Blocked areas may be skipped or serviced around and will still be charged.");
+  P("**8.3** Identify or mark concealed or fragile items before the first cut, including sprinkler heads, landscape lighting, buried cables, invisible pet fencing, and decorative stones.");
+  P("**8.4** Keep pets secured during service visits.");
+  P("**8.5** Report any problem with a cut, or any damage, in writing (text or email is acceptable) within forty-eight (48) hours of the visit, with photographs when possible. Late claims may be denied.");
+  P("## Article 9: Insurance and Liability");
+  P("**9.1 Insurance.** The Company maintains general liability insurance related to the services provided.");
+  P("**9.2 Repair of Damage.** If the Company’s negligence damages the Property, the Company will, at its option, repair the damage or pay the reasonable cost of repair, provided the Customer gives timely notice under Section 8.5.");
+  P("**9.3 Exclusions.** The Company is not responsible for: damage to concealed, unmarked or undisclosed items; pre-existing conditions; ordinary wear to turf from regular mowing; or lawn conditions caused by weather, drought, insects, disease, or watering.");
+  P(`**9.4 Limitation of Liability.** Except for gross negligence or willful misconduct, the Company’s total liability under this Agreement shall not exceed the amount paid by the Customer for the ${LSA_SEASON} season. Neither Party is liable for indirect, incidental or consequential damages.`);
+  P("**9.5 Force Majeure.** The Company is not in breach for delays or failures caused by severe weather, equipment failure, illness, road closures or other events beyond its reasonable control. Service will resume as soon as reasonably practicable.");
+  P("## Article 10: General Provisions");
+  P("**10.1 Independent Contractor.** The Company is an independent contractor and controls the means, methods, equipment, and personnel used to perform the services, and may use subcontractors.");
+  P("**10.2 Photographs.** The Company may photograph the Property before and after service. Photos may be sent to the Customer and are kept as the Company’s service records.");
+  P("**10.3 Entire Agreement; Amendments.** This Agreement is the entire agreement of the Parties and supersedes all prior discussions. Amendments must be in writing and signed or confirmed by email by both Parties.");
+  P("**10.4 Governing Law; Venue.** This Agreement is governed by the laws of the State of Michigan. Any dispute shall be brought in the courts of Wayne County, Michigan, including small claims court where eligible.");
+  P("**10.5 Severability.** If any provision is held unenforceable, the remaining provisions remain in full force and effect.");
+  P("**10.6 Electronic Signatures and Records.** This Agreement may be signed by electronic signature, which is deemed an original. The Customer agrees to receive this Agreement, the Notice of Cancellation, receipts, and other notices electronically at the email address(es) in Article 1, and may ask for a paper copy at any time at no charge.");
   P("## Signatures");
   P("IN WITNESS WHEREOF, the Parties have executed this Agreement as of the dates below.");
   P(`**${SSA_CANCEL_STATEMENT}**`);
   P("**If you cancel within that period, all payments you have made will be refunded in full within 10 business days after the Company receives your cancellation notice.**");
   return o.join("\n\n");
 }
-// Setup: the admin chooses the Lawn service and the communication plan. Full is the default; the radio allows one.
+// Setup: the admin confirms the emails and the Lawn service; the customer only signs and adds a card.
 function openLawn(clientId){
   const c=clients[clientId]; if(!c) return toast("Save the client first.");
   if($("#clientDlg").open && openId===clientId && dialogDirty()) return toast("Save the client first, then open the agreement.");
   const s=lsaService(c); if(!s) return toast("Add a Lawn service with its price per cut first.");
-  const S={ sid:s.sid, email:c.email||"", email2:c.email2||"", prop:c.address||"", comm:lsaComm(s.comm) };
+  const S={ sid:s.sid, email:c.email||"", email2:c.email2||"", prop:c.address||"" };
   signCtx={ mode:"lsa-setup", clientId, S };
   lsaSetup();
   if(!$("#signDlg").open) $("#signDlg").showModal();
@@ -2389,7 +2382,6 @@ function openLawn(clientId){
 function lsaSetup(){
   const X=signCtx, S=X.S, c=clients[X.clientId]; X.mode="lsa-setup"; ssaBarOff();
   const lawns=svcList(c).filter(x=>x.type==="lawn"), other=c.signReq && c.signReq.kind!=="lawn" && OPEN_REQ.includes(c.signReq.status);
-  const rb=(v,label)=>`<label class="row ssack"><input type="radio" name="ls-comm" value="${v}" ${S.comm===v?"checked":""}> <span>${label}</span></label>`;
   $("#signTitle").textContent = LSA_NAME+": setup";
   $("#signBody").innerHTML = `<div class="signpanel" id="lsaForm" style="margin-top:0">
     <h4>${esc(c.name)}</h4>
@@ -2402,9 +2394,6 @@ function lsaSetup(){
     </div>
     <div class="sect">Service</div>
     <div class="svc svcbar lawn"><b id="ls-sum"></b><div class="meta">Frequency, day and price per cut come from the client's Lawn service. Change them there, save, and open this again.</div></div>
-    <div class="sect">Communication plan (4.1)</div>
-    ${rb("Full","<b>Full</b>: a text before each visit, a text with photos after, and messages when a visit is rescheduled.")}
-    ${rb("Limited","<b>Limited</b>: the crew takes care of the service and reaches out only when it needs something or something is out of the ordinary.")}
     <div class="pstotal"><span>Charged today</span><b>$0</b></div>
     <div class="meta">The card goes on file at signing. The first cut is charged after it is done, then each month on the 1st.</div>
     ${other?`<div class="warnline">This client also has an open ${esc(SSA_NAME)} link. That link keeps working; its live status here is replaced by this one.</div>`:""}
@@ -2420,7 +2409,6 @@ function lsaSync(){
   const X=signCtx; if(!X || X.mode!=="lsa-setup") return; const S=X.S, g=id=>document.getElementById(id), c=clients[X.clientId];
   S.email=g("ls-email").value.trim(); S.email2=g("ls-email2").value.trim(); S.prop=g("ls-prop").value.trim();
   if(g("ls-sid")) S.sid=g("ls-sid").value;
-  const r=document.querySelector('input[name="ls-comm"]:checked'); S.comm = r ? r.value : "Full";
   const s=lsaService(c, S.sid); g("ls-sum").textContent = s ? `Lawn: ${SERVICE_TYPES.lawn.summary(s)||"no details yet"}` : "No Lawn service";
 }
 function lsaErrors(){
@@ -2431,13 +2419,12 @@ function lsaErrors(){
   if(!s) e.push("a Lawn service on the client"); else if(!(+s.price>0)) e.push("the price per cut on the Lawn service");
   return e;
 }
-// What signing changes on the client: emails, the plan on the Lawn service, payment method missing until the card is saved.
+// What signing changes on the client: emails, a note on the Lawn service, payment method missing until the card is saved.
 function lsaApply(c, id, S, s, agNo, now){
   const upd={};
   if(S.email && S.email!==(c.email||"")) upd["clients/"+id+"/email"]=S.email;
   if((S.email2||"")!==(c.email2||"")) upd["clients/"+id+"/email2"]=S.email2||null;
   if(!payOnFileOk(c)) upd["clients/"+id+"/payOnFile"] = { status:"missing", since:now };
-  upd[`clients/${id}/services/${s.sid}/comm`] = S.comm==="Limited" ? "Limited" : "";
   const note = `${LSA_NAME} ${agNo}, ${LSA_SEASON} season`;
   upd[`clients/${id}/services/${s.sid}/notes`] = s.notes && !String(s.notes).includes(agNo) ? s.notes+"; "+note : (s.notes||note);
   if(LEAD_STAGES.includes(c.status)){ upd["clients/"+id+"/status"]="active"; if(!c.wonAt) upd["clients/"+id+"/wonAt"]=now; }
@@ -2458,10 +2445,10 @@ async function lsaSend(){
     const textT = lsaText(c,S,s,X.agNo).split(L).join("{{SIGNED_LONG}}");
     const noticeT = ssaNotice(X.agNo).split(CB).join("{{CANCEL_BY_LONG}}").split(L).join("{{SIGNED_LONG}}");
     const token = randToken(), svc=svcInfo(), link = `${SIGN_PAGE}?t=${token}&s=${svcDeploy(svc.url)}`;
-    const summary = `Lawn, ${s.freq==="Biweekly"?"bi-weekly":"weekly"}${s.day?" on "+s.day:""}, ${money(price)} per cut, ${S.comm==="Limited"?"limited":"full"} communication`;
+    const summary = `Lawn, ${s.freq==="Biweekly"?"bi-weekly":"weekly"}${s.day?" on "+s.day:""}, ${money(price)} per cut`;
     const apply = Object.entries(lsaApply(c, id, S, s, X.agNo, now));
     const req = { status:"queued", kind:"lawn", clientId:id, tplName:LSA_NAME, tplVersion:LSA_VERSION, agreementNo:X.agNo, amount:price, dueNow:0, dueInstall:0, perVisit:null, lines:[],
-      serviceSummary:summary, details:{ kind:"lawn", agreementNo:X.agNo, version:LSA_VERSION, season:LSA_SEASON, sid:s.sid, frequency:s.freq||"Weekly", day:s.day||"", pricePerCut:price, communication:S.comm, serviceProperty:S.prop, email:S.email, email2:S.email2||"", total:price, dueNow:0, dueInstall:0 },
+      serviceSummary:summary, details:{ kind:"lawn", agreementNo:X.agNo, version:LSA_VERSION, season:LSA_SEASON, sid:s.sid, frequency:s.freq||"Weekly", day:s.day||"", pricePerCut:price, serviceProperty:S.prop, email:S.email, email2:S.email2||"", total:price, dueNow:0, dueInstall:0 },
       covers:{ lawn:true }, textT, noticeT, signerName:c.name, to, companySig:mySig.data, companySigner:mySig.name||me.displayName||me.email,
       createdAt:now, createdBy:me.email, expiresAt:now+7*864e5, link, apply, payUrl:"" };
     const upd = {
