@@ -1190,6 +1190,7 @@ function renderContracts(){
   box.querySelectorAll("[data-ssa]").forEach(b=>b.onclick=()=>openSeasonal(openId));
   box.querySelectorAll("[data-lsa]").forEach(b=>b.onclick=()=>openLawn(openId));
   box.querySelectorAll("[data-lda]").forEach(b=>b.onclick=()=>openLandscaping(openId, b.dataset.lda));
+  box.querySelectorAll("[data-lda-new]").forEach(b=>b.onclick=()=>{ const sel=$("#addSvcSel"); sel.value="landscaping"; sel.dispatchEvent(new Event("change",{bubbles:true})); const last=[...document.querySelectorAll("#svcList .svc.landscaping")].pop(); if(last){ last.scrollIntoView({behavior:"smooth",block:"center"}); const f=last.querySelector("input"); if(f) f.focus({preventScroll:true}); } toast("Fill in the Job, Date and Price, tap Save, then Set up and email here."); });
   box.querySelectorAll("[data-sign]").forEach(b=>b.onclick=()=>{ const [tid,sid]=b.dataset.sign.split("|"); openSigning(openId, tid, sid); });
   box.querySelectorAll("[data-view-ctr]").forEach(b=>b.onclick=()=>viewContract(openId, b.dataset.viewCtr));
 }
@@ -2484,6 +2485,7 @@ function ldaSignedFor(c, s){ if(!s.agreementNo) return null; return Object.entri
 const ldaSignedAll = c => Object.entries(c.contracts||{}).filter(([,m])=>m.name===LDA_NAME&&m.status==="signed"&&!m.voided);
 const ldaReq = (c, sid) => c.signReq && c.signReq.kind==="landscaping" && (!sid || c.signReq.sid===sid) ? c.signReq : null;
 function ldaRowsHtml(c, dirty){
+  if(!ldaJobs(c).length) return `<div class="ctr"><div class="t"><b>${LDA_NAME}</b><div class="meta">For landscaping jobs: one agreement per job, 50% at signing, the balance when the job is done. Add a Landscaping job with its price first.</div></div><button type="button" class="small primary" data-lda-new="1" ${dirty?"disabled":""}>New landscaping job</button></div>`;
   return ldaJobs(c).map(s=>{ const sg=ldaSignedFor(c,s), r=ldaReq(c,s.sid);
     return `<div class="ctr"><div class="t"><b>${LDA_NAME}</b><div class="meta">${esc(SERVICE_TYPES.landscaping.summary(s))}${sg?"":". 50% at signing, the balance when the job is done."}</div></div>
     ${sg?`<span class="pill signed">Signed ${fmtDate(new Date(sg[1].signedAt).toLocaleDateString("en-CA",{timeZone:TZ}))}</span><button type="button" class="small" data-view-ctr="${sg[0]}">View</button>`:`<span class="pill unsigned">Not signed</span>`}
