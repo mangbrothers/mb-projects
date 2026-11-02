@@ -1177,10 +1177,11 @@ function renderContracts(){
   const shown = new Set(needs.filter(x=>x.signed).map(x=>x.signed[0]));
   const ssaSg=ssaSigned(c); if(ssaSg) shown.add(ssaSg[0]);
   const lsaSg=lsaSigned(c); if(lsaSg) shown.add(lsaSg[0]);
+  ldaSignedAll(c).forEach(([cid])=>shown.add(cid));
   const others = mir.filter(([cid])=>!shown.has(cid)).sort((a,b)=>b[1].signedAt-a[1].signedAt);
   const dirty = dialogDirty();
   $("#ctrCount").textContent = needs.length ? `(${needs.filter(x=>x.signed).length} of ${needs.length} signed)` : "";
-  box.innerHTML = ssaRowHtml(c, dirty) + lsaRowHtml(c, dirty) + (dirty ? `<div class="warnline">Services changed. Save first so the contract shows the right price and dates.</div>` : "") +
+  box.innerHTML = ssaRowHtml(c, dirty) + lsaRowHtml(c, dirty) + ldaRowsHtml(c, dirty) + (dirty ? `<div class="warnline">Services changed. Save first so the contract shows the right price and dates.</div>` : "") +
     needs.map(x=>`<div class="ctr"><div class="t"><b>${esc(x.t.name)}</b>${x.t.sample?' <span class="pill sample">SAMPLE</span>':""}<div class="meta">${esc(SERVICE_TYPES[x.s.type].label)}: ${esc(SERVICE_TYPES[x.s.type].summary(x.s))}</div></div>
       ${x.signed?`<span class="pill signed">Signed ${fmtDate(new Date(x.signed[1].signedAt).toLocaleDateString("en-CA",{timeZone:TZ}))}</span><button type="button" class="small" data-view-ctr="${x.signed[0]}">View</button>`
                :`<span class="pill unsigned">Not signed</span><button type="button" class="small primary" data-sign="${x.tid}|${x.sid}" ${dirty?"disabled":""}>Open to sign</button>`}</div>`).join("") +
@@ -1188,6 +1189,7 @@ function renderContracts(){
     "";
   box.querySelectorAll("[data-ssa]").forEach(b=>b.onclick=()=>openSeasonal(openId));
   box.querySelectorAll("[data-lsa]").forEach(b=>b.onclick=()=>openLawn(openId));
+  box.querySelectorAll("[data-lda]").forEach(b=>b.onclick=()=>openLandscaping(openId, b.dataset.lda));
   box.querySelectorAll("[data-sign]").forEach(b=>b.onclick=()=>{ const [tid,sid]=b.dataset.sign.split("|"); openSigning(openId, tid, sid); });
   box.querySelectorAll("[data-view-ctr]").forEach(b=>b.onclick=()=>viewContract(openId, b.dataset.viewCtr));
 }
@@ -1703,7 +1705,7 @@ function driveNag(){
 let tplEditing=null;
 function renderContractsView(m){
   const list=Object.entries(templates).filter(([id,t])=>!id.startsWith("_") && !t.sample).sort((a,b)=>(a[1].name||"").localeCompare(b[1].name||""));
-  const signedCount = live().reduce((n,[,c])=>n+Object.values(c.contracts||{}).filter(x=>x.tpl==="seasonal"&&x.name!==LSA_NAME&&x.status==="signed"&&!x.voided).length,0);
+  const signedCount = live().reduce((n,[,c])=>n+Object.values(c.contracts||{}).filter(x=>x.tpl==="seasonal"&&x.name!==LSA_NAME&&x.name!==LDA_NAME&&x.status==="signed"&&!x.voided).length,0);
   m.innerHTML = `<div class="card"><h2>${SSA_NAME}</h2>
     <p class="meta">The agreement for fall cleanup, Christmas lights and snow. To sign one, open a client, go to Contracts, and tap Set up and sign. ${signedCount} signed so far.</p></div>
     ${list.length?`<div class="card"><div class="row"><h2 style="flex:1;margin:0">Other contracts</h2><button class="primary" id="tplNew">+ New contract</button></div>
@@ -1714,6 +1716,8 @@ function renderContractsView(m){
     </tbody></table></div>`:""}
     <div class="card"><h2>${LSA_NAME}</h2>
     <p class="meta">Lawn mowing for the ${LSA_SEASON} season, priced per cut from the client's Lawn service. To send one, open a client with a Lawn service, go to Contracts, and tap Set up and email. Nothing is charged at signing; the card goes on file. ${lsaCount()} signed so far.</p></div>
+    <div class="card"><h2>${LDA_NAME}</h2>
+    <p class="meta">One per Landscaping job: open the client, go to Contracts, and tap Set up and email on the job. 50% is charged when the card is saved at signing; the balance is charged when the job is set to Done.</p></div>
     <div class="card"><h2>Google Drive copies</h2>${(()=>{ const n=driveMissing().length; return `<p class="meta">Every signed contract is also saved as a PDF and an exact record in your Google Drive folder "${esc(DRIVE_ROOT_NAME)}", one folder per client.</p>` +
       (n ? `<div class="warnline">${n} signed contract${n===1?" is":"s are"} not in Google Drive yet. <button class="small primary" id="driveAll">Save to Drive</button></div>` : `<p class="meta">All signed contracts are in Google Drive.</p>`); })()}</div>
     <div class="card"><h2>Payment</h2><p class="meta">Every client keeps a card on file, taken right after signing, even when nothing is due that day. A bank account (ACH) is an approved exception, and prepaying everything by check is the only other choice. No card fee. Card and bank numbers are entered in QuickBooks only; this page keeps the brand and the last four digits. Charges waiting to be run are in the Charges tab.</p></div>
@@ -1778,6 +1782,7 @@ cache.contractTemplates = () => templates;
 const SSA_VERSION = 3;
 const SSA_NAME = "Seasonal Services Agreement";
 const LSA_NAME = "Lawn Service Agreement";
+const LDA_NAME = "Landscaping Services Agreement";
 const SSA_TYPES = ["fall","lights","snow"];
 // Version 2 (Oct 13, 2026): prices from the Oct 13 price book, card on file, no card fee, no late fee,
 // no snow season maximum, three areas, neighbor credit. Policy source: claude/contracts-v2-2026-10-13.md.
@@ -1923,11 +1928,11 @@ function ssaCalc(S){
   return { fall, lights, snow, total:r2(fall+lights+snow), fl, ll, sl, lightsGross, dueNow, dueInstall, std };
 }
 // Newest signed, not voided agreement on a client, and whether a seasonal service is still not covered by one.
-function ssaSigned(c){ return Object.entries(c.contracts||{}).filter(([,m])=>m.tpl==="seasonal"&&m.name!==LSA_NAME&&m.status==="signed"&&!m.voided).sort((a,b)=>b[1].signedAt-a[1].signedAt)[0]||null; }
+function ssaSigned(c){ return Object.entries(c.contracts||{}).filter(([,m])=>m.tpl==="seasonal"&&m.name!==LSA_NAME&&m.name!==LDA_NAME&&m.status==="signed"&&!m.voided).sort((a,b)=>b[1].signedAt-a[1].signedAt)[0]||null; }
 function ssaOpen(c, sid){ const sg=ssaSigned(c), cov=(sg&&sg[1].covers)||{}; return svcList(c).some(s=>SSA_TYPES.includes(s.type) && (!sid||s.sid===sid) && !cov[s.type]); }
 // On a lead card: Email contract until it is signed, then Signed · View. An open link shows its live status.
 function leadCtrHtml(id, c){
-  const sg=ssaSigned(c), r=c.signReq&&c.signReq.kind!=="lawn"?c.signReq:null;
+  const sg=ssaSigned(c), r=c.signReq&&!c.signReq.kind?c.signReq:null;
   if(sg) return `<div class="leadctr"><button type="button" class="small signedbtn" data-lead-view="${id}|${sg[0]}">\u2713 Signed \u00B7 View</button>${sg[1].test?' <span class="pill sample" style="align-self:center">TEST</span>':""} ${payFilePill(c)}</div>`;
   const open = r && OPEN_REQ.includes(r.status), signedReq = r && r.status==="signed";
   return `<div class="leadctr">${open||signedReq?`<button type="button" class="small" data-lead-status="${id}" title="${esc(reqStatusText(r,c))}">${esc(reqStatusText(r,c))}</button>`:""}
@@ -1939,7 +1944,7 @@ function ssaRowHtml(c, dirty){
   const covered = sg ? SSA_TYPES.filter(t=>(sg[1].covers||{})[t]).map(t=>SERVICE_TYPES[t].label).join(", ") : "";
   return `<div class="ctr"><div class="t"><b>${SSA_NAME}</b><div class="meta">${sg ? "Covers: "+esc(covered)+(open?". A service was added since; sign a new agreement to cover it.":"") : "Fall cleanup, Christmas lights and snow. You choose the services and options, the customer only signs."}${c.ssaDraft&&!sg?" Setup saved, not signed.":""}</div></div>
     ${sg?`<span class="pill signed">Signed ${fmtDate(new Date(sg[1].signedAt).toLocaleDateString("en-CA",{timeZone:TZ}))}</span><button type="button" class="small" data-view-ctr="${sg[0]}">View</button>`:(has?`<span class="pill unsigned">Not signed</span>`:"")}
-    ${!sg&&c.signReq&&c.signReq.kind!=="lawn"&&OPEN_REQ.includes(c.signReq.status)?`<span class="pill open" title="${esc((c.signReq.to||[]).join(", "))}">${esc(reqStatusText(c.signReq,c))}</span>`:""}
+    ${!sg&&c.signReq&&!c.signReq.kind&&OPEN_REQ.includes(c.signReq.status)?`<span class="pill open" title="${esc((c.signReq.to||[]).join(", "))}">${esc(reqStatusText(c.signReq,c))}</span>`:""}
     <button type="button" class="small ${sg&&!open?"":"primary"}" data-ssa="1" ${dirty?"disabled":""}>${sg?"New agreement":"Set up, email or sign"}</button></div>`;
 }
 // Tables in contract text: lines starting with "|". "|=" is a header row, "|+" a total row.
@@ -2263,7 +2268,7 @@ async function lockSeasonal(){
     ...ssaApply(c, id, S, k, X.agNo, now, cid)
   };
   // An open emailed link for this client is replaced by this signing.
-  if(c.signReq && c.signReq.kind!=="lawn" && ["queued","sent","error"].includes(c.signReq.status)){ upd["sync/sign/"+c.signReq.token+"/status"]="cancelled"; upd["clients/"+id+"/signReq/status"]="cancelled"; }
+  if(c.signReq && !c.signReq.kind && ["queued","sent","error"].includes(c.signReq.status)){ upd["sync/sign/"+c.signReq.token+"/status"]="cancelled"; upd["clients/"+id+"/signReq/status"]="cancelled"; }
   // With the signing service set up, it saves the PDF to admin@'s Drive and emails both addresses.
   const to=[S.email, S.email2].filter(Boolean);
   if(svcReady()) upd["sync/mail/"+cid] = { kind:"contract", clientId:id, contractId:cid, to, status:"queued", createdAt:now, createdBy:me.email };
@@ -2383,7 +2388,7 @@ function openLawn(clientId){
 }
 function lsaSetup(){
   const X=signCtx, S=X.S, c=clients[X.clientId]; X.mode="lsa-setup"; ssaBarOff();
-  const lawns=svcList(c).filter(x=>x.type==="lawn"), other=c.signReq && c.signReq.kind!=="lawn" && OPEN_REQ.includes(c.signReq.status);
+  const lawns=svcList(c).filter(x=>x.type==="lawn"), other=c.signReq && !c.signReq.kind && OPEN_REQ.includes(c.signReq.status);
   $("#signTitle").textContent = LSA_NAME+": setup";
   $("#signBody").innerHTML = `<div class="signpanel" id="lsaForm" style="margin-top:0">
     <h4>${esc(c.name)}</h4>
@@ -2468,6 +2473,208 @@ async function lsaSend(){
   finally{ X.busy=false; if(btn){ btn.disabled=false; btn.textContent="Email contract to sign"; } }
 }
 
+// ---------- Landscaping Services Agreement: one per landscaping job, emailed on the same signing system ----------
+// Built from the client's Landscaping job (Job, Date, Price). 50% is charged when the card is saved at signing; the
+// balance waits as a "completion" charge and is released when the job is set to Done (same as Bill 50/50).
+// The signing service files it like the Seasonal agreement (kind "seasonal"); the name tells them apart, and the
+// job's agreementNo ties a signed copy to its job. Changing the text: raise LDA_VERSION.
+const LDA_VERSION = 1;
+const ldaJobs = c => svcList(c).filter(s=>s.type==="landscaping");
+function ldaSignedFor(c, s){ if(!s.agreementNo) return null; return Object.entries(c.contracts||{}).find(([,m])=>m.name===LDA_NAME&&m.agreementNo===s.agreementNo&&m.status==="signed"&&!m.voided)||null; }
+const ldaSignedAll = c => Object.entries(c.contracts||{}).filter(([,m])=>m.name===LDA_NAME&&m.status==="signed"&&!m.voided);
+const ldaReq = (c, sid) => c.signReq && c.signReq.kind==="landscaping" && (!sid || c.signReq.sid===sid) ? c.signReq : null;
+function ldaRowsHtml(c, dirty){
+  return ldaJobs(c).map(s=>{ const sg=ldaSignedFor(c,s), r=ldaReq(c,s.sid);
+    return `<div class="ctr"><div class="t"><b>${LDA_NAME}</b><div class="meta">${esc(SERVICE_TYPES.landscaping.summary(s))}${sg?"":". 50% at signing, the balance when the job is done."}</div></div>
+    ${sg?`<span class="pill signed">Signed ${fmtDate(new Date(sg[1].signedAt).toLocaleDateString("en-CA",{timeZone:TZ}))}</span><button type="button" class="small" data-view-ctr="${sg[0]}">View</button>`:`<span class="pill unsigned">Not signed</span>`}
+    ${!sg&&r&&OPEN_REQ.includes(r.status)?`<span class="pill open" title="${esc((r.to||[]).join(", "))}">${esc(reqStatusText(r,c))}</span>`:""}
+    ${sg?"":`<button type="button" class="small primary" data-lda="${s.sid}" ${dirty?"disabled":""}>Set up and email</button>`}</div>`; }).join("");
+}
+function ldaText(c, S, s, agNo){
+  const t = v => String(v||"").replace(/[|\r\n]+/g," ").trim();
+  const price=+s.price, half=r2(price/2), bal=r2(price-half), when = s.date ? fmtLong(s.date) : "To be scheduled";
+  const o=[]; const P = (...x) => o.push(x.join("\n"));
+  P("# LANDSCAPING SERVICES AGREEMENT");
+  P("Landscaping Project");
+  P(`**Agreement No.:** ${agNo}`, `**Effective Date:** ${fmtLong(today())}`);
+  P("This Landscaping Services Agreement is entered into by and between **Mangiapane Brothers LLC** (the “Company”) and the customer identified below (the “Customer”). The Company and the Customer are each a “Party” and together the “Parties.” The Parties agree as follows:");
+  P("## Article 1: Parties, Property and Term");
+  P("|= | Customer Information", `| Name | ${t(c.name)}`, `| Address | ${t(c.address)}`, `| Phone | ${t(c.phone)}`, `| Email | ${t(S.email)||"Not provided"}`, ...(S.email2?[`| Second email | ${t(S.email2)}`]:[]));
+  P(`**1.1 Service Property.** The services will be performed at: ${t(S.prop)}`);
+  P(`**1.2 Property Type.** ${t(S.ptype)||"Residential"}`);
+  P(`**1.3 Work Areas.** The areas of the Property where the Project is performed: ${t(S.areas)||"As described in Section 2.1."}`);
+  P("**1.4 Term.** This Agreement begins on the Effective Date and ends when the Project is complete and every amount owed under it has been paid. The dates below are estimates (Article 5).");
+  P("|= Milestone | Estimated date", `| Project start | ${when}`, `| Project completion | ${t(S.done)||when}`);
+  P("## Article 2: Project and Pricing");
+  P("The Customer purchases only the work listed below at the prices stated. All prices include card processing; there is no separate card fee.");
+  P("### 2.1 Project Description");
+  P("The Company will perform the following work at the Property (the “Project”):");
+  P("|= Work to be performed | Materials and quantities", `| ${t(s.desc)} | ${t(S.materials)||"None"}`);
+  P("### 2.2 Project Pricing");
+  P("|= Item | Price", `| ${t(s.desc)} | ${money(price)}`, `|+ Project Total | ${money(price)}`);
+  P(`**2.3 Plant Warranty.** ${t(S.warranty)||"None"} (see Section 3.7).`);
+  P("## Article 3: Landscaping Project Terms");
+  P("**3.1 Included Work.** The Company will perform only the work described in Article 2. Anything not listed there is excluded, including permits, engineering, irrigation, electrical, drainage, and hauling away soil or debris, unless Article 2 states it.");
+  P("**3.2 Changes.** Any change to the Project, including added work, different materials, or a change in quantities, must be agreed in writing before the work is done. A text or email from the Customer approving the change and its price is sufficient. Approved changes are added to the balance due under Section 6.1.");
+  P("**3.3 Substitutions.** If a listed material or plant is unavailable, the Company may substitute one of equal or better quality and similar appearance, and will tell the Customer before installing it. Natural materials such as stone, mulch and plants vary in color, size and shape.");
+  P("**3.4 Ownership of Materials.** Materials remain the property of the Company until the Project is paid in full.");
+  P("**3.5 Normal Settling.** Mulch fades and breaks down, stone and soil settle, and weeds can grow through fabric and edging over time. These are normal and are not defects.");
+  P("**3.6 Workmanship.** The Company will perform the work in a good and workmanlike manner. If the Customer reports a problem under Section 7.7, the Company will inspect it and, if the problem is the Company’s fault, correct it at no charge.");
+  P("**3.7 Plants.** Plants are living things. Unless Section 2.3 states a plant warranty, the Company does not guarantee that plants will survive. Any plant warranty covers replacement of the plant only, once, and does not apply if the plant was not watered as the Company instructed, or was damaged by weather, animals, insects, disease, lawn equipment, chemicals, or the Customer’s other contractors.");
+  P("## Article 4: Access and Site Conditions");
+  P("**4.1 Right of Entry.** The Customer grants the Company, its employees and its subcontractors the right to enter the Property, including the yard, driveway and any area needed to reach the work, from the Effective Date until the Project is complete and the balance is paid. This includes return visits to finish work, correct a problem, or inspect the work.");
+  P("**4.2 Equipment and Materials.** The Company may drive, park and operate equipment on the driveway and lawn as needed to reach the work, and may stage materials and debris on the Property while the Project is underway. The Company will choose routes that limit wear where it reasonably can.");
+  P("**4.3 Authority.** The Customer represents that the Customer owns the Property or has the owner’s permission to authorize this work, and that the work does not violate any homeowners association rule, deed restriction or easement known to the Customer.");
+  P("**4.4 MISS DIG.** Before any digging, the Company will request marking of public utility lines through MISS DIG 811, as Michigan law requires.");
+  P("**4.5 Private Lines.** MISS DIG does not mark private lines. Before work begins, the Customer shall mark or disclose every private buried item in the work area, including sprinkler lines and heads, landscape and low-voltage lighting, invisible pet fencing, private gas or electric lines, drain tile and septic components.");
+  P("**4.6 Hidden Conditions.** The price assumes ordinary soil. If the Company encounters rock, concrete, large roots, buried debris, standing water, or other conditions that could not reasonably be seen before the work began, the Company will notify the Customer. Extra work to address them is a change under Section 3.2.");
+  P("**4.7 Existing Conditions.** The Company is not responsible for the condition of existing plants, trees, soil, drainage or hardscape that it did not install, or for problems caused by them.");
+  P("## Article 5: Schedule and Completion");
+  P("**5.1 Scheduling.** The Company schedules the Project after the deposit under Section 6.1 is paid. The start and completion dates in Section 1.4 are estimates and may move with weather, frozen or saturated ground, material availability and site conditions. The Company will keep the Customer informed of any change.");
+  P("**5.2 Completion.** The Project is complete on the day the Company finishes the work in Article 2, with any approved changes, and notifies the Customer. The Customer may walk the Project with the Company on that day or later. Items reported under Section 7.7 are handled under Section 3.6 and do not delay the balance due.");
+  P("## Article 6: Payment Terms");
+  P("**6.1 Payment Schedule.** The Project is paid fifty percent (50%) at signing and the balance, plus any changes approved under Section 3.2, on the day the Project is complete under Section 5.2. No work is scheduled and no materials are ordered until the amount due at signing has been paid.");
+  P("**6.2 Payment Method on File.** The Customer shall keep a valid credit or debit card on file with the Company for the length of this Agreement. With the Company’s approval, the Customer may instead keep a bank account on file for electronic (ACH) payment. A Customer who does not keep a payment method on file may instead pay the full Project Total in advance by check at signing, payable to Mangiapane Brothers LLC; no work is scheduled until the check is received. Payment information is stored by the Company’s payment processor, QuickBooks Payments (Intuit Inc.). The Company keeps only the card brand and last four digits.");
+  P("**6.3 Due Dates and Declined Payments.** Each amount is due on the day stated in this Agreement. If a charge to the payment method on file is declined or fails for any reason, including an expired card or insufficient funds, the amount is past due as of that day. The Company will notify the Customer, and the Customer shall pay the amount or provide a working payment method. While any amount is past due, the Company may retry the charge, stop work, and collect the amount under Section 6.5. Stopping work does not reduce the amount owed. Any additional time the Company allows is at its discretion and does not waive this Section.");
+  P("**6.4 Reversed Payments.** If a payment is reversed, charged back, or returned after the Company has performed the work it paid for, the amount remains due, and the Customer shall also pay any fees the Company is charged for the reversal.");
+  P("**6.5 Collection Costs.** To the extent permitted by Michigan law, the Customer shall pay reasonable collection costs and attorney fees incurred by the Company to collect any unpaid balance. The Company keeps any lien rights available to it under Michigan law.");
+  P("**6.6 Billing Disputes.** The Customer must dispute any charge in writing (text or email is acceptable) within 30 days of the receipt for it. Undisputed amounts remain due when payable.");
+  P("**6.7 Authorization to Charge.** By signing this Agreement, the Customer authorizes Mangiapane Brothers LLC to charge the payment method on file, without a separate approval each time, for: (a) each amount due under Section 6.1 when it comes due; and (b) any change the Customer approves in writing under Section 3.2 (text or email is acceptable), at the price agreed for it. This authorization remains in effect until every amount owed under this Agreement has been paid. The Customer may replace the payment method on file at any time by contacting the Company.");
+  P("**6.8 Receipts.** The Company emails a receipt for every charge to the email address(es) in Article 1, showing the work, the Property, the date, and the amount. The Company does not send notice before a charge; the receipt is the Customer’s record. Charges appear on statements as Mangiapane Brothers.");
+  P("|= Payment Summary | Amount", `| 2.2 Project Total | ${money(price)}`, `|+ Charged at signing (Section 6.1, 50%) | ${money(half)}`, `|+ Charged when the Project is complete | ${money(bal)}`, "| Approved changes (Section 3.2) | Charged when the Project is complete");
+  P("## Article 7: Customer Obligations");
+  P("The Customer shall:");
+  P("**7.1** Provide access to all work areas, including unlocked gates or the code or key to them.");
+  P("**7.2** Keep work areas clear of vehicles, refuse containers, toys, hoses and other objects on work days.");
+  P("**7.3** Mark or disclose every private buried line and fragile item, as required by Section 4.5, including sprinkler heads, landscape lighting, buried cables, invisible pet fencing, low walls, decorative stones and curbing.");
+  P("**7.4** Keep pets secured while the crew is on the Property.");
+  P("**7.5** Allow reasonable use of an outdoor water spigot and electrical outlet during the Project.");
+  P("**7.6** Water new plants, sod and seed as the Company instructs after completion, and obtain any homeowners association approval the Project needs before work begins.");
+  P("**7.7** Report any damage or problem with the work in writing (text or email is acceptable) within seven (7) days after the visit or completion, with photographs when possible. Late claims may be denied.");
+  P(`**Pre-existing conditions noted at signing:** ${t(S.pre)||"None noted"}`);
+  P("## Article 8: Insurance, Liability and Force Majeure");
+  P("**8.1 Insurance.** The Company maintains general liability insurances related to the services provided.");
+  P("**8.2 Repair of Damage.** If the Company’s negligence damages the Property, the Company will, at its option, repair the damage or pay the reasonable cost of repair, provided the Customer gives timely notice under Section 7.7.");
+  P("**8.3 Exclusions.** The Company is not responsible for: ordinary wear to lawn, turf and driveways along the routes equipment must travel to reach the work; damage to private lines or items that were not marked or disclosed under Section 4.5; pre-existing conditions; settling or natural variation under Section 3.5; plant loss outside any warranty under Section 3.7; or damage to concrete, asphalt or pavers in poor condition.");
+  P("**8.4 Limitation of Liability.** Except for gross negligence or willful misconduct, the Company’s total liability under this Agreement shall not exceed the Project Total. Neither Party is liable for indirect, incidental or consequential damages, including lost profits or rental income.");
+  P("**8.5 Force Majeure.** The Company is not in breach for delays or failures caused by severe weather, frozen or saturated ground, material shortages, equipment failure, illness, road closures or other events beyond its reasonable control. Work will resume as soon as reasonably possible.");
+  P("## Article 9: Cancellation and Termination");
+  P("**9.1 Customer’s Three-Day Right to Cancel.** The Customer may cancel this Agreement, without any penalty or obligation, at any time before midnight of the third business day after the date of this Agreement, by written notice to the Company. If the Customer cancels within that period, the Company will refund all payments made under this Agreement, to the original payment method, within 10 business days after receiving the notice. See the Notice of Cancellation at the end of this Agreement.");
+  P("**9.2 Customer Cancellation After Three Days.** After that period, the Customer may cancel by written notice. The Company may keep from the deposit the cost of materials already ordered or delivered and the value of work already performed, and will refund the rest to the original payment method. If those costs exceed the deposit, the Customer shall pay the difference.");
+  P("**9.3 By Company.** The Company may terminate this Agreement on 3 days’ written notice, or immediately for non-payment, unsafe conditions, or abusive conduct toward Company personnel. The Company will refund amounts paid for work not performed and materials not ordered, to the original payment method.");
+  P("## Article 10: General Provisions");
+  P("**10.1 Independent Contractor.** The Company is an independent contractor and controls the means, methods, equipment, and personnel used to perform the services, and may use subcontractors.");
+  P("**10.2 Photographs.** The Company photographs the Property before, during and after the work. Photos may be sent to the Customer with receipts and visit records and are kept as the Company’s service records.");
+  P("**10.3 Entire Agreement; Amendments.** This Agreement, with any attached exhibits, is the entire agreement of the Parties and supersedes all prior discussions and estimates. Amendments must be in writing and signed or confirmed by email by both Parties.");
+  P("**10.4 Governing Law; Venue.** This Agreement is governed by the laws of the State of Michigan. Any dispute shall be brought in the courts of the county in which the Property is located, Wayne County or Washtenaw County, Michigan, including small claims court where eligible.");
+  P("**10.5 Severability.** If any provision is held unenforceable, the remaining provisions remain in full force and effect.");
+  P("**10.6 Notices.** Notices under this Agreement may be delivered by hand, mail, or email to the addresses in Article 1.");
+  P("**10.7 Counterparts; Electronic Signatures and Records.** This Agreement may be signed in counterparts and by electronic signature, each of which is deemed an original. The Customer agrees to receive this Agreement, the Notice of Cancellation, receipts, and other notices electronically at the email address(es) in Article 1, and may ask for a paper copy at any time at no charge.");
+  P("## Signatures");
+  P("IN WITNESS WHEREOF, the Parties have executed this Agreement as of the dates below.");
+  P(`**${SSA_CANCEL_STATEMENT}**`);
+  P("**If you cancel within that period, all payments you have made will be refunded in full within 10 business days after the Company receives your cancellation notice.**");
+  return o.join("\n\n");
+}
+function openLandscaping(clientId, sid){
+  const c=clients[clientId]; if(!c) return toast("Save the client first.");
+  if($("#clientDlg").open && openId===clientId && dialogDirty()) return toast("Save the client first, then open the agreement.");
+  const s=ldaJobs(c).find(x=>x.sid===sid) || ldaJobs(c)[0]; if(!s) return toast("Add a Landscaping job with its price first.");
+  const d=(c.ldaDraft||{})[s.sid]||{};
+  const S={ sid:s.sid, email:c.email||"", email2:c.email2||"", prop:c.address||"", ptype:"Residential", areas:"", materials:"", warranty:"None", done:"", pre:"", ...d };
+  signCtx={ mode:"lda-setup", clientId, S };
+  ldaSetup();
+  if(!$("#signDlg").open) $("#signDlg").showModal();
+  $("#signBody").scrollTop=0;
+}
+function ldaSetup(){
+  const X=signCtx, S=X.S, c=clients[X.clientId], s=(c.services||{})[S.sid]||{}; X.mode="lda-setup"; ssaBarOff();
+  const price=+s.price||0, half=r2(price/2);
+  $("#signTitle").textContent = LDA_NAME+": setup";
+  $("#signBody").innerHTML = `<div class="signpanel" id="ldaForm" style="margin-top:0">
+    <h4>${esc(c.name)}</h4>
+    <div class="meta">${esc(c.address||"No address on file")} · ${esc(c.phone||"no phone")}. These come from the client record; close this and edit the client to change them.</div>
+    <div class="svc svcbar landscaping" style="margin-top:10px"><b>${esc(s.desc||"No job description")}</b> <span class="meta">${esc([s.date?fmtLong(s.date):"No date", money(price)].join(" · "))}</span><div class="meta">Job, date and price come from the Landscaping service. Change them there, save, and open this again.</div></div>
+    <div class="grid2">
+      <div><label>Email for the customer's copy and receipts</label><input id="ld-email" type="email" value="${esc(S.email)}" placeholder="name@example.com" autocomplete="off"></div>
+      <div><label>Second email (optional)</label><input id="ld-email2" type="email" value="${esc(S.email2||"")}" autocomplete="off"></div>
+      <div style="grid-column:1/-1"><label>Service property (1.1)</label><input id="ld-prop" value="${esc(S.prop)}"></div>
+      <div><label>Property type (1.2)</label><select id="ld-ptype">${opts(["Residential","Commercial","Multi-Unit / HOA"],S.ptype)}</select></div>
+      <div><label>Completion date (1.4), empty for the same day</label><input id="ld-done" value="${esc(S.done)}" placeholder="Same as the start"></div>
+      <div style="grid-column:1/-1"><label>Work areas (1.3)</label><input id="ld-areas" value="${esc(S.areas)}" placeholder="Behind the garage and under the apple tree. Empty uses the job description."></div>
+      <div style="grid-column:1/-1"><label>Materials and quantities (2.1)</label><input id="ld-mat" value="${esc(S.materials)}" placeholder="None. Write hauling here if the debris leaves with you."></div>
+      <div><label>Plant warranty (2.3)</label><input id="ld-war" value="${esc(S.warranty)}"></div>
+      <div><label>Pre-existing conditions (Article 7)</label><input id="ld-pre" value="${esc(S.pre)}" placeholder="None noted"></div>
+    </div>
+    <div class="pstotal"><span>Charged today</span><b>${money(half)||"$0"}</b></div>
+    <div class="meta">50% when the card is saved at signing. The other ${money(r2(price-half))} is charged when the job is set to Done.</div>
+    <div class="meta" id="ld-err" style="color:var(--red);font-weight:600;margin-top:8px"></div>
+    <div class="actions"><button type="button" class="left" id="ld-later">Save for later</button><button type="button" class="primary big" id="ld-send">Email contract to sign</button></div>
+  </div>`;
+  const form=$("#ldaForm"); form.oninput=ldaSync; form.onchange=ldaSync;
+  $("#ld-later").onclick = async () => { ldaSync(); try{ await ldaSaveDraft(); toast("Setup saved on the client."); $("#signDlg").close(); }catch(e){ toast("Not saved: "+(e.code||e.message)); } };
+  $("#ld-send").onclick = () => { ldaSync(); const e=ldaErrors(); $("#ld-err").textContent = e.length ? "Still needed: "+e.join(", ")+"." : ""; if(!e.length) ldaSend(); };
+}
+function ldaSync(){
+  const X=signCtx; if(!X || X.mode!=="lda-setup") return; const S=X.S, g=id=>document.getElementById(id);
+  S.email=g("ld-email").value.trim(); S.email2=g("ld-email2").value.trim(); S.prop=g("ld-prop").value.trim(); S.ptype=g("ld-ptype").value;
+  S.done=g("ld-done").value.trim(); S.areas=g("ld-areas").value.trim(); S.materials=g("ld-mat").value.trim(); S.warranty=g("ld-war").value.trim(); S.pre=g("ld-pre").value.trim();
+}
+const ldaSaveDraft = () => { const X=signCtx; return db.ref().update({ ["clients/"+X.clientId+"/ldaDraft/"+X.S.sid]: JSON.parse(JSON.stringify(X.S)), ["clients/"+X.clientId+"/updatedAt"]: Date.now(), ["clients/"+X.clientId+"/updatedBy"]: me.email }); };
+function ldaErrors(){
+  const X=signCtx, S=X.S, s=(clients[X.clientId].services||{})[S.sid], e=[];
+  if(!S.email) e.push("the customer's email"); else if(!/^\S+@\S+\.\S+$/.test(S.email)) e.push("a valid email");
+  if(S.email2 && !/^\S+@\S+\.\S+$/.test(S.email2)) e.push("a valid second email, or leave it empty");
+  if(!S.prop) e.push("service property");
+  if(!s) e.push("the Landscaping job"); else { if(!s.desc) e.push("the job description"); if(!(+s.price>0)) e.push("the job price"); }
+  return e;
+}
+async function ldaSend(){
+  const X=signCtx; if(!X || X.busy) return;
+  const c=clients[X.clientId], S=X.S, id=X.clientId, s={ sid:S.sid, ...(c.services||{})[S.sid] };
+  if(!svcReady()){ const m="Not sent: the signing service is not set in the CRM."; $("#ld-err").textContent=m; return toast(m); }
+  const to=[S.email, S.email2].filter(Boolean);
+  const mySig = X.mySig!==undefined ? X.mySig : await loadMySig(); X.mySig=mySig;
+  if(!mySig?.data){ const m="Not sent: draw your countersignature once first: More, Contracts, Your countersignature."; $("#ld-err").textContent=m; return toast(m); }
+  X.busy=true; const btn=$("#ld-send"); if(btn){ btn.disabled=true; btn.textContent="Sending…"; }
+  try{
+    ldaSaveDraft().catch(()=>{});
+    X.agNo = X.agNo || `MB-${today().replace(/-/g,"")}-${Math.random().toString(36).slice(2,6).toUpperCase().padEnd(4,"X")}`;
+    const d=today(), L=fmtLong(d), CB=fmtLong(ssaCancelBy(d)), now=Date.now(), price=+s.price, half=r2(price/2), bal=r2(price-half);
+    const textT = ldaText(c,S,s,X.agNo).split(L).join("{{SIGNED_LONG}}");
+    const noticeT = ssaNotice(X.agNo).split(CB).join("{{CANCEL_BY_LONG}}").split(L).join("{{SIGNED_LONG}}");
+    const token = randToken(), svc=svcInfo(), link = `${SIGN_PAGE}?t=${token}&s=${svcDeploy(svc.url)}`;
+    const job = `Landscaping${s.desc?": "+s.desc:""}`, summary = `${job}, ${money(price)}: 50% at signing, balance when done`;
+    const upd0 = {};
+    if(S.email && S.email!==(c.email||"")) upd0["clients/"+id+"/email"]=S.email;
+    if((S.email2||"")!==(c.email2||"")) upd0["clients/"+id+"/email2"]=S.email2||null;
+    if(!payOnFileOk(c)) upd0["clients/"+id+"/payOnFile"] = { status:"missing", since:now };
+    upd0[`clients/${id}/services/${s.sid}/agreementNo`] = X.agNo;
+    if(s.jobStatus!=="Done") upd0[`clients/${id}/services/${s.sid}/jobStatus`] = "Scheduled";
+    upd0["sync/qb/"+db.ref("sync/qb").push().key] = { type:"charge", trigger:"signing", status:"pending", clientId:id, contractId:"{{CID}}", sid:s.sid, amount:half, date:today(), description:`${LDA_NAME} ${X.agNo}: 50% deposit, ${job}`, createdAt:now, createdBy:me.email };
+    upd0["sync/qb/"+db.ref("sync/qb").push().key] = { type:"charge", trigger:"completion", status:"scheduled", clientId:id, contractId:"{{CID}}", sid:s.sid, amount:bal, description:`${job}: balance, job complete (${X.agNo})`, createdAt:now, createdBy:me.email };
+    if(LEAD_STAGES.includes(c.status)){ upd0["clients/"+id+"/status"]="active"; if(!c.wonAt) upd0["clients/"+id+"/wonAt"]=now; }
+    Object.assign(upd0, qbCustomerRow(id));
+    const req = { status:"queued", kind:"landscaping", clientId:id, tplName:LDA_NAME, tplVersion:LDA_VERSION, agreementNo:X.agNo, amount:price, dueNow:half, dueInstall:0, perVisit:null,
+      lines:[[job, price]], serviceSummary:summary,
+      details:{ kind:"landscaping", agreementNo:X.agNo, version:LDA_VERSION, sid:s.sid, job:s.desc||"", date:s.date||"", total:price, dueNow:half, dueAtCompletion:bal, serviceProperty:S.prop, propertyType:S.ptype, workAreas:S.areas, materials:S.materials, warranty:S.warranty, preExisting:S.pre, email:S.email, email2:S.email2||"" },
+      covers:{ landscaping:true }, textT, noticeT, signerName:c.name, to, companySig:mySig.data, companySigner:mySig.name||me.displayName||me.email,
+      createdAt:now, createdBy:me.email, expiresAt:now+7*864e5, link, apply:Object.entries(upd0), payUrl:"" };
+    const upd = {
+      ["sync/sign/"+token]: JSON.parse(JSON.stringify(req)),
+      ["clients/"+id+"/signReq"]: { token, kind:"landscaping", sid:s.sid, status:"queued", createdAt:now, createdBy:me.email, to, link, agreementNo:X.agNo, amount:price, dueNow:half },
+      ["clients/"+id+"/lastContactAt"]: now,
+      ["clientLog/"+id+"/"+db.ref("clientLog").push().key]: { text:`Emailed ${LDA_NAME} ${X.agNo} to ${to.join(" and ")}: ${summary}.`, at:now, by:me.email, source:"contract" }
+    };
+    const prev=ldaReq(c, s.sid); if(prev && OPEN_REQ.includes(prev.status) && prev.token!==token) upd["sync/sign/"+prev.token+"/status"]="cancelled";
+    if(LEAD_STAGES.includes(c.status) && c.status!=="quoted") upd["clients/"+id+"/status"]="quoted";
+    await db.ref().update(upd);
+    svcCall("send", { t:token });
+    X.sentToken=token; showSent();
+  }catch(e){ toast("Not sent: "+(e.code||e.message)); }
+  finally{ X.busy=false; if(btn){ btn.disabled=false; btn.textContent="Email contract to sign"; } }
+}
+
 // ---------- Email the contract: one link for phone sales ----------
 const SIGN_PAGE = "https://apps.mangbrothers.com/sign.html";
 const svcInfo = () => templates._signing || null;
@@ -2511,7 +2718,7 @@ async function ssaSend(){
       ["clients/"+id+"/lastContactAt"]: now,
       ["clientLog/"+id+"/"+db.ref("clientLog").push().key]: { text:`Emailed ${SSA_NAME} ${X.agNo} to ${to.join(" and ")}: ${ssaSummary(S,k)}. Total ${money(k.total)}; charged at signing ${money(k.dueNow)}.`, at:now, by:me.email, source:"contract" }
     };
-    if(c.signReq && c.signReq.kind!=="lawn" && OPEN_REQ.includes(c.signReq.status) && c.signReq.token!==token) upd["sync/sign/"+c.signReq.token+"/status"]="cancelled";
+    if(c.signReq && !c.signReq.kind && OPEN_REQ.includes(c.signReq.status) && c.signReq.token!==token) upd["sync/sign/"+c.signReq.token+"/status"]="cancelled";
     if(LEAD_STAGES.includes(c.status) && c.status!=="quoted") upd["clients/"+id+"/status"]="quoted";
     await db.ref().update(upd);
     svcCall("send", { t:token });
@@ -2552,7 +2759,7 @@ async function ssaSendTest(c, S, id, to, mySig){
   const upd = { ["sync/sign/"+token]: JSON.parse(JSON.stringify(req)),
     ["clients/"+id+"/signReq"]: { token, status:"queued", test:true, createdAt:now, createdBy:me.email, to, link, agreementNo:agNo, amount:2, dueNow:1 },
     ["clientLog/"+id+"/"+db.ref("clientLog").push().key]: { text:`Emailed TEST agreement ${agNo} to ${to.join(" and ")}: $1 at signing, $1 later, no service.`, at:now, by:me.email, source:"contract" } };
-  if(c.signReq && c.signReq.kind!=="lawn" && OPEN_REQ.includes(c.signReq.status) && c.signReq.token!==token) upd["sync/sign/"+c.signReq.token+"/status"]="cancelled";
+  if(c.signReq && !c.signReq.kind && OPEN_REQ.includes(c.signReq.status) && c.signReq.token!==token) upd["sync/sign/"+c.signReq.token+"/status"]="cancelled";
   await db.ref().update(upd);
   svcCall("send", { t:token });
   X.sentToken=token; showSent();
@@ -2586,7 +2793,7 @@ function showSent(){
   paint(); clearInterval(sentTimer); sentTimer=setInterval(paint, 1500);
   $("#sentCopy").onclick=()=>navigator.clipboard.writeText(r.link||"").then(()=>toast("Link copied."));
   $("#sentResend").onclick=async()=>{ const rr=(clients[id]||{}).signReq; if(!rr) return; await db.ref().update({ ["sync/sign/"+rr.token+"/status"]:"queued", ["sync/sign/"+rr.token+"/expiresAt"]:Date.now()+7*864e5, ["clients/"+id+"/signReq/status"]:"queued" }); svcCall("send",{t:rr.token}); toast("Sending again."); };
-  $("#sentEdit").onclick=()=>{ clearInterval(sentTimer); (r.kind==="lawn"?openLawn:openSeasonal)(id); };
+  $("#sentEdit").onclick=()=>{ clearInterval(sentTimer); (r.kind==="lawn"?openLawn:r.kind==="landscaping"?(x=>openLandscaping(x, r.sid)):openSeasonal)(id); };
   $("#sentDone").onclick=()=>{ clearInterval(sentTimer); $("#signDlg").close(); };
 }
 

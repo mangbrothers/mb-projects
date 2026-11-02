@@ -154,7 +154,8 @@ function quoteRows(A, withLines){
   return `${lines.length?`<table class="quote">${lines.map(l=>r(esc(l[0])+(starred&&isSnowLine(l)?"<sup>*</sup>":""),esc(money(l[1])))).join("")}</table>`:""}
     <div class="totals${lines.length?"":" solo"}">${lines.length?t("Total",esc(money(A.total)),"tot"):""}
     ${t("Charged today",esc(money(A.dueNow)||"$0"),"today")}
-    ${A.dueInstall>0?t("Charged when your lights are installed",esc(money(A.dueInstall)),"later"):""}</div>
+    ${A.dueInstall>0?t("Charged when your lights are installed",esc(money(A.dueInstall)),"later"):""}
+    ${A.tplName==="Landscaping Services Agreement"&&A.total>A.dueNow?t("Charged when the job is done",esc(money(A.total-A.dueNow)),"later"):""}</div>
     ${snowNote(A, starred)}`;
 }
 
