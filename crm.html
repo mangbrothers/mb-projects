@@ -1190,6 +1190,7 @@ function renderContracts(){
   box.querySelectorAll("[data-ssa]").forEach(b=>b.onclick=()=>openSeasonal(openId));
   box.querySelectorAll("[data-lsa]").forEach(b=>b.onclick=()=>openLawn(openId));
   box.querySelectorAll("[data-lda]").forEach(b=>b.onclick=()=>openLandscaping(openId, b.dataset.lda));
+  box.querySelectorAll("[data-req-status]").forEach(b=>b.onclick=()=>showSentFor(openId));
   box.querySelectorAll("[data-lda-new]").forEach(b=>b.onclick=()=>{ const sel=$("#addSvcSel"); sel.value="landscaping"; sel.dispatchEvent(new Event("change",{bubbles:true})); const last=[...document.querySelectorAll("#svcList .svc.landscaping")].pop(); if(last){ last.scrollIntoView({behavior:"smooth",block:"center"}); const f=last.querySelector("input"); if(f) f.focus({preventScroll:true}); } toast("Fill in the Job, Date and Price, tap Save, then Set up and email here."); });
   box.querySelectorAll("[data-sign]").forEach(b=>b.onclick=()=>{ const [tid,sid]=b.dataset.sign.split("|"); openSigning(openId, tid, sid); });
   box.querySelectorAll("[data-view-ctr]").forEach(b=>b.onclick=()=>viewContract(openId, b.dataset.viewCtr));
@@ -1718,7 +1719,7 @@ function renderContractsView(m){
     <div class="card"><h2>${LSA_NAME}</h2>
     <p class="meta">Lawn mowing for the ${LSA_SEASON} season, priced per cut from the client's Lawn service. To send one, open a client with a Lawn service, go to Contracts, and tap Set up and email. Nothing is charged at signing; the card goes on file. ${lsaCount()} signed so far.</p></div>
     <div class="card"><h2>${LDA_NAME}</h2>
-    <p class="meta">One per Landscaping job: open the client, go to Contracts, and tap Set up and email on the job. 50% is charged when the card is saved at signing; the balance is charged when the job is set to Done.</p></div>
+    <p class="meta">One per Landscaping job: open the client, go to Contracts, and tap Set up and email on the job. Jobs of $${LDA_DEPOSIT_MIN} or more: 50% when the card is saved at signing, the balance when the job is set to Done. Smaller jobs: the card goes on file and the full price is charged when the job is set to Done.</p></div>
     <div class="card"><h2>Google Drive copies</h2>${(()=>{ const n=driveMissing().length; return `<p class="meta">Every signed contract is also saved as a PDF and an exact record in your Google Drive folder "${esc(DRIVE_ROOT_NAME)}", one folder per client.</p>` +
       (n ? `<div class="warnline">${n} signed contract${n===1?" is":"s are"} not in Google Drive yet. <button class="small primary" id="driveAll">Save to Drive</button></div>` : `<p class="meta">All signed contracts are in Google Drive.</p>`); })()}</div>
     <div class="card"><h2>Payment</h2><p class="meta">Every client keeps a card on file, taken right after signing, even when nothing is due that day. A bank account (ACH) is an approved exception, and prepaying everything by check is the only other choice. No card fee. Card and bank numbers are entered in QuickBooks only; this page keeps the brand and the last four digits. Charges waiting to be run are in the Charges tab.</p></div>
@@ -2300,7 +2301,7 @@ function lsaRowHtml(c, dirty){
   if(!sg && !has) return "";
   return `<div class="ctr"><div class="t"><b>${LSA_NAME}</b><div class="meta">${sg ? `Signed for the ${LSA_SEASON} lawn season${sg[1].agreementNo?" ("+esc(sg[1].agreementNo)+")":""}.` : `Lawn mowing for the ${LSA_SEASON} season at the Lawn service price per cut. The customer only signs and adds a card.`}</div></div>
     ${sg?`<span class="pill signed">Signed ${fmtDate(new Date(sg[1].signedAt).toLocaleDateString("en-CA",{timeZone:TZ}))}</span><button type="button" class="small" data-view-ctr="${sg[0]}">View</button>`:`<span class="pill unsigned">Not signed</span>`}
-    ${!sg&&r&&OPEN_REQ.includes(r.status)?`<span class="pill open" title="${esc((r.to||[]).join(", "))}">${esc(reqStatusText(r,c))}</span>`:""}
+    ${!sg&&r&&OPEN_REQ.includes(r.status)?`<button type="button" class="small" data-req-status="1" title="Copy the link, resend, or change it">${esc(reqStatusText(r,c))} · Link</button>`:""}
     <button type="button" class="small ${sg?"":"primary"}" data-lsa="1" ${dirty?"disabled":""}>${sg?"New agreement":"Set up and email"}</button></div>`;
 }
 function lsaService(c, sid){ const l=svcList(c).filter(s=>s.type==="lawn"); return l.find(s=>s.sid===sid) || l.find(s=>s.season!=="Off") || l[0] || null; }
@@ -2479,22 +2480,25 @@ async function lsaSend(){
 // balance waits as a "completion" charge and is released when the job is set to Done (same as Bill 50/50).
 // The signing service files it like the Seasonal agreement (kind "seasonal"); the name tells them apart, and the
 // job's agreementNo ties a signed copy to its job. Changing the text: raise LDA_VERSION.
-const LDA_VERSION = 1;
+const LDA_VERSION = 2;
+// Deposit gate: jobs at or over this price are billed 50% at signing; smaller jobs are billed in full when done.
+const LDA_DEPOSIT_MIN = 500;
+const ldaDeposit = price => (+price||0) >= LDA_DEPOSIT_MIN ? r2((+price||0)/2) : 0;
 const ldaJobs = c => svcList(c).filter(s=>s.type==="landscaping");
 function ldaSignedFor(c, s){ if(!s.agreementNo) return null; return Object.entries(c.contracts||{}).find(([,m])=>m.name===LDA_NAME&&m.agreementNo===s.agreementNo&&m.status==="signed"&&!m.voided)||null; }
 const ldaSignedAll = c => Object.entries(c.contracts||{}).filter(([,m])=>m.name===LDA_NAME&&m.status==="signed"&&!m.voided);
 const ldaReq = (c, sid) => c.signReq && c.signReq.kind==="landscaping" && (!sid || c.signReq.sid===sid) ? c.signReq : null;
 function ldaRowsHtml(c, dirty){
-  if(!ldaJobs(c).length) return `<div class="ctr"><div class="t"><b>${LDA_NAME}</b><div class="meta">For landscaping jobs: one agreement per job, 50% at signing, the balance when the job is done. Add a Landscaping job with its price first.</div></div><button type="button" class="small primary" data-lda-new="1" ${dirty?"disabled":""}>New landscaping job</button></div>`;
+  if(!ldaJobs(c).length) return `<div class="ctr"><div class="t"><b>${LDA_NAME}</b><div class="meta">For landscaping jobs: one agreement per job. Jobs of $${LDA_DEPOSIT_MIN} or more are billed 50% at signing; smaller jobs in full when done. Add a Landscaping job with its price first.</div></div><button type="button" class="small primary" data-lda-new="1" ${dirty?"disabled":""}>New landscaping job</button></div>`;
   return ldaJobs(c).map(s=>{ const sg=ldaSignedFor(c,s), r=ldaReq(c,s.sid);
-    return `<div class="ctr"><div class="t"><b>${LDA_NAME}</b><div class="meta">${esc(SERVICE_TYPES.landscaping.summary(s))}${sg?"":". 50% at signing, the balance when the job is done."}</div></div>
+    return `<div class="ctr"><div class="t"><b>${LDA_NAME}</b><div class="meta">${esc(SERVICE_TYPES.landscaping.summary(s))}${sg?"":(ldaDeposit(s.price)>0?". 50% at signing, the balance when the job is done.":". Billed in full when the job is done.")}</div></div>
     ${sg?`<span class="pill signed">Signed ${fmtDate(new Date(sg[1].signedAt).toLocaleDateString("en-CA",{timeZone:TZ}))}</span><button type="button" class="small" data-view-ctr="${sg[0]}">View</button>`:`<span class="pill unsigned">Not signed</span>`}
-    ${!sg&&r&&OPEN_REQ.includes(r.status)?`<span class="pill open" title="${esc((r.to||[]).join(", "))}">${esc(reqStatusText(r,c))}</span>`:""}
+    ${!sg&&r&&OPEN_REQ.includes(r.status)?`<button type="button" class="small" data-req-status="1" title="Copy the link, resend, or change it">${esc(reqStatusText(r,c))} · Link</button>`:""}
     ${sg?"":`<button type="button" class="small primary" data-lda="${s.sid}" ${dirty?"disabled":""}>Set up and email</button>`}</div>`; }).join("");
 }
 function ldaText(c, S, s, agNo){
   const t = v => String(v||"").replace(/[|\r\n]+/g," ").trim();
-  const price=+s.price, half=r2(price/2), bal=r2(price-half), when = s.date ? fmtLong(s.date) : "To be scheduled";
+  const price=+s.price, half=ldaDeposit(price), bal=r2(price-half), when = s.date ? fmtLong(s.date) : "To be scheduled";
   const o=[]; const P = (...x) => o.push(x.join("\n"));
   P("# LANDSCAPING SERVICES AGREEMENT");
   P("Landscaping Project");
@@ -2532,10 +2536,11 @@ function ldaText(c, S, s, agNo){
   P("**4.6 Hidden Conditions.** The price assumes ordinary soil. If the Company encounters rock, concrete, large roots, buried debris, standing water, or other conditions that could not reasonably be seen before the work began, the Company will notify the Customer. Extra work to address them is a change under Section 3.2.");
   P("**4.7 Existing Conditions.** The Company is not responsible for the condition of existing plants, trees, soil, drainage or hardscape that it did not install, or for problems caused by them.");
   P("## Article 5: Schedule and Completion");
-  P("**5.1 Scheduling.** The Company schedules the Project after the deposit under Section 6.1 is paid. The start and completion dates in Section 1.4 are estimates and may move with weather, frozen or saturated ground, material availability and site conditions. The Company will keep the Customer informed of any change.");
+  P((half>0 ? "**5.1 Scheduling.** The Company schedules the Project after the deposit under Section 6.1 is paid." : "**5.1 Scheduling.** The Company schedules the Project once this Agreement is signed and a payment method is on file.") + " The start and completion dates in Section 1.4 are estimates and may move with weather, frozen or saturated ground, material availability and site conditions. The Company will keep the Customer informed of any change.");
   P("**5.2 Completion.** The Project is complete on the day the Company finishes the work in Article 2, with any approved changes, and notifies the Customer. The Customer may walk the Project with the Company on that day or later. Items reported under Section 7.7 are handled under Section 3.6 and do not delay the balance due.");
   P("## Article 6: Payment Terms");
-  P("**6.1 Payment Schedule.** The Project is paid fifty percent (50%) at signing and the balance, plus any changes approved under Section 3.2, on the day the Project is complete under Section 5.2. No work is scheduled and no materials are ordered until the amount due at signing has been paid.");
+  P(half>0 ? "**6.1 Payment Schedule.** The Project is paid fifty percent (50%) at signing and the balance, plus any changes approved under Section 3.2, on the day the Project is complete under Section 5.2. No work is scheduled and no materials are ordered until the amount due at signing has been paid."
+           : "**6.1 Payment Schedule.** Nothing is charged at signing. The Project Total, plus any changes approved under Section 3.2, is paid in full on the day the Project is complete under Section 5.2. No work is scheduled until a payment method is on file under Section 6.2.");
   P("**6.2 Payment Method on File.** The Customer shall keep a valid credit or debit card on file with the Company for the length of this Agreement. With the Company’s approval, the Customer may instead keep a bank account on file for electronic (ACH) payment. A Customer who does not keep a payment method on file may instead pay the full Project Total in advance by check at signing, payable to Mangiapane Brothers LLC; no work is scheduled until the check is received. Payment information is stored by the Company’s payment processor, QuickBooks Payments (Intuit Inc.). The Company keeps only the card brand and last four digits.");
   P("**6.3 Due Dates and Declined Payments.** Each amount is due on the day stated in this Agreement. If a charge to the payment method on file is declined or fails for any reason, including an expired card or insufficient funds, the amount is past due as of that day. The Company will notify the Customer, and the Customer shall pay the amount or provide a working payment method. While any amount is past due, the Company may retry the charge, stop work, and collect the amount under Section 6.5. Stopping work does not reduce the amount owed. Any additional time the Company allows is at its discretion and does not waive this Section.");
   P("**6.4 Reversed Payments.** If a payment is reversed, charged back, or returned after the Company has performed the work it paid for, the amount remains due, and the Customer shall also pay any fees the Company is charged for the reversal.");
@@ -2543,7 +2548,7 @@ function ldaText(c, S, s, agNo){
   P("**6.6 Billing Disputes.** The Customer must dispute any charge in writing (text or email is acceptable) within 30 days of the receipt for it. Undisputed amounts remain due when payable.");
   P("**6.7 Authorization to Charge.** By signing this Agreement, the Customer authorizes Mangiapane Brothers LLC to charge the payment method on file, without a separate approval each time, for: (a) each amount due under Section 6.1 when it comes due; and (b) any change the Customer approves in writing under Section 3.2 (text or email is acceptable), at the price agreed for it. This authorization remains in effect until every amount owed under this Agreement has been paid. The Customer may replace the payment method on file at any time by contacting the Company.");
   P("**6.8 Receipts.** The Company emails a receipt for every charge to the email address(es) in Article 1, showing the work, the Property, the date, and the amount. The Company does not send notice before a charge; the receipt is the Customer’s record. Charges appear on statements as Mangiapane Brothers.");
-  P("|= Payment Summary | Amount", `| 2.2 Project Total | ${money(price)}`, `|+ Charged at signing (Section 6.1, 50%) | ${money(half)}`, `|+ Charged when the Project is complete | ${money(bal)}`, "| Approved changes (Section 3.2) | Charged when the Project is complete");
+  P("|= Payment Summary | Amount", `| 2.2 Project Total | ${money(price)}`, ...(half>0?[`|+ Charged at signing (Section 6.1, 50%) | ${money(half)}`]:["|+ Charged at signing | $0"]), `|+ Charged when the Project is complete | ${money(bal)}`, "| Approved changes (Section 3.2) | Charged when the Project is complete");
   P("## Article 7: Customer Obligations");
   P("The Customer shall:");
   P("**7.1** Provide access to all work areas, including unlocked gates or the code or key to them.");
@@ -2562,7 +2567,7 @@ function ldaText(c, S, s, agNo){
   P("**8.5 Force Majeure.** The Company is not in breach for delays or failures caused by severe weather, frozen or saturated ground, material shortages, equipment failure, illness, road closures or other events beyond its reasonable control. Work will resume as soon as reasonably possible.");
   P("## Article 9: Cancellation and Termination");
   P("**9.1 Customer’s Three-Day Right to Cancel.** The Customer may cancel this Agreement, without any penalty or obligation, at any time before midnight of the third business day after the date of this Agreement, by written notice to the Company. If the Customer cancels within that period, the Company will refund all payments made under this Agreement, to the original payment method, within 10 business days after receiving the notice. See the Notice of Cancellation at the end of this Agreement.");
-  P("**9.2 Customer Cancellation After Three Days.** After that period, the Customer may cancel by written notice. The Company may keep from the deposit the cost of materials already ordered or delivered and the value of work already performed, and will refund the rest to the original payment method. If those costs exceed the deposit, the Customer shall pay the difference.");
+  P("**9.2 Customer Cancellation After Three Days.** After that period, the Customer may cancel by written notice. The Company may keep from any amount paid the cost of materials already ordered or delivered and the value of work already performed, and will refund the rest to the original payment method. If those costs exceed the amount paid, the Customer shall pay the difference.");
   P("**9.3 By Company.** The Company may terminate this Agreement on 3 days’ written notice, or immediately for non-payment, unsafe conditions, or abusive conduct toward Company personnel. The Company will refund amounts paid for work not performed and materials not ordered, to the original payment method.");
   P("## Article 10: General Provisions");
   P("**10.1 Independent Contractor.** The Company is an independent contractor and controls the means, methods, equipment, and personnel used to perform the services, and may use subcontractors.");
@@ -2591,7 +2596,7 @@ function openLandscaping(clientId, sid){
 }
 function ldaSetup(){
   const X=signCtx, S=X.S, c=clients[X.clientId], s=(c.services||{})[S.sid]||{}; X.mode="lda-setup"; ssaBarOff();
-  const price=+s.price||0, half=r2(price/2);
+  const price=+s.price||0, half=ldaDeposit(price);
   $("#signTitle").textContent = LDA_NAME+": setup";
   $("#signBody").innerHTML = `<div class="signpanel" id="ldaForm" style="margin-top:0">
     <h4>${esc(c.name)}</h4>
@@ -2609,7 +2614,7 @@ function ldaSetup(){
       <div><label>Pre-existing conditions (Article 7)</label><input id="ld-pre" value="${esc(S.pre)}" placeholder="None noted"></div>
     </div>
     <div class="pstotal"><span>Charged today</span><b>${money(half)||"$0"}</b></div>
-    <div class="meta">50% when the card is saved at signing. The other ${money(r2(price-half))} is charged when the job is set to Done.</div>
+    <div class="meta">${half>0?`50% when the card is saved at signing. The other ${money(r2(price-half))} is charged when the job is set to Done.`:`Under $${LDA_DEPOSIT_MIN}: the card goes on file at signing and the full ${money(price)} is charged when the job is set to Done.`}</div>
     <div class="meta" id="ld-err" style="color:var(--red);font-weight:600;margin-top:8px"></div>
     <div class="actions"><button type="button" class="left" id="ld-later">Save for later</button><button type="button" class="primary big" id="ld-send">Email contract to sign</button></div>
   </div>`;
@@ -2642,19 +2647,19 @@ async function ldaSend(){
   try{
     ldaSaveDraft().catch(()=>{});
     X.agNo = X.agNo || `MB-${today().replace(/-/g,"")}-${Math.random().toString(36).slice(2,6).toUpperCase().padEnd(4,"X")}`;
-    const d=today(), L=fmtLong(d), CB=fmtLong(ssaCancelBy(d)), now=Date.now(), price=+s.price, half=r2(price/2), bal=r2(price-half);
+    const d=today(), L=fmtLong(d), CB=fmtLong(ssaCancelBy(d)), now=Date.now(), price=+s.price, half=ldaDeposit(price), bal=r2(price-half);
     const textT = ldaText(c,S,s,X.agNo).split(L).join("{{SIGNED_LONG}}");
     const noticeT = ssaNotice(X.agNo).split(CB).join("{{CANCEL_BY_LONG}}").split(L).join("{{SIGNED_LONG}}");
     const token = randToken(), svc=svcInfo(), link = `${SIGN_PAGE}?t=${token}&s=${svcDeploy(svc.url)}`;
-    const job = `Landscaping${s.desc?": "+s.desc:""}`, summary = `${job}, ${money(price)}: 50% at signing, balance when done`;
+    const job = `Landscaping${s.desc?": "+s.desc:""}`, summary = `${job}, ${money(price)}: ${half>0?"50% at signing, balance when done":"billed in full when done"}`;
     const upd0 = {};
     if(S.email && S.email!==(c.email||"")) upd0["clients/"+id+"/email"]=S.email;
     if((S.email2||"")!==(c.email2||"")) upd0["clients/"+id+"/email2"]=S.email2||null;
     if(!payOnFileOk(c)) upd0["clients/"+id+"/payOnFile"] = { status:"missing", since:now };
     upd0[`clients/${id}/services/${s.sid}/agreementNo`] = X.agNo;
     if(s.jobStatus!=="Done") upd0[`clients/${id}/services/${s.sid}/jobStatus`] = "Scheduled";
-    upd0["sync/qb/"+db.ref("sync/qb").push().key] = { type:"charge", trigger:"signing", status:"pending", clientId:id, contractId:"{{CID}}", sid:s.sid, amount:half, date:today(), description:`${LDA_NAME} ${X.agNo}: 50% deposit, ${job}`, createdAt:now, createdBy:me.email };
-    upd0["sync/qb/"+db.ref("sync/qb").push().key] = { type:"charge", trigger:"completion", status:"scheduled", clientId:id, contractId:"{{CID}}", sid:s.sid, amount:bal, description:`${job}: balance, job complete (${X.agNo})`, createdAt:now, createdBy:me.email };
+    if(half>0) upd0["sync/qb/"+db.ref("sync/qb").push().key] = { type:"charge", trigger:"signing", status:"pending", clientId:id, contractId:"{{CID}}", sid:s.sid, amount:half, date:today(), description:`${LDA_NAME} ${X.agNo}: 50% deposit, ${job}`, createdAt:now, createdBy:me.email };
+    upd0["sync/qb/"+db.ref("sync/qb").push().key] = { type:"charge", trigger:"completion", status:"scheduled", clientId:id, contractId:"{{CID}}", sid:s.sid, amount:bal, description:`${job}: ${half>0?"balance":"full amount"}, job complete (${X.agNo})`, createdAt:now, createdBy:me.email };
     if(LEAD_STAGES.includes(c.status)){ upd0["clients/"+id+"/status"]="active"; if(!c.wonAt) upd0["clients/"+id+"/wonAt"]=now; }
     Object.assign(upd0, qbCustomerRow(id));
     const req = { status:"queued", kind:"landscaping", clientId:id, tplName:LDA_NAME, tplVersion:LDA_VERSION, agreementNo:X.agNo, amount:price, dueNow:half, dueInstall:0, perVisit:null,
