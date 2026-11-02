@@ -2658,6 +2658,7 @@ async function ldaSend(){
     if(!payOnFileOk(c)) upd0["clients/"+id+"/payOnFile"] = { status:"missing", since:now };
     upd0[`clients/${id}/services/${s.sid}/agreementNo`] = X.agNo;
     if(s.jobStatus!=="Done") upd0[`clients/${id}/services/${s.sid}/jobStatus`] = "Scheduled";
+    if(Object.values(qbRows).some(r=>r.type==="charge" && r.sid===s.sid && ["deposit","completion"].includes(r.trigger))) throw new Error("This job already has charges from Bill 50/50. Remove them in Charges first, or bill it without an agreement.");
     if(half>0) upd0["sync/qb/"+db.ref("sync/qb").push().key] = { type:"charge", trigger:"signing", status:"pending", clientId:id, contractId:"{{CID}}", sid:s.sid, amount:half, date:today(), description:`${LDA_NAME} ${X.agNo}: 50% deposit, ${job}`, createdAt:now, createdBy:me.email };
     upd0["sync/qb/"+db.ref("sync/qb").push().key] = { type:"charge", trigger:"completion", status:"scheduled", clientId:id, contractId:"{{CID}}", sid:s.sid, amount:bal, description:`${job}: ${half>0?"balance":"full amount"}, job complete (${X.agNo})`, createdAt:now, createdBy:me.email };
     if(LEAD_STAGES.includes(c.status)){ upd0["clients/"+id+"/status"]="active"; if(!c.wonAt) upd0["clients/"+id+"/wonAt"]=now; }
@@ -3103,26 +3104,29 @@ function renderSvcBills(){
       const trig = s.type==="lights" ? ["install"] : ["deposit","completion"];
       const rows = Object.entries(qbRows).filter(([,r])=>r.type==="charge" && r.clientId===openId && trig.includes(r.trigger) && (r.sid===sid || (!r.sid && s.type==="lights")));
       h = rows.map(([,r])=>`<div class="bl"><b>${esc(CHARGE_LABEL[r.trigger])}</b> ${money(r.amount)} ${STATE_WORD(r)}${r.status==="scheduled"?`<span class="meta">${s.type==="lights"?"Tick Installed, then Save and charge (or approve the crew's day in Service log).":"Set Status to Done, then Save and charge (or approve the crew's day in Service log)."}</span>`:""}</div>`).join("");
-      if(s.type==="landscaping" && !rows.length && +s.price>0)
-        h = `<div class="bl"><button type="button" class="small" data-fifty="${sid}" ${dirty?"disabled":""}>Bill 50/50: ${money(r2(+s.price/2))} now, ${money(r2(+s.price - r2(+s.price/2)))} when done</button>${dirty?'<span class="meta">Save first.</span>':""}</div>`;
+      const inAgreement = s.type==="landscaping" && (s.agreementNo || (c.signReq && c.signReq.kind==="landscaping" && c.signReq.sid===sid && OPEN_REQ.includes(c.signReq.status)));
+      if(s.type==="landscaping" && inAgreement && !rows.length) h = `<div class="bl"><span class="meta">Billing is set by the ${LDA_NAME} when it is signed.</span></div>`;
+      if(s.type==="landscaping" && !inAgreement && !rows.length && +s.price>0)
+        h = `<div class="bl"><button type="button" class="small" data-fifty="${sid}" ${dirty?"disabled":""}>${ldaDeposit(s.price)>0?`Bill 50/50: ${money(ldaDeposit(s.price))} now, ${money(r2(+s.price - ldaDeposit(s.price)))} when done`:`Bill when done: ${money(+s.price)} (under $${LDA_DEPOSIT_MIN}, no deposit)`}</button>${dirty?'<span class="meta">Save first.</span>':""}</div>`;
     }
     box.innerHTML=h; box.hidden=!h;
   });
-  document.querySelectorAll("#svcList [data-fifty]").forEach(b=>b.onclick=()=>{ if(armed(b,"Tap again to set up 50/50")) billFifty(openId, b.dataset.fifty); });
+  document.querySelectorAll("#svcList [data-fifty]").forEach(b=>b.onclick=()=>{ if(armed(b,"Tap again to set up billing")) billFifty(openId, b.dataset.fifty); });
   const bar=$("#chargeBar"); if(bar){ bar.innerHTML = `<button type="button" class="small" id="chgOpen">Add a charge</button><span class="meta">Snow visit past 16, lights service call, or anything else.</span>`; $("#chgOpen").onclick=()=>openChargeDlg(openId); }
 }
 // Landscaping 50/50: half due now, the balance waits until the job is set to Done. Not on the Undo list (money rows).
 async function billFifty(clientId, sid){
   const c=clients[clientId]||{}, s=(c.services||{})[sid]; if(!s || !(+s.price>0)) return toast("Set a price on the job and save first.");
   if(Object.values(qbRows).some(r=>r.type==="charge" && r.sid===sid && (r.trigger==="deposit"||r.trigger==="completion"))) return toast("This job already has its 50/50 charges.");
-  const now=Date.now(), half=r2(+s.price/2), bal=r2(+s.price-half), job=`Landscaping${s.desc?", "+s.desc:""}`, done=s.jobStatus==="Done";
-  const upd={
-    ["sync/qb/"+db.ref("sync/qb").push().key]: { type:"charge", trigger:"deposit", status:"pending", auto:true, releasedAt:now, releasedBy:me.email, clientId, sid, amount:half, date:today(), description:`${job}: 50% deposit`, createdAt:now, createdBy:me.email },
-    ["sync/qb/"+db.ref("sync/qb").push().key]: { type:"charge", trigger:"completion", status:done?"pending":"scheduled", clientId, sid, amount:bal, ...(done?{date:today()}:{}), description:`${job}: balance, job complete`, createdAt:now, createdBy:me.email },
-    [`clientLog/${clientId}/${db.ref("clientLog").push().key}`]: { text:`${job}: billed 50/50. ${money(half)} deposit due now; ${money(bal)} ${done?"balance also due now (job already done)":"balance when the job is done"}.`, at:now, by:me.email, source:"payment" } };
+  const now=Date.now(), half=ldaDeposit(s.price), bal=r2(+s.price-half), job=`Landscaping${s.desc?", "+s.desc:""}`, done=s.jobStatus==="Done";
+  const upd={};
+  if(half>0) upd["sync/qb/"+db.ref("sync/qb").push().key] = { type:"charge", trigger:"deposit", status:"pending", auto:true, releasedAt:now, releasedBy:me.email, clientId, sid, amount:half, date:today(), description:`${job}: 50% deposit`, createdAt:now, createdBy:me.email };
+  Object.assign(upd, {
+    ["sync/qb/"+db.ref("sync/qb").push().key]: { type:"charge", trigger:"completion", status:done?"pending":"scheduled", clientId, sid, amount:bal, ...(done?{date:today()}:{}), description:`${job}: ${half>0?"balance":"full amount"}, job complete`, createdAt:now, createdBy:me.email },
+    [`clientLog/${clientId}/${db.ref("clientLog").push().key}`]: { text: half>0 ? `${job}: billed 50/50. ${money(half)} deposit due now; ${money(bal)} ${done?"balance also due now (job already done)":"balance when the job is done"}.` : `${job}: billed in full when done, ${money(bal)}${done?" (job already done, due now)":""}.`, at:now, by:me.email, source:"payment" } });
   if(!c.payOnFile) upd[`clients/${clientId}/payOnFile`] = { status:"missing", since:now };
   await db.ref().update(upd);
-  toast(`${money(half)} deposit is in Charges to run. The ${money(bal)} balance waits for Done.`); renderSvcBills();
+  toast(half>0 ? `${money(half)} deposit is in Charges to run. The ${money(bal)} balance waits for Done.` : `The ${money(bal)} charge waits for Done.`); renderSvcBills();
 }
 const CHG_KINDS = [
   { k:"overage", t:"Snow visit past 16", trig:"overage" },
