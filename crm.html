@@ -1907,7 +1907,7 @@ const ssaBlank = c => ({
   neighborName:"", neighborAddr:"",
   fall:{ on:hasSvc(c,"fall"), two:false, corner:false, oak:false, gutters:false, big:false, bigPrice:"", nb:false, cp:false, cpPrice:"", cpWhy:"", cpOther:"", wlDisp:"haul", wlGut:false, note:"" },
   lights:{ on:hasSvc(c,"lights"), pkg:"", color:"", shrub:0, medTree:0, lgTree:0, wreath:0, two:false, twoShow:false, steep:false, ft:0, nb:false, cp:false, cpPrice:"", cpWhy:"", cpOther:"" },
-  snow:{ on:hasSvc(c,"snow"), lot:"", nb:false, cp:false, cpPrice:"", cpWhy:"", cpOther:"" } });
+  snow:{ on:hasSvc(c,"snow"), lot:"", nb:false, cp:false, cpPrice:"", cpWhy:"", cpOther:"", cpPP:"" } });
 // Showcase carries a full season Fall Cleanup inside its price. It is sold only in Livonia (South or North).
 const ssaShowcaseFall = S => S.lights.on && S.lights.pkg==="showcase" && S.zone!=="westland";
 const r2 = n => Math.round(n*100)/100;
@@ -2018,7 +2018,9 @@ function ssaText(c, S, k, agNo){
 }
 // Snow: the season price covers this many visits; each one after is invoiced at the per-push rate for the area and lot.
 const SSA_PUSHES = 16;
-const ssaPerPush = S => { const P=SSA_SNOW.find(x=>x.k===S.snow.lot); return P ? (S.zone==="north"?P.ppN:P.ppSw) : 0; };
+// A custom snow price can also carry its own per-visit rate after the sixteenth (Nov 4, 2026), e.g. a corner lot
+// sold at standard pricing keeps the standard per-visit rate.
+const ssaPerPush = S => { if(S.snow.cp && +S.snow.cpPP>0) return +S.snow.cpPP; const P=SSA_SNOW.find(x=>x.k===S.snow.lot); return P ? (S.zone==="north"?P.ppN:P.ppSw) : 0; };
 // Three-day right to cancel (FTC Cooling-Off Rule, 16 CFR 429; Michigan Home Solicitation Sales Act, MCL 445.113).
 const SSA_SELLER = "Mangiapane Brothers LLC";
 const SSA_SELLER_ADDR = "3540 Thorn Tree Ct., Ann Arbor, MI 48105";
@@ -2115,7 +2117,8 @@ function ssaSetup(){
         ${nb("ss-l-nb",S.lights.nb)}${cp("l",S.lights,"Christmas Lights")}</div></div>
     <div class="svc svcbar snow">${ck("ss-snow",`<b>Snow Removal</b> <span class="meta" id="ss-snow-p"></span>`,S.snow.on)}
       <div id="ss-snow-box" class="ssabox"><label>Lot</label><select id="ss-s-lot"><option value="">Choose</option>${SSA_SNOW.map(P=>`<option value="${P.k}"${S.snow.lot===P.k?" selected":""}>${P.n} ($${P.sw} South and Westland, $${P.n2} North)</option>`).join("")}</select>
-        ${nb("ss-s-nb",S.snow.nb)}${cp("s",S.snow,"Snow Removal")}</div></div>
+        ${nb("ss-s-nb",S.snow.nb)}${cp("s",S.snow,"Snow Removal")}
+        <div id="ss-s-pprow" ${S.snow.cp?"":"hidden"} style="margin-top:6px"><label>Per visit after the sixteenth, $ (leave empty for the lot's standard rate)</label><input id="ss-s-pp" type="number" inputmode="decimal" min="0" step="1" style="width:140px" value="${esc(S.snow.cpPP||"")}"></div></div></div>
     <div id="ss-nb-box" class="grid2" hidden>
       <div><label>Neighbor's name</label><input id="ss-nb-name" value="${esc(S.neighborName||"")}" autocomplete="off"></div>
       <div><label>Neighbor's address</label><input id="ss-nb-addr" value="${esc(S.neighborAddr||"")}" autocomplete="off"></div></div>
@@ -2141,7 +2144,7 @@ function ssaSync(){
   S.fall.on=g("ss-fall").checked; SSA_FALL_ADJ.forEach(([k])=>S.fall[k]=g("ss-f-"+k).checked); S.fall.bigPrice=g("ss-f-bigp").value; S.fall.big=g("ss-f-big").checked; S.fall.nb=g("ss-f-nb").checked; S.fall.wlDisp=g("ss-f-wldisp").value; S.fall.wlGut=g("ss-f-wlgut").checked; S.fall.note=g("ss-f-note").value.trim();
   S.lights.on=g("ss-lights").checked; S.lights.pkg=g("ss-l-pkg").value; S.lights.color=g("ss-l-color").value; S.lights.nb=g("ss-l-nb").checked;
   SSA_ADDONS.forEach(([k])=>S.lights[k]=n("ss-a-"+k)); SSA_L_ADJ.forEach(([k])=>S.lights[k]=g("ss-la-"+k).checked); S.lights.ft=n("ss-l-ft");
-  S.snow.on=g("ss-snow").checked; S.snow.lot=g("ss-s-lot").value; S.snow.nb=g("ss-s-nb").checked;
+  S.snow.on=g("ss-snow").checked; S.snow.lot=g("ss-s-lot").value; S.snow.nb=g("ss-s-nb").checked; S.snow.cpPP=g("ss-s-pp").value; g("ss-s-pprow").hidden=!S.snow.cp;
   [["f",S.fall],["l",S.lights],["s",S.snow]].forEach(([p,x])=>{ x.cpPrice=g(`ss-${p}-cpp`).value; x.cpWhy=g(`ss-${p}-cpw`).value; x.cpOther=g(`ss-${p}-cpo`).value.trim();
     g(`ss-${p}-cpbox`).hidden=!x.cp; g(`ss-${p}-cporow`).hidden=x.cpWhy!=="Other"; g(`ss-${p}-cpbtn`).textContent=x.cp?"Remove custom price":"Custom price"; });
   S.neighborName=g("ss-nb-name").value.trim(); S.neighborAddr=g("ss-nb-addr").value.trim(); S.payUrl=(g("ss-payurl")?.value||"").trim();
