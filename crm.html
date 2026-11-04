@@ -1781,7 +1781,7 @@ cache.contractTemplates = () => templates;
 // The admin sets it up (services, options, property details), then hands the iPad over. The customer sees a
 // finished agreement that holds only the services chosen, and signs at the bottom. Nothing else to fill in.
 // Prices and clause text come from the company's Seasonal Services Agreement. Changing either: raise SSA_VERSION.
-const SSA_VERSION = 3;
+const SSA_VERSION = 4;
 const SSA_NAME = "Seasonal Services Agreement";
 const LSA_NAME = "Lawn Service Agreement";
 const LDA_NAME = "Landscaping Services Agreement";
@@ -1805,6 +1805,15 @@ const SSA_FALL_WL_ITEMS = [
   ["3.2","Debris Disposal.","Leaves and yard waste gathered during the visit are hauled away by the Company."],
   ["3.3","Gutters.","Gutter cleaning is not included in the Westland Fall Cleanup."],
   ["3.4","Concealed Items.","The Company is not responsible for damage to items concealed by leaves or vegetation, including hoses, toys, unmarked sprinkler heads and low-voltage wiring."]];
+// Version 4 (Nov 3, 2026): Westland Fall Cleanup takes a leaf disposal choice (hauled away by the Company, or bagged
+// into the Customer's yard waste cans), an optional gutter add, and any Fall Cleanup can carry a scope note that
+// prints on the agreement under Section 2.1.
+const ssaWlBag = f => f.wlDisp==="bag";
+const ssaWlDesc = f => `One visit in November, after most of the leaves have fallen: leaves raked or blown from the lawn and flower beds, sticks and branches gathered, and everything ${ssaWlBag(f)?"bagged and placed in the Customer's yard waste cans and bags at the Property":"hauled away by the Company"}${f.wlGut?"; gutters cleared during the visit":""}. Not included: ${f.wlGut?"":"gutter cleaning, "}${ssaWlBag(f)?"hauling or disposal of the bagged leaves, ":""}roof checks, bed cleanouts, mulch, and leaves that fall after the visit.`;
+const ssaWlItems = f => SSA_FALL_WL_ITEMS.map(([n,h,b]) =>
+  n==="3.2" ? [n,h, ssaWlBag(f) ? "Leaves and yard waste gathered during the visit are bagged and placed in the Customer's yard waste cans and bags at the Property. The Company does not haul them away; curbside collection is the Customer's responsibility." : b] :
+  n==="3.3" ? [n,h, f.wlGut ? "Gutters are cleared during the visit, and the gutter debris is disposed of with the leaves." : b] : [n,h,b]);
+const ssaWlLabel = f => `Westland Fall Cleanup: one visit, ${f.wlGut?"gutters included":"no gutters"}, leaves ${ssaWlBag(f)?"bagged at the customer's cans (not hauled)":"hauled away"}. These terms go into the agreement automatically.`;
 const ssaTerm = (S,x) => x==="fall" && S.zone==="westland" ? SSA_FALL_WL_TERM : SSA_TERM[x];
 const SSA_FALL_ADJ = [["two","Two-storey home",80],["corner","Corner lot",85],["oak","Heavy oak lot",60],["gutters","Gutters not cleaned in three or more years",50]];
 const SSA_PKG = [
@@ -1896,7 +1905,7 @@ const ssaBlank = c => ({
   zone: ssaZoneOf(c.region),
   ptype:"Residential", prop:c.address||"", areas:"", pre:"", email:c.email||"", email2:c.email2||"",
   neighborName:"", neighborAddr:"",
-  fall:{ on:hasSvc(c,"fall"), two:false, corner:false, oak:false, gutters:false, big:false, bigPrice:"", nb:false, cp:false, cpPrice:"", cpWhy:"", cpOther:"" },
+  fall:{ on:hasSvc(c,"fall"), two:false, corner:false, oak:false, gutters:false, big:false, bigPrice:"", nb:false, cp:false, cpPrice:"", cpWhy:"", cpOther:"", wlDisp:"haul", wlGut:false, note:"" },
   lights:{ on:hasSvc(c,"lights"), pkg:"", color:"", shrub:0, medTree:0, lgTree:0, wreath:0, two:false, twoShow:false, steep:false, ft:0, nb:false, cp:false, cpPrice:"", cpWhy:"", cpOther:"" },
   snow:{ on:hasSvc(c,"snow"), lot:"", nb:false, cp:false, cpPrice:"", cpWhy:"", cpOther:"" } });
 // Showcase carries a full season Fall Cleanup inside its price. It is sold only in Livonia (South or North).
@@ -1977,7 +1986,7 @@ function ssaText(c, S, k, agNo){
   P("|= Service | Timeframe", ...[termFall&&"fall", on.lights&&"lights", on.snow&&"snow"].filter(Boolean).map(x=>`| ${ssaTerm(S,x)[0]} | ${ssaTerm(S,x)[1]}`));
   P("## Article 2: Services and Pricing");
   P("The Customer purchases only the services listed below at the prices stated. All prices include card processing; there is no separate card fee.");
-  if(on.fall){ P("### 2.1 Fall Cleanup"); P(S.zone==="westland" ? `**Westland Fall Cleanup.** ${SSA_FALL_WL_DESC}` : `**Full Fall Cleanup.** ${SSA_FALL_DESC}`); P(lineTable(k.fl,"Fall Cleanup Total",k.fall)); }
+  if(on.fall){ P("### 2.1 Fall Cleanup"); P(S.zone==="westland" ? `**Westland Fall Cleanup.** ${ssaWlDesc(S.fall)}` : `**Full Fall Cleanup.** ${SSA_FALL_DESC}`); if(t(S.fall.note)) P(`**Agreed Scope.** ${t(S.fall.note)}`); P(lineTable(k.fl,"Fall Cleanup Total",k.fall)); }
   if(on.lights){ const pk=SSA_PKG.find(x=>x.k===S.lights.pkg);
     P("### 2.2 Holiday Lighting"); P(`**${pk.n}.** ${pk.d}`); P(SSA_LIGHTS_NOTE); P(`**Light Color:** ${t(S.lights.color)}`); P(lineTable(k.ll,"Holiday Lighting Total",k.lights)); }
   if(on.snow){ P("### 2.3 Snow Removal"); P([...lineTable(k.sl,"Snow Removal Season Total",k.snow).split("\n"), `| Each visit after the sixteenth (Section 4.8) | ${money(pp)}`].join("\n")); }
@@ -1986,7 +1995,7 @@ function ssaText(c, S, k, agNo){
     if(A.svc && !(A.svc==="fall" ? termFall : on[A.svc])) continue;
     P(`## Article ${A.n}: ${A.title}`);
     if(A.n===7) P("The Customer shall:");
-    for(const [num,head,body] of (A.n===3 && S.zone==="westland" ? SSA_FALL_WL_ITEMS : A.items)){
+    for(const [num,head,body] of (A.n===3 && S.zone==="westland" ? ssaWlItems(S.fall) : A.items)){
       if(num==="4.8"){ P(`**4.8 Season Limit.** The season price covers up to sixteen (${SSA_PUSHES}) visits, counted under Section 4.2. Each visit after the sixteenth is charged to the payment method on file after that visit, at the per-visit rate in Section 2.3 (${money(pp)}).`); continue; }
       P(head ? `**${num} ${head}** ${body}` : `**${num}** ${body}`);
     }
@@ -2085,9 +2094,12 @@ function ssaSetup(){
     <div id="ss-real">
     <div class="sect">Services</div>
     <div class="svc svcbar fall">${ck("ss-fall",`<b>Fall Cleanup</b> <span class="meta" id="ss-fall-p"></span>`,S.fall.on)}
-      <div class="warnline" id="ss-fall-wl" hidden>Westland Fall Cleanup: one visit, no gutters, leaves hauled away. The Westland terms go into the agreement automatically.</div>
+      <div class="warnline" id="ss-fall-wl" hidden>${ssaWlLabel(S.fall)}</div>
+      <div id="ss-fall-wlopt" class="ssabox" hidden><div class="grid2"><div><label>Leaves (3.2)</label><select id="ss-f-wldisp"><option value="haul"${S.fall.wlDisp!=="bag"?" selected":""}>Hauled away by the Company</option><option value="bag"${S.fall.wlDisp==="bag"?" selected":""}>Bagged into the customer's yard waste cans, not hauled</option></select></div></div>
+        ${ck("ss-f-wlgut","Gutters cleaned on this visit (3.3), price it with Custom price",S.fall.wlGut)}</div>
       <div id="ss-fall-box" class="ssabox">${SSA_FALL_ADJ.map(([k,n,p])=>ck("ss-f-"+k,`${n} +$${p}`,S.fall[k])).join("")}
         <div class="row">${ck("ss-f-big","Turf over 10,000 sq ft, walked price $",S.fall.big)}<input id="ss-f-bigp" type="number" inputmode="decimal" min="0" style="width:110px" value="${esc(S.fall.bigPrice)}"></div>
+        <div style="margin-top:6px"><label>Scope note, printed on the agreement under 2.1 (leave empty for none)</label><textarea id="ss-f-note" rows="2" placeholder="Example: Leaves bagged into the three yard waste cans at the side of the garage.">${esc(S.fall.note||"")}</textarea></div>
         ${nb("ss-f-nb",S.fall.nb)}${cp("f",S.fall,"Fall Cleanup")}</div></div>
     <div class="svc svcbar lights">${ck("ss-lights",`<b>Christmas Lights</b> <span class="meta" id="ss-lights-p"></span>`,S.lights.on)}
       <div id="ss-lights-box" class="ssabox">
@@ -2126,7 +2138,7 @@ function ssaSetup(){
 function ssaSync(){
   const X=signCtx; if(!X || X.mode!=="ssa-setup") return; const S=X.S, g=id=>document.getElementById(id), n=id=>Math.max(0,parseInt(g(id).value)||0);
   S.email=g("ss-email").value.trim(); S.email2=g("ss-email2").value.trim(); S.zone=g("ss-zone").value; S.prop=g("ss-prop").value.trim(); S.ptype=g("ss-ptype").value; S.areas=g("ss-areas").value.trim(); S.pre=g("ss-pre").value.trim();
-  S.fall.on=g("ss-fall").checked; SSA_FALL_ADJ.forEach(([k])=>S.fall[k]=g("ss-f-"+k).checked); S.fall.bigPrice=g("ss-f-bigp").value; S.fall.big=g("ss-f-big").checked; S.fall.nb=g("ss-f-nb").checked;
+  S.fall.on=g("ss-fall").checked; SSA_FALL_ADJ.forEach(([k])=>S.fall[k]=g("ss-f-"+k).checked); S.fall.bigPrice=g("ss-f-bigp").value; S.fall.big=g("ss-f-big").checked; S.fall.nb=g("ss-f-nb").checked; S.fall.wlDisp=g("ss-f-wldisp").value; S.fall.wlGut=g("ss-f-wlgut").checked; S.fall.note=g("ss-f-note").value.trim();
   S.lights.on=g("ss-lights").checked; S.lights.pkg=g("ss-l-pkg").value; S.lights.color=g("ss-l-color").value; S.lights.nb=g("ss-l-nb").checked;
   SSA_ADDONS.forEach(([k])=>S.lights[k]=n("ss-a-"+k)); SSA_L_ADJ.forEach(([k])=>S.lights[k]=g("ss-la-"+k).checked); S.lights.ft=n("ss-l-ft");
   S.snow.on=g("ss-snow").checked; S.snow.lot=g("ss-s-lot").value; S.snow.nb=g("ss-s-nb").checked;
@@ -2139,7 +2151,7 @@ function ssaSync(){
   const wl=S.zone==="westland", show=S.lights.pkg==="showcase";
   if(wl){ S.fall.two=false; S.fall.gutters=false; }
   const k=ssaCalc(S);
-  g("ss-fall-wl").hidden=!(wl && S.fall.on); g("ss-fall-box").hidden=!S.fall.on;
+  g("ss-fall-wl").hidden=!(wl && S.fall.on); g("ss-fall-wl").textContent=ssaWlLabel(S.fall); g("ss-fall-wlopt").hidden=!(wl && S.fall.on); g("ss-fall-box").hidden=!S.fall.on;
   ["two","gutters"].forEach(x=>{ const el=g("ss-f-"+x); el.closest("label").hidden=wl; if(wl){ el.checked=false; S.fall[x]=false; } });
   g("ss-lights-box").hidden=!S.lights.on; g("ss-snow-box").hidden=!S.snow.on;
   g("ss-l-wl").hidden=!(wl && show); g("ss-la-two-row").hidden=show; g("ss-la-twoShow-row").hidden=!show;
@@ -2214,7 +2226,7 @@ function ssaDetails(S, k, agNo){
   const details = { agreementNo:agNo, version:SSA_VERSION, zone:S.zone, propertyType:S.ptype, serviceProperty:S.prop, serviceAreas:S.areas, preExisting:S.pre, email:S.email, email2:S.email2||"",
     total:k.total, dueNow:k.dueNow, dueInstall:k.dueInstall };
   if(nbAny) details.neighbor = { name:S.neighborName, address:S.neighborAddr, fall:fallOn&&S.fall.nb, lights:S.lights.on&&S.lights.nb, snow:S.snow.on&&S.snow.nb };
-  if(fallOn) details.fall = { lines:k.fl, total:k.fall, options:{ two:S.fall.two, corner:S.fall.corner, oak:S.fall.oak, gutters:S.fall.gutters, big:S.fall.big, bigPrice:S.fall.big?(+S.fall.bigPrice||0):0 }, customPrice:ssaCpDetail(S.fall,k.std.fall) };
+  if(fallOn) details.fall = { lines:k.fl, total:k.fall, options:{ two:S.fall.two, corner:S.fall.corner, oak:S.fall.oak, gutters:S.fall.gutters, big:S.fall.big, bigPrice:S.fall.big?(+S.fall.bigPrice||0):0, ...(S.zone==="westland"?{ leaves:ssaWlBag(S.fall)?"bagged":"hauled", westlandGutters:!!S.fall.wlGut }:{}) }, scopeNote:S.fall.note||"", customPrice:ssaCpDetail(S.fall,k.std.fall) };
   if(S.lights.on) details.lights = { lines:k.ll, total:k.lights, gross:k.lightsGross, package:S.lights.pkg, color:S.lights.color, includesFallCleanup:ssaShowcaseFall(S),
     addons:Object.fromEntries(SSA_ADDONS.map(([a])=>[a,S.lights[a]||0]).filter(x=>x[1]>0)), options:{ two:S.lights.pkg!=="showcase"&&S.lights.two, twoShow:S.lights.pkg==="showcase"&&S.lights.twoShow, steep:S.lights.steep }, extraFeet:S.lights.ft||0,
     serviceCall:{ included:1, noLadder:SSA_CALL.plain, ladder:SSA_CALL.ladder }, customPrice:ssaCpDetail(S.lights,k.std.lights) };
@@ -2239,7 +2251,7 @@ function ssaApply(c, id, S, k, agNo, now, cid){
     const all = { ...(e?{}:{ type, createdAt:now, ...fresh }), ...fields, notes: e&&e[1].notes && !String(e[1].notes).includes(note) ? e[1].notes+"; "+note : note };
     for(const [f,v] of Object.entries(all)) upd[`clients/${id}/services/${sid}/${f}`]=v; };
   const noteOf = lines => lines.map(r=>r[0]).join(", ")+` (${agNo})`;
-  if(fallOn) put("fall", { package:S.zone==="westland"?"One visit":"Two passes", price:k.fall }, { route:"Route 1", pass1:false, pass2:false }, noteOf(k.fl));
+  if(fallOn) put("fall", { package:S.zone==="westland"?"One visit":"Two passes", price:k.fall }, { route:"Route 1", pass1:false, pass2:false }, noteOf(k.fl)+(S.zone==="westland"?`; leaves ${ssaWlBag(S.fall)?"BAGGED at customer's cans, not hauled":"hauled away"}${S.fall.wlGut?"; GUTTERS included":""}`:"")+(S.fall.note?`; scope: ${S.fall.note}`:""));
   else if(incFall) put("fall", { package:"Two passes" }, { route:"Route 1", price:0, pass1:false, pass2:false }, `Included in the Showcase lights package (${agNo})`);
   if(S.lights.on) put("lights", { price:k.lights }, { install:"", installed:false, takedown:"", gutters:false }, S.lights.color+": "+noteOf(k.ll));
   if(S.snow.on) put("snow", { price:k.snow }, { crew:"", start:"2026-11-01", end:"2027-03-15" }, noteOf(k.sl));
