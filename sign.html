@@ -14,6 +14,8 @@
   never received or stored by Mangiapane Brothers: the card form here sends the card straight to Intuit (QuickBooks Payments)
   for a one-time token. If the signing service switches card mode off, the card step emails a QuickBooks page instead.
   Agreement numbers starting TEST- are test agreements: a red banner on every step, no service, $1 charges.
+  Card on File links (kind "card", November 8, 2026): the same link with no agreement. The customer ticks the
+  authorization, types a name and enters a card. The card is saved in QuickBooks Payments and nothing is charged.
 -->
 <style>
   :root{color-scheme:light dark;
@@ -107,7 +109,7 @@
 </head>
 <body>
 <header><div class="in"><img src="mb-logo.png" alt="Mangiapane Brothers Lawn &amp; Snow"><div class="tag">Full-Service Property Maintenance for Those Who Take Pride in Their Home</div></div></header>
-<main id="main"><div class="center">Loading your agreement…</div></main>
+<main id="main"><div class="center">Loading…</div></main>
 
 <script>
 "use strict";
@@ -371,6 +373,103 @@ function showPayLink(A){
   });
 }
 
+// ---------- Card on File link (November 8, 2026): no agreement, nothing charged ----------
+// Same token link, same signing service, same Intuit card step as the agreements. The customer ticks the authorization,
+// types a name, and enters the card; the signing service saves it in QuickBooks Payments and replaces the card on file.
+const noFallback = m => String(m||"").replace(/,? or tap "Email me a secure QuickBooks page instead"( below)?/g, "").replace(/ You can turn it off for this page and try again\./, " Turn it off for this page and try again.") + (/call/.test(m||"") ? "" : " If it keeps happening, call "+PHONE+".");
+function showCardLink(A){
+  document.title = "Card on file · Mangiapane Brothers";
+  if(A.cardMode!=="token") return message("Card entry is not available right now", "Please call us at "+esc(PHONE)+" and we will help you put a card on file.");
+  if(A.locked) return message("Card entry is closed for this link", "For your security, card entry closes after three cards are not accepted. Call us at "+esc(PHONE)+" for a new link.");
+  $("#main").innerHTML = `
+    <div class="card"><h1>Hello ${esc(first(A))},</h1>
+      <p class="meta" style="margin:0 0 10px"><b>${esc(A.signerName)}</b>${A.address?`<br>${esc(A.address)}`:""}</p>
+      <p style="margin:0">${esc(A.intro)}</p>
+      <p class="meta" style="margin:10px 0 0">Nothing is charged when you save your card. This link works until ${esc(fmtStamp(A.expiresAt))}.</p></div>
+    <div class="card"><h2>Your card on file</h2>
+      <form class="opt main" id="cardForm" autocomplete="on" onsubmit="return false">
+        <div class="field2"><label for="ccName">Name on card</label><input id="ccName" name="ccname" autocomplete="cc-name" autocapitalize="words" value="${esc(A.signerName||"")}"></div>
+        <div class="field2"><label for="ccNum">Card number</label><input id="ccNum" name="cardnumber" autocomplete="cc-number" inputmode="numeric" placeholder="1234 5678 9012 3456" maxlength="23"><span class="brand" id="ccBrand"></span></div>
+        <div class="three"><div class="field2"><label for="ccExp">Expiration</label><input id="ccExp" name="exp-date" autocomplete="cc-exp" inputmode="numeric" placeholder="MM/YY" maxlength="5"></div>
+          <div class="field2"><label for="ccCvc">Security code</label><input id="ccCvc" name="cvc" autocomplete="cc-csc" inputmode="numeric" maxlength="4" placeholder="123"></div>
+          <div class="field2"><label for="ccZip">Billing ZIP</label><input id="ccZip" name="postal" autocomplete="billing postal-code" inputmode="numeric" placeholder="48150" maxlength="10"></div></div>
+        <label class="ck"><input type="checkbox" id="consent"><span>${esc(A.authText)}</span></label>
+        <div class="field"><label for="typed">Type your full name</label><input id="typed" autocomplete="name" autocapitalize="words" spellcheck="false" placeholder="${esc(A.signerName||"Your full name")}"></div>
+        <p class="meta" style="margin:8px 0 4px">Date: <b>${esc(A.todayLong)}</b>.</p>
+        <button type="button" class="primary wide" id="cardGo" style="margin-top:10px">Save my card</button>
+        <div class="err" id="err" hidden></div>
+        <p class="meta" style="margin:10px 0 0">Payments are processed by QuickBooks Payments, provided by Intuit Payments Inc. Your card goes straight to them; we never receive or store your card number or security code. There is no card fee.</p>
+        <p class="meta" style="margin:6px 0 0">This page is protected by reCAPTCHA, and the Google <a href="https://policies.google.com/privacy" target="_blank" rel="noopener">Privacy Policy</a> and <a href="https://policies.google.com/terms" target="_blank" rel="noopener">Terms of Service</a> apply.</p>
+      </form></div>
+    <p class="meta">${contact}</p>`;
+  const err = t => { const e=$("#err"); e.hidden=!t; e.textContent=t||""; if(t) e.scrollIntoView({block:"center"}); };
+  loadCaptcha(A.captchaKey).catch(()=>{});
+  const num=$("#ccNum"), exp=$("#ccExp"), btn=$("#cardGo"), WAS="Save my card";
+  num.oninput = () => { const d=digits(num.value).slice(0,19); num.value = d.replace(/(\d{4})(?=\d)/g,"$1 "); $("#ccBrand").textContent = brandOf(d); };
+  exp.oninput = () => { let d=digits(exp.value).slice(0,4); if(d.length===1 && +d>1) d="0"+d; exp.value = d.length>2 ? d.slice(0,2)+"/"+d.slice(2) : d; };
+  const reset = () => { btn.disabled=false; btn.textContent=WAS; };
+  // A lost reply never shows a failure or invites a second try: the outcome is read back by its attempt id.
+  const recheck = async attempt => {
+    btn.textContent="Confirming your card…";
+    const why = { declined:"That card was not accepted. Check the details or use a different card.", locked:"For your security, card entry is closed for this link. Call "+PHONE+" for a new link.",
+      captcha:"We could not confirm this request came from a person, so nothing was saved. Try again, or call "+PHONE+".", failed:"We could not save that card. Try again in a minute, or call "+PHONE+"." };
+    for(let i=0;i<15;i++){
+      await new Promise(r => setTimeout(r, 3000));
+      let V; try{ V = await call("get"); }catch(e){ continue; }
+      if(!V || !V.ok) continue;
+      if(V.status==="saved") return showCardDone({ ...A, ...V });
+      const last = V.payLast && V.payLast.attempt===attempt ? V.payLast.result : "";
+      if(last){ reset(); return err(why[last]||why.failed); }
+    }
+    message("We are still confirming your card", "Please do not enter your card again. Reload this page in a minute to see the result. If it still shows the card form, call "+esc(PHONE)+".");
+  };
+  btn.onclick = async () => {
+    const n=digits(num.value), m=/^(\d{2})\/(\d{2})$/.exec(exp.value), zip=$("#ccZip").value.trim(), name=$("#ccName").value.trim(), cvc=digits($("#ccCvc").value);
+    const typed=$("#typed").value.replace(/\s+/g," ").trim();
+    if(name.length<2) return err("Enter the name on the card.");
+    if(n.length<13 || !luhn(n)) return err("That card number is not valid. Check it and try again.");
+    if(!m || +m[1]<1 || +m[1]>12) return err("Enter the expiration as MM/YY.");
+    if(!/^\d{3,4}$/.test(cvc)) return err("Enter the security code from the card.");
+    if(!/^\d{5}(-\d{4})?$/.test(zip)) return err("Enter the billing ZIP code.");
+    if(!$("#consent").checked) return err("Tick the box to authorize us to keep the card on file.");
+    if(typed.length<3 || !/[A-Za-z]/.test(typed)){ $("#typed").focus(); return err("Type your full name."); }
+    err(""); btn.disabled=true; btn.textContent="Checking your card…";
+    let cardToken, captcha;
+    try{ cardToken = await intuitToken({ number:n, expMonth:m[1], expYear:"20"+m[2], cvc, name, address:{ postalCode:zip } }, A.payEnv); }
+    catch(e){ reset(); return err(noFallback(e.message)); }
+    num.value=""; $("#ccCvc").value="";
+    try{ captcha = await captchaToken(A.captchaKey); }
+    catch(e){ reset(); return err(noFallback(e.message)); }
+    btn.textContent="Saving your card…";
+    const attempt = "a-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2,10);
+    let R;
+    try{ R = await call("cardsave", { cardToken, captcha, attempt, consent:true, typedName:typed, ua:navigator.userAgent.slice(0,300), screen:`${screen.width}x${screen.height}` }); }
+    catch(e){ return recheck(attempt); }
+    if(R && R.ok && R.status==="saved") return showCardDone({ ...A, ...R });
+    try{ const V = await call("get"); if(V && V.ok && V.status==="saved") return showCardDone({ ...A, ...V }); }catch(e){ return recheck(attempt); }
+    if(!R || /unknown request/i.test(R.error||"")) return recheck(attempt);
+    if(R.locked){ return message("Card entry is closed for this link", esc(R.error)); }
+    reset(); err(R.error || "Not saved.");
+  };
+}
+function showCardDone(A){
+  document.title = "Card on file · Mangiapane Brothers";
+  const r=(a,b)=>`<tr><td>${a}</td><td>${b}</td></tr>`;
+  $("#main").innerHTML = `<div class="card done"><h1><span class="tick">✓</span>Your card is saved. Thank you.</h1>
+      <p style="margin:6px 0 0">${A.payLabel?esc(A.payLabel)+" is now the card on file for your Mangiapane Brothers services.":"It is now the card on file for your Mangiapane Brothers services."} Nothing was charged. You will receive an emailed receipt each time it is charged.</p></div>
+    <div class="card"><table class="quote">${r("Name",esc(A.signerName))}${A.payLabel?r("Card",esc(A.payLabel)):""}${A.savedAt?r("Saved",esc(fmtStamp(A.savedAt))):""}</table></div>
+    <p class="meta">${contact}</p>`;
+  window.scrollTo(0,0);
+}
+function routeCard(A){
+  if(A.status==="saved") return showCardDone(A);
+  if(A.status==="cancelled") return message("This link is no longer active", "A newer card link was sent to you. Use the latest link, or call us and we will send a new one.");
+  if(A.status==="expired") return message("This link has expired", "Card links work for 7 days. Call us and we will send a new one.");
+  if(A.status!=="ready") return message("This link is not valid", "We could not find this card link. Call us and we will send a new one.");
+  if(A.payBusy) return message("We are saving your card", "Please do not enter your card again. Reload this page in a minute to see the result, or call "+esc(PHONE)+".");
+  showCardLink(A);
+}
+
 // ---------- done ----------
 function showDone(A){
   dropBar();
@@ -422,6 +521,7 @@ function route(A){
   try{ A = await call("get"); }
   catch(e){ return message("We could not load your agreement", esc(e.message)+" Check your connection and reload this page."); }
   if(!A.ok) return message("We could not load your agreement", esc(A.error||""));
+  if(A.kind==="card") return routeCard(A);
   if(A.status==="cancelled") return message("This link is no longer active", "This agreement link was withdrawn, usually because a corrected one was sent. Check your email for a newer link.");
   if(A.status==="expired") return message("This link has expired", "Agreement links work for 7 days. Call us and we will send a new one.");
   if(A.status!=="ready" && A.status!=="signed") return message("This link is not valid", "We could not find this agreement.");

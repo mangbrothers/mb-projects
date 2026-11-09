@@ -399,6 +399,7 @@ details.ssamore summary{cursor:pointer;font-weight:600}
     <div id="svcRecord"></div>
 
     <div class="meta" id="billSummary" style="margin-top:10px"></div>
+    <div id="cardLinkBar" style="margin-top:8px"></div>
     <div class="row" id="chargeBar" style="margin-top:8px"></div>
 
     <div class="sect">Contact log <span class="n" id="logCount"></span></div>
@@ -1119,6 +1120,7 @@ $("#dlgPhone").oninput = showDlgDup;
 function renderStamps(){
   const c = openId ? clients[openId] : null;
   $("#billSummary").innerHTML = !c ? "" : `<b>Payment on file:</b> ${payOnFileLabel(c)||"none recorded"}. <b>Billing:</b> ${c.payStatus?esc(PAY_STATUSES[c.payStatus]||c.payStatus):"no payment recorded"}${c.qbId?" · QuickBooks customer "+esc(c.qbId):""}. Payments are recorded from Payment on file on each signed contract.`;
+  renderCardLink();
   if(!c){ $("#clientStamps").innerHTML=""; return; }
   $("#clientStamps").innerHTML = `<b>First contact</b><span>${fmtStamp(c.firstContactAt||c.createdAt)}</span><b>Last contact</b><span>${fmtStamp(lastContact(c))} <i class="meta">(${ago(lastContact(c))})</i></span>${c.wonAt?`<b>Won</b><span>${fmtStamp(c.wonAt)}</span>`:""}`;
 }
@@ -1178,13 +1180,15 @@ function renderContracts(){
   const ssaSg=ssaSigned(c); if(ssaSg) shown.add(ssaSg[0]);
   const lsaSg=lsaSigned(c); if(lsaSg) shown.add(lsaSg[0]);
   ldaSignedAll(c).forEach(([cid])=>shown.add(cid));
-  const others = mir.filter(([cid])=>!shown.has(cid)).sort((a,b)=>b[1].signedAt-a[1].signedAt);
+  const auths = mir.filter(([,m])=>m.tpl==="cardauth").sort((a,b)=>b[1].signedAt-a[1].signedAt);
+  const others = mir.filter(([cid,m])=>!shown.has(cid) && m.tpl!=="cardauth").sort((a,b)=>b[1].signedAt-a[1].signedAt);
   const dirty = dialogDirty();
   $("#ctrCount").textContent = needs.length ? `(${needs.filter(x=>x.signed).length} of ${needs.length} signed)` : "";
   box.innerHTML = ssaRowHtml(c, dirty) + lsaRowHtml(c, dirty) + ldaRowsHtml(c, dirty) + (dirty ? `<div class="warnline">Services changed. Save first so the contract shows the right price and dates.</div>` : "") +
     needs.map(x=>`<div class="ctr"><div class="t"><b>${esc(x.t.name)}</b>${x.t.sample?' <span class="pill sample">SAMPLE</span>':""}<div class="meta">${esc(SERVICE_TYPES[x.s.type].label)}: ${esc(SERVICE_TYPES[x.s.type].summary(x.s))}</div></div>
       ${x.signed?`<span class="pill signed">Signed ${fmtDate(new Date(x.signed[1].signedAt).toLocaleDateString("en-CA",{timeZone:TZ}))}</span><button type="button" class="small" data-view-ctr="${x.signed[0]}">View</button>`
                :`<span class="pill unsigned">Not signed</span><button type="button" class="small primary" data-sign="${x.tid}|${x.sid}" ${dirty?"disabled":""}>Open to sign</button>`}</div>`).join("") +
+    auths.map(([cid,m])=>`<div class="ctr"><div class="t"><b>${esc(m.name||CARD_AUTH_NAME)}</b><div class="meta">${esc(m.card||"Card")} · authorized ${fmtStamp(m.signedAt)}</div></div><span class="pill ${m.voided?"voided":"signed"}">${m.voided?"Voided":"Authorized"}</span><button type="button" class="small" data-view-ctr="${cid}">View</button></div>`).join("") +
     others.map(([cid,m])=>`<div class="ctr"><div class="t"><b>${esc(m.name||"Contract")}</b>${m.sample?' <span class="pill sample">SAMPLE</span>':""}<div class="meta">${m.voided?"Voided":"Service since removed or changed"} · signed ${fmtStamp(m.signedAt)}</div></div><span class="pill ${m.voided?"voided":"signed"}">${m.voided?"Voided":"Signed"}</span><button type="button" class="small" data-view-ctr="${cid}">View</button></div>`).join("") +
     "";
   box.querySelectorAll("[data-ssa]").forEach(b=>b.onclick=()=>openSeasonal(openId));
@@ -1545,13 +1549,15 @@ async function driveStatus(clientId, cid, rec, start){
 // ---------- viewing a signed contract ----------
 function contractDocHtml(rec){
   return `${rec.sample?`<div class="samplebar">SAMPLE CONTRACT. Signed as a test only. Not binding.</div>`:""}${rec.voided?`<div class="voidbar">VOIDED ${esc(fmtStamp(rec.voidedAt))}${rec.voidReason?": "+esc(rec.voidReason):""}</div>`:""}
-    ${rec.kind==="seasonal"?docHead(rec.tplName||SSA_NAME):""}${renderDocHtml(rec.text,"view",rec.choices,rec.initials)}
+    ${rec.kind==="seasonal"||rec.kind==="cardauth"?docHead(rec.tplName||SSA_NAME):""}${renderDocHtml(rec.text,"view",rec.choices,rec.initials)}
+    ${rec.kind==="cardauth"?`<div class="sigs"><div><div class="typedsig">${esc(rec.signatureTyped)}</div><div class="meta">Box ticked and name typed by the customer</div><b>${esc(rec.signerName)}</b><br>Client · ${esc(fmtLong(rec.signedDate))}</div></div>
+    <div class="fp">Authorized ${esc(fmtStamp(rec.signedAt))} Eastern · ${esc(rec.witness)} · device: ${esc(rec.device||"")}${rec.replaced?` · replaced ${esc(rec.replaced)}`:""} · "${esc(rec.tplName)}" version ${esc(rec.tplVersion)}<br>Record fingerprint (SHA-256): ${esc(rec.hash)}</div>`:`
     <div class="sigs">
       <div>${rec.signatureTyped?`<div class="typedsig">${esc(rec.signatureTyped)}</div><div class="meta">Signed electronically by typed name</div>`:`<img src="${rec.signature}" alt="Client signature">`}<b>${esc(rec.signerName)}</b><br>Client · ${esc(fmtLong(rec.signedDate))}</div>
       <div>${rec.companySig?`<img src="${rec.companySig}" alt="Company signature">`:""}<b>${esc(rec.companySigner||"")}</b><br>For ${esc(rec.kind==="seasonal"?"Mangiapane Brothers LLC":COMPANY)} · ${esc(fmtLong(rec.signedDate))}</div>
     </div>
     ${rec.notice?`<div class="ssanotice">${renderDocHtml(rec.notice,"view")}</div>`:""}
-    <div class="fp">Signed ${esc(fmtStamp(rec.signedAt))} Eastern · ${rec.remote?"":"witness "}${esc(rec.witness)} · template "${esc(rec.tplName)}" version ${esc(rec.tplVersion)}<br>Record fingerprint (SHA-256): ${esc(rec.hash)}</div>`;
+    <div class="fp">Signed ${esc(fmtStamp(rec.signedAt))} Eastern · ${rec.remote?"":"witness "}${esc(rec.witness)} · template "${esc(rec.tplName)}" version ${esc(rec.tplVersion)}<br>Record fingerprint (SHA-256): ${esc(rec.hash)}</div>`}`;
 }
 async function viewContract(clientId, cid, recIn){
   let rec = recIn;
@@ -1573,6 +1579,7 @@ async function viewContract(clientId, cid, recIn){
   $("#signBody").scrollTop=0;
   driveStatus(clientId, cid, rec, false);
   $("#cvPay").onclick = () => openPaySheet(clientId, cid, rec);
+  if(rec.kind==="cardauth"){ $("#cvPay").remove(); $("#cvPayLine").textContent = `Payment on file now: ${payOnFileLabel(c)||"none"}.`; }
   if(svcReady() && !rec.voided && c.email){ const ml=$("#signBody").querySelector('a[href^="mailto:"]'); if(ml) ml.outerHTML=`<button type="button" id="cvMail">Email the signed copy</button>`;
     $("#cvMail").onclick=async()=>{ const k=db.ref("sync/mail").push().key; await db.ref("sync/mail/"+k).set({ kind:"contract", clientId, contractId:cid, to:[c.email,c.email2].filter(Boolean), status:"queued", createdAt:Date.now(), createdBy:me.email }); svcCall("mail",{k}); toast("Sending the signed PDF from admin@."); }; }
   $("#cvPrint").onclick = () => { $("#printArea").innerHTML = `<div class="doc">${contractDocHtml(rec)}</div>`; window.print(); };
@@ -2818,6 +2825,91 @@ function showSent(){
   $("#sentResend").onclick=async()=>{ const rr=(clients[id]||{}).signReq; if(!rr) return; await db.ref().update({ ["sync/sign/"+rr.token+"/status"]:"queued", ["sync/sign/"+rr.token+"/expiresAt"]:Date.now()+7*864e5, ["clients/"+id+"/signReq/status"]:"queued" }); svcCall("send",{t:rr.token}); toast("Sending again."); };
   $("#sentEdit").onclick=()=>{ clearInterval(sentTimer); (r.kind==="lawn"?openLawn:r.kind==="landscaping"?(x=>openLandscaping(x, r.sid)):openSeasonal)(id); };
   $("#sentDone").onclick=()=>{ clearInterval(sentTimer); $("#signDlg").close(); };
+}
+
+// ---------- Card on File link (November 8, 2026) ----------
+// A contract without the contract: the same token link, signing service and QuickBooks Payments card step as the
+// agreements, with no agreement body and nothing charged. Russel sends it from the client card when a card declines,
+// expires, or the client wants a different card. Copy link is the default (he texts it from Quo); Email uses the email
+// on file. The request lives at sync/sign/{token} (kind "card") and is mirrored on clients/{id}/cardReq, so it never
+// touches an agreement's signReq. The signing service saves the card, replaces the one on file, keeps the
+// authorization as a contract record (tpl "cardauth"), and writes the contact log entry.
+const CARD_AUTH_NAME = "Card on File Authorization";
+const CARD_LINK_DAYS = 7;
+let svcCard = null; // null: not asked yet; false: asking, or the deployed service has no card links yet; true: ready
+function svcCardReady(){
+  if(svcCard===null && svcReady()){ svcCard=false; svcCall("ping").then(p=>{ if(!p) svcCard=null; else svcCard=!!p.cardLink; if(openId) renderCardLink(); }); }
+  return svcCard===true;
+}
+function lastDeclined(id){
+  const rows=Object.values(qbRows).filter(r=>r && r.type==="charge" && r.clientId===id && r.status==="declined").sort((a,b)=>(b.declinedAt||b.updatedAt||0)-(a.declinedAt||a.updatedAt||0));
+  return rows[0]||null;
+}
+const shortDay = ms => ms ? new Date(ms).toLocaleDateString("en-US",{timeZone:TZ,month:"short",day:"numeric"}) : "";
+function cardReqText(r){
+  if(!r || r.status==="cancelled") return "";
+  if(r.status==="saved") return `Card saved from the card link ${ago(r.savedAt)}: ${esc(r.cardLabel||"")}.`;
+  if(r.status==="queued") return "Card link: sending the email…";
+  if(r.status==="error") return `Card link email failed: ${esc(r.error||"")}. Copy the link and text it instead.`;
+  if(r.status==="expired") return "Card link expired. Send a new one.";
+  if(r.openedAt) return `Card link opened ${ago(r.openedAt)}. Waiting for the card.`;
+  return r.via==="email" ? `Card link emailed ${ago(r.sentAt||r.createdAt)} to ${esc((r.to||[]).join(" and "))}. Not opened yet.` : `Card link copied ${ago(r.createdAt)}. Not opened yet.`;
+}
+function renderCardLink(){
+  const box=$("#cardLinkBar"); if(!box) return;
+  const c = openId ? clients[openId] : null;
+  if(!c){ box.innerHTML=""; return; }
+  const ready=svcCardReady(), onFile=payOnFileOk(c) && (c.payOnFile.method||"card")==="card", r=c.cardReq, open=r && OPEN_REQ.includes(r.status) && r.expiresAt>Date.now();
+  const dec=lastDeclined(openId), st=cardReqText(r);
+  box.innerHTML = `<div class="row">
+      <button type="button" class="small${dec?" primary":""}" id="clOpen" ${ready?"":"disabled"}>${onFile?"Replace card":"Send card link"}</button>
+      ${open?`<button type="button" class="small" id="clCopyOpen">Copy the open link</button>`:""}
+      ${dec?`<span class="pill pastdue">Last charge declined: ${money(dec.amount)}, ${esc(shortDay(dec.declinedAt||dec.updatedAt))}</span>`:""}
+    </div>
+    ${st?`<div class="meta" style="margin-top:4px">${st}</div>`:""}
+    ${ready?"":`<div class="meta" style="margin-top:4px">${svcReady()?(svcCard===false?"Checking the signing service…":"")+" Card links need the November 8 signing service. Paste the new Code.gs and deploy a new version.":"Card links need the signing service: More, Contracts, Signing service."}</div>`}
+    <div id="clPanel" hidden style="margin-top:8px;border:1px solid var(--line);border-radius:var(--r);padding:10px;background:var(--bg)">
+      <div class="meta" style="color:var(--ink);font-size:14px;margin-bottom:8px">Send ${esc(c.name||"the client")} a secure link to enter ${onFile?"a new card. It replaces "+payOnFileLabel(c)+".":"a card to keep on file."} Nothing is charged by the link.${dec?" When the new card lands, retry the declined charge in Charges to run.":""}</div>
+      <div class="row"><button type="button" class="primary" id="clCopy">Copy link to text</button>
+        ${c.email?`<button type="button" id="clEmail">Email to ${esc([c.email,c.email2].filter(Boolean).join(" and "))}</button>`:`<span class="meta">No email on file: text it.</span>`}
+        <button type="button" class="link" id="clCancel">Cancel</button></div>
+      <div id="clLinkBox" hidden style="margin-top:8px"><label>Copy this link</label><input id="clLink" readonly></div>
+      ${open?`<p class="meta" style="margin:8px 0 0">A new link replaces the open one.</p>`:""}
+    </div>`;
+  const panel=box.querySelector("#clPanel");
+  box.querySelector("#clOpen").onclick=()=>{ panel.hidden=!panel.hidden; };
+  box.querySelector("#clCancel").onclick=()=>{ panel.hidden=true; };
+  if(open) box.querySelector("#clCopyOpen").onclick=()=>navigator.clipboard.writeText(r.link||"").then(()=>toast("Link copied. Paste it into a text from Quo."),()=>showCardLinkBox(r.link));
+  const id=openId;
+  box.querySelector("#clCopy").onclick=async()=>{
+    // The link is written first, then copied. Safari only allows a copy inside the tap, so the copy is handed a
+    // promise of the text (ClipboardItem) while the database write runs.
+    const made=cardLinkCreate(id,"copy");
+    try{
+      if(window.ClipboardItem && navigator.clipboard?.write) await navigator.clipboard.write([new ClipboardItem({ "text/plain": made.then(l=>new Blob([l],{type:"text/plain"})) })]);
+      else await navigator.clipboard.writeText(await made);
+      toast("Card link copied. Paste it into a text from Quo.");
+    }catch(e){ const l=await made.catch(err=>{ toast("Not made: "+(err.code||err.message)); return null; }); if(l) showCardLinkBox(l); }
+  };
+  const em=box.querySelector("#clEmail");
+  if(em) em.onclick=async()=>{ em.disabled=true; try{ await cardLinkCreate(id,"email"); toast("Card link emailed from admin@."); }catch(e){ em.disabled=false; toast("Not sent: "+(e.code||e.message)); } };
+}
+function showCardLinkBox(link){ const b=$("#clLinkBox"), i=$("#clLink"); if(!b||!i) return; b.hidden=false; i.value=link; i.focus(); i.select(); toast("Copy the link from the box."); }
+async function cardLinkCreate(id, via){
+  const c=clients[id]; if(!c) throw new Error("Client not found.");
+  if(!svcCardReady()) throw new Error("The signing service does not have card links yet.");
+  const token=randToken(), link=`${SIGN_PAGE}?t=${token}&s=${svcDeploy(svcInfo().url)}`, now=Date.now(), to=[c.email,c.email2].filter(Boolean);
+  if(via==="email" && !to.length) throw new Error("No email on file.");
+  const req={ status:via==="email"?"queued":"sent", kind:"card", via, clientId:id, signerName:c.name||"", address:c.address||"", to, link,
+    createdAt:now, createdBy:me.email, expiresAt:now+CARD_LINK_DAYS*864e5, ...(via==="email"?{}:{ sentAt:now }) };
+  const upd={ ["sync/sign/"+token]:req,
+    ["clients/"+id+"/cardReq"]:{ token, status:req.status, via, to, link, createdAt:now, createdBy:me.email, expiresAt:req.expiresAt, ...(via==="email"?{}:{ sentAt:now }) },
+    ["clients/"+id+"/lastContactAt"]:now,
+    ["clientLog/"+id+"/"+db.ref("clientLog").push().key]:{ text: via==="email" ? `Emailed a card link to ${to.join(" and ")}. Nothing is charged by the link.` : "Copied a card link to text to the client. Nothing is charged by the link.", at:now, by:me.email, source:"payment" } };
+  const prev=c.cardReq; if(prev && OPEN_REQ.includes(prev.status) && prev.token!==token) upd["sync/sign/"+prev.token+"/status"]="cancelled";
+  await db.ref().update(upd);
+  if(via==="email") svcCall("send",{ t:token });
+  return link;
 }
 
 // ---------- import ----------
