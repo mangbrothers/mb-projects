@@ -1580,7 +1580,7 @@ async function viewContract(clientId, cid, recIn){
   driveStatus(clientId, cid, rec, false);
   $("#cvPay").onclick = () => openPaySheet(clientId, cid, rec);
   if(rec.kind==="cardauth"){ $("#cvPay").remove(); $("#cvPayLine").textContent = `Payment on file now: ${payOnFileLabel(c)||"none"}.`; }
-  if(svcReady() && !rec.voided && c.email){ const ml=$("#signBody").querySelector('a[href^="mailto:"]'); if(ml) ml.outerHTML=`<button type="button" id="cvMail">Email the signed copy</button>`;
+  if(svcReady() && !rec.voided && c.email && rec.kind!=="cardauth"){ const ml=$("#signBody").querySelector('a[href^="mailto:"]'); if(ml) ml.outerHTML=`<button type="button" id="cvMail">Email the signed copy</button>`;
     $("#cvMail").onclick=async()=>{ const k=db.ref("sync/mail").push().key; await db.ref("sync/mail/"+k).set({ kind:"contract", clientId, contractId:cid, to:[c.email,c.email2].filter(Boolean), status:"queued", createdAt:Date.now(), createdBy:me.email }); svcCall("mail",{k}); toast("Sending the signed PDF from admin@."); }; }
   $("#cvPrint").onclick = () => { $("#printArea").innerHTML = `<div class="doc">${contractDocHtml(rec)}</div>`; window.print(); };
   if($("#cvVoid")){
