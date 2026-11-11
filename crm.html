@@ -103,6 +103,9 @@
   .intchips button{border:1px solid var(--line);background:var(--card);border-radius:999px;padding:5px 12px;font-size:13px;color:var(--muted)}
   .intchips button.on{background:var(--ink);color:var(--card);border-color:var(--ink);font-weight:600}
   details.fold{border-top:1px solid var(--line);margin-top:14px;padding-top:2px}
+  #foldContact{border-top:0;margin-top:4px} #contactLine{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+  #cardState .lstat{font-size:14px;padding:7px 10px;margin:8px 0 2px}
+  #cardState .quickrow{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px} #cardState .quickrow a{display:inline-block;border:1px solid var(--line);border-radius:999px;padding:5px 12px;font-size:13px;text-decoration:none;color:var(--ink)}
   details.fold>summary{cursor:pointer;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:600;padding:10px 0 6px;display:flex;align-items:center;gap:8px;list-style:none}
   details.fold>summary::-webkit-details-marker{display:none}
   details.fold>summary::before{content:"\25B8";font-size:12px}
@@ -155,7 +158,7 @@
   .warnline{background:var(--amber-soft);color:var(--amber);border:1px solid var(--amber);border-radius:var(--r);padding:6px 10px;font-size:13px;margin-top:8px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
   .warnline b{color:inherit}
   /* leads board */
-  .quick{display:grid;grid-template-columns:1.4fr 1fr 1.6fr .9fr .9fr 1fr auto;gap:8px;align-items:end}
+  .quick{display:grid;grid-template-columns:1.3fr 1fr 1.5fr 1.2fr .9fr .9fr 1fr auto;gap:8px;align-items:end}
   .quick label{margin:0 0 3px}
   @media(max-width:1000px){.quick{grid-template-columns:1fr 1fr 1fr}} @media(max-width:600px){.quick{grid-template-columns:1fr}}
   .board{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(230px,1fr);gap:12px;overflow-x:auto;padding-bottom:6px;align-items:stretch}
@@ -180,7 +183,17 @@
   .age.a0{background:var(--green-soft);color:var(--green)} .age.a1{background:var(--amber-soft);color:var(--amber)} .age.a2{background:var(--red-soft);color:var(--red)}
   .lstat{font-size:12px;font-weight:700;border-radius:5px;padding:3px 8px;margin:5px 0 3px;border-left:4px solid currentColor}
   .lstat.todo{background:var(--accent-soft);color:var(--accent)} .lstat.warm{background:var(--amber-soft);color:var(--amber)} .lstat.hot,.lstat.bad{background:var(--red-soft);color:var(--red)} .lstat.good{background:var(--green-soft);color:var(--green)} .lstat.cold{background:var(--surface2);color:var(--ink2)}
-  .col.grave{background:var(--surface2)} .col.grave .lead{opacity:.85}
+  @media(max-width:700px){ main .card{overflow-x:auto;-webkit-overflow-scrolling:touch} body{overflow-x:clip} }
+  .lstat.inline{display:inline-block;margin:0;padding:2px 8px;border-left-width:3px;white-space:nowrap}
+  .lead .l2{font-size:12px;color:var(--ink2);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .lead .l3{font-size:12px;color:var(--muted);margin-top:3px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .lead .ltags{margin-top:4px;display:flex;gap:4px;flex-wrap:wrap}
+  .lead .lstat[data-lead-status]{cursor:pointer}
+  .leadbar{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:8px}
+  .leadbar input[type=search]{flex:1 1 220px;max-width:320px}
+  .leadbar .fchip,.srcstrip .pill{cursor:pointer;border:1px solid var(--line);background:var(--card);color:var(--ink2);border-radius:999px;padding:4px 11px;font-size:12px;font-weight:600}
+  .leadbar .fchip b{margin-left:4px} .leadbar .fchip.zero{opacity:.5;font-weight:500}
+  .leadbar .fchip.on,.srcstrip .pill.on{background:var(--ink);color:var(--card);border-color:var(--ink)}
   .lead select{margin-top:6px;padding:3px 6px;font-size:12px;width:100%}
   @media(min-width:701px){.lead select{display:none}}
   @media(max-width:700px){.board{grid-auto-flow:row;grid-auto-columns:auto;grid-template-columns:1fr}.col{min-height:0}.lead{cursor:default}}
@@ -340,8 +353,8 @@
   .pgdrawer a:hover{background:var(--surface2)}
   .pgdrawer a.here{background:var(--accent-soft);color:var(--accent);font-weight:650}
   .pgdrawer .pdfoot{margin-top:auto;font-size:12px;color:var(--muted);padding:8px 4px 0}
-.leadctr{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0 4px}
-.leadctr button{min-height:36px}
+.leadctr{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0 2px}
+.leadctr button{min-height:32px}
 .leadctr .signedbtn{background:var(--greenbg,#e6f2e9);color:var(--green,#1f6b33);border-color:transparent;font-weight:600}
 .quickbtns{display:flex;gap:8px;align-items:flex-end}
 .quickbtns button{min-height:44px;white-space:nowrap}
@@ -396,6 +409,8 @@ details.ssamore summary{cursor:pointer;font-weight:600}
       <h3 id="clientTitle">Client</h3>
       <div class="kv" id="clientStamps"></div>
     </div>
+    <div id="cardState"></div>
+    <details class="fold" id="foldContact"><summary><span>Contact details</span><span class="n" id="contactLine"></span></summary>
     <div class="grid2">
       <div><label>Name</label><input name="name"></div>
       <div><label>Phone</label><input name="phone" type="tel" id="dlgPhone"></div>
@@ -406,6 +421,9 @@ details.ssamore summary{cursor:pointer;font-weight:600}
       <div style="grid-column:1/-1"><label>Address</label><input name="address" placeholder="Street, City"></div>
       <div><label>Status</label><select name="status" id="statusSel"></select></div>
       <div><label>Lead source</label><select name="source" id="sourceSel"></select></div>
+    </div>
+    </details>
+    <div class="grid2" style="margin-top:10px">
       <div style="grid-column:1/-1"><label>Interested in</label><div class="intchips" id="intChips"></div></div>
       <div style="grid-column:1/-1"><label>Summary</label><input name="interest" placeholder="One line: what they asked about"></div>
     </div>
@@ -695,13 +713,26 @@ function attach(){
 }
 function detach(){ Object.values(refs).forEach(r => r && r.off()); }
 // Records saved before phone keys existed get one, plus a phone index entry, once.
-// Nov 10, 2026. A lead still marked New moves to Contacted once the contact log shows a real conversation
-// (an answered call or a text we sent, as the Quo sync writes them). Done once per lead, so a card moved back
-// to New by hand stays there.
+// Nov 10, 2026. Housekeeping the page does by itself whenever an admin has the CRM open (run 1.5 seconds after data
+// arrives, and again as it changes):
+//  1. A lead still marked New moves to Contacted once the log shows an answered call or a text we sent. Once per lead.
+//  2. A lead with no contact for GRAVE_DAYS moves to Lost, with where it was, why and when kept on the record.
+//  3. A lead that went to Lost that way comes back to its stage when new contact is logged after it left.
+//  4. A lead with no real source gets one when the caller's words name it (door hanger, yard sign, a neighbor...).
+const SRC_WORDS = [["Door hanger",/door\s*(hanger|flyer|flier)|hanger|flyer|flier/i],["Yard sign",/yard sign|lawn sign|saw (the|your|a) sign/i],["Referral",/neighbo|referr|friend|recommend/i],["Google",/google/i],["Angi",/\bangi\b|angie/i],["Website",/website/i]];
 function autoStage(){
-  if(!me) return; const upd={}, now=Date.now();
-  live().forEach(([id,c])=>{ if(c.status!=="new" || c.autoStagedAt) return;
-    if(Object.values(logs[id]||{}).some(e=>/Call (inbound|outbound), |Text out:/.test(String(e.text||"")))){ upd[`clients/${id}/status`]="contacted"; upd[`clients/${id}/autoStagedAt`]=now; upd[`clients/${id}/updatedAt`]=now; upd[`clients/${id}/updatedBy`]=me.email; } });
+  if(!me) return; const upd={}, now=Date.now(), day=new Date(now).toISOString().slice(0,10).replace(/-/g,"");
+  live().forEach(([id,c])=>{ const b="clients/"+id+"/"; const L=Object.values(logs[id]||{});
+    if(c.status==="new" && !c.autoStagedAt && L.some(e=>/Call (inbound|outbound), |Text out:/.test(String(e.text||"")))){ upd[b+"status"]="contacted"; upd[b+"autoStagedAt"]=now; upd[b+"updatedAt"]=now; upd[b+"updatedBy"]=me.email; return; }
+    if(LEAD_STAGES.includes(c.status) && isGrave(c)){
+      upd[b+"status"]="lost"; upd[b+"lostAt"]=now; upd[b+"lostReason"]="quiet"; upd[b+"lostFrom"]=c.status; upd[b+"updatedAt"]=now; upd[b+"updatedBy"]=me.email;
+      upd["clientLog/"+id+"/autolost"+day]={ text:`Moved to Lost automatically: no contact for ${GRAVE_DAYS} days (was ${STATUSES[c.status]}). Last contact ${fmtStamp(lastContact(c))}.`, at:now, by:me.email }; return; }
+    if(c.status==="lost" && c.lostReason==="quiet" && lastContact(c) > (c.lostAt||0)+60000){
+      upd[b+"status"]=backStage(c); upd[b+"lostAt"]=null; upd[b+"lostReason"]=null; upd[b+"lostFrom"]=null; upd[b+"updatedAt"]=now; upd[b+"updatedBy"]=me.email;
+      upd["clientLog/"+id+"/autoback"+day]={ text:`Back from Lost automatically: new contact (returned to ${STATUSES[backStage(c)]}).`, at:now, by:me.email }; return; }
+    if(LEAD_STAGES.includes(c.status) && (!c.source||c.source==="Other") && !c.srcGuessed){ const words=[c.interest, ...L.slice(0,4).map(e=>e.text)].join(" "); const hit=SRC_WORDS.find(([,re])=>re.test(words));
+      if(hit){ upd[b+"source"]=hit[0]; upd[b+"srcGuessed"]=true; } }
+  });
   if(Object.keys(upd).length) db.ref().update(upd).catch(()=>{});
 }
 function backfillPhones(){
@@ -813,6 +844,17 @@ function renderInt(){
   const box=$("#intChips"); if(!box) return;
   box.innerHTML = Object.entries(SERVICE_TYPES).map(([k,T])=>`<button type="button" data-int="${k}" class="${draftInt[k]?"on":""}" aria-pressed="${draftInt[k]?"true":"false"}">${esc(T.label)}</button>`).join("");
   box.querySelectorAll("[data-int]").forEach(b=>b.onclick=()=>{ const k=b.dataset.int; if(draftInt[k]) delete draftInt[k]; else draftInt[k]=true; renderInt(); });
+}
+// Top of the client card: where this person stands, and one-tap call, text and map.
+function renderCardState(){
+  const box=$("#cardState"); if(!box) return; const c = openId ? clients[openId] : null;
+  if(!c){ box.innerHTML=""; $("#contactLine").textContent=""; return; }
+  const gv = c.status==="lost" && c.lostReason==="quiet";
+  const nx = LEAD_STAGES.includes(c.status) ? leadNext(c) : c.status==="active" ? clientNext(c, openId) : gv ? ["cold",`Lost: no follow-up in ${GRAVE_DAYS} days (was ${STATUSES[backStage(c)]})`] : ["cold", STATUSES[c.status]||c.status];
+  const d=String(c.phone||"").replace(/\D/g,""), k=phoneKey(c.phone);
+  box.innerHTML = `<div class="lstat ${nx[0]}">${esc(STATUSES[c.status]||"")}${LEAD_STAGES.includes(c.status)||c.status==="active"?" \u00B7 "+esc(nx[1]):gv?" \u00B7 "+esc(nx[1].replace(/^Lost: /,"")):""}</div>
+    <div class="quickrow">${k?`<a href="tel:${k}">Call ${esc(c.phone)}</a><a href="sms:${k}">Text</a>`:""}${c.email?`<a href="mailto:${esc(c.email)}">Email</a>`:""}${c.address?`<a href="https://maps.apple.com/?q=${encodeURIComponent(c.address)}" target="_blank" rel="noopener">Map</a>`:""}</div>`;
+  $("#contactLine").textContent = [c.address, c.region, c.source].filter(Boolean).join(" \u00B7 ");
 }
 function renderSvcSummary(){
   const box=$("#svcSummary"); if(!box) return; const c = openId ? clients[openId] : null, L = c ? svcList(c) : [];
@@ -959,58 +1001,85 @@ let collapsedCols = new Set(); try{ collapsedCols = new Set(JSON.parse(localStor
 function toggleCol(k){ collapsedCols.has(k) ? collapsedCols.delete(k) : collapsedCols.add(k); try{ localStorage.setItem("crmFoldedCols", JSON.stringify([...collapsedCols])); }catch(e){} render(); }
 // Nov 10, 2026. The strip on a lead card says where the lead stands and what it is waiting on, read from the
 // record: the agreement link, a saved quote, the stage. The badge is days since the last contact.
-// A lead with no contact for GRAVE_DAYS shows in the Graveyard column instead of its stage. Nothing on the record
-// changes: any new contact (a note, a call or text the Quo sync logs, an agreement sent) brings it back by itself.
+// A lead with no contact for GRAVE_DAYS moves to Lost by itself (leadAuto). The record keeps the stage it was in
+// (lostFrom), the reason (lostReason "quiet"), the date (lostAt) and a log line. Any new contact after that (a note,
+// a call or text the Quo sync logs) puts it back in the stage it came from.
 const GRAVE_DAYS = 7;
 const isGrave = c => LEAD_STAGES.includes(c.status) && Date.now()-lastContact(c) > GRAVE_DAYS*864e5;
 function leadNext(c){
-  if(ssaSigned(c)||lsaSigned(c)||ldaSignedAll(c).length) return ["good", payOnFileOk(c) ? "Signed" : "Signed \u00B7 needs a card"];
-  const r=c.signReq;
-  if(r && r.status==="signed") return ["good","Signed \u00B7 waiting for the card"];
-  if(r && r.status==="sent") return r.openedAt ? ["hot",`Agreement opened ${ago(r.openedAt)} \u00B7 not signed`] : ["warm",`Agreement sent ${ago(r.sentAt||r.createdAt)} \u00B7 not opened`];
-  if(r && r.status==="queued") return ["warm","Agreement sending"];
-  if(r && r.status==="error") return ["bad","Agreement email failed \u00B7 resend"];
-  if(r && r.status==="expired") return ["cold","Agreement link expired \u00B7 resend"];
-  if(c.ssaDraft) return ["warm","Quote saved \u00B7 not sent"];
-  if(c.status==="new") return ["todo","Needs a first call"];
-  if(c.status==="contacted") return ["todo","Talked \u00B7 needs a quote"];
-  return ["warm","Quoted \u00B7 follow up"];
+  if(ssaSigned(c)||lsaSigned(c)||ldaSignedAll(c).length) return ["good", payOnFileOk(c) ? "Signed" : "Signed \u00B7 needs a card", payOnFileOk(c) ? "signed" : "card"];
+  const r=anyReq(c);
+  if(r && r.status==="signed") return ["good","Signed \u00B7 waiting for the card","card"];
+  if(r && r.status==="sent") return r.openedAt ? ["hot",`Agreement opened ${ago(r.openedAt)} \u00B7 not signed`,"opened"] : ["warm",`Agreement sent ${ago(r.sentAt||r.createdAt)} \u00B7 not opened`,"sent"];
+  if(r && r.status==="queued") return ["warm","Agreement sending","sent"];
+  if(r && r.status==="error") return ["bad","Agreement email failed \u00B7 resend","fix"];
+  if(r && r.status==="expired") return ["cold","Agreement link expired \u00B7 resend","fix"];
+  if(c.ssaDraft) return ["warm","Quote saved \u00B7 not sent","quote"];
+  if(c.status==="new") return ["todo","Needs a first call","call"];
+  if(c.status==="contacted") return ["todo","Talked \u00B7 needs a quote","quote"];
+  return ["warm","Quoted \u00B7 follow up","follow"];
 }
 function ageBadge(c){ const d=Math.floor((Date.now()-lastContact(c))/864e5); return `<span class="age ${d<=2?"a0":d<GRAVE_DAYS?"a1":"a2"}" title="Days since the last contact">${d<=0?"today":d+"d"}</span>`; }
+const backStage = c => LEAD_STAGES.includes(c.lostFrom) ? c.lostFrom : "contacted";
 function reviveLead(id, status){
   const c=clients[id]; if(!c) return; const now=Date.now();
-  return commit(`${c.name}: picked back up`, { ...fieldUpdates("clients/"+id, { status: status||c.status, ...stamp() }), ["clients/"+id+"/lastContactAt"]: now,
-    ["clientLog/"+id+"/"+db.ref("clientLog/"+id).push().key]: { text:"Picked back up from the Graveyard.", at:now, by:me.email } });
+  return commit(`${c.name}: picked back up`, { ...fieldUpdates("clients/"+id, { status: status||backStage(c), lostAt:null, lostReason:null, lostFrom:null, ...stamp() }), ["clients/"+id+"/lastContactAt"]: now,
+    ["clientLog/"+id+"/"+db.ref("clientLog/"+id).push().key]: { text:"Picked back up from Lost.", at:now, by:me.email } });
 }
+// Moving a card out of Lost into a lead stage counts as picking it back up (the contact date is stamped), so the
+// seven-day rule does not send it straight back.
 function leadDrop(id, col){
   const c=clients[id]; if(!c) return;
-  if(col==="grave") return toast(`The Graveyard fills itself: a lead lands there after ${GRAVE_DAYS} days with no contact.`);
-  if(isGrave(c) && LEAD_STAGES.includes(col)) return reviveLead(id, col);
+  if(c.status==="lost" && LEAD_STAGES.includes(col)) return reviveLead(id, col);
   return setStatus(id, col);
 }
+// Where a client stands, for the strip on Won cards and the Clients table.
+function clientNext(c, id){
+  if(lastDeclined(id)) return ["bad","Charge declined"];
+  const signedAny = !!(ssaSigned(c)||lsaSigned(c)||ldaSignedAll(c).length);
+  if(signedAny && !payOnFileOk(c)) return ["hot","Signed \u00B7 needs a card"];
+  if(unsignedFor(c)) return ["warm","Agreement not signed"];
+  if(c.payStatus==="pastdue") return ["bad","Past due in QuickBooks"];
+  if(signedAny) return ["good","Signed \u00B7 card on file"];
+  return ["cold","No agreement yet"];
+}
+// What the board is narrowed to: typed search, one "needs" chip, one source. Kept while the page is open.
+let leadFilter = { q:"", k:"", src:"" };
+const LEAD_CHIPS = [["call","Needs a first call"],["quote","Needs a quote"],["sent","Sent, not opened"],["opened","Opened, not signed"],["follow","Follow up"],["fix","Link problem"],["card","Signed, needs a card"]];
 function renderLeads(m){
-  const leads = live().filter(([,c])=>LEAD_STAGES.includes(c.status));
-  const grave = leads.filter(([,c])=>isGrave(c));
-  const won = live().filter(([,c])=>c.status==="active" && c.wonAt && Date.now()-c.wonAt < 30*864e5);
-  const lost = live().filter(([,c])=>c.status==="lost");
-  const src = groupBy(leads, ([,c])=>c.source);
+  const lfFocus = !!(document.activeElement && document.activeElement.id==="lfq");
+  const allLeads = live().filter(([,c])=>LEAD_STAGES.includes(c.status));
+  const lq = leadFilter.q.trim().toLowerCase();
+  const hit = ([,c]) => (!lq || [c.name,c.phone,c.address,c.email,c.interest].join(" ").toLowerCase().includes(lq)) && (!leadFilter.src || (c.source||"Other")===leadFilter.src);
+  const kOf = c => leadNext(c)[2];
+  const leads = allLeads.filter(x=>hit(x) && (!leadFilter.k || kOf(x[1])===leadFilter.k));
+  const kCount = {}; allLeads.filter(hit).forEach(([,c])=>{ const k=kOf(c); kCount[k]=(kCount[k]||0)+1; });
+
+  const won = live().filter(([,c])=>c.status==="active" && c.wonAt && Date.now()-c.wonAt < 30*864e5).filter(hit);
+  const lost = live().filter(([,c])=>c.status==="lost").filter(hit);
+  const src = groupBy(allLeads, ([,c])=>c.source||"Other");
   const cols = [
-    ...LEAD_STAGES.map(s=>({key:s,label:STATUSES[s],items:leads.filter(([,c])=>c.status===s && !isGrave(c))})),
+    ...LEAD_STAGES.map(s=>({key:s,label:STATUSES[s],items:leads.filter(([,c])=>c.status===s)})),
     {key:"active",label:"Won (last 30 days)",items:won,cls:"won"},
-    {key:"lost",label:"Lost",items:lost,cls:"lost"},
-    {key:"grave",label:`Graveyard (${GRAVE_DAYS}+ days quiet)`,items:grave,cls:"grave"} ];
+    {key:"lost",label:"Lost",items:lost,cls:"lost"} ];
   const card = ([id,c]) => {
     const lc = lastContact(c); const stale = LEAD_STAGES.includes(c.status) && Date.now()-lc > 5*864e5;
-    const isLead = LEAD_STAGES.includes(c.status), gv = isLead && isGrave(c), nx = isLead ? leadNext(c) : null;
+    const isLead = LEAD_STAGES.includes(c.status), gv = c.status==="lost" && c.lostReason==="quiet", nx = isLead ? leadNext(c) : c.status==="active" ? clientNext(c,id) : gv ? ["cold",`No follow-up in ${GRAVE_DAYS} days \u00B7 was ${STATUSES[backStage(c)]}`] : c.status==="lost" ? ["cold","Lost"] : null;
+    const sg = ssaSigned(c), r = anyReq(c), openReq = isLead && !!(r && OPEN_REQ.includes(r.status));
+    const srcTxt = isLead && (!c.source||c.source==="Other") ? `<b class="stale" title="No lead source recorded. Ask how they heard about us.">Source?</b>` : esc(c.source||"");
+    const act = gv ? `<button type="button" class="small primary" data-revive="${id}">Pick back up</button>`
+      : sg ? `<button type="button" class="small signedbtn" data-lead-view="${id}|${sg[0]}">\u2713 Signed \u00B7 View</button>`
+      : !isLead ? ""
+      : openReq ? `<button type="button" class="small" data-lead-status="${id}">Link: copy or resend</button>`
+      : `<button type="button" class="small primary" data-lead-send="${id}">${c.ssaDraft?"Finish the quote":"Quote"}</button>`;
     return `<div class="lead" data-card="${id}" data-id="${id}">
-      <div class="name"><span>${esc(c.name)}${unsignedPill(c)}</span>${isLead?ageBadge(c):""}</div>
-      ${nx?`<div class="lstat ${gv?"cold":nx[0]}">${gv?esc(STATUSES[c.status])+" \u00B7 ":""}${esc(nx[1])}</div>`:""}
-      ${gv?`<div class="leadctr"><button type="button" class="small primary" data-revive="${id}">Pick back up</button></div>`:""}
-      <div class="meta">${tel(c.phone)}${c.region?" · "+esc(c.region):""}</div>
-      <div class="meta">${isLead && (!c.source||c.source==="Other") ? `<b class="stale" title="No lead source recorded. Ask how they heard about us.">Source?</b>` : esc(c.source||"")}${c.interest?" · "+esc(c.interest):""}</div>
-      <div class="meta">${tags(c)}${tags(c)?" · ":""}<span class="${stale?"stale":""}">last contact ${ago(lc)}</span></div>
-      ${leadCtrHtml(id,c)}
-      <select data-stage="${id}">${opts([...LEAD_STAGES,"active","lost"], c.status, {...STATUSES, active:"Won → Active client"})}</select>
+      <div class="name"><span>${esc(c.name)}</span>${isLead?ageBadge(c):`<span class="meta" style="margin-left:auto;font-weight:400">${ago(lc)}</span>`}</div>
+      ${nx?`<div class="lstat ${nx[0]}"${openReq?` data-lead-status="${id}" title="Open the link status"`:""}>${esc(nx[1])}</div>`:""}
+      <div class="l2">${[tel(c.phone), esc(c.region||""), srcTxt].filter(Boolean).join(" \u00B7 ")}</div>
+      ${tags(c)?`<div class="ltags">${tags(c)}</div>`:""}
+      ${c.interest?`<div class="l3" title="${esc(c.interest)}">${esc(c.interest)}</div>`:""}
+      ${act?`<div class="leadctr">${act}</div>`:""}
+      <select data-stage="${id}">${opts([...LEAD_STAGES,"active","lost"], c.status, {...STATUSES, active:"Won \u2192 Active client"})}</select>
     </div>`; };
   // Keep what was typed in the quick-add form across live re-renders.
   const prev = $("#quickAdd") ? Object.fromEntries(new FormData($("#quickAdd")).entries()) : null;
@@ -1028,15 +1097,24 @@ function renderLeads(m){
         <div class="quickbtns"><button type="button" id="quickGo">Add lead</button><button class="primary" type="button" id="quickQuote">Add and quote</button></div>
       </form>
       <div id="quickDup"></div>
-      <div class="meta" style="margin-top:6px">Type while on the call. A number already in the CRM is flagged as you type. First contact is stamped when you press Add. Open a card to log notes. Drag cards between columns: on an iPad or iPhone, hold a card a moment, then drag. The dropdown on a phone works too.</div>
     </div>
-    <div class="srcstrip">${SOURCES.map(s=>`<span class="pill">${esc(s)} <b>${(src[s]||[]).length}</b></span>`).join("")}</div>
+    <div class="leadbar">
+      <input type="search" id="lfq" placeholder="Search leads: name, phone, address" value="${esc(leadFilter.q)}">
+      ${LEAD_CHIPS.map(([k,l])=>`<button type="button" class="fchip${leadFilter.k===k?" on":""}${kCount[k]?"":" zero"}" data-lk="${k}">${l}<b>${kCount[k]||0}</b></button>`).join("")}
+      ${leadFilter.q||leadFilter.k||leadFilter.src?`<button type="button" class="small" id="lfClear">Show all</button>`:""}
+    </div>
+    <div class="srcstrip">${SOURCES.map(s=>`<button type="button" class="pill${leadFilter.src===s?" on":""}" data-lsrc="${esc(s)}">${esc(s)} <b>${(src[s]||[]).length}</b></button>`).join("")}</div>
     <div class="board" style="grid-template-columns:${cols.map(col=>collapsedCols.has(col.key)?"52px":"minmax(230px,1fr)").join(" ")}">${cols.map(col=>{ const shut=collapsedCols.has(col.key); return `
       <div class="col ${col.cls||""}${shut?" shut":""}" data-col="${col.key}"><h2 data-fold="${col.key}" title="${shut?"Show":"Hide"} ${esc(col.label)}"><span class="fold">${shut?"\u25B8":"\u25BE"}</span><span class="lbl">${esc(col.label)}</span><span class="n">${col.items.length}</span></h2>
-        ${shut ? "" : (col.items.sort((a,b)=>lastContact(b[1])-lastContact(a[1])).map(card).join("") || `<div class="empty" style="padding:12px">None</div>`)}
+        ${shut ? "" : (col.items.sort((a,b)=> LEAD_STAGES.includes(col.key) ? lastContact(a[1])-lastContact(b[1]) : lastContact(b[1])-lastContact(a[1])).map(card).join("") || `<div class="empty" style="padding:12px">None</div>`)}
       </div>`; }).join("")}
     </div>
-    <div class="meta" style="margin-top:6px">Tap a column title to fold it away or bring it back. Folded columns stay folded on this device.</div>`;
+    <div class="meta" style="margin-top:6px">Longest-waiting leads sit at the top of each stage. A lead with no contact for ${GRAVE_DAYS} days moves to Lost by itself and comes back on the next contact. Drag a card to move it (on a phone or iPad, hold it a moment first, or use its dropdown). Tap a column title to fold it.</div>`;
+  { const q=$("#lfq"); q.oninput = e => { leadFilter.q=e.target.value; renderLeads(m); };
+    if(lfFocus){ q.focus(); try{ q.setSelectionRange(q.value.length,q.value.length); }catch(e){} } }
+  m.querySelectorAll("[data-lk]").forEach(b=>b.onclick=()=>{ leadFilter.k = leadFilter.k===b.dataset.lk ? "" : b.dataset.lk; renderLeads(m); });
+  m.querySelectorAll("[data-lsrc]").forEach(b=>b.onclick=()=>{ leadFilter.src = leadFilter.src===b.dataset.lsrc ? "" : b.dataset.lsrc; renderLeads(m); });
+  { const c=$("#lfClear"); if(c) c.onclick=()=>{ leadFilter={ q:"", k:"", src:"" }; renderLeads(m); }; }
   const form=$("#quickAdd");
   if(prev){ for(const [k,v] of Object.entries(prev)) if(form.elements[k]) form.elements[k].value=v; if(focusName && form.elements[focusName]){ const el=form.elements[focusName]; el.focus(); try{ el.setSelectionRange(el.value.length,el.value.length); }catch(e){} } }
   const showDup = () => { const hit=findByPhone(form.phone.value); $("#quickDup").innerHTML = hit ? dupHtml(hit) : ""; wireDup($("#quickDup")); if(!hit) quickDupAck=null; return hit; };
@@ -1066,12 +1144,12 @@ function renderLeads(m){
   $("#quickGo").onclick = () => quick(false); $("#quickQuote").onclick = () => quick(true);
   form.onkeydown = e => { if(e.key==="Enter" && e.target.tagName==="INPUT"){ e.preventDefault(); quick(false); } };
   m.querySelectorAll(".lead").forEach(el=>{
-    el.onclick = e => { if(!justDragged(m) && !e.target.closest("select,a,button")) openClient(el.dataset.id); };
+    el.onclick = e => { if(!justDragged(m) && !e.target.closest("select,a,button,[data-lead-status]")) openClient(el.dataset.id); };
   });
   m.querySelectorAll("select[data-stage]").forEach(s=> s.onchange = () => leadDrop(s.dataset.stage, s.value));
   m.querySelectorAll("[data-revive]").forEach(b=> b.onclick = () => reviveLead(b.dataset.revive));
   m.querySelectorAll("[data-lead-send]").forEach(b=> b.onclick = () => openSeasonal(b.dataset.leadSend));
-  m.querySelectorAll("[data-lead-status]").forEach(b=> b.onclick = () => showSentFor(b.dataset.leadStatus));
+  m.querySelectorAll("[data-lead-status]").forEach(b=> b.onclick = () => { const c=clients[b.dataset.leadStatus]; showSentFor(b.dataset.leadStatus, reqSlot(c, anyReq(c))); });
   m.querySelectorAll("[data-lead-view]").forEach(b=> b.onclick = () => { const [cid2,ct]=b.dataset.leadView.split("|"); viewContract(cid2, ct); });
   m.querySelectorAll("[data-fold]").forEach(h=> h.onclick = () => toggleCol(h.dataset.fold));
   // Drag by mouse, or by finger on the iPad and iPhone (hold a card a moment, then drag). October 17, 2026.
@@ -1138,7 +1216,7 @@ function renderClients(m){
     <table><thead><tr>${th("name","Name")}<th>Phone</th>${th("address","Address")}${th("region","Region")}${th("services","Services")}${th("status","Status")}${th("pay","Billing")}${th("last","Last contact")}</tr></thead>
     <tbody>${rows.map(([id,c])=>`<tr class="click" data-id="${id}">
       <td><b>${esc(c.name)}</b>${unsignedPill(c)}</td><td style="white-space:nowrap">${tel(c.phone)}</td><td>${esc(c.address||"")}</td><td>${esc(c.region||"")}</td>
-      <td>${tags(c)}</td><td>${statusPill(c.status)}</td><td>${payFilePill(c)} ${payPill(c)}</td><td class="meta">${ago(lastContact(c))}</td></tr>`).join("") || `<tr><td colspan="8" class="empty">No clients match.</td></tr>`}
+      <td>${tags(c)}</td><td>${c.status==="active" ? (x=>`<span class="lstat inline ${x[0]}">${esc(x[1])}</span>`)(clientNext(c,id)) : statusPill(c.status)}</td><td>${payFilePill(c)} ${payPill(c)}</td><td class="meta">${ago(lastContact(c))}</td></tr>`).join("") || `<tr><td colspan="8" class="empty">No clients match.</td></tr>`}
     </tbody></table></div>`;
   $("#fq").oninput = e => { filters.q=e.target.value; renderClients(m); const i=$("#fq"); i.focus(); i.setSelectionRange(i.value.length,i.value.length); };
   $("#fregion").onchange = e => { filters.region=e.target.value; renderClients(m); };
@@ -1219,12 +1297,13 @@ function openClient(id, defaultStatus){
   draftServices = JSON.parse(JSON.stringify(c.services||{})); removedServices = new Set();
   draftInt = { ...((c.interestIn && Object.keys(c.interestIn).length) ? c.interestIn : (id && LEAD_STAGES.includes(c.status) ? intFromText(c.interest) : {})) }; renderInt();
   staged=[]; renderStamps(); renderSvcs(); renderLog(); renderContracts(); renderRecord(); renderSvcSummary(); showDlgDup();
-  if(sameCard!==id){ sameCard=id; $("#foldSvc").open=false; $("#foldLog").open=true; $("#foldBilling").open = !!(id && (lastDeclined(id) || (c.status==="active" && !payOnFileOk(c)))); }
+  renderCardState();
+  if(sameCard!==id){ sameCard=id; $("#foldContact").open = !id; $("#foldSvc").open=false; $("#foldLog").open=true; $("#foldBilling").open = !!(id && (lastDeclined(id) || (c.status==="active" && !payOnFileOk(c)))); }
   $("#clientTrash").hidden = !id; $("#addNote").style.display = id ? "" : "none";
   if(!$("#clientDlg").open) $("#clientDlg").showModal();
-  f.name.focus();
+  if(!id) f.name.focus(); else $("#clientDlg").focus();
 }
-function showDlgDup(){ const hit=findByPhone($("#dlgPhone").value, openId); $("#dlgDup").innerHTML = hit ? dupHtml(hit) : ""; wireDup($("#dlgDup")); }
+function showDlgDup(){ const hit=findByPhone($("#dlgPhone").value, openId); $("#dlgDup").innerHTML = hit ? dupHtml(hit) : ""; wireDup($("#dlgDup")); if(hit) $("#foldContact").open=true; }
 $("#dlgPhone").oninput = showDlgDup;
 function renderStamps(){
   const c = openId ? clients[openId] : null;
@@ -1235,7 +1314,7 @@ function renderStamps(){
   if(!c){ $("#clientStamps").innerHTML=""; return; }
   $("#clientStamps").innerHTML = `<b>First contact</b><span>${fmtStamp(c.firstContactAt||c.createdAt)}</span><b>Last contact</b><span>${fmtStamp(lastContact(c))} <i class="meta">(${ago(lastContact(c))})</i></span>${c.wonAt?`<b>Won</b><span>${fmtStamp(c.wonAt)}</span>`:""}`;
 }
-function refreshDialogLive(){ if(openId && !clients[openId]) { $("#clientDlg").close(); return; } renderStamps(); renderContracts(); renderSvcBills(); renderSvcSummary(); }
+function refreshDialogLive(){ if(openId && !clients[openId]) { $("#clientDlg").close(); return; } renderStamps(); renderContracts(); renderSvcBills(); renderSvcSummary(); renderCardState(); }
 function fieldInput(sid, fld, val){
   const n=`svc/${sid}/${fld.k}`;
   if(fld.t==="select") return `<select name="${n}">${opts(fld.o, val ?? fld.o[0], fld.lb)}</select>`;
@@ -1305,7 +1384,7 @@ function renderContracts(){
   box.querySelectorAll("[data-ssa]").forEach(b=>b.onclick=()=>openSeasonal(openId));
   box.querySelectorAll("[data-lsa]").forEach(b=>b.onclick=()=>openLawn(openId));
   box.querySelectorAll("[data-lda]").forEach(b=>b.onclick=()=>openLandscaping(openId, b.dataset.lda));
-  box.querySelectorAll("[data-req-status]").forEach(b=>b.onclick=()=>showSentFor(openId));
+  box.querySelectorAll("[data-req-status]").forEach(b=>b.onclick=()=>{ const c=clients[openId]||{}; showSentFor(openId, REQ_SLOTS.find(k=>c[k] && c[k].token===b.dataset.reqStatus) || "signReq"); });
   box.querySelectorAll("[data-lda-new]").forEach(b=>b.onclick=()=>{ const sel=$("#addSvcSel"); sel.value="landscaping"; sel.dispatchEvent(new Event("change",{bubbles:true})); const last=[...document.querySelectorAll("#svcList .svc.landscaping")].pop(); if(last){ last.scrollIntoView({behavior:"smooth",block:"center"}); const f=last.querySelector("input"); if(f) f.focus({preventScroll:true}); } toast("Fill in the Job, Date and Price, tap Save, then Set up and email here."); });
   box.querySelectorAll("[data-sign]").forEach(b=>b.onclick=()=>{ const [tid,sid]=b.dataset.sign.split("|"); openSigning(openId, tid, sid); });
   box.querySelectorAll("[data-view-ctr]").forEach(b=>b.onclick=()=>viewContract(openId, b.dataset.viewCtr));
@@ -1343,14 +1422,15 @@ $("#clientSave").onclick = async () => {
   const f=$("#clientForm"); readSvcForm();
   const services = {}; for(const [sid,s] of Object.entries(draftServices)) services[sid]=s;
   const data = { name:f.name.value.trim(), phone:f.phone.value.trim(), email:f.email.value.trim(), email2:f.email2.value.trim(), address:f.address.value.trim(), region:f.region.value, status:f.status.value, source:f.source.value, interest:f.interest.value.trim(), interestIn: Object.keys(draftInt).length ? { ...draftInt } : null };
-  if(!data.name){ toast("Name is required"); f.name.focus(); return; }
-  if(!data.source){ toast("Pick a lead source"); f.source.focus(); return; }
+  if(!data.name){ $("#foldContact").open=true; toast("Name is required"); f.name.focus(); return; }
+  if(!data.source){ $("#foldContact").open=true; toast("Pick a lead source"); f.source.focus(); return; }
   const prev = openId ? clients[openId] : null;
   // A new record needs a phone; an existing record that already has one cannot have it cleared.
   // Older imported records with no phone can still be edited.
-  { const pm=phoneProblem(data.phone, !prev || !!(prev.phone||"").trim()); if(pm){ toast(pm); f.phone.focus(); return; } }
+  { const pm=phoneProblem(data.phone, !prev || !!(prev.phone||"").trim()); if(pm){ $("#foldContact").open=true; toast(pm); f.phone.focus(); return; } }
   const upd = {};
   if(prev && data.status==="active" && prev.status!=="active" && !prev.wonAt) data.wonAt=Date.now();
+  if(prev && prev.status==="lost" && LEAD_STAGES.includes(data.status)){ data.lastContactAt=Date.now(); data.lostAt=null; data.lostReason=null; data.lostFrom=null; }
   if(!prev && data.status==="active") data.wonAt=Date.now();
   const id = openId || db.ref("clients").push().key;
   Object.assign(upd, fieldUpdates("clients/"+id, {...data, ...stamp(), ...(prev?{}:{createdAt:Date.now(), createdBy:me.email, firstContactAt:Date.now(), lastContactAt:Date.now()})}));
@@ -2082,7 +2162,7 @@ function leadCtrHtml(id, c){
   return `<div class="leadctr">${open||signedReq?`<button type="button" class="small" data-lead-status="${id}" title="${esc(reqStatusText(r,c))}">${esc(reqStatusText(r,c))}</button>`:""}
     ${signedReq?"":`<button type="button" class="small primary" data-lead-send="${id}">${open?"Resend contract":"Email contract"}</button>`}</div>`;
 }
-function showSentFor(clientId){ signCtx={ mode:"sent", clientId, S:signCtx?.S }; showSent(); if(!$("#signDlg").open) $("#signDlg").showModal(); }
+function showSentFor(clientId, slot){ signCtx={ mode:"sent", clientId, slot:slot||"signReq", S:signCtx?.S }; showSent(); if(!$("#signDlg").open) $("#signDlg").showModal(); }
 function ssaRowHtml(c, dirty){
   const sg=ssaSigned(c), open=ssaOpen(c), has=svcList(c).some(s=>SSA_TYPES.includes(s.type));
   const covered = sg ? SSA_TYPES.filter(t=>(sg[1].covers||{})[t]).map(t=>SERVICE_TYPES[t].label).join(", ") : "";
@@ -2459,13 +2539,21 @@ const LSA_SEASON = "2027";
 const LSA_START = "April 14, 2027";
 function lsaSigned(c){ return Object.entries(c.contracts||{}).filter(([,m])=>m.name===LSA_NAME&&m.status==="signed"&&!m.voided).sort((a,b)=>b[1].signedAt-a[1].signedAt)[0]||null; }
 const lsaCount = () => live().reduce((n,[,c])=>n+Object.values(c.contracts||{}).filter(x=>x.name===LSA_NAME&&x.status==="signed"&&!x.voided&&!x.test).length,0);
-const lsaReq = c => c.signReq && c.signReq.kind==="lawn" ? c.signReq : null;
+// Nov 10, 2026: each agreement keeps its link status in its own slot, so a Landscaping link no longer wipes a Lawn
+// link's status (and the other way round). The new slots need the Nov 10 signing service; until the ping says it is
+// deployed (svcSlots), everything stays on the old single slot.
+let svcSlots = false;
+const REQ_SLOTS = ["signReq","signReqLawn","signReqLand"];
+const slotLawn = () => svcSlots ? "signReqLawn" : "signReq", slotLand = () => svcSlots ? "signReqLand" : "signReq";
+const reqSlot = (c, r) => (r && REQ_SLOTS.find(k=>c[k] && c[k].token===r.token)) || "signReq";
+const anyReq = c => { const all=REQ_SLOTS.map(k=>c[k]).filter(Boolean); return all.find(r=>OPEN_REQ.includes(r.status)) || all.sort((a,b)=>(b.createdAt||0)-(a.createdAt||0))[0] || null; };
+const lsaReq = c => c.signReqLawn || (c.signReq && c.signReq.kind==="lawn" ? c.signReq : null);
 function lsaRowHtml(c, dirty){
   const sg=lsaSigned(c), has=svcList(c).some(s=>s.type==="lawn"), r=lsaReq(c);
   if(!sg && !has) return "";
   return `<div class="ctr"><div class="t"><b>${LSA_NAME}</b><div class="meta">${sg ? `Signed for the ${LSA_SEASON} lawn season${sg[1].agreementNo?" ("+esc(sg[1].agreementNo)+")":""}.` : `Lawn mowing for the ${LSA_SEASON} season at the Lawn service price per cut. The customer only signs and adds a card.`}</div></div>
     ${sg?`<span class="pill signed">Signed ${fmtDate(new Date(sg[1].signedAt).toLocaleDateString("en-CA",{timeZone:TZ}))}</span><button type="button" class="small" data-view-ctr="${sg[0]}">View</button>`:`<span class="pill unsigned">Not signed</span>`}
-    ${!sg&&r&&OPEN_REQ.includes(r.status)?`<button type="button" class="small" data-req-status="1" title="Copy the link, resend, or change it">${esc(reqStatusText(r,c))} · Link</button>`:""}
+    ${!sg&&r&&OPEN_REQ.includes(r.status)?`<button type="button" class="small" data-req-status="${esc(r.token)}" title="Copy the link, resend, or change it">${esc(reqStatusText(r,c))} · Link</button>`:""}
     <button type="button" class="small ${sg?"":"primary"}" data-lsa="1" ${dirty?"disabled":""}>${sg?"New agreement":"Set up and email"}</button></div>`;
 }
 function lsaService(c, sid){ const l=svcList(c).filter(s=>s.type==="lawn"); return l.find(s=>s.sid===sid) || l.find(s=>s.season!=="Off") || l[0] || null; }
@@ -2626,7 +2714,7 @@ async function lsaSend(){
       createdAt:now, createdBy:me.email, expiresAt:now+7*864e5, link, apply, payUrl:"" };
     const upd = {
       ["sync/sign/"+token]: JSON.parse(JSON.stringify(req)),
-      ["clients/"+id+"/signReq"]: { token, kind:"lawn", status:"queued", createdAt:now, createdBy:me.email, to, link, agreementNo:X.agNo, amount:price, dueNow:0 },
+      ["clients/"+id+"/"+slotLawn()]: { token, kind:"lawn", status:"queued", createdAt:now, createdBy:me.email, to, link, agreementNo:X.agNo, amount:price, dueNow:0 },
       ["clients/"+id+"/lastContactAt"]: now,
       ["clientLog/"+id+"/"+db.ref("clientLog").push().key]: { text:`Emailed ${LSA_NAME} ${X.agNo} to ${to.join(" and ")}: ${summary}. Nothing charged at signing.`, at:now, by:me.email, source:"contract" }
     };
@@ -2651,14 +2739,14 @@ const ldaDeposit = price => (+price||0) >= LDA_DEPOSIT_MIN ? r2((+price||0)/2) :
 const ldaJobs = c => svcList(c).filter(s=>s.type==="landscaping");
 function ldaSignedFor(c, s){ if(!s.agreementNo) return null; return Object.entries(c.contracts||{}).find(([,m])=>m.name===LDA_NAME&&m.agreementNo===s.agreementNo&&m.status==="signed"&&!m.voided)||null; }
 const ldaSignedAll = c => Object.entries(c.contracts||{}).filter(([,m])=>m.name===LDA_NAME&&m.status==="signed"&&!m.voided);
-const ldaReq = (c, sid) => c.signReq && c.signReq.kind==="landscaping" && (!sid || c.signReq.sid===sid) ? c.signReq : null;
+const ldaReq = (c, sid) => { const r = c.signReqLand || (c.signReq && c.signReq.kind==="landscaping" ? c.signReq : null); return r && (!sid || r.sid===sid) ? r : null; };
 function ldaRowsHtml(c, dirty){
   const jobs = ldaJobs(c).filter(s=>!(s.jobStatus==="Done" && !ldaSignedFor(c,s)));
   if(!jobs.length) return `<div class="ctr"><div class="t"><b>${LDA_NAME}</b><div class="meta">For landscaping jobs: one agreement per job. Jobs of $${LDA_DEPOSIT_MIN} or more are billed 50% at signing; smaller jobs in full when done. Add a Landscaping job with its price first.</div></div><button type="button" class="small primary" data-lda-new="1" ${dirty?"disabled":""}>New landscaping job</button></div>`;
   return jobs.map(s=>{ const sg=ldaSignedFor(c,s), r=ldaReq(c,s.sid);
     return `<div class="ctr"><div class="t"><b>${LDA_NAME}</b><div class="meta">${esc(SERVICE_TYPES.landscaping.summary(s))}${sg?"":(ldaDeposit(s.price)>0?". 50% at signing, the balance when the job is done.":". Billed in full when the job is done.")}</div></div>
     ${sg?`<span class="pill signed">Signed ${fmtDate(new Date(sg[1].signedAt).toLocaleDateString("en-CA",{timeZone:TZ}))}</span><button type="button" class="small" data-view-ctr="${sg[0]}">View</button>`:`<span class="pill unsigned">Not signed</span>`}
-    ${!sg&&r&&OPEN_REQ.includes(r.status)?`<button type="button" class="small" data-req-status="1" title="Copy the link, resend, or change it">${esc(reqStatusText(r,c))} · Link</button>`:""}
+    ${!sg&&r&&OPEN_REQ.includes(r.status)?`<button type="button" class="small" data-req-status="${esc(r.token)}" title="Copy the link, resend, or change it">${esc(reqStatusText(r,c))} · Link</button>`:""}
     ${sg?"":`<button type="button" class="small primary" data-lda="${s.sid}" ${dirty?"disabled":""}>Set up and email</button>`}</div>`; }).join("");
 }
 function ldaText(c, S, s, agNo){
@@ -2835,7 +2923,7 @@ async function ldaSend(){
       createdAt:now, createdBy:me.email, expiresAt:now+7*864e5, link, apply:Object.entries(upd0), payUrl:"" };
     const upd = {
       ["sync/sign/"+token]: JSON.parse(JSON.stringify(req)),
-      ["clients/"+id+"/signReq"]: { token, kind:"landscaping", sid:s.sid, status:"queued", createdAt:now, createdBy:me.email, to, link, agreementNo:X.agNo, amount:price, dueNow:half },
+      ["clients/"+id+"/"+slotLand()]: { token, kind:"landscaping", sid:s.sid, status:"queued", createdAt:now, createdBy:me.email, to, link, agreementNo:X.agNo, amount:price, dueNow:half },
       ["clients/"+id+"/lastContactAt"]: now,
       ["clientLog/"+id+"/"+db.ref("clientLog").push().key]: { text:`Emailed ${LDA_NAME} ${X.agNo} to ${to.join(" and ")}: ${summary}.`, at:now, by:me.email, source:"contract" }
     };
@@ -2953,9 +3041,10 @@ function reqStatusText(r, c){
 let sentTimer=null;
 function showSent(){
   const X=signCtx, id=X.clientId; ssaBarOff(); X.mode="sent";
-  const paint=()=>{ const c=clients[id]||{}, r=c.signReq||{}; const box=$("#sentStatus"); if(!box){ clearInterval(sentTimer); return; }
+  const slot = X.sentToken ? reqSlot(clients[id]||{}, { token:X.sentToken }) : (X.slot||"signReq");
+  const paint=()=>{ const c=clients[id]||{}, r=c[slot]||{}; const box=$("#sentStatus"); if(!box){ clearInterval(sentTimer); return; }
     box.textContent=reqStatusText(r,c); box.className = r.status==="signed" ? "pill signed" : r.status==="error" ? "pill pastdue" : "pill open"; };
-  const c=clients[id]||{}, r=c.signReq||{};
+  const c=clients[id]||{}, r=c[slot]||{};
   $("#signTitle").textContent = "Contract sent";
   $("#signBody").innerHTML = `<div class="signpanel" style="margin-top:0">
     <h4>Sent to ${esc((r.to||[]).join(" and "))}</h4>
@@ -2965,7 +3054,7 @@ function showSent(){
     <div class="actions"><button type="button" class="left" id="sentCopy">Copy link</button><button type="button" id="sentEdit">Change and resend</button><button type="button" id="sentResend">Send the email again</button><button type="button" class="primary" id="sentDone">Done</button></div></div>`;
   paint(); clearInterval(sentTimer); sentTimer=setInterval(paint, 1500);
   $("#sentCopy").onclick=()=>navigator.clipboard.writeText(r.link||"").then(()=>toast("Link copied."));
-  $("#sentResend").onclick=async()=>{ const rr=(clients[id]||{}).signReq; if(!rr) return; await db.ref().update({ ["sync/sign/"+rr.token+"/status"]:"queued", ["sync/sign/"+rr.token+"/expiresAt"]:Date.now()+7*864e5, ["clients/"+id+"/signReq/status"]:"queued" }); svcCall("send",{t:rr.token}); toast("Sending again."); };
+  $("#sentResend").onclick=async()=>{ const rr=(clients[id]||{})[slot]; if(!rr) return; await db.ref().update({ ["sync/sign/"+rr.token+"/status"]:"queued", ["sync/sign/"+rr.token+"/expiresAt"]:Date.now()+7*864e5, ["clients/"+id+"/"+slot+"/status"]:"queued" }); svcCall("send",{t:rr.token}); toast("Sending again."); };
   $("#sentEdit").onclick=()=>{ clearInterval(sentTimer); (r.kind==="lawn"?openLawn:r.kind==="landscaping"?(x=>openLandscaping(x, r.sid)):openSeasonal)(id); };
   $("#sentDone").onclick=()=>{ clearInterval(sentTimer); $("#signDlg").close(); };
 }
@@ -2981,7 +3070,7 @@ const CARD_AUTH_NAME = "Card on File Authorization";
 const CARD_LINK_DAYS = 7;
 let svcCard = null; // null: not asked yet; false: asking, or the deployed service has no card links yet; true: ready
 function svcCardReady(){
-  if(svcCard===null && svcReady()){ svcCard=false; svcCall("ping").then(p=>{ if(!p) svcCard=null; else svcCard=!!p.cardLink; if(openId) renderCardLink(); }); }
+  if(svcCard===null && svcReady()){ svcCard=false; svcCall("ping").then(p=>{ if(!p) svcCard=null; else { svcCard=!!p.cardLink; svcSlots=!!p.slots; } if(openId) renderCardLink(); }); }
   return svcCard===true;
 }
 function lastDeclined(id){
@@ -3354,7 +3443,7 @@ function renderSvcBills(){
       const trig = s.type==="lights" ? ["install"] : ["deposit","completion"];
       const rows = Object.entries(qbRows).filter(([,r])=>r.type==="charge" && r.clientId===openId && trig.includes(r.trigger) && (r.sid===sid || (!r.sid && s.type==="lights")));
       h = rows.map(([,r])=>`<div class="bl"><b>${esc(CHARGE_LABEL[r.trigger])}</b> ${money(r.amount)} ${STATE_WORD(r)}${r.status==="scheduled"?`<span class="meta">${s.type==="lights"?"Tick Installed, then Save and charge (or approve the crew's day in Service log).":"Set Status to Done, then Save and charge (or approve the crew's day in Service log)."}</span>`:""}</div>`).join("");
-      const inAgreement = s.type==="landscaping" && (s.agreementNo || (c.signReq && c.signReq.kind==="landscaping" && c.signReq.sid===sid && OPEN_REQ.includes(c.signReq.status)));
+      const inAgreement = s.type==="landscaping" && (s.agreementNo || (ldaReq(c,sid) && OPEN_REQ.includes(ldaReq(c,sid).status)));
       if(s.type==="landscaping" && inAgreement && !rows.length) h = `<div class="bl"><span class="meta">Billing is set by the ${LDA_NAME} when it is signed.</span></div>`;
       if(s.type==="landscaping" && !inAgreement && !rows.length && +s.price>0)
         h = `<div class="bl"><button type="button" class="small" data-fifty="${sid}" ${dirty?"disabled":""}>${ldaDeposit(s.price)>0?`Bill 50/50: ${money(ldaDeposit(s.price))} now, ${money(r2(+s.price - ldaDeposit(s.price)))} when done`:`Bill when done: ${money(+s.price)} (under $${LDA_DEPOSIT_MIN}, no deposit)`}</button>${dirty?'<span class="meta">Save first.</span>':""}</div>`;
