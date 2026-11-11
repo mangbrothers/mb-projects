@@ -853,7 +853,9 @@ function renderCardState(){
   const nx = LEAD_STAGES.includes(c.status) ? leadNext(c) : c.status==="active" ? clientNext(c, openId) : c.status==="lost" ? [lostStrip(c)[0], "Lost: "+lostStrip(c)[1]] : ["cold", STATUSES[c.status]||c.status];
   const d=String(c.phone||"").replace(/\D/g,""), k=phoneKey(c.phone);
   box.innerHTML = `<div class="lstat ${nx[0]}">${nx[1].startsWith(c.status==="quoted"?"Quoted":"\u0000") ? "" : esc(STATUSES[c.status]||"")}${LEAD_STAGES.includes(c.status)||c.status==="active"?(nx[1].startsWith(c.status==="quoted"?"Quoted":"\u0000")?"":" \u00B7 ")+esc(nx[1]):c.status==="lost"?" \u00B7 "+esc(nx[1].replace(/^Lost: /,"")):""}</div>
-    <div class="quickrow">${k?`<a href="tel:${k}">Call ${esc(c.phone)}</a><a href="sms:${k}">Text</a>`:""}${c.email?`<a href="mailto:${esc(c.email)}">Email</a>`:""}${c.address?`<a href="https://maps.apple.com/?q=${encodeURIComponent(c.address)}" target="_blank" rel="noopener">Map</a>`:""}</div>`;
+    <div class="quickrow">${k?`<a href="tel:${k}">Call ${esc(c.phone)}</a><a href="sms:${k}">Text</a>`:""}${c.email?`<a href="mailto:${esc(c.email)}">Email</a>`:""}${c.address?`<a href="https://maps.apple.com/?q=${encodeURIComponent(c.address)}" target="_blank" rel="noopener">Map</a>`:""}</div>
+    ${c.status==="lost"?`<div class="row" style="margin-top:8px;gap:8px;flex-wrap:nowrap"><label style="margin:0;white-space:nowrap">Why it was lost</label><select id="lostWhy" style="max-width:240px">${opts(Object.keys(LOST_WHY), lostKind(c), LOST_WHY)}</select></div>`:""}`;
+  { const lw=$("#lostWhy"); if(lw) lw.onchange=()=>setLostWhy(openId, lw.value); }
   $("#contactLine").textContent = [c.address, c.region, c.source].filter(Boolean).join(" \u00B7 ");
 }
 function renderSvcSummary(){
@@ -1024,12 +1026,15 @@ const backStage = c => LEAD_STAGES.includes(c.lostFrom) ? c.lostFrom : "contacte
 // Two kinds of Lost (Nov 11, 2026). "quiet": nobody followed up for GRAVE_DAYS (set by the page, or by hand).
 // "no": the customer said no. A record lost before this was tracked is read from its dates: lost more than
 // GRAVE_DAYS after the last contact counts as not followed up. Only "quiet" comes back by itself on new contact.
-const lostKind = c => c.lostReason==="quiet" ? "quiet" : c.lostReason==="no" ? "no" : (c.lostAt && c.lostAt-lastContact(c) > GRAVE_DAYS*864e5) ? "quiet" : "no";
-const lostStrip = c => lostKind(c)==="quiet" ? ["cold",`Not followed up${c.lostFrom?" \u00B7 was "+STATUSES[backStage(c)]:""}`] : ["bad","Said no"];
-function flipLost(id){
-  const c=clients[id]; if(!c || c.status!=="lost") return; const to = lostKind(c)==="quiet" ? "no" : "quiet";
-  return commit(`${c.name}: ${to==="no"?"said no":"not followed up"}`, fieldUpdates("clients/"+id, { lostReason:to, ...(c.lostAt?{}:{ lostAt:Date.now() }), ...stamp() }));
+// "declined" (Nov 11, 2026): we turned the job down. Like "no", it never comes back by itself.
+const LOST_WHY = { no:"They said no", declined:"We said no", quiet:"Not followed up" };
+const lostKind = c => LOST_WHY[c.lostReason] ? c.lostReason : (c.lostAt && c.lostAt-lastContact(c) > GRAVE_DAYS*864e5) ? "quiet" : "no";
+const lostStrip = c => { const k=lostKind(c); return k==="quiet" ? ["cold",`Not followed up${c.lostFrom?" \u00B7 was "+STATUSES[backStage(c)]:""}`] : k==="declined" ? ["warm","We said no"] : ["bad","They said no"]; };
+function setLostWhy(id, to){
+  const c=clients[id]; if(!c || c.status!=="lost" || !LOST_WHY[to]) return;
+  return commit(`${c.name}: ${LOST_WHY[to].toLowerCase()}`, fieldUpdates("clients/"+id, { lostReason:to, ...(c.lostAt?{}:{ lostAt:Date.now() }), ...stamp() }));
 }
+function flipLost(id){ const c=clients[id]; if(!c) return; const order=["no","declined","quiet"]; return setLostWhy(id, order[(order.indexOf(lostKind(c))+1)%3]); }
 function reviveLead(id, status){
   const c=clients[id]; if(!c) return; const now=Date.now();
   return commit(`${c.name}: picked back up`, { ...fieldUpdates("clients/"+id, { status: status||backStage(c), lostAt:null, lostReason:null, lostFrom:null, ...stamp() }), ["clients/"+id+"/lastContactAt"]: now,
@@ -1083,7 +1088,7 @@ function renderLeads(m){
       : `<button type="button" class="small primary" data-lead-send="${id}">${c.ssaDraft?"Finish the quote":"Quote"}</button>`;
     return `<div class="lead" data-card="${id}" data-id="${id}">
       <div class="name"><span>${esc(c.name)}</span>${isLead?ageBadge(c):`<span class="meta" style="margin-left:auto;font-weight:400">${ago(lc)}</span>`}</div>
-      ${nx?`<div class="lstat ${nx[0]}"${openReq?` data-lead-status="${id}" title="Open the link status"`:c.status==="lost"?` data-lost-flip="${id}" title="Tap to switch between Said no and Not followed up" style="cursor:pointer"`:""}>${esc(nx[1])}</div>`:""}
+      ${nx?`<div class="lstat ${nx[0]}"${openReq?` data-lead-status="${id}" title="Open the link status"`:c.status==="lost"?` data-lost-flip="${id}" title="Tap to switch: They said no, We said no, Not followed up" style="cursor:pointer"`:""}>${esc(nx[1])}</div>`:""}
       <div class="l2">${[tel(c.phone), esc(c.region||""), srcTxt].filter(Boolean).join(" \u00B7 ")}</div>
       ${tags(c)?`<div class="ltags">${tags(c)}</div>`:""}
       ${c.interest?`<div class="l3" title="${esc(c.interest)}">${esc(c.interest)}</div>`:""}
