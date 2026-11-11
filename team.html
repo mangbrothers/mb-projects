@@ -1190,7 +1190,7 @@ async function addStop(rid, cid){
   const svc=Object.entries(c.services||{}).find(([,s])=>s&&s.type===r.service);
   const order=Math.max(0,...stopsOf(r).map(s=>s.order||0))+1, sid=store.key();
   const stop={ clientId:cid, name:c.name, address:c.address||"", phone:c.phone||null, order, kind:(KINDS_FOR[r.service]||["other"])[0], ...(svc?{svcId:svc[0]}:{}),
-    zone: c.region==="Newburgh / 7 Mile" ? "north" : "rosedale" };
+    zone: (c.region==="North Livonia"||c.region==="Newburgh / 7 Mile") ? "north" : "rosedale" };
   try { const sg=Object.entries(c.contracts||{}).filter(([,m])=>m.tpl==="seasonal"&&m.status==="signed"&&!m.voided).sort((a,b)=>b[1].signedAt-a[1].signedAt)[0];
     if(sg){ const det=((await store.get(`contracts/${cid}/${sg[0]}`))||{}).details||{}; if(det.zone) stop.zone=det.zone==="north"?"north":"rosedale"; if(det.lights&&det.lights.package) stop.pkg=det.lights.package; } } catch(e){}
   toast("Placing "+c.name+" on the map");
