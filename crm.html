@@ -685,7 +685,7 @@ function attach(){
   refs.fm = db.ref("fileMeta"); refs.fm.on("value", s => { fileMetaAll = s.val()||{}; if(openId) renderSvcFiles(); }, ()=>{});
   refs.cr = db.ref("crewRoutes"); refs.cr.on("value", s => { crewRoutesAll = s.val()||{}; queueStopSync(); }, ()=>{});
   refs.c.on("value", s => { clients = s.val()||{}; queueStopSync(); render(); if(openId) refreshDialogLive(); if(!backfilled){ backfilled=true; backfillPhones(); } driveNag(); });
-  refs.l.on("value", s => { logs = s.val()||{}; render(); if(openId) renderLog(); });
+  refs.l.on("value", s => { logs = s.val()||{}; render(); if(openId) renderLog(); clearTimeout(autoStage.t); autoStage.t=setTimeout(autoStage, 1500); });
   refs.t.on("value", s => { templates = s.val()||{}; render(); if(openId) renderContracts(); });
   refs.q.on("value", s => { qbRows = s.val()||{}; if(view==="tools"||view==="servicelog"||view==="charges") render(); if(openId) { renderSvcBills(); renderStamps(); renderRecord(); } });
   refs.sl = db.ref("serviceLog"); refs.dl = db.ref("dayLogs");
@@ -695,6 +695,15 @@ function attach(){
 }
 function detach(){ Object.values(refs).forEach(r => r && r.off()); }
 // Records saved before phone keys existed get one, plus a phone index entry, once.
+// Nov 10, 2026. A lead still marked New moves to Contacted once the contact log shows a real conversation
+// (an answered call or a text we sent, as the Quo sync writes them). Done once per lead, so a card moved back
+// to New by hand stays there.
+function autoStage(){
+  if(!me) return; const upd={}, now=Date.now();
+  live().forEach(([id,c])=>{ if(c.status!=="new" || c.autoStagedAt) return;
+    if(Object.values(logs[id]||{}).some(e=>/Call (inbound|outbound), |Text out:/.test(String(e.text||"")))){ upd[`clients/${id}/status`]="contacted"; upd[`clients/${id}/autoStagedAt`]=now; upd[`clients/${id}/updatedAt`]=now; upd[`clients/${id}/updatedBy`]=me.email; } });
+  if(Object.keys(upd).length) db.ref().update(upd).catch(()=>{});
+}
 function backfillPhones(){
   const upd={};
   live().forEach(([id,c])=>{ const k=phoneKey(c.phone); if(k && c.phoneKey!==k){ upd["clients/"+id+"/phoneKey"]=k; upd["phoneIndex/"+k]=id; } });
@@ -998,7 +1007,7 @@ function renderLeads(m){
       ${nx?`<div class="lstat ${gv?"cold":nx[0]}">${gv?esc(STATUSES[c.status])+" \u00B7 ":""}${esc(nx[1])}</div>`:""}
       ${gv?`<div class="leadctr"><button type="button" class="small primary" data-revive="${id}">Pick back up</button></div>`:""}
       <div class="meta">${tel(c.phone)}${c.region?" · "+esc(c.region):""}</div>
-      <div class="meta">${esc(c.source||"")}${c.interest?" · "+esc(c.interest):""}</div>
+      <div class="meta">${isLead && (!c.source||c.source==="Other") ? `<b class="stale" title="No lead source recorded. Ask how they heard about us.">Source?</b>` : esc(c.source||"")}${c.interest?" · "+esc(c.interest):""}</div>
       <div class="meta">${tags(c)}${tags(c)?" · ":""}<span class="${stale?"stale":""}">last contact ${ago(lc)}</span></div>
       ${leadCtrHtml(id,c)}
       <select data-stage="${id}">${opts([...LEAD_STAGES,"active","lost"], c.status, {...STATUSES, active:"Won → Active client"})}</select>

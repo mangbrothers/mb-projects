@@ -123,6 +123,10 @@
   .people .card.col-after{box-shadow:4px 0 0 0 var(--accent)}
   .people .card .fill{flex:1}
   .people .hint{color:var(--muted);font-size:12px;margin-top:8px}
+  .prio{border:1px solid var(--accent);border-radius:var(--r);padding:8px 10px;margin-top:8px;background:var(--accent-soft)}
+  .prio .row{justify-content:space-between;flex-wrap:nowrap} .prio b{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--accent)}
+  .prio ol{margin:6px 0 0;padding-left:20px} .prio li{margin:3px 0;font-weight:600} .prio li a{color:inherit;text-decoration:none} .prio li a:hover{text-decoration:underline}
+  .prio select{width:100%;margin-top:6px}
   .pblock{border:1px solid var(--line);border-radius:var(--r);padding:8px 10px;margin-top:8px;background:var(--bg)}
   .pblock details{margin-top:4px}
   .pblock summary{cursor:pointer;font-size:12px}
@@ -885,6 +889,28 @@ function reassignProject(pid, to){
   live(tasks).forEach(([tid,t])=>{ if(t.projectId===pid && t.assignee && t.assignee===(p.owner||"")) upd["tasks/"+tid+"/assignee"]=to; });
   return commit(to?`Reassigned project to ${to}`:"Removed project owner", upd);
 }
+// Priority (Nov 10, 2026): three projects per person, in order, shown at the top of the column. Anyone on the
+// admin team can set them. A project that is finished, archived or trashed drops off by itself.
+let prioEditing=null;
+const teamKeyOf = name => Object.keys(team).find(k=>team[k] && team[k].name===name) || "";
+const prioOf = k => { const v=team[k]&&team[k].priorities; return (Array.isArray(v)?v:Object.values(v||{})).filter(id=>{ const p=projects[id]; return p && !p.deletedAt && !p.archivedAt && p.status!=="done"; }).slice(0,3); };
+function prioBox(name){
+  const k=teamKeyOf(name); if(!k) return "";
+  const cur=prioOf(k);
+  if(prioEditing===k){
+    const all=openProjects().map(([id,p])=>({id,...p})).filter(p=>p.status!=="done" && !p.event).sort((a,b)=>((a.owner===name)?0:1)-((b.owner===name)?0:1) || a.name.localeCompare(b.name));
+    const sel=i=>`<select data-prio-sel="${i}"><option value="">${i+1}. Not set</option>${all.map(p=>`<option value="${p.id}"${cur[i]===p.id?" selected":""}>${esc(p.name)}${p.owner&&p.owner!==name?" ("+esc(p.owner)+")":""}</option>`).join("")}</select>`;
+    return `<div class="prio" data-prio-box="${k}"><div class="row"><b>Priority</b><span><button class="small" data-prio-cancel="1">Cancel</button> <button class="small primary" data-prio-save="${k}">Save</button></span></div>${[0,1,2].map(sel).join("")}</div>`;
+  }
+  return `<div class="prio"><div class="row"><b>Priority</b><button class="small" data-prio-edit="${k}">${cur.length?"Change":"Set"}</button></div><ol>${[0,1,2].map(i=>`<li>${cur[i]?`<a href="#" data-edit-proj="${cur[i]}">${esc(projects[cur[i]].name)}</a>`:'<span class="meta" style="font-weight:400">Not set</span>'}</li>`).join("")}</ol></div>`;
+}
+function wirePrio(m){
+  m.querySelectorAll("[data-prio-edit]").forEach(b=>b.onclick=()=>{ prioEditing=b.dataset.prioEdit; render(); });
+  m.querySelectorAll("[data-prio-cancel]").forEach(b=>b.onclick=()=>{ prioEditing=null; render(); });
+  m.querySelectorAll("[data-prio-save]").forEach(b=>b.onclick=async()=>{ const k=b.dataset.prioSave; const ids=[...b.closest(".prio").querySelectorAll("[data-prio-sel]")].map(x=>x.value).filter((v,i,a)=>v && a.indexOf(v)===i);
+    prioEditing=null; await commit("Set priorities for "+(team[k]?.name||""), { ["allowed/"+k+"/priorities"]: ids.length?ids:null }); render(); });
+  m.querySelectorAll(".prio a[data-edit-proj]").forEach(a=>a.addEventListener("click", e=>e.preventDefault()));
+}
 function renderPerson(m){
   // Since Sept 25: a column shows the projects the person owns, as blocks, with their own tasks
   // folded inside (a task with no assignee counts as the owner's). A task only appears on its own
@@ -912,8 +938,8 @@ function renderPerson(m){
   const columnItems=g=>[...g.ps.map(x=>({d:effDate(x.p), n:x.p.name, html:block(x)})), ...g.ts.map(t=>({d:t.due||"", n:t.title, html:taskRow(t,true,true)}))]
     .sort((a,b)=>(a.d||"9").localeCompare(b.d||"9") || a.n.localeCompare(b.n)).map(i=>i.html).join("");
   m.innerHTML = `<div class="people-bar"><span>A project sits under its owner with its tasks inside. A task shows on its own only when it is assigned to someone else. Everything is in date order by its nearest date (a project counts its earliest open task), undated last. Drag a column header to reorder; drag a project block or a task onto a person to reassign it.</span>${custom?`<button class="small" id="resetOrder">Reset order</button>`:""}</div>` +
-    `<div class="people">` + groups.map(g=>`<div class="card" data-col="${esc(g.n)}" draggable="true"><h2><span class="grip" title="Drag to reorder">&#8942;&#8942;</span>${esc(g.n)}<span class="meta">${g.open} open</span></h2>${columnItems(g)}${g.ps.length||g.ts.length?"":'<div class="meta" style="padding:8px 0">Nothing open.</div>'}<div class="fill"></div></div>`).join("") + `</div>`;
-  wire(m);
+    `<div class="people">` + groups.map(g=>`<div class="card" data-col="${esc(g.n)}" draggable="true"><h2><span class="grip" title="Drag to reorder">&#8942;&#8942;</span>${esc(g.n)}<span class="meta">${g.open} open</span></h2>${g.n===UNASSIGNED?"":prioBox(g.n)}${columnItems(g)}${g.ps.length||g.ts.length?"":'<div class="meta" style="padding:8px 0">Nothing open.</div>'}<div class="fill"></div></div>`).join("") + `</div>`;
+  wire(m); wirePrio(m);
   const rb=$("#resetOrder"); if(rb) rb.onclick=()=>{ saveOrder(null); render(); };
   m.querySelectorAll(".people .task").forEach(el=>{ el.setAttribute("draggable","true");
     el.ondragstart=e=>{ e.stopPropagation(); e.dataTransfer.setData("mb/task", el.dataset.task); e.dataTransfer.effectAllowed="move"; el.classList.add("dragging"); };
