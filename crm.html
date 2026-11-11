@@ -193,6 +193,7 @@
   .leadbar input[type=search]{flex:1 1 220px;max-width:320px}
   .leadbar .fchip,.srcstrip .pill{cursor:pointer;border:1px solid var(--line);background:var(--card);color:var(--ink2);border-radius:999px;padding:4px 11px;font-size:12px;font-weight:600}
   .leadbar .fchip b{margin-left:4px} .leadbar .fchip.zero{opacity:.5;font-weight:500}
+  .leadbar .cbchip{background:var(--red-soft);color:var(--red);border-color:var(--red)}
   .leadbar .fchip.on,.srcstrip .pill.on{background:var(--ink);color:var(--card);border-color:var(--ink)}
   .lead select{margin-top:6px;padding:3px 6px;font-size:12px;width:100%}
   @media(min-width:701px){.lead select{display:none}}
@@ -496,6 +497,7 @@ details.ssamore summary{cursor:pointer;font-weight:600}
 </dialog>
 
 <!-- Contract signing / viewing, full screen -->
+<dialog id="cbDlg"><div class="body" id="cbBody"></div></dialog>
 <dialog id="signDlg" class="sign">
   <div class="signbar"><h3 id="signTitle">Contract</h3><button type="button" class="ghost small" id="signClose">Close</button></div>
   <div class="signbody" id="signBody"></div>
@@ -706,6 +708,7 @@ function attach(){
   refs.l.on("value", s => { logs = s.val()||{}; render(); if(openId) renderLog(); clearTimeout(autoStage.t); autoStage.t=setTimeout(autoStage, 1500); });
   refs.t.on("value", s => { templates = s.val()||{}; render(); if(openId) renderContracts(); });
   refs.q.on("value", s => { qbRows = s.val()||{}; if(view==="tools"||view==="servicelog"||view==="charges") render(); if(openId) { renderSvcBills(); renderStamps(); renderRecord(); } });
+  refs.cb = db.ref("sync/quo/callbacks"); refs.cb.on("value", s => { callbacks = s.val()||{}; if(view==="leads") render(); if($("#cbDlg").open) renderCallbacks(); }, ()=>{});
   refs.sl = db.ref("serviceLog"); refs.dl = db.ref("dayLogs");
   refs.sl.on("value", s => { svcLog = s.val()||{}; if(view==="servicelog") render(); if(openId) renderRecord(); });
   refs.dl.on("value", s => { dayLogs = s.val()||{}; if(view==="servicelog") render(); if(openId) renderRecord(); });
@@ -723,7 +726,7 @@ const SRC_WORDS = [["Door hanger",/door\s*(hanger|flyer|flier)|hanger|flyer|flie
 function autoStage(){
   if(!me) return; const upd={}, now=Date.now(), day=new Date(now).toISOString().slice(0,10).replace(/-/g,"");
   live().forEach(([id,c])=>{ const b="clients/"+id+"/"; const L=Object.values(logs[id]||{});
-    if(c.status==="new" && !c.autoStagedAt && L.some(e=>/Call (inbound|outbound), |Text out:/.test(String(e.text||"")))){ upd[b+"status"]="contacted"; upd[b+"autoStagedAt"]=now; upd[b+"updatedAt"]=now; upd[b+"updatedBy"]=me.email; return; }
+    if(c.status==="new" && !c.autoStagedAt && L.some(e=>/Call (inbound|outbound), |Text out:/.test(String(e.text||"")) && !/Text out: This is Mangiapane Brothers( Lawn and Snow)?\. We (missed your call|received your voicemail)/.test(String(e.text||"")))){ upd[b+"status"]="contacted"; upd[b+"autoStagedAt"]=now; upd[b+"updatedAt"]=now; upd[b+"updatedBy"]=me.email; return; }
     if(LEAD_STAGES.includes(c.status) && isGrave(c)){
       upd[b+"status"]="lost"; upd[b+"lostAt"]=now; upd[b+"lostReason"]="quiet"; upd[b+"lostFrom"]=c.status; upd[b+"updatedAt"]=now; upd[b+"updatedBy"]=me.email;
       upd["clientLog/"+id+"/autolost"+day]={ text:`Moved to Lost automatically, not followed up: no contact for ${GRAVE_DAYS} days (was ${STATUSES[c.status]}). Last contact ${fmtStamp(lastContact(c))}.`, at:now, by:me.email }; return; }
@@ -1059,6 +1062,25 @@ function clientNext(c, id){
 }
 // What the board is narrowed to: typed search, one "needs" chip, one source. Kept while the page is open.
 let leadFilter = { q:"", k:"", src:"" };
+// Call back list (Nov 11, 2026). One entry per number: { name, clientId, first, at (latest missed call), count }.
+// The Quo sync adds a number on a missed call with no voicemail and takes it off once the call is returned, the
+// caller texts or leaves a voicemail, or two days pass. Done here takes it off by hand. Nothing here is a lead.
+let callbacks = {};
+const CB_KEEP = 2*864e5;
+const cbList = () => Object.entries(callbacks||{}).filter(([,e])=>e && e.at && Date.now()-e.at < CB_KEEP).sort((a,b)=>(b[1].count||1)-(a[1].count||1) || a[1].at-b[1].at);
+function renderCallbacks(){
+  const L=cbList(), box=$("#cbBody");
+  box.innerHTML = `<h3 style="margin:0 0 4px">Call back <span class="meta" style="font-weight:400">${L.length} waiting</span></h3>
+    <p class="meta" style="margin:0 0 10px">Missed calls with no voicemail that have not been returned. Each one got the missed-call text. A number leaves this list when you call or text it back, when the caller replies, or after two days.</p>` +
+    (L.map(([ph,e])=>{ const d=ph.replace(/\D/g,"").slice(-10), nice=`(${d.slice(0,3)}) ${d.slice(3,6)}-${d.slice(6)}`, c=e.clientId&&clients[e.clientId]&&!clients[e.clientId].deletedAt?clients[e.clientId]:null;
+      return `<div class="ctr"><div class="t"><b>${esc((c&&c.name)||e.name||"Unknown caller")}</b> ${(e.count||1)>1?`<span class="pill pastdue">called ${e.count} times</span>`:""}<div class="meta">${nice} \u00B7 ${fmtStamp(e.at)}${c?" \u00B7 "+esc(STATUSES[c.status]||""):""}</div></div>
+        <a class="small" href="tel:${esc(ph)}" style="text-decoration:none;border:1px solid var(--line);border-radius:6px;padding:5px 10px">Call</a><a class="small" href="sms:${esc(ph)}" style="text-decoration:none;border:1px solid var(--line);border-radius:6px;padding:5px 10px">Text</a>
+        ${c?`<button type="button" class="small" data-cb-open="${esc(e.clientId)}">Card</button>`:""}<button type="button" class="small" data-cb-done="${esc(ph)}">Done</button></div>`; }).join("") || `<div class="meta">Nobody is waiting on a call back.</div>`) +
+    `<div class="actions"><button type="button" class="primary" id="cbClose">Close</button></div>`;
+  box.querySelectorAll("[data-cb-done]").forEach(b=>b.onclick=()=>db.ref("sync/quo/callbacks/"+b.dataset.cbDone).set(null).catch(e=>toast("Not removed: "+(e.code||e.message))));
+  box.querySelectorAll("[data-cb-open]").forEach(b=>b.onclick=()=>{ $("#cbDlg").close(); openClient(b.dataset.cbOpen); });
+  $("#cbClose").onclick=()=>$("#cbDlg").close();
+}
 const LEAD_CHIPS = [["call","Needs a first call"],["quote","Needs a quote"],["sent","Sent, not opened"],["opened","Opened, not signed"],["follow","Follow up"],["fix","Link problem"],["card","Signed, needs a card"]];
 function renderLeads(m){
   const lfFocus = !!(document.activeElement && document.activeElement.id==="lfq");
@@ -1113,6 +1135,7 @@ function renderLeads(m){
       <div id="quickDup"></div>
     </div>
     <div class="leadbar">
+      ${cbList().length?`<button type="button" class="fchip cbchip" id="cbOpen" title="Missed calls with no voicemail, not returned yet">\u260E Call back<b>${cbList().length}</b></button>`:""}
       <input type="search" id="lfq" placeholder="Search leads: name, phone, address" value="${esc(leadFilter.q)}">
       ${LEAD_CHIPS.map(([k,l])=>`<button type="button" class="fchip${leadFilter.k===k?" on":""}${kCount[k]?"":" zero"}" data-lk="${k}">${l}<b>${kCount[k]||0}</b></button>`).join("")}
       ${leadFilter.q||leadFilter.k||leadFilter.src?`<button type="button" class="small" id="lfClear">Show all</button>`:""}
@@ -1129,6 +1152,7 @@ function renderLeads(m){
   m.querySelectorAll("[data-lk]").forEach(b=>b.onclick=()=>{ leadFilter.k = leadFilter.k===b.dataset.lk ? "" : b.dataset.lk; renderLeads(m); });
   m.querySelectorAll("[data-lsrc]").forEach(b=>b.onclick=()=>{ leadFilter.src = leadFilter.src===b.dataset.lsrc ? "" : b.dataset.lsrc; renderLeads(m); });
   { const c=$("#lfClear"); if(c) c.onclick=()=>{ leadFilter={ q:"", k:"", src:"" }; renderLeads(m); }; }
+  { const c=$("#cbOpen"); if(c) c.onclick=()=>{ renderCallbacks(); if(!$("#cbDlg").open) $("#cbDlg").showModal(); }; }
   const form=$("#quickAdd");
   if(prev){ for(const [k,v] of Object.entries(prev)) if(form.elements[k]) form.elements[k].value=v; if(focusName && form.elements[focusName]){ const el=form.elements[focusName]; el.focus(); try{ el.setSelectionRange(el.value.length,el.value.length); }catch(e){} } }
   const showDup = () => { const hit=findByPhone(form.phone.value); $("#quickDup").innerHTML = hit ? dupHtml(hit) : ""; wireDup($("#quickDup")); if(!hit) quickDupAck=null; return hit; };
