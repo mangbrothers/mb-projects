@@ -726,7 +726,7 @@ function autoStage(){
     if(c.status==="new" && !c.autoStagedAt && L.some(e=>/Call (inbound|outbound), |Text out:/.test(String(e.text||"")))){ upd[b+"status"]="contacted"; upd[b+"autoStagedAt"]=now; upd[b+"updatedAt"]=now; upd[b+"updatedBy"]=me.email; return; }
     if(LEAD_STAGES.includes(c.status) && isGrave(c)){
       upd[b+"status"]="lost"; upd[b+"lostAt"]=now; upd[b+"lostReason"]="quiet"; upd[b+"lostFrom"]=c.status; upd[b+"updatedAt"]=now; upd[b+"updatedBy"]=me.email;
-      upd["clientLog/"+id+"/autolost"+day]={ text:`Moved to Lost automatically: no contact for ${GRAVE_DAYS} days (was ${STATUSES[c.status]}). Last contact ${fmtStamp(lastContact(c))}.`, at:now, by:me.email }; return; }
+      upd["clientLog/"+id+"/autolost"+day]={ text:`Moved to Lost automatically, not followed up: no contact for ${GRAVE_DAYS} days (was ${STATUSES[c.status]}). Last contact ${fmtStamp(lastContact(c))}.`, at:now, by:me.email }; return; }
     if(c.status==="lost" && c.lostReason==="quiet" && lastContact(c) > (c.lostAt||0)+60000){
       upd[b+"status"]=backStage(c); upd[b+"lostAt"]=null; upd[b+"lostReason"]=null; upd[b+"lostFrom"]=null; upd[b+"updatedAt"]=now; upd[b+"updatedBy"]=me.email;
       upd["clientLog/"+id+"/autoback"+day]={ text:`Back from Lost automatically: new contact (returned to ${STATUSES[backStage(c)]}).`, at:now, by:me.email }; return; }
@@ -797,7 +797,7 @@ function setStatus(id, status){
   const upd = fieldUpdates("clients/"+id, { status, ...stamp() });
   if(status==="active" && !c.wonAt) upd["clients/"+id+"/wonAt"]=Date.now();
   if(status==="active") Object.assign(upd, qbCustomerRow(id));
-  if(status==="lost") upd["clients/"+id+"/lostAt"]=Date.now();
+  if(status==="lost"){ upd["clients/"+id+"/lostAt"]=Date.now(); if(LEAD_STAGES.includes(c.status)){ upd["clients/"+id+"/lostFrom"]=c.status; upd["clients/"+id+"/lostReason"]= isGrave(c) ? "quiet" : "no"; } }
   return commit(`${c.name}: ${STATUSES[status]}`, upd);
 }
 function addNote(id, text){
@@ -849,10 +849,10 @@ function renderInt(){
 function renderCardState(){
   const box=$("#cardState"); if(!box) return; const c = openId ? clients[openId] : null;
   if(!c){ box.innerHTML=""; $("#contactLine").textContent=""; return; }
-  const gv = c.status==="lost" && c.lostReason==="quiet";
-  const nx = LEAD_STAGES.includes(c.status) ? leadNext(c) : c.status==="active" ? clientNext(c, openId) : gv ? ["cold",`Lost: no follow-up in ${GRAVE_DAYS} days (was ${STATUSES[backStage(c)]})`] : ["cold", STATUSES[c.status]||c.status];
+  const gv = c.status==="lost" && lostKind(c)==="quiet";
+  const nx = LEAD_STAGES.includes(c.status) ? leadNext(c) : c.status==="active" ? clientNext(c, openId) : c.status==="lost" ? [lostStrip(c)[0], "Lost: "+lostStrip(c)[1]] : ["cold", STATUSES[c.status]||c.status];
   const d=String(c.phone||"").replace(/\D/g,""), k=phoneKey(c.phone);
-  box.innerHTML = `<div class="lstat ${nx[0]}">${nx[1].startsWith(c.status==="quoted"?"Quoted":"\u0000") ? "" : esc(STATUSES[c.status]||"")}${LEAD_STAGES.includes(c.status)||c.status==="active"?(nx[1].startsWith(c.status==="quoted"?"Quoted":"\u0000")?"":" \u00B7 ")+esc(nx[1]):gv?" \u00B7 "+esc(nx[1].replace(/^Lost: /,"")):""}</div>
+  box.innerHTML = `<div class="lstat ${nx[0]}">${nx[1].startsWith(c.status==="quoted"?"Quoted":"\u0000") ? "" : esc(STATUSES[c.status]||"")}${LEAD_STAGES.includes(c.status)||c.status==="active"?(nx[1].startsWith(c.status==="quoted"?"Quoted":"\u0000")?"":" \u00B7 ")+esc(nx[1]):c.status==="lost"?" \u00B7 "+esc(nx[1].replace(/^Lost: /,"")):""}</div>
     <div class="quickrow">${k?`<a href="tel:${k}">Call ${esc(c.phone)}</a><a href="sms:${k}">Text</a>`:""}${c.email?`<a href="mailto:${esc(c.email)}">Email</a>`:""}${c.address?`<a href="https://maps.apple.com/?q=${encodeURIComponent(c.address)}" target="_blank" rel="noopener">Map</a>`:""}</div>`;
   $("#contactLine").textContent = [c.address, c.region, c.source].filter(Boolean).join(" \u00B7 ");
 }
@@ -1021,6 +1021,15 @@ function leadNext(c){
 }
 function ageBadge(c){ const d=Math.floor((Date.now()-lastContact(c))/864e5); return `<span class="age ${d<=2?"a0":d<GRAVE_DAYS?"a1":"a2"}" title="Days since the last contact">${d<=0?"today":d+"d"}</span>`; }
 const backStage = c => LEAD_STAGES.includes(c.lostFrom) ? c.lostFrom : "contacted";
+// Two kinds of Lost (Nov 11, 2026). "quiet": nobody followed up for GRAVE_DAYS (set by the page, or by hand).
+// "no": the customer said no. A record lost before this was tracked is read from its dates: lost more than
+// GRAVE_DAYS after the last contact counts as not followed up. Only "quiet" comes back by itself on new contact.
+const lostKind = c => c.lostReason==="quiet" ? "quiet" : c.lostReason==="no" ? "no" : (c.lostAt && c.lostAt-lastContact(c) > GRAVE_DAYS*864e5) ? "quiet" : "no";
+const lostStrip = c => lostKind(c)==="quiet" ? ["cold",`Not followed up${c.lostFrom?" \u00B7 was "+STATUSES[backStage(c)]:""}`] : ["bad","Said no"];
+function flipLost(id){
+  const c=clients[id]; if(!c || c.status!=="lost") return; const to = lostKind(c)==="quiet" ? "no" : "quiet";
+  return commit(`${c.name}: ${to==="no"?"said no":"not followed up"}`, fieldUpdates("clients/"+id, { lostReason:to, ...(c.lostAt?{}:{ lostAt:Date.now() }), ...stamp() }));
+}
 function reviveLead(id, status){
   const c=clients[id]; if(!c) return; const now=Date.now();
   return commit(`${c.name}: picked back up`, { ...fieldUpdates("clients/"+id, { status: status||backStage(c), lostAt:null, lostReason:null, lostFrom:null, ...stamp() }), ["clients/"+id+"/lastContactAt"]: now,
@@ -1064,7 +1073,7 @@ function renderLeads(m){
     {key:"lost",label:"Lost",items:lost,cls:"lost"} ];
   const card = ([id,c]) => {
     const lc = lastContact(c); const stale = LEAD_STAGES.includes(c.status) && Date.now()-lc > 5*864e5;
-    const isLead = LEAD_STAGES.includes(c.status), gv = c.status==="lost" && c.lostReason==="quiet", nx = isLead ? leadNext(c) : c.status==="active" ? clientNext(c,id) : gv ? ["cold",`No follow-up in ${GRAVE_DAYS} days \u00B7 was ${STATUSES[backStage(c)]}`] : c.status==="lost" ? ["cold","Lost"] : null;
+    const isLead = LEAD_STAGES.includes(c.status), gv = c.status==="lost" && lostKind(c)==="quiet", nx = isLead ? leadNext(c) : c.status==="active" ? clientNext(c,id) : c.status==="lost" ? lostStrip(c) : null;
     const sg = ssaSigned(c), r = anyReq(c), openReq = isLead && !!(r && OPEN_REQ.includes(r.status));
     const srcTxt = isLead && (!c.source||c.source==="Other") ? `<b class="stale" title="No lead source recorded. Ask how they heard about us.">Source?</b>` : esc(c.source||"");
     const act = gv ? `<button type="button" class="small primary" data-revive="${id}">Pick back up</button>`
@@ -1074,7 +1083,7 @@ function renderLeads(m){
       : `<button type="button" class="small primary" data-lead-send="${id}">${c.ssaDraft?"Finish the quote":"Quote"}</button>`;
     return `<div class="lead" data-card="${id}" data-id="${id}">
       <div class="name"><span>${esc(c.name)}</span>${isLead?ageBadge(c):`<span class="meta" style="margin-left:auto;font-weight:400">${ago(lc)}</span>`}</div>
-      ${nx?`<div class="lstat ${nx[0]}"${openReq?` data-lead-status="${id}" title="Open the link status"`:""}>${esc(nx[1])}</div>`:""}
+      ${nx?`<div class="lstat ${nx[0]}"${openReq?` data-lead-status="${id}" title="Open the link status"`:c.status==="lost"?` data-lost-flip="${id}" title="Tap to switch between Said no and Not followed up" style="cursor:pointer"`:""}>${esc(nx[1])}</div>`:""}
       <div class="l2">${[tel(c.phone), esc(c.region||""), srcTxt].filter(Boolean).join(" \u00B7 ")}</div>
       ${tags(c)?`<div class="ltags">${tags(c)}</div>`:""}
       ${c.interest?`<div class="l3" title="${esc(c.interest)}">${esc(c.interest)}</div>`:""}
@@ -1144,10 +1153,11 @@ function renderLeads(m){
   $("#quickGo").onclick = () => quick(false); $("#quickQuote").onclick = () => quick(true);
   form.onkeydown = e => { if(e.key==="Enter" && e.target.tagName==="INPUT"){ e.preventDefault(); quick(false); } };
   m.querySelectorAll(".lead").forEach(el=>{
-    el.onclick = e => { if(!justDragged(m) && !e.target.closest("select,a,button,[data-lead-status]")) openClient(el.dataset.id); };
+    el.onclick = e => { if(!justDragged(m) && !e.target.closest("select,a,button,[data-lead-status],[data-lost-flip]")) openClient(el.dataset.id); };
   });
   m.querySelectorAll("select[data-stage]").forEach(s=> s.onchange = () => leadDrop(s.dataset.stage, s.value));
   m.querySelectorAll("[data-revive]").forEach(b=> b.onclick = () => reviveLead(b.dataset.revive));
+  m.querySelectorAll("[data-lost-flip]").forEach(b=> b.onclick = () => flipLost(b.dataset.lostFlip));
   m.querySelectorAll("[data-lead-send]").forEach(b=> b.onclick = () => openSeasonal(b.dataset.leadSend));
   m.querySelectorAll("[data-lead-status]").forEach(b=> b.onclick = () => { const c=clients[b.dataset.leadStatus]; showSentFor(b.dataset.leadStatus, reqSlot(c, anyReq(c))); });
   m.querySelectorAll("[data-lead-view]").forEach(b=> b.onclick = () => { const [cid2,ct]=b.dataset.leadView.split("|"); viewContract(cid2, ct); });

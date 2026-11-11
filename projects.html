@@ -127,6 +127,11 @@
   .prio .row{justify-content:space-between;flex-wrap:nowrap} .prio b{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--accent)}
   .prio ol{margin:6px 0 0;padding-left:20px} .prio li{margin:3px 0;font-weight:600} .prio li a{color:inherit;text-decoration:none} .prio li a:hover{text-decoration:underline}
   .prio select{width:100%;margin-top:6px}
+  .task[data-task], .pblock[data-pblock], .card[data-proj] > .row.head, .dl-row.tap{cursor:pointer}
+  .task[data-task]:hover .title, .pblock[data-pblock]:hover > .row b, .dl-row.tap:hover .dl-what{text-decoration:underline;text-decoration-color:var(--line)}
+  .pname{background:none;border:0;padding:0;font:inherit;color:inherit;cursor:pointer;text-align:left} .pname:hover{text-decoration:underline}
+  .hiddenbar{margin-top:10px;color:var(--muted);font-size:13px;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  #personDlg .kv{display:grid;grid-template-columns:auto 1fr;gap:4px 14px;font-size:14px;margin:10px 0} #personDlg .kv b{color:var(--muted);font-weight:500}
   .pblock{border:1px solid var(--line);border-radius:var(--r);padding:8px 10px;margin-top:8px;background:var(--bg)}
   .pblock details{margin-top:4px}
   .pblock summary{cursor:pointer;font-size:12px}
@@ -311,6 +316,7 @@
   <div class="actions"><button type="button" class="danger left" id="taskDelete" hidden>Delete task</button><button type="button" id="taskCancel">Cancel</button><button class="primary" value="save">Save</button></div>
 </form></dialog>
 
+<dialog id="personDlg"><div class="body"></div></dialog>
 <dialog id="filesDlg"><div class="body">
   <h3 id="filesDlgTitle">Files</h3>
   <p class="meta">Quotes, photos, spreadsheets, notes: anything the team needs for this project. Photos are shrunk before upload. Limit 8 MB per file; for anything bigger, or for Google Docs and Sheets, add a link.</p>
@@ -834,7 +840,6 @@ function taskRow(t, showProject, hideAssignee){
     <input type="checkbox" ${t.status==="done"?"checked":""} data-toggle="${t.id}">
     <div class="t"><div class="title">${esc(t.title)}${t.essential?' <span class="pill essential" title="Essential: on the timeline">essential</span>':""}${t.event?' <span class="pill event" title="Event or launch: on the timeline">\u25C6 event</span>':""}</div>
       <div class="meta">${[showProject&&p?`<b>${esc(p.name)}</b>`:"", hideAssignee?"":(t.assignee?esc(t.assignee):"<i>Unassigned</i>"), t.due?`<span class="${dueClass(t.due,t.status==="done")}">due ${fmtDate(t.due)}</span>`:"", t.status==="doing"?'<span class="pill doing">Doing</span>':""].filter(Boolean).join(" · ")}${t.notes?`<div>${esc(t.notes)}</div>`:""}</div></div>
-    <button class="small" data-edit-task="${t.id}">Edit</button>
   </div>`;
 }
 
@@ -854,7 +859,7 @@ function renderBoard(m){
     `<div class="board">` + (list.length? list.map(p=>{
       const ts=tasksFor(p.id); const done=ts.filter(t=>t.status==="done").length; const isF=folded.has(p.id);
       const others=new Set(ts.map(t=>t.assignee||p.owner||"").filter(n=>n && n!==(p.owner||""))); // people other than the owner working on it
-      return `<div class="card ${p.pinned?"pinned":""} ${isF?"folded":""}${catCls(p.category)}" data-proj="${p.id}"><div class="row head"><button class="fold" data-fold="${p.id}" title="${isF?"Show tasks":"Hide tasks"}" aria-expanded="${!isF}">${isF?"\u25B8":"\u25BE"}</button><h2 style="flex:1">${esc(p.name)}</h2>${catPill(p.category)}${p.essential?`<span class="pill essential" title="Essential to the yearly goal">essential</span>`:""}${p.event?`<span class="pill event" title="Event or launch">\u25C6 event</span>`:""}<span class="pill ${p.status}">${p.status}</span><button class="small pin ${p.pinned?"on":""}" data-pin="${p.id}" title="${p.pinned?"Unpin: let it sort normally":"Pin to the top of the board"}">${p.pinned?"Pinned":"Pin"}</button>${p.status==="done"?`<button class="small" data-archive-proj="${p.id}">Archive</button>`:""}<button class="small" data-edit-proj="${p.id}">Edit</button></div>
+      return `<div class="card ${p.pinned?"pinned":""} ${isF?"folded":""}${catCls(p.category)}" data-proj="${p.id}"><div class="row head"><button class="fold" data-fold="${p.id}" title="${isF?"Show tasks":"Hide tasks"}" aria-expanded="${!isF}">${isF?"\u25B8":"\u25BE"}</button><h2 style="flex:1">${esc(p.name)}</h2>${catPill(p.category)}${p.essential?`<span class="pill essential" title="Essential to the yearly goal">essential</span>`:""}${p.event?`<span class="pill event" title="Event or launch">\u25C6 event</span>`:""}<span class="pill ${p.status}">${p.status}</span><button class="small pin ${p.pinned?"on":""}" data-pin="${p.id}" title="${p.pinned?"Unpin: let it sort normally":"Pin to the top of the board"}">${p.pinned?"Pinned":"Pin"}</button>${p.status==="done"?`<button class="small" data-archive-proj="${p.id}">Archive</button>`:""}</div>
         <div class="meta">${p.owner?`Owner: ${esc(p.owner)}`:"No owner"}${p.deadline?` · <span class="${dueClass(p.deadline,p.status==="done")}">${p.event?"on":"deadline"} ${fmtDate(p.deadline)}</span> ${calLink("MB: "+p.name,p.deadline,p.description)}`:""}${(n=>n&&(!p.deadline||n<p.deadline)?` · <span class="${dueClass(n,false)}">next task due ${fmtDate(n)}</span>`:"")(nextTaskDue(p.id))} · ${done}/${ts.length} tasks done${isF&&ts.length-done?` · <span class="meta">${ts.length-done} open, hidden</span>`:""}</div>
         <div class="foldable">${p.description?`<p style="margin:8px 0">${esc(p.description)}</p>`:""}
         ${ts.map(t=>taskRow(t,false,!others.size)).join("")}
@@ -911,6 +916,28 @@ function wirePrio(m){
     prioEditing=null; await commit("Set priorities for "+(team[k]?.name||""), { ["allowed/"+k+"/priorities"]: ids.length?ids:null }); render(); });
   m.querySelectorAll(".prio a[data-edit-proj]").forEach(a=>a.addEventListener("click", e=>e.preventDefault()));
 }
+// Hidden columns (Nov 11, 2026) follow the signed-in account, like CRM pins: saved on your own team-list entry.
+const arrOf = v => Array.isArray(v) ? v : Object.values(v||{});
+const hiddenPeople = () => me ? arrOf(team[emailKey(me.email)] && team[emailKey(me.email)].hiddenPeople) : [];
+function setHidden(name, on){
+  const cur=hiddenPeople().filter(n=>n!==name); if(on) cur.push(name);
+  return commit((on?"Hid ":"Showed ")+name+" in By person", { ["allowed/"+emailKey(me.email)+"/hiddenPeople"]: cur.length?cur:null }).then(render);
+}
+function openPerson(name){
+  const d=$("#personDlg"), k=teamKeyOf(name), t=k?team[k]:null;
+  const ps=openProjects().filter(([,p])=>p.status!=="done" && !p.event && (p.owner||UNASSIGNED)===name);
+  const ts=openTasks().filter(([,x])=>x.status!=="done" && ((x.assignee||projects[x.projectId]?.owner||UNASSIGNED)===name));
+  const late=ts.filter(([,x])=>x.due && x.due<today()).length;
+  const pr=k?prioOf(k).map(id=>projects[id].name):[];
+  d.querySelector(".body").innerHTML = `<h3 style="margin:0">${esc(name)}</h3>
+    <div class="kv">${t?`<b>Email</b><span>${t.email?`<a href="mailto:${esc(t.email)}">${esc(t.email)}</a>`:"none"}</span><b>Access</b><span>${esc(t.tier||"admin")}</span>`:`<b>About</b><span>Work that nobody owns yet.</span>`}
+      <b>Open projects</b><span>${ps.length}</span><b>Open tasks</b><span>${ts.length}${late?` (${late} overdue)`:""}</span>${pr.length?`<b>Priority</b><span>${pr.map(esc).join("; ")}</span>`:""}</div>
+    <div class="actions"><button type="button" class="left" id="personHide">Hide this column</button><button type="button" class="primary" id="personClose">Close</button></div>
+    <p class="meta" style="margin:8px 0 0">Hiding is for your view only. Hidden people are listed at the bottom of By person; tap one to bring it back.</p>`;
+  $("#personHide").onclick=()=>{ d.close(); setHidden(name,true); };
+  $("#personClose").onclick=()=>d.close();
+  if(!d.open) d.showModal();
+}
 function renderPerson(m){
   // Since Sept 25: a column shows the projects the person owns, as blocks, with their own tasks
   // folded inside (a task with no assignee counts as the owner's). A task only appears on its own
@@ -920,7 +947,8 @@ function renderPerson(m){
   const projs=openProjects().map(([id,p])=>({id,...p})).filter(p=>p.status!=="done" && !p.event);
   const ownerOf=t=>t.assignee || projects[t.projectId]?.owner || "";
   const byDue=(a,b)=>(a.due||"9").localeCompare(b.due||"9");
-  const order=personOrder(); const custom=!!loadOrder();
+  const hiddenAll = hiddenPeople();
+  const order=personOrder().filter(n=>!hiddenAll.includes(n)); const hiddenNow=personOrder().filter(n=>hiddenAll.includes(n));
   const groups=order.map(n=>{
     const key=n===UNASSIGNED?"":n;
     const ps=projs.filter(p=>(p.owner||"")===key).map(p=>{
@@ -931,16 +959,18 @@ function renderPerson(m){
     const ts=all.filter(t=>ownerOf(t)===key && ((projects[t.projectId]?.owner||"")!==key || projects[t.projectId]?.event)).sort(byDue);
     return {n, ps, ts, open: ps.reduce((s,x)=>s+x.mine.length,0)+ts.length};
   });
-  const block=x=>`<div class="pblock" data-pblock="${x.p.id}" draggable="true" title="Drag onto a person to change the owner"><div class="row" style="flex-wrap:nowrap"><span class="grip" title="Drag to reassign">&#8942;&#8942;</span><b style="flex:1">${esc(x.p.name)}</b><button class="small" data-edit-proj="${x.p.id}">Edit</button></div>
+  const block=x=>`<div class="pblock" data-pblock="${x.p.id}" draggable="true" title="Drag onto a person to change the owner"><div class="row" style="flex-wrap:nowrap"><span class="grip" title="Drag to reassign">&#8942;&#8942;</span><b style="flex:1">${esc(x.p.name)}</b></div>
       <div class="meta">${[x.p.deadline?`<span class="${dueClass(x.p.deadline,false)}">deadline ${fmtDate(x.p.deadline)}</span>`:"", (n=>n&&(!x.p.deadline||n<x.p.deadline)?`<span class="${dueClass(n,false)}">next task due ${fmtDate(n)}</span>`:"")(nextTaskDue(x.p.id)), x.mine.length?`${x.mine.length} open task${x.mine.length===1?"":"s"}`:"no open tasks", Object.keys(x.helpers).length?`with ${Object.entries(x.helpers).map(([h,c])=>`${esc(h||UNASSIGNED)} (${c})`).join(", ")}`:""].filter(Boolean).join(" \u00b7 ")}</div>
       ${x.mine.length?`<details open><summary class="meta">Tasks</summary>${x.mine.map(t=>taskRow(t,false,true)).join("")}<button class="small" data-new-task="${x.p.id}" style="margin-top:6px">+ Task</button></details>`:`<button class="small" data-new-task="${x.p.id}" style="margin-top:6px">+ Task</button>`}</div>`;
   // One list per column, projects and loose tasks together, by date (project deadline or task due), undated last.
   const columnItems=g=>[...g.ps.map(x=>({d:effDate(x.p), n:x.p.name, html:block(x)})), ...g.ts.map(t=>({d:t.due||"", n:t.title, html:taskRow(t,true,true)}))]
     .sort((a,b)=>(a.d||"9").localeCompare(b.d||"9") || a.n.localeCompare(b.n)).map(i=>i.html).join("");
-  m.innerHTML = `<div class="people-bar"><span>A project sits under its owner with its tasks inside. A task shows on its own only when it is assigned to someone else. Everything is in date order by its nearest date (a project counts its earliest open task), undated last. Drag a column header to reorder; drag a project block or a task onto a person to reassign it.</span>${custom?`<button class="small" id="resetOrder">Reset order</button>`:""}</div>` +
-    `<div class="people">` + groups.map(g=>`<div class="card" data-col="${esc(g.n)}" draggable="true"><h2><span class="grip" title="Drag to reorder">&#8942;&#8942;</span>${esc(g.n)}<span class="meta">${g.open} open</span></h2>${g.n===UNASSIGNED?"":prioBox(g.n)}${columnItems(g)}${g.ps.length||g.ts.length?"":'<div class="meta" style="padding:8px 0">Nothing open.</div>'}<div class="fill"></div></div>`).join("") + `</div>`;
+  m.innerHTML = `<div class="people-bar"><span>Tap a card to edit it. Tap a name for that person's details or to hide the column. Drag a column by its header to reorder; drag a project or task onto a person to reassign it.</span></div>` +
+    `<div class="people">` + groups.map(g=>`<div class="card" data-col="${esc(g.n)}" draggable="true"><h2><span class="grip" title="Drag to reorder">&#8942;&#8942;</span><button type="button" class="pname" data-person="${esc(g.n)}" title="Details and Hide">${esc(g.n)}</button><span class="meta">${g.open} open</span></h2>${g.n===UNASSIGNED?"":prioBox(g.n)}${columnItems(g)}${g.ps.length||g.ts.length?"":'<div class="meta" style="padding:8px 0">Nothing open.</div>'}<div class="fill"></div></div>`).join("") + `</div>` +
+    (hiddenNow.length ? `<div class="hiddenbar"><span>Hidden:</span>${hiddenNow.map(n=>`<button class="small" data-unhide="${esc(n)}" title="Show this column again">${esc(n)} \u00B7 show</button>`).join("")}</div>` : "");
   wire(m); wirePrio(m);
-  const rb=$("#resetOrder"); if(rb) rb.onclick=()=>{ saveOrder(null); render(); };
+  m.querySelectorAll("[data-person]").forEach(b=>b.onclick=e=>{ e.stopPropagation(); openPerson(b.dataset.person); });
+  m.querySelectorAll("[data-unhide]").forEach(b=>b.onclick=()=>setHidden(b.dataset.unhide,false));
   m.querySelectorAll(".people .task").forEach(el=>{ el.setAttribute("draggable","true");
     el.ondragstart=e=>{ e.stopPropagation(); e.dataTransfer.setData("mb/task", el.dataset.task); e.dataTransfer.effectAllowed="move"; el.classList.add("dragging"); };
     el.ondragend=()=>el.classList.remove("dragging");
@@ -992,7 +1022,7 @@ function renderDeadlines(m){
   });
   const day = d => { const [y,mo,dd]=d.split("-").map(Number); const dt=new Date(y,mo-1,dd); return d<td ? fmtDate(d) : `${DOW[dt.getDay()]} ${dd}`; };
   const tag = c => `<span class="dl-tag${catName(c)?" cat-"+c:""}">${catName(c)||"Other"}</span>`;
-  const row = i => `<div class="dl-row"><span class="dl-date ${dueClass(i.date)}">${day(i.date)}</span>${tag(i.cat)}<div class="dl-what">${i.kind==="Event"?'<span class="dl-ev" title="Event or launch">◆</span> ':""}${esc(i.title)}${i.sub?`<div class="meta">${esc(i.sub)}</div>`:""}</div><span class="dl-who" title="Responsible">${i.who?esc(i.who):"Unassigned"}</span><span class="dl-act">${i.cal} <button class="small" ${i.edit}>Edit</button></span></div>`;
+  const row = i => `<div class="dl-row tap" ${i.edit}><span class="dl-date ${dueClass(i.date)}">${day(i.date)}</span>${tag(i.cat)}<div class="dl-what">${i.kind==="Event"?'<span class="dl-ev" title="Event or launch">◆</span> ':""}${esc(i.title)}${i.sub?`<div class="meta">${esc(i.sub)}</div>`:""}</div><span class="dl-who" title="Responsible">${i.who?esc(i.who):"Unassigned"}</span><span class="dl-act">${i.cal}</span></div>`;
   m.innerHTML = `<div class="filters">${catBar()}</div>` +
     `<div class="card">${groups.length ? groups.map(g=>`<div class="dl-wk${g.key==="over"?" overdue":""}">${g.label}</div>${g.rows.map(row).join("")}`).join("") : `<div class="meta">No open deadlines${catFilter?" in this category":""}.</div>`}</div>`;
   wireCatBar();
@@ -1298,9 +1328,14 @@ function tasksAll(pid){ return Object.values(tasks).filter(t=>t.projectId===pid)
 
 function wire(m){
   m.querySelectorAll("[data-toggle]").forEach(c=>c.onchange=()=>commit(c.checked?"Completed task":"Reopened task", fieldUpdates("tasks/"+c.dataset.toggle,{status:c.checked?"done":"todo", ...stamp()})));
-  m.querySelectorAll("[data-edit-task]").forEach(b=>b.onclick=()=>openTask(b.dataset.editTask,null));
+  // Nov 11, 2026: the card itself opens the edit screen. Ticks, buttons, links, grips and the Tasks fold keep their own job.
+  const inert = e => !!e.target.closest("input,button,a,select,summary,label,.grip,.prio");
+  m.querySelectorAll("[data-edit-task]").forEach(b=>b.onclick=e=>{ if(b.tagName!=="BUTTON" && inert(e)) return; openTask(b.dataset.editTask,null); });
+  m.querySelectorAll(".task[data-task]").forEach(el=>el.addEventListener("click", e=>{ if(inert(e)) return; e.stopPropagation(); openTask(el.dataset.task,null); }));
+  m.querySelectorAll(".card[data-proj] > .row.head").forEach(el=>el.addEventListener("click", e=>{ if(inert(e)) return; openProject(el.parentElement.dataset.proj); }));
+  m.querySelectorAll(".pblock[data-pblock]").forEach(el=>el.addEventListener("click", e=>{ if(inert(e) || e.target.closest(".task")) return; openProject(el.dataset.pblock); }));
   m.querySelectorAll("[data-new-task]").forEach(b=>b.onclick=()=>openTask(null,b.dataset.newTask));
-  m.querySelectorAll("[data-edit-proj]").forEach(b=>b.onclick=()=>openProject(b.dataset.editProj));
+  m.querySelectorAll("[data-edit-proj]").forEach(b=>b.onclick=e=>{ if(b.tagName!=="BUTTON" && b.tagName!=="A" && inert(e)) return; openProject(b.dataset.editProj); });
   m.querySelectorAll("[data-archive-proj]").forEach(b=>b.onclick=()=>archiveProject(b.dataset.archiveProj));
   m.querySelectorAll("[data-files]").forEach(b=>b.onclick=()=>openFiles(b.dataset.files));
 }
