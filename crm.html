@@ -852,7 +852,7 @@ function renderCardState(){
   const gv = c.status==="lost" && c.lostReason==="quiet";
   const nx = LEAD_STAGES.includes(c.status) ? leadNext(c) : c.status==="active" ? clientNext(c, openId) : gv ? ["cold",`Lost: no follow-up in ${GRAVE_DAYS} days (was ${STATUSES[backStage(c)]})`] : ["cold", STATUSES[c.status]||c.status];
   const d=String(c.phone||"").replace(/\D/g,""), k=phoneKey(c.phone);
-  box.innerHTML = `<div class="lstat ${nx[0]}">${esc(STATUSES[c.status]||"")}${LEAD_STAGES.includes(c.status)||c.status==="active"?" \u00B7 "+esc(nx[1]):gv?" \u00B7 "+esc(nx[1].replace(/^Lost: /,"")):""}</div>
+  box.innerHTML = `<div class="lstat ${nx[0]}">${nx[1].startsWith(c.status==="quoted"?"Quoted":"\u0000") ? "" : esc(STATUSES[c.status]||"")}${LEAD_STAGES.includes(c.status)||c.status==="active"?(nx[1].startsWith(c.status==="quoted"?"Quoted":"\u0000")?"":" \u00B7 ")+esc(nx[1]):gv?" \u00B7 "+esc(nx[1].replace(/^Lost: /,"")):""}</div>
     <div class="quickrow">${k?`<a href="tel:${k}">Call ${esc(c.phone)}</a><a href="sms:${k}">Text</a>`:""}${c.email?`<a href="mailto:${esc(c.email)}">Email</a>`:""}${c.address?`<a href="https://maps.apple.com/?q=${encodeURIComponent(c.address)}" target="_blank" rel="noopener">Map</a>`:""}</div>`;
   $("#contactLine").textContent = [c.address, c.region, c.source].filter(Boolean).join(" \u00B7 ");
 }
