@@ -123,6 +123,13 @@
   th.sortable{cursor:pointer;user-select:none;white-space:nowrap} th.sortable:hover{color:var(--ink)} th.sortable.on{color:var(--accent)}
   tr.click{cursor:pointer} tr.click:hover td{background:var(--surface2)}
   td.num,th.num{text-align:right;white-space:nowrap}
+  .cg-tiles{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:6px 0 4px}
+  .cg-tile{background:var(--surface2);border:1px solid var(--line);border-radius:var(--r);padding:10px 12px}
+  .cg-tile .v{font-size:22px;font-weight:700} .cg-tile .l{font-size:12px;font-weight:600}
+  .cg-tile.warn .v{color:var(--amber)} .cg-tile.good .v{color:var(--green)}
+  table.cg td{vertical-align:top} table.cg .cg-when{white-space:nowrap;color:var(--ink2)} table.cg .cg-act{white-space:nowrap}
+  table.cg .cg-what{min-width:220px} .cg-help{margin-top:12px} .cg-help summary{cursor:pointer;font-size:13px;color:var(--ink2)}
+  @media(max-width:700px){ .cg-tiles{grid-template-columns:1fr} }
   input,select,textarea{font:inherit;padding:7px 9px;border:1px solid var(--line);border-radius:var(--r);background:var(--card);color:var(--ink);width:100%}
   @media (pointer:coarse),(max-width:820px){input,select,textarea,textarea.code{font-size:16px}html .lead select,html #addSvcSel{font-size:16px!important}}
   input[type=checkbox]{width:18px;height:18px;margin:0;vertical-align:middle}
@@ -585,11 +592,9 @@ const SERVICE_TYPES = {
     {k:"package",l:"Package",t:"select",o:["Two passes","One visit","One pass"]},
     {k:"route",l:"Route",t:"select",o:["Route 1","Route 2","Route 3"]},
     {k:"price",l:"Price",t:"money"},
-    {k:"pass1",l:"Pass 1 done",t:"check"},
-    {k:"pass2",l:"Pass 2 done",t:"check"},
     {k:"notes",l:"Public notes (crew and managers see these)",t:"note",w:3},
     {k:"privateNotes",l:"Private notes (admins only)",t:"note",w:3,ph:"Prices, billing, job history. Only admins see this."} ],
-    summary:s=>[s.package, s.route, money(s.price), s.pass1?"P1 ✓":"", s.pass2?"P2 ✓":""].filter(Boolean).join(" · ") },
+    summary:s=>[s.package, s.route, money(s.price)].filter(Boolean).join(" · ") },
   snow: { label:"Snow", fields:[
     {k:"price",l:"Seasonal price",t:"money"},
     {k:"crew",l:"Crew",t:"select",o:["","Crew 1","Crew 2"]},
@@ -710,7 +715,7 @@ function attach(){
   refs.q.on("value", s => { qbRows = s.val()||{}; if(view==="tools"||view==="servicelog"||view==="charges") render(); if(openId) { renderSvcBills(); renderStamps(); renderRecord(); } });
   refs.cb = db.ref("sync/quo/callbacks"); refs.cb.on("value", s => { callbacks = s.val()||{}; if(view==="leads") render(); if($("#cbDlg").open) renderCallbacks(); }, ()=>{});
   refs.sl = db.ref("serviceLog"); refs.dl = db.ref("dayLogs");
-  refs.sl.on("value", s => { svcLog = s.val()||{}; if(view==="servicelog") render(); if(openId) renderRecord(); });
+  refs.sl.on("value", s => { svcLog = s.val()||{}; if(view==="servicelog" || view==="clients") render(); if(openId) renderRecord(); });
   refs.dl.on("value", s => { dayLogs = s.val()||{}; if(view==="servicelog") render(); if(openId) renderRecord(); });
   refs.c.once("value").then(autoPurge);
 }
@@ -1285,9 +1290,9 @@ function renderService(m, type){
   } else if(type==="fall"){
     const byR = groupBy(rows, r=>r.s.route||"No route");
     body = Object.keys(byR).sort().map(g=>`<div class="sect">${esc(g)} <span class="n">${byR[g].length} · ${money(byR[g].reduce((a,r)=>a+(+r.s.price||0),0))}</span></div>
-      <table><thead><tr><th>Client</th><th>Region</th><th>Package</th><th class="num">Price</th><th>Pass 1</th><th>Pass 2</th><th>Billing</th></tr></thead><tbody>
+      <table><thead><tr><th>Client</th><th>Region</th><th>Package</th><th class="num">Price</th><th>Visits</th><th>Billing</th></tr></thead><tbody>
       ${byR[g].sort((a,b)=>(a.c.region||"").localeCompare(b.c.region||"")||a.c.name.localeCompare(b.c.name)).map(r=>`<tr class="click" data-id="${r.id}">${nameCell(r)}<td>${esc(r.c.region||"")}</td><td>${esc(r.s.package||"")}</td><td class="num">${money(r.s.price)}</td>
-        <td><input type="checkbox" data-tick="${r.id}/${r.s.sid}/pass1" ${r.s.pass1?"checked":""}></td><td><input type="checkbox" data-tick="${r.id}/${r.s.sid}/pass2" ${r.s.pass2?"checked":""} ${r.s.package==="One pass"?"disabled":""}></td><td>${payPill(r.c)}</td></tr>`).join("")}
+        <td>${fallVisitCell(r.id, r.s)}</td><td>${payPill(r.c)}</td></tr>`).join("")}
       </tbody></table>`).join("");
   } else if(type==="snow"){
     const byG = groupBy(rows, r=>r.c.region||"No region");
@@ -3259,6 +3264,17 @@ async function doImport(){
 // The signing service charges rows marked auto on its next 5-minute run, to a saved card.
 const LOG_KINDS = { snow:"Snow visit", lights:"Lights installed", call:"Lights service call", landscaping:"Landscaping job done", fall:"Fall cleanup pass", lawn:"Lawn cut", other:"Other service" };
 const SNOW_INCLUDED = 16;
+// Fall visits for one client this season, read from the service log. A visit counts once the crew checks it off;
+// it shows as waiting until the manager approves that day.
+const fallNeed = sv => sv.package==="Two passes" ? 2 : 1;
+function fallVisits(id, sid){ const yr=seasonOf(today()), from=yr+"-09-01";
+  return allEntries().filter(x=>x.date>=from && x.e && x.e.clientId===id && x.e.kind==="fall" && (!x.e.sid || x.e.sid===sid)).map(x=>({ date:x.date, ok:entryApproved(x.date,x.e) })); }
+function fallVisitCell(id, sv){ const v=fallVisits(id, sv.sid), need=fallNeed(sv), old=(sv.pass1?1:0)+(sv.pass2?1:0), n=Math.max(v.length, old);
+  const md = d => { const [,m,dd]=d.split("-"); return `${+m}/${+dd}`; };
+  const when = v.map(x=>md(x.date)+(x.ok?"":" (waiting on approval)")).join(", ");
+  if(!n) return `<span class="meta">Not yet</span>`;
+  const cls = n>=need ? "paid" : "open", head = need>1 ? `${Math.min(n,need)} of ${need}` : "Done";
+  return `<span class="pill ${cls}" title="From the service log">${head}</span>${when?` <span class="meta">${esc(when)}</span>`:""}`; }
 const seasonOf = d => { const [y,m]=d.split("-").map(Number); return m>=7 ? y : y-1; };
 // Approval is per crew per day (dayLogs/{date}/crews/{crew}) since the crew view (October 16): each crew's manager
 // approves his own crew, and admins approve any crew plus "Office" (visits added on this tab). The signing service
@@ -3574,26 +3590,42 @@ const AUTO_TRIG = ["install","completion"];
 const autoNote = (r,c) => (r.auto || AUTO_TRIG.includes(r.trigger)) && !r.test && apiCard(c) && r.status==="pending" && r.releasedAt && !r.autoTriedAt ? "Charging automatically within 5 minutes." : "";
 const apiCard = c => !!(c && c.payOnFile && c.payOnFile.status==="on-file" && c.payOnFile.qbCardId);
 const testPill = r => r && r.test ? ' <span class="pill sample">TEST</span>' : "";
+let chgTests = false;
 function chargesHtml(){
-  const all=Object.entries(qbRows).filter(([,r])=>r.type==="charge");
-  const by=s=>all.filter(([,r])=>r.status===s).sort((a,b)=>(a[1].createdAt||0)-(b[1].createdAt||0));
+  const live = r => { const c=clients[r.clientId]; return !!c && !c.deletedAt; };
+  const every=Object.entries(qbRows).filter(([,r])=>r.type==="charge");
+  const hidden=every.filter(([,r])=>r.test || !live(r));
+  const all = chgTests ? every : every.filter(([,r])=>!r.test && live(r));
+  const newest=(a,b)=>((b[1].doneAt||b[1].releasedAt||b[1].createdAt||0)-(a[1].doneAt||a[1].releasedAt||a[1].createdAt||0));
+  const by=s=>all.filter(([,r])=>r.status===s).sort(newest);
   const pend=[...by("declined"),...by("pending")], sched=by("scheduled"), chk=by("awaiting-check"), attn=[...by("error"),...by("held"),...by("charging")];
-  const recent=all.filter(([,r])=>(r.status==="done"||r.status==="voided") && r.chargeId && (r.doneAt||0) > Date.now()-45*864e5).sort((a,b)=>(b[1].doneAt||0)-(a[1].doneAt||0));
-  const row=([rid,r],btns,extra)=>{ const c=clients[r.clientId]||{}; return `<tr><td><b>${esc(c.name||"(deleted client)")}</b>${testPill(r)}${r.status==="declined"?' <span class="pill pastdue">declined, past due</span>':""}<div class="meta">${esc(CHARGE_LABEL[r.trigger]||r.trigger||"")} · ${esc(r.description||"")}</div><div class="meta">${payOnFileLabel(c)||"No payment method recorded"}${apiCard(c)?" · saved in QuickBooks Payments":""}</div>${extra?`<div class="meta">${extra}</div>`:""}</td><td class="num"><b>${money(r.amount)}</b></td><td class="num" style="white-space:nowrap">${btns(rid,r,c)}</td></tr>`; };
-  const tbl=(rows,btns,extra)=>`<div style="overflow-x:auto"><table><tbody>${rows.map(x=>row(x,btns,extra&&extra(x[1]))).join("")}</tbody></table></div>`;
-  const sum=a=>money(a.filter(([,r])=>!r.test).reduce((s,[,r])=>s+(+r.amount||0),0))||"$0";
-  const nReal=a=>a.filter(([,r])=>!r.test).length;
+  const recent=all.filter(([,r])=>(r.status==="done"||r.status==="voided") && r.chargeId && (r.doneAt||0) > Date.now()-45*864e5).sort(newest);
+  const real=a=>a.filter(([,r])=>!r.test);
+  const tot=a=>real(a).reduce((s,[,r])=>s+(+r.amount||0),0);
+  const sum=a=>money(tot(a))||"$0";
+  const day=t=>t?new Date(t).toLocaleDateString("en-US",{timeZone:"America/Detroit",month:"short",day:"numeric"}):"";
+  const what=r=>{ const d=(r.description||"").replace(/^Seasonal Services Agreement\s+/,"Agreement "); return `<b>${esc(CHARGE_LABEL[r.trigger]||r.trigger||"Charge")}</b>${d?`<div class="meta">${esc(d)}</div>`:""}`; };
+  const row=([rid,r],btns,extra,when)=>{ const c=clients[r.clientId]||{}; return `<tr><td class="cg-who"><b>${esc(c.name||"(deleted client)")}</b>${testPill(r)}${r.status==="declined"?' <span class="pill pastdue">declined</span>':""}<div class="meta">${payOnFileLabel(c)||"No card on file"}</div></td><td class="cg-what">${what(r)}${extra?`<div class="meta">${extra}</div>`:""}</td><td class="cg-when">${esc(day(when(r)))}</td><td class="num"><b>${money(r.amount)}</b></td><td class="num cg-act">${btns(rid,r,c)}</td></tr>`; };
+  const tbl=(rows,btns,extra,when,wl)=>`<div style="overflow-x:auto"><table class="cg"><thead><tr><th>Client</th><th>For</th><th>${wl}</th><th class="num">Amount</th><th></th></tr></thead><tbody>${rows.map(x=>row(x,btns,extra&&extra(x[1]),when)).join("")}</tbody></table></div>`;
   const runBtn=(rid,r,label)=>`<button class="small primary" data-run="${rid}" data-amt="${esc(money(r.amount))}">${label}</button>`;
   const handBtns=rid=>`<button class="small primary" data-chg="${rid}" data-to="done">Charged</button> <button class="small danger" data-chg="${rid}" data-to="declined">Declined</button>`;
   const undoState=r=> r.status==="voided" ? '<span class="pill voided">voided</span>' : (+r.refunded||0) >= (+r.amount||0)-0.001 ? '<span class="pill voided">refunded</span>' : (+r.refunded||0)>0 ? `<span class="pill open">refunded ${money(r.refunded)}</span>` : "";
-  return `<div class="card" id="chargesCard"><h2>Charges to run <span class="meta">${nReal(pend)} due now · ${sum(pend)}</span></h2>
-    <p class="meta">Approved service bills itself: lights and landscaping balances, snow visits past 16 and service calls charge a saved card within 5 minutes of approval (Service log, or Save and charge on the client). To bill anything else, a lights service call or anything else, open the client and tap <b>Add a charge</b>. <b>Charge card on file</b> charges a card the customer saved on the signing page, once, and emails the receipt. A card taken in GoPayment is charged in QuickBooks (Customers, the client, Receive payment), then marked here with Charged or Declined. Declined makes the amount past due as of today.</p>
-    ${attn.length?`<div class="sect" style="color:var(--red)">Needs attention <span class="n">${attn.length}</span></div>${tbl(attn,(rid,r,c)=>r.status==="charging"?'<span class="meta">Running…</span>':apiCard(c)?runBtn(rid,r,"Try again"):handBtns(rid),r=>esc(r.error||"")+(r.status==="error"?" Trying again cannot charge twice.":""))}`:""}
-    ${attn.length||pend.length?`<div class="sect">Due now <span class="n">${nReal(pend)} · ${sum(pend)}</span></div>`:""}
-    ${pend.length?tbl(pend,(rid,r,c)=>apiCard(c)?runBtn(rid,r,"Charge card on file"):handBtns(rid),r=>esc(autoNote(r,clients[r.clientId]||{}))):`<div class="meta">Nothing to charge right now.</div>`}
-    ${sched.length?`<div class="sect">Waiting for the job to be done <span class="n">${nReal(sched)} · ${sum(sched)}</span></div>${tbl(sched,(rid,r,c)=>r.trigger==="test"&&apiCard(c)?runBtn(rid,r,"Charge the second $1 now"):`<button class="small" data-chg="${rid}" data-to="pending">Open now</button>`,r=>GATE_TEXT[r.trigger]?esc(GATE_TEXT[r.trigger])+". Open now only if the work is done and nobody marked it.":"")}`:""}
-    ${chk.length?`<div class="sect">Waiting for a prepay check <span class="n">${chk.length}</span></div>${tbl(chk,rid=>`<button class="small" data-chg="${rid}" data-to="check">Check received</button>`)}`:""}
-    ${recent.length?`<div class="sect">Charged through QuickBooks Payments, last 45 days <span class="n">${recent.length}</span></div>${tbl(recent,(rid,r)=>{ const st=undoState(r), left=r.status!=="voided" && (+r.amount||0)-(+r.refunded||0)>0.001; return [st, left?`<button class="small" data-refund="${rid}" data-client="${r.clientId}">Refund?</button>`:""].filter(Boolean).join(" "); },r=>`Charged ${esc(fmtDate(new Date(r.doneAt).toLocaleDateString("en-CA",{timeZone:"America/Detroit"})))}${r.ranBy?` by ${esc(r.ranBy)}`:""} · transaction ${esc(r.chargeId)}`)}<p class="meta">Refund? opens the refund form: any amount up to what is left, with a reason the client sees on the emailed receipt. The whole charge on the day it was made is cancelled before it posts.</p>`:""}
+  const made=r=>r.createdAt, tile=(n,l,v,cls)=>`<div class="cg-tile ${cls||""}"><div class="v">${v}</div><div class="l">${l}</div><div class="meta">${n}</div></div>`;
+  const got=recent.filter(([,r])=>r.status==="done"), collected=real(got).reduce((s,[,r])=>s+(+r.amount||0)-(+r.refunded||0),0);
+  return `<div class="card" id="chargesCard"><h2>Charges</h2>
+    <div class="cg-tiles">
+      ${tile(real(pend).length+" to run", "Due now", sum(pend), tot(pend)?"warn":"")}
+      ${tile(real(sched).length+" waiting", "Waiting on the job", sum(sched))}
+      ${tile(real(got).length+" charges", "Collected, last 45 days", money(collected)||"$0", "good")}
+    </div>
+    ${attn.length?`<div class="sect" style="color:var(--red)">Needs attention <span class="n">${attn.length}</span></div>${tbl(attn,(rid,r,c)=>r.status==="charging"?'<span class="meta">Running…</span>':apiCard(c)?runBtn(rid,r,"Try again"):handBtns(rid),r=>esc(r.error||"")+(r.status==="error"?" Trying again cannot charge twice.":""),made,"Added")}`:""}
+    <div class="sect">Due now <span class="n">${real(pend).length} · ${sum(pend)}</span></div>
+    ${pend.length?tbl(pend,(rid,r,c)=>apiCard(c)?runBtn(rid,r,"Charge card on file"):handBtns(rid),r=>esc(autoNote(r,clients[r.clientId]||{})),r=>r.releasedAt||r.createdAt,"Since"):`<div class="meta">Nothing to charge right now.</div>`}
+    ${sched.length?`<div class="sect">Waiting on the job <span class="n">${real(sched).length} · ${sum(sched)}</span></div>${tbl(sched,(rid,r,c)=>r.trigger==="test"&&apiCard(c)?runBtn(rid,r,"Charge the second $1 now"):`<button class="small" data-chg="${rid}" data-to="pending" title="${esc(GATE_TEXT[r.trigger]||"")}">Open now</button>`,null,made,"Added")}<p class="meta">These open by themselves when the crew day is approved. Use Open now only if the work is done and nobody marked it.</p>`:""}
+    ${chk.length?`<div class="sect">Waiting for a prepay check <span class="n">${chk.length}</span></div>${tbl(chk,rid=>`<button class="small" data-chg="${rid}" data-to="check">Check received</button>`,null,made,"Added")}`:""}
+    ${recent.length?`<div class="sect">Charged, last 45 days <span class="n">${real(recent).length} · ${money(collected)||"$0"}</span></div>${tbl(recent,(rid,r)=>{ const st=undoState(r), left=r.status!=="voided" && (+r.amount||0)-(+r.refunded||0)>0.001; return [st, left?`<button class="small" data-refund="${rid}" data-client="${r.clientId}" title="Transaction ${esc(r.chargeId)}">Refund</button>`:""].filter(Boolean).join(" "); },null,r=>r.doneAt,"Charged")}`:""}
+    <details class="cg-help"><summary>How charging works</summary><p class="meta">Approved service bills itself: lights and landscaping balances, snow visits past 16 and service calls charge a saved card within 5 minutes of approval (Service log, or Save and charge on the client). To bill anything else, open the client and tap <b>Add a charge</b>. <b>Charge card on file</b> charges a card the customer saved on the signing page, once, and emails the receipt. A card taken in GoPayment is charged in QuickBooks, then marked here with Charged or Declined. Declined makes the amount past due as of today. Refund opens the refund form: any amount up to what is left, with a reason the client sees on the emailed receipt.</p></details>
+    ${hidden.length?`<p class="meta" style="margin-top:10px"><button type="button" class="small" data-chg-tests>${chgTests?"Hide":"Show"} ${hidden.length} test and deleted-client rows</button></p>`:""}
   </div>`;
 }
 // Two taps for anything that moves money: the first arms the button for 4 seconds, the second runs it.
@@ -3602,6 +3634,7 @@ function wireCharges(m){
   m.querySelectorAll("[data-chg]").forEach(b=>b.onclick=()=>moveCharge(b.dataset.chg, b.dataset.to));
   m.querySelectorAll("[data-run]").forEach(b=>b.onclick=()=>{ if(armed(b,`Tap again: charge ${b.dataset.amt}`)) runCharge(b.dataset.run, b); });
   m.querySelectorAll("[data-refund]").forEach(b=>b.onclick=()=>openRefund(b.dataset.client, b.dataset.refund));
+  m.querySelectorAll("[data-chg-tests]").forEach(b=>b.onclick=()=>{ chgTests=!chgTests; render(); });
 }
 async function runCharge(rid, btn){
   const r=qbRows[rid]; if(!r) return; if(!svcReady()) return toast("Set up the signing service first: More, Contracts, Signing service.");
