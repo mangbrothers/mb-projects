@@ -1032,7 +1032,7 @@ const backStage = c => LEAD_STAGES.includes(c.lostFrom) ? c.lostFrom : "contacte
 // "declined" (Nov 11, 2026): we turned the job down. Like "no", it never comes back by itself.
 const LOST_WHY = { no:"They said no", declined:"We said no", quiet:"Not followed up" };
 const lostKind = c => LOST_WHY[c.lostReason] ? c.lostReason : (c.lostAt && c.lostAt-lastContact(c) > GRAVE_DAYS*864e5) ? "quiet" : "no";
-const lostStrip = c => { const k=lostKind(c); return k==="quiet" ? ["cold",`Not followed up${c.lostFrom?" \u00B7 was "+STATUSES[backStage(c)]:""}`] : k==="declined" ? ["warm","We said no"] : ["bad","They said no"]; };
+const lostStrip = c => { const k=lostKind(c); return k==="quiet" ? ["cold",`Not followed up${c.lostFrom?" \u00B7 was "+STATUSES[backStage(c)]:""}`] : k==="declined" ? ["cold","We said no"] : ["cold","They said no"]; };
 function setLostWhy(id, to){
   const c=clients[id]; if(!c || c.status!=="lost" || !LOST_WHY[to]) return;
   return commit(`${c.name}: ${LOST_WHY[to].toLowerCase()}`, fieldUpdates("clients/"+id, { lostReason:to, ...(c.lostAt?{}:{ lostAt:Date.now() }), ...stamp() }));
@@ -1104,7 +1104,6 @@ function renderLeads(m){
     const sg = ssaSigned(c), r = anyReq(c), openReq = isLead && !!(r && OPEN_REQ.includes(r.status));
     const srcTxt = isLead && (!c.source||c.source==="Other") ? `<b class="stale" title="No lead source recorded. Ask how they heard about us.">Source?</b>` : esc(c.source||"");
     const act = gv ? `<button type="button" class="small primary" data-revive="${id}">Pick back up</button>`
-      : sg ? `<button type="button" class="small signedbtn" data-lead-view="${id}|${sg[0]}">\u2713 Signed \u00B7 View</button>`
       : !isLead ? ""
       : openReq ? `<button type="button" class="small" data-lead-status="${id}">Link: copy or resend</button>`
       : `<button type="button" class="small primary" data-lead-send="${id}">${c.ssaDraft?"Finish the quote":"Quote"}</button>`;
