@@ -123,6 +123,8 @@
   th.sortable{cursor:pointer;user-select:none;white-space:nowrap} th.sortable:hover{color:var(--ink)} th.sortable.on{color:var(--accent)}
   tr.click{cursor:pointer} tr.click:hover td{background:var(--surface2)}
   td.num,th.num{text-align:right;white-space:nowrap}
+  .setupMenu{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:8px 12px;margin:-4px 0 8px;border:1px dashed var(--line);border-radius:var(--r)}
+  .setupMenu[hidden]{display:none}
   .cg-tiles{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:6px 0 4px}
   .cg-tile{background:var(--surface2);border:1px solid var(--line);border-radius:var(--r);padding:10px 12px}
   .cg-tile .v{font-size:22px;font-weight:700} .cg-tile .l{font-size:12px;font-weight:600}
@@ -1339,7 +1341,7 @@ function openClient(id, defaultStatus){
   $("#clientTitle").textContent = id ? c.name : "New client";
   draftServices = JSON.parse(JSON.stringify(c.services||{})); removedServices = new Set();
   draftInt = { ...((c.interestIn && Object.keys(c.interestIn).length) ? c.interestIn : (id && LEAD_STAGES.includes(c.status) ? intFromText(c.interest) : {})) }; renderInt();
-  staged=[]; renderStamps(); renderSvcs(); renderLog(); renderContracts(); renderRecord(); renderSvcSummary(); showDlgDup();
+  staged=[]; renderStamps(); renderSvcs(); readSvcForm(); svcBase=JSON.stringify(draftServices); renderLog(); renderContracts(); renderRecord(); renderSvcSummary(); showDlgDup();
   renderCardState();
   if(sameCard!==id){ sameCard=id; $("#foldContact").open = !id; $("#foldSvc").open=false; $("#foldLog").open=true; $("#foldBilling").open = !!(id && (lastDeclined(id) || (c.status==="active" && !payOnFileOk(c)))); }
   $("#clientTrash").hidden = !id; $("#addNote").style.display = id ? "" : "none";
@@ -1425,10 +1427,11 @@ function renderContracts(){
     others.map(([cid,m])=>`<div class="ctr"><div class="t"><b>${esc(m.name||"Contract")}</b>${m.sample?' <span class="pill sample">SAMPLE</span>':""}<div class="meta">${m.voided?"Voided":"Service since removed or changed"} · signed ${fmtStamp(m.signedAt)}</div></div><span class="pill ${m.voided?"voided":"signed"}">${m.voided?"Voided":"Signed"}</span><button type="button" class="small" data-view-ctr="${cid}">View</button></div>`).join("") +
     "";
   box.querySelectorAll("[data-ssa]").forEach(b=>b.onclick=()=>openSeasonal(openId));
+  box.querySelectorAll("[data-setup]").forEach(b=>b.onclick=()=>{ const m=$("#setupMenu"); if(m) m.hidden=!m.hidden; });
   box.querySelectorAll("[data-lsa]").forEach(b=>b.onclick=()=>openLawn(openId));
   box.querySelectorAll("[data-lda]").forEach(b=>b.onclick=()=>openLandscaping(openId, b.dataset.lda));
   box.querySelectorAll("[data-req-status]").forEach(b=>b.onclick=()=>{ const c=clients[openId]||{}; showSentFor(openId, REQ_SLOTS.find(k=>c[k] && c[k].token===b.dataset.reqStatus) || "signReq"); });
-  box.querySelectorAll("[data-lda-new]").forEach(b=>b.onclick=()=>{ const sel=$("#addSvcSel"); sel.value="landscaping"; sel.dispatchEvent(new Event("change",{bubbles:true})); const last=[...document.querySelectorAll("#svcList .svc.landscaping")].pop(); if(last){ last.scrollIntoView({behavior:"smooth",block:"center"}); const f=last.querySelector("input"); if(f) f.focus({preventScroll:true}); } toast("Fill in the Job, Date and Price, tap Save, then Set up and email here."); });
+  box.querySelectorAll("[data-lda-new]").forEach(b=>b.onclick=()=>{ const sel=$("#addSvcSel"); sel.value="landscaping"; sel.dispatchEvent(new Event("change",{bubbles:true})); const last=[...document.querySelectorAll("#svcList .svc.landscaping")].pop(); if(last){ last.scrollIntoView({behavior:"smooth",block:"center"}); const f=last.querySelector("input"); if(f) f.focus({preventScroll:true}); } const sm=$("#setupMenu"); if(sm) sm.hidden=true; toast("Fill in the Job, Date and Price, tap Save, then Set up and email on the landscaping row."); });
   box.querySelectorAll("[data-sign]").forEach(b=>b.onclick=()=>{ const [tid,sid]=b.dataset.sign.split("|"); openSigning(openId, tid, sid); });
   box.querySelectorAll("[data-view-ctr]").forEach(b=>b.onclick=()=>viewContract(openId, b.dataset.viewCtr));
 }
@@ -1463,6 +1466,7 @@ $("#clientCancel").onclick = () => $("#clientDlg").close();
 $("#clientForm").onkeydown = e => { if(e.key==="Enter" && e.target.tagName==="INPUT"){ e.preventDefault(); } };
 $("#clientSave").onclick = async () => {
   const f=$("#clientForm"); readSvcForm();
+  const svcTouched = removedServices.size>0 || JSON.stringify(draftServices)!==svcBase;
   const services = {}; for(const [sid,s] of Object.entries(draftServices)) services[sid]=s;
   const data = { name:f.name.value.trim(), phone:f.phone.value.trim(), email:f.email.value.trim(), email2:f.email2.value.trim(), address:f.address.value.trim(), region:f.region.value, status:f.status.value, source:f.source.value, interest:f.interest.value.trim(), interestIn: Object.keys(draftInt).length ? { ...draftInt } : null };
   if(!data.name){ $("#foldContact").open=true; toast("Name is required"); f.name.focus(); return; }
@@ -1492,6 +1496,7 @@ $("#clientSave").onclick = async () => {
   // Stay open when a contract is now waiting, so it can be signed right away.
   // Oct 20, 2026: Save never closes the client card, so the contract can be set up right after saving. Close and Cancel close it.
   const saved = clients[id];
+  if(!pend.length && !svcTouched){ $("#clientDlg").close(); toast("Saved."); return; }
   openClient(id);
   if(!pend.length) toast(saved && contractNeeds(saved).some(x=>!x.signed) ? "Saved. The contract is ready to sign below." : "Saved.");
 };
@@ -2209,10 +2214,13 @@ function showSentFor(clientId, slot){ signCtx={ mode:"sent", clientId, slot:slot
 function ssaRowHtml(c, dirty){
   const sg=ssaSigned(c), open=ssaOpen(c), has=svcList(c).some(s=>SSA_TYPES.includes(s.type));
   const covered = sg ? SSA_TYPES.filter(t=>(sg[1].covers||{})[t]).map(t=>SERVICE_TYPES[t].label).join(", ") : "";
-  return `<div class="ctr"><div class="t"><b>${SSA_NAME}</b><div class="meta">${sg ? "Covers: "+esc(covered)+(open?". A service was added since; sign a new agreement to cover it.":"") : "Fall cleanup, Christmas lights and snow. You choose the services and options, the customer only signs."}${c.ssaDraft&&!sg?" Setup saved, not signed.":""}</div></div>
+  return `<div class="ctr"><div class="t"><b>${SSA_NAME}</b><div class="meta">${sg ? "Covers: "+esc(covered)+(open?". A service was added since; sign a new agreement to cover it.":"") : "Fall cleanup, Christmas lights, snow, or a landscaping job. You choose the services and options, the customer only signs."}${c.ssaDraft&&!sg?" Setup saved, not signed.":""}</div></div>
     ${sg?`<span class="pill signed">Signed ${fmtDate(new Date(sg[1].signedAt).toLocaleDateString("en-CA",{timeZone:TZ}))}</span><button type="button" class="small" data-view-ctr="${sg[0]}">View</button>`:(has?`<span class="pill unsigned">Not signed</span>`:"")}
     ${!sg&&c.signReq&&!c.signReq.kind&&OPEN_REQ.includes(c.signReq.status)?`<span class="pill open" title="${esc((c.signReq.to||[]).join(", "))}">${esc(reqStatusText(c.signReq,c))}</span>`:""}
-    <button type="button" class="small ${sg&&!open?"":"primary"}" data-ssa="1" ${dirty?"disabled":""}>${sg?"New agreement":"Set up, email or sign"}</button></div>`;
+    <button type="button" class="small ${sg&&!open?"":"primary"}" data-setup="1" ${dirty?"disabled":""}>${sg?"New agreement":"Set up, email or sign"}</button></div>
+    <div class="setupMenu" id="setupMenu" hidden><span class="meta">What is this agreement for?</span>
+      <button type="button" class="small primary" data-ssa="1">Seasonal services: fall, lights, snow</button>
+      <button type="button" class="small primary" data-lda-new="1">Landscaping job</button></div>`;
 }
 // Tables in contract text: lines starting with "|". "|=" is a header row, "|+" a total row.
 function ssaTable(lines, inline){
@@ -2785,7 +2793,7 @@ const ldaSignedAll = c => Object.entries(c.contracts||{}).filter(([,m])=>m.name=
 const ldaReq = (c, sid) => { const r = c.signReqLand || (c.signReq && c.signReq.kind==="landscaping" ? c.signReq : null); return r && (!sid || r.sid===sid) ? r : null; };
 function ldaRowsHtml(c, dirty){
   const jobs = ldaJobs(c).filter(s=>!(s.jobStatus==="Done" && !ldaSignedFor(c,s)));
-  if(!jobs.length) return `<div class="ctr"><div class="t"><b>${LDA_NAME}</b><div class="meta">For landscaping jobs: one agreement per job. Jobs of $${LDA_DEPOSIT_MIN} or more are billed 50% at signing; smaller jobs in full when done. Add a Landscaping job with its price first.</div></div><button type="button" class="small primary" data-lda-new="1" ${dirty?"disabled":""}>New landscaping job</button></div>`;
+  if(!jobs.length) return "";
   return jobs.map(s=>{ const sg=ldaSignedFor(c,s), r=ldaReq(c,s.sid);
     return `<div class="ctr"><div class="t"><b>${LDA_NAME}</b><div class="meta">${esc(SERVICE_TYPES.landscaping.summary(s))}${sg?"":(ldaDeposit(s.price)>0?". 50% at signing, the balance when the job is done.":". Billed in full when the job is done.")}</div></div>
     ${sg?`<span class="pill signed">Signed ${fmtDate(new Date(sg[1].signedAt).toLocaleDateString("en-CA",{timeZone:TZ}))}</span><button type="button" class="small" data-view-ctr="${sg[0]}">View</button>`:`<span class="pill unsigned">Not signed</span>`}
@@ -3590,7 +3598,7 @@ const AUTO_TRIG = ["install","completion"];
 const autoNote = (r,c) => (r.auto || AUTO_TRIG.includes(r.trigger)) && !r.test && apiCard(c) && r.status==="pending" && r.releasedAt && !r.autoTriedAt ? "Charging automatically within 5 minutes." : "";
 const apiCard = c => !!(c && c.payOnFile && c.payOnFile.status==="on-file" && c.payOnFile.qbCardId);
 const testPill = r => r && r.test ? ' <span class="pill sample">TEST</span>' : "";
-let chgTests = false;
+let chgTests = false, svcBase = "{}";
 function chargesHtml(){
   const live = r => { const c=clients[r.clientId]; return !!c && !c.deletedAt; };
   const every=Object.entries(qbRows).filter(([,r])=>r.type==="charge");
