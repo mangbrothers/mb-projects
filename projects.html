@@ -1141,11 +1141,11 @@ function backupJson(){ return JSON.stringify({ exportedAt:new Date().toISOString
 // (PBKDF2-SHA256, 600,000 rounds, AES-256-GCM) and stored as one sealed blob at logins/_vault, so the database never
 // holds a password in plain text. The code is never stored or sent anywhere. Three wrong codes lock the tab with
 // growing waits (1, 5, 15, then 60 minutes), kept per person at logins/_lock and in this browser. The tab locks again
-// after 10 minutes without use, when the page is hidden, or on leaving the tab. Lose the code and the list is gone:
+// after 5 minutes without use (switching browser tabs does not lock it; closing or reloading the page does). Lose the code and the list is gone:
 // delete logins/_vault in the Firebase console to clear the tab and set a new code.
 let logins = {}, loginEdit = null, loginAdding = false, loginQ = "", loginShown = new Set();
 const LG = { key: null, items: {}, salt: null, iter: 600000, openedVer: null, idle: null, entry: "", busy: false, setup: null, msg: "" };
-const LG_WAITS = [60e3, 5*60e3, 15*60e3, 60*60e3], LG_IDLE = 10*60e3;
+const LG_WAITS = [60e3, 5*60e3, 15*60e3, 60*60e3], LG_IDLE = 5*60e3;
 const lgB64 = b => btoa(String.fromCharCode(...new Uint8Array(b)));
 const lgUnb64 = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
 const lgMeKey = () => me.email.toLowerCase().replace(/\./g, ",");
@@ -1169,8 +1169,11 @@ async function lgSetLock(st){
 }
 function lgLock(why){ if(!LG.key) return; LG.key = null; LG.items = {}; LG.entry = ""; loginShown = new Set(); loginEdit = null; loginAdding = false; clearTimeout(LG.idle);
   if(why) LG.msg = why; if(view === "logins") render(); }
-function lgTouch(){ clearTimeout(LG.idle); if(LG.key) LG.idle = setTimeout(() => lgLock("Locked after 10 minutes without use."), LG_IDLE); }
-document.addEventListener("visibilitychange", () => { if(document.hidden) lgLock("Locked when the page was put away."); });
+const LG_IDLE_MSG = "Locked after 5 minutes without use.";
+function lgTouch(){ clearTimeout(LG.idle); LG.last = Date.now(); if(LG.key) LG.idle = setTimeout(() => lgLock(LG_IDLE_MSG), LG_IDLE); }
+// Switching browser tabs no longer locks (you need to copy a password from another tab while adding one). Browsers
+// slow or freeze timers on hidden pages, so the idle clock is checked again the moment the page comes back.
+document.addEventListener("visibilitychange", () => { if(!document.hidden && LG.key && Date.now() - (LG.last || 0) >= LG_IDLE) lgLock(LG_IDLE_MSG); });
 ["pointerdown","keydown"].forEach(ev => document.addEventListener(ev, () => { if(LG.key && view === "logins") lgTouch(); }, true));
 // Writes the whole list, sealed, and removes any plain-text entries in the same update.
 async function lgSave(items, label){
