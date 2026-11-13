@@ -125,6 +125,8 @@
   td.num,th.num{text-align:right;white-space:nowrap}
   .setupMenu{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:8px 12px;margin:-4px 0 8px;border:1px dashed var(--line);border-radius:var(--r)}
   .setupMenu[hidden]{display:none}
+  .setupMenu .pk{gap:6px;flex-wrap:nowrap;color:var(--ink)} .setupMenu .pk input{width:20px;height:20px;flex:none}
+  #pkSteps{flex-basis:100%;display:flex;flex-direction:column;gap:6px;align-items:flex-start}
   .cg-tiles{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:6px 0 4px}
   .cg-tile{background:var(--surface2);border:1px solid var(--line);border-radius:var(--r);padding:10px 12px}
   .cg-tile .v{font-size:22px;font-weight:700} .cg-tile .l{font-size:12px;font-weight:600}
@@ -1419,7 +1421,7 @@ function renderContracts(){
   const others = mir.filter(([cid,m])=>!shown.has(cid) && m.tpl!=="cardauth").sort((a,b)=>b[1].signedAt-a[1].signedAt);
   const dirty = dialogDirty();
   $("#ctrCount").textContent = needs.length ? `(${needs.filter(x=>x.signed).length} of ${needs.length} signed)` : "";
-  box.innerHTML = ssaRowHtml(c, dirty) + lsaRowHtml(c, dirty) + ldaRowsHtml(c, dirty) + (dirty ? `<div class="warnline">Services changed. Save first so the contract shows the right price and dates.</div>` : "") +
+  box.innerHTML = ctrPickHtml(c, dirty) + lsaRowHtml(c, dirty) + ssaRowHtml(c, dirty) + ldaRowsHtml(c, dirty) + (dirty ? `<div class="warnline">Services changed. Save first so the contract shows the right price and dates.</div>` : "") +
     needs.map(x=>`<div class="ctr"><div class="t"><b>${esc(x.t.name)}</b>${x.t.sample?' <span class="pill sample">SAMPLE</span>':""}<div class="meta">${esc(SERVICE_TYPES[x.s.type].label)}: ${esc(SERVICE_TYPES[x.s.type].summary(x.s))}</div></div>
       ${x.signed?`<span class="pill signed">Signed ${fmtDate(new Date(x.signed[1].signedAt).toLocaleDateString("en-CA",{timeZone:TZ}))}</span><button type="button" class="small" data-view-ctr="${x.signed[0]}">View</button>`
                :`<span class="pill unsigned">Not signed</span><button type="button" class="small primary" data-sign="${x.tid}|${x.sid}" ${dirty?"disabled":""}>Open to sign</button>`}</div>`).join("") +
@@ -1428,6 +1430,7 @@ function renderContracts(){
     "";
   box.querySelectorAll("[data-ssa]").forEach(b=>b.onclick=()=>openSeasonal(openId));
   box.querySelectorAll("[data-setup]").forEach(b=>b.onclick=()=>{ const m=$("#setupMenu"); if(m) m.hidden=!m.hidden; });
+  box.querySelectorAll("[data-pk-go]").forEach(b=>b.onclick=ctrPickGo);
   box.querySelectorAll("[data-lsa]").forEach(b=>b.onclick=()=>openLawn(openId));
   box.querySelectorAll("[data-lda]").forEach(b=>b.onclick=()=>openLandscaping(openId, b.dataset.lda));
   box.querySelectorAll("[data-req-status]").forEach(b=>b.onclick=()=>{ const c=clients[openId]||{}; showSentFor(openId, REQ_SLOTS.find(k=>c[k] && c[k].token===b.dataset.reqStatus) || "signReq"); });
@@ -2211,18 +2214,51 @@ function leadCtrHtml(id, c){
     ${signedReq?"":`<button type="button" class="small primary" data-lead-send="${id}">${open?"Resend contract":"Email contract"}</button>`}</div>`;
 }
 function showSentFor(clientId, slot){ signCtx={ mode:"sent", clientId, slot:slot||"signReq", S:signCtx?.S }; showSent(); if(!$("#signDlg").open) $("#signDlg").showModal(); }
+const PK_TYPES = ["lawn","fall","lights","snow","landscaping"];
+function ctrPickHtml(c, dirty){
+  const sg=ssaSigned(c), cov=(sg&&sg[1].covers)||{}, b=ssaBlank(c);
+  const pre={ lawn:hasSvc(c,"lawn")&&!lsaSigned(c), fall:b.fall.on&&!cov.fall, lights:b.lights.on&&!cov.lights, snow:b.snow.on&&!cov.snow, landscaping:ldaJobs(c).some(x=>x.jobStatus!=="Done"&&!ldaSignedFor(c,x)) };
+  return `<div class="ctr"><div class="t"><b>Contracts</b><div class="meta">Pick the services, then set up, email or sign. Agreements already sent or signed are listed below.</div></div>
+    <button type="button" class="small primary" data-setup="1" ${dirty?"disabled":""}>Contracts</button></div>
+    <div class="setupMenu" id="setupMenu" hidden><span class="meta">Which services is this for?</span>
+      ${PK_TYPES.map(t=>`<label class="row pk"><input type="checkbox" data-pk="${t}" ${pre[t]?"checked":""}> <span>${esc(SERVICE_TYPES[t].label)}</span></label>`).join("")}
+      <button type="button" class="small primary" data-pk-go="1">Continue</button><div id="pkSteps"></div></div>`;
+}
+function ctrAddSvc(type, msg){
+  const sel=$("#addSvcSel"); sel.value=type; sel.dispatchEvent(new Event("change",{bubbles:true}));
+  const last=[...document.querySelectorAll("#svcList .svc."+type)].pop();
+  if(last){ last.scrollIntoView({behavior:"smooth",block:"center"}); const fl=last.querySelector("input"); if(fl) fl.focus({preventScroll:true}); }
+  const sm=$("#setupMenu"); if(sm) sm.hidden=true; toast(msg);
+}
+// Lawn, Seasonal (fall, lights, snow) and Landscaping are still three documents. One pick can need more than one.
+function ctrPickGo(){
+  const c=clients[openId]; if(!c) return;
+  const on = t => !!document.querySelector(`#setupMenu [data-pk="${t}"]`)?.checked;
+  const seas=SSA_TYPES.filter(on), steps=[];
+  if(on("lawn")) steps.push(lsaService(c) ? { label:LSA_NAME, attr:'data-lsa="1"', run:()=>openLawn(openId) }
+    : { label:LSA_NAME+": add the Lawn service and its price per cut first", attr:'data-lsa-new="1"', run:()=>ctrAddSvc("lawn","Fill in the price per cut, tap Save, then Contracts again.") });
+  if(seas.length) steps.push({ label:SSA_NAME+": "+seas.map(t=>SERVICE_TYPES[t].label).join(", "), attr:'data-ssa="1"', run:()=>openSeasonal(openId, Object.fromEntries(SSA_TYPES.map(t=>[t,seas.includes(t)]))) });
+  if(on("landscaping")){
+    const jobs=ldaJobs(c).filter(x=>x.jobStatus!=="Done"&&!ldaSignedFor(c,x));
+    jobs.forEach(x=>steps.push({ label:LDA_NAME+": "+SERVICE_TYPES.landscaping.summary(x), attr:`data-lda="${x.sid}"`, run:()=>openLandscaping(openId,x.sid) }));
+    if(!jobs.length) steps.push({ label:LDA_NAME+": add the job first", attr:'data-lda-new="1"', run:()=>ctrAddSvc("landscaping","Fill in the Job, Date and Price, tap Save, then Contracts again.") });
+  }
+  const box=$("#pkSteps");
+  if(!steps.length){ box.innerHTML=`<div class="warnline">Tick at least one service.</div>`; return; }
+  if(steps.length===1){ box.innerHTML=""; return steps[0].run(); }
+  box.innerHTML = `<div class="meta">That is ${steps.length} separate agreements. Set up each one:</div>`
+    + steps.map((x,i)=>`<button type="button" class="small primary" ${x.attr} data-pk-step="${i}">${i+1}. ${esc(x.label)}</button>`).join("")
+    + (svcSlots ? "" : `<div class="warnline">The card follows one open link per client until the signing service update is deployed. Send the next agreement after the first one is signed.</div>`);
+  box.querySelectorAll("[data-pk-step]").forEach(b=>b.onclick=()=>steps[+b.dataset.pkStep].run());
+}
 function ssaRowHtml(c, dirty){
   const sg=ssaSigned(c), open=ssaOpen(c), has=svcList(c).some(s=>SSA_TYPES.includes(s.type));
   const covered = sg ? SSA_TYPES.filter(t=>(sg[1].covers||{})[t]).map(t=>SERVICE_TYPES[t].label).join(", ") : "";
-  return `<div class="ctr"><div class="t"><b>${SSA_NAME}</b><div class="meta">${sg ? "Covers: "+esc(covered)+(open?". A service was added since; sign a new agreement to cover it.":"") : "Fall cleanup, Christmas lights, snow, or a landscaping job. You choose the services and options, the customer only signs."}${c.ssaDraft&&!sg?" Setup saved, not signed.":""}</div></div>
+  if(!sg && !has && !c.ssaDraft && !(c.signReq&&!c.signReq.kind&&OPEN_REQ.includes(c.signReq.status))) return "";
+  return `<div class="ctr"><div class="t"><b>${SSA_NAME}</b><div class="meta">${sg ? "Covers: "+esc(covered)+(open?". A service was added since; sign a new agreement to cover it.":"") : "Fall cleanup, Christmas lights and snow. You choose the services and options, the customer only signs."}${c.ssaDraft&&!sg?" Setup saved, not signed.":""}</div></div>
     ${sg?`<span class="pill signed">Signed ${fmtDate(new Date(sg[1].signedAt).toLocaleDateString("en-CA",{timeZone:TZ}))}</span><button type="button" class="small" data-view-ctr="${sg[0]}">View</button>`:(has?`<span class="pill unsigned">Not signed</span>`:"")}
-    ${!sg&&c.signReq&&!c.signReq.kind&&OPEN_REQ.includes(c.signReq.status)?`<span class="pill open" title="${esc((c.signReq.to||[]).join(", "))}">${esc(reqStatusText(c.signReq,c))}</span>`:""}
-    <button type="button" class="small ${sg&&!open?"":"primary"}" data-setup="1" ${dirty?"disabled":""}>${sg?"New agreement":"Set up, email or sign"}</button></div>
-    <div class="setupMenu" id="setupMenu" hidden><span class="meta">What is this agreement for?</span>
-      <button type="button" class="small primary" data-ssa="1">Seasonal services: fall, lights, snow</button>
-      <button type="button" class="small primary" data-lda-new="1">Landscaping job</button></div>`;
+    ${!sg&&c.signReq&&!c.signReq.kind&&OPEN_REQ.includes(c.signReq.status)?`<span class="pill open" title="${esc((c.signReq.to||[]).join(", "))}">${esc(reqStatusText(c.signReq,c))}</span>`:""}</div>`;
 }
-// Tables in contract text: lines starting with "|". "|=" is a header row, "|+" a total row.
 function ssaTable(lines, inline){
   return "<table>"+lines.map(l=>{ const kind=l[1]==="="?"h":l[1]==="+"?"t":""; const cells=l.replace(/^\|[=+]?/,"").split(/\s*\|\s*/).map(x=>x.trim());
     return `<tr${kind==="t"?' class="tot"':""}>`+cells.map((x,i)=> kind==="h" ? `<th>${inline(x)}</th>` : `<td${i===cells.length-1&&/^[+−-]?\$/.test(x)?' class="r"':""}>${inline(x)}</td>`).join("")+"</tr>"; }).join("")+"</table>";
@@ -2318,13 +2354,14 @@ function ssaNotice(agNo){
 }
 
 // Step 1, admin: choose services and options.
-function openSeasonal(clientId){
+function openSeasonal(clientId, pick){
   askDriveToken().catch(()=>{});
   const c=clients[clientId]; if(!c) return toast("Save the client first.");
   if($("#clientDlg").open && openId===clientId && dialogDirty()) return toast("Save the client first, then open the agreement.");
   const base=ssaBlank(c), d=c.ssaDraft||{};
   const S={ ...base, ...d, fall:{...base.fall,...(d.fall||{})}, lights:{...base.lights,...(d.lights||{})}, snow:{...base.snow,...(d.snow||{})} };
   S.test=false; // a test agreement is chosen fresh each time, never carried in a saved draft
+  if(pick) SSA_TYPES.forEach(t=>{ S[t].on=!!pick[t]; });
   S.extras = Object.values(S.extras||{}).filter(Boolean).map(x=>({ svc:x.svc||"fall", desc:x.desc||"", price:x.price??"" }));
   if(!S.prop) S.prop=c.address||""; if(!S.email) S.email=c.email||"";
   signCtx={ mode:"ssa-setup", clientId, S };
@@ -2604,8 +2641,7 @@ function lsaRowHtml(c, dirty){
   if(!sg && !has) return "";
   return `<div class="ctr"><div class="t"><b>${LSA_NAME}</b><div class="meta">${sg ? `Signed for the ${LSA_SEASON} lawn season${sg[1].agreementNo?" ("+esc(sg[1].agreementNo)+")":""}.` : `Lawn mowing for the ${LSA_SEASON} season at the Lawn service price per cut. The customer only signs and adds a card.`}</div></div>
     ${sg?`<span class="pill signed">Signed ${fmtDate(new Date(sg[1].signedAt).toLocaleDateString("en-CA",{timeZone:TZ}))}</span><button type="button" class="small" data-view-ctr="${sg[0]}">View</button>`:`<span class="pill unsigned">Not signed</span>`}
-    ${!sg&&r&&OPEN_REQ.includes(r.status)?`<button type="button" class="small" data-req-status="${esc(r.token)}" title="Copy the link, resend, or change it">${esc(reqStatusText(r,c))} · Link</button>`:""}
-    <button type="button" class="small ${sg?"":"primary"}" data-lsa="1" ${dirty?"disabled":""}>${sg?"New agreement":"Set up and email"}</button></div>`;
+    ${!sg&&r&&OPEN_REQ.includes(r.status)?`<button type="button" class="small" data-req-status="${esc(r.token)}" title="Copy the link, resend, or change it">${esc(reqStatusText(r,c))} · Link</button>`:""}</div>`;
 }
 function lsaService(c, sid){ const l=svcList(c).filter(s=>s.type==="lawn"); return l.find(s=>s.sid===sid) || l.find(s=>s.season!=="Off") || l[0] || null; }
 function lsaText(c, S, s, agNo){
@@ -2797,8 +2833,7 @@ function ldaRowsHtml(c, dirty){
   return jobs.map(s=>{ const sg=ldaSignedFor(c,s), r=ldaReq(c,s.sid);
     return `<div class="ctr"><div class="t"><b>${LDA_NAME}</b><div class="meta">${esc(SERVICE_TYPES.landscaping.summary(s))}${sg?"":(ldaDeposit(s.price)>0?". 50% at signing, the balance when the job is done.":". Billed in full when the job is done.")}</div></div>
     ${sg?`<span class="pill signed">Signed ${fmtDate(new Date(sg[1].signedAt).toLocaleDateString("en-CA",{timeZone:TZ}))}</span><button type="button" class="small" data-view-ctr="${sg[0]}">View</button>`:`<span class="pill unsigned">Not signed</span>`}
-    ${!sg&&r&&OPEN_REQ.includes(r.status)?`<button type="button" class="small" data-req-status="${esc(r.token)}" title="Copy the link, resend, or change it">${esc(reqStatusText(r,c))} · Link</button>`:""}
-    ${sg?"":`<button type="button" class="small primary" data-lda="${s.sid}" ${dirty?"disabled":""}>Set up and email</button>`}</div>`; }).join("");
+    ${!sg&&r&&OPEN_REQ.includes(r.status)?`<button type="button" class="small" data-req-status="${esc(r.token)}" title="Copy the link, resend, or change it">${esc(reqStatusText(r,c))} · Link</button>`:""}</div>`; }).join("");
 }
 function ldaText(c, S, s, agNo){
   const t = v => String(v||"").replace(/[|\r\n]+/g," ").trim();
