@@ -1448,7 +1448,7 @@ function renderStamps(){
   { const d = c && openId ? lastDeclined(openId) : null, bl=$("#billLine");
     if(bl) bl.innerHTML = !c ? "" : [payOnFileLabel(c)||"no card on file", d ? `<b style="color:var(--red)">last charge declined</b>` : "", c.payStatus==="pastdue" ? `<b style="color:var(--red)">QuickBooks: past due${c.qbBalance?" "+money(c.qbBalance):""}</b>` : c.payStatus==="open" ? "QuickBooks: open invoice" : ""].filter(Boolean).join(" · "); }
   if(!c){ $("#clientStamps").innerHTML=""; return; }
-  $("#clientStamps").innerHTML = `<b>First contact</b><span>${fmtStamp(c.firstContactAt||c.createdAt)}</span><b>Last contact</b><span>${fmtStamp(lastContact(c))} <i class="meta">(${ago(lastContact(c))})</i></span>${c.wonAt?`<b>Won</b><span>${fmtStamp(c.wonAt)}</span>`:""}`;
+  $("#clientStamps").innerHTML = `<b>First contact</b><span>${fmtStamp(c.firstContactAt||c.createdAt)}</span><b>Last contact</b><span>${fmtStamp(lastContact(c))} <i class="meta">(${ago(lastContact(c))})</i></span>${c.wonAt?`<b>Won</b><span>${fmtStamp(c.wonAt)}</span>`:""}${propLine(c)}`;
 }
 function refreshDialogLive(){ if(openId && !clients[openId]) { $("#clientDlg").close(); return; } renderStamps(); renderContracts(); renderSvcBills(); renderSvcSummary(); renderCardState(); }
 function fieldInput(sid, fld, val){
@@ -2249,14 +2249,33 @@ const docHead = name => `<div class="ssahead"><img src="${SSA_LOGO}" alt="Mangia
 const SSA_HEAD = docHead(SSA_NAME);
 
 const ssaZoneOf = region => (region==="North Livonia"||region==="Newburgh / 7 Mile") ? "north" : region==="Westland" ? "westland" : "south";
-const ssaBlank = c => ({
-  zone: ssaZoneOf(c.region),
+const propOf = c => (c && c.property && typeof c.property==="object") ? c.property : {};
+const ssaBlank = c => ssaFromProp(c, ({
+  zone: SSA_ZONES[propOf(c).zone] ? propOf(c).zone : ssaZoneOf(c.region),
   ptype:"Residential", prop:c.address||"", areas:"", pre:"", email:c.email||"", email2:c.email2||"",
   neighborName:"", neighborAddr:"",
   extras:[],
   fall:{ on:hasSvc(c,"fall")||(LEAD_STAGES.includes(c.status)&&!!intOf(c).fall), two:false, corner:false, oak:false, gutters:false, big:false, bigPrice:"", nb:false, cp:false, cpPrice:"", cpWhy:"", cpOther:"", wlDisp:"haul", wlGut:false, note:"", mode:"", modeWhy:"" },
   lights:{ on:hasSvc(c,"lights")||(LEAD_STAGES.includes(c.status)&&!!intOf(c).lights), pkg:"", color:"", shrub:0, medTree:0, lgTree:0, wreath:0, two:false, twoShow:false, steep:false, ft:0, nb:false, cp:false, cpPrice:"", cpWhy:"", cpOther:"" },
-  snow:{ on:hasSvc(c,"snow")||(LEAD_STAGES.includes(c.status)&&!!intOf(c).snow), lot:"", nb:false, cp:false, cpPrice:"", cpWhy:"", cpOther:"", cpPP:"" } });
+  snow:{ on:hasSvc(c,"snow")||(LEAD_STAGES.includes(c.status)&&!!intOf(c).snow), lot:"", nb:false, cp:false, cpPrice:"", cpWhy:"", cpOther:"", cpPP:"" } }));
+// A new agreement starts from the property check, when there is one. Nothing is locked; every box can be changed.
+function ssaFromProp(c, S){ const P=propOf(c);
+  if(P.corner===true){ S.fall.corner=true; S.snow.lot="corner"; } else if(P.corner===false) S.snow.lot="standard";
+  if(P.storeys===2){ S.fall.two=true; S.lights.two=true; }
+  if(P.steep===true) S.lights.steep=true;
+  return S; }
+// The property check as one line for the card, with the prices it moves.
+function propLine(c){ const P=propOf(c); if(!P.at) return "";
+  const bits=[], zone=SSA_ZONES[P.zone] ? P.zone : "", col=zone==="north"?"n2":"sw";
+  if(P.section) bits.push(esc(P.section)+(zone?" ("+SSA_ZONES[zone]+" pricing)":" (outside the priced areas)"));
+  if(P.corner===true) bits.push(`<b>Corner lot</b> (snow ${money(SSA_SNOW[1][col])} not ${money(SSA_SNOW[0][col])}; fall +${money(SSA_FALL_ADJ[1][2])})`); else if(P.corner===false) bits.push("Not a corner");
+  if(P.storeys===2) bits.push(`<b>Two-storey</b> (fall +${money(SSA_FALL_ADJ[0][2])}; lights +${money(SSA_L_ADJ[0][2])})`); else if(P.storeys===1) bits.push("One storey");
+  if(P.steep===true) bits.push(`<b>Steep roof</b> (lights +${money(SSA_L_ADJ[2][2])})`);
+  if(P.footprint) bits.push("house about "+Number(P.footprint).toLocaleString("en-US")+" sq ft on the ground");
+  if(P.drive) bits.push("driveway: "+esc(P.drive));
+  if(P.trees) bits.push("trees: "+esc(P.trees));
+  if(P.note) bits.push(esc(P.note));
+  return `<b>Property</b><span>${bits.join(" \u00B7 ")} <i class="meta">(checked on Google Maps ${fmtStamp(P.at)}${P.map?`, <a href="${esc(P.map)}" target="_blank" rel="noopener">map</a>`:""}; confirm on site)</i></span>`; }
 // Showcase carries a full season Fall Cleanup inside its price. It is sold only in Livonia (South or North).
 const ssaShowcaseFall = S => S.lights.on && S.lights.pkg==="showcase";
 const r2 = n => Math.round(n*100)/100;
