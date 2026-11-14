@@ -1156,16 +1156,17 @@ function clientNext(c, id){
 let leadFilter = { q:"", k:"", src:"", due:false };
 // Call back list (Nov 11, 2026). One entry per number: { name, clientId, first, at (latest missed call), count }.
 // The Quo sync adds a number on a missed call with no voicemail and takes it off once the call is returned, the
-// caller texts or leaves a voicemail, or two days pass. Done here takes it off by hand. Nothing here is a lead.
+// caller texts or leaves a voicemail. Age does not take a number off (Nov 14, 2026): the default is call back as soon
+// as possible. Done here takes it off by hand. Nothing here is a lead.
 let callbacks = {};
-const CB_KEEP = 2*864e5;
-const cbList = () => Object.entries(callbacks||{}).filter(([,e])=>e && e.at && Date.now()-e.at < CB_KEEP).sort((a,b)=>(b[1].count||1)-(a[1].count||1) || a[1].at-b[1].at);
+const cbWait = e => { const d=Math.floor((Date.now()-(e.first||e.at))/864e5); return d>=1 ? `waiting ${d} day${d===1?"":"s"}` : ""; };
+const cbList = () => Object.entries(callbacks||{}).filter(([,e])=>e && e.at).sort((a,b)=>(b[1].count||1)-(a[1].count||1) || a[1].at-b[1].at);
 function renderCallbacks(){
   const L=cbList(), box=$("#cbBody");
   box.innerHTML = `<h3 style="margin:0 0 4px">Call back <span class="meta" style="font-weight:400">${L.length} waiting</span></h3>
-    <p class="meta" style="margin:0 0 10px">Missed calls with no voicemail that have not been returned. Each one got the missed-call text. A number leaves this list when you call or text it back, when the caller replies, or after two days.</p>` +
+    <p class="meta" style="margin:0 0 10px">Missed calls with no voicemail that have not been returned. Each one got the missed-call text. Call each one back as soon as you can. A number leaves this list when you call or text it back, when the caller replies, or when you tap Done.</p>` +
     (L.map(([ph,e])=>{ const d=ph.replace(/\D/g,"").slice(-10), nice=`(${d.slice(0,3)}) ${d.slice(3,6)}-${d.slice(6)}`, c=e.clientId&&clients[e.clientId]&&!clients[e.clientId].deletedAt?clients[e.clientId]:null;
-      return `<div class="ctr"><div class="t"><b>${esc((c&&c.name)||e.name||"Unknown caller")}</b> ${(e.count||1)>1?`<span class="pill pastdue">called ${e.count} times</span>`:""}<div class="meta">${nice} \u00B7 ${fmtStamp(e.at)}${c?" \u00B7 "+esc(STATUSES[c.status]||""):""}</div></div>
+      return `<div class="ctr"><div class="t"><b>${esc((c&&c.name)||e.name||"Unknown caller")}</b> ${(e.count||1)>1?`<span class="pill pastdue">called ${e.count} times</span>`:""}${cbWait(e)?` <span class="pill pastdue">${cbWait(e)}</span>`:""}<div class="meta">${nice} \u00B7 ${fmtStamp(e.at)}${c?" \u00B7 "+esc(STATUSES[c.status]||""):""}</div></div>
         <a class="small" href="tel:${esc(ph)}" style="text-decoration:none;border:1px solid var(--line);border-radius:6px;padding:5px 10px">Call</a><a class="small" href="sms:${esc(ph)}" style="text-decoration:none;border:1px solid var(--line);border-radius:6px;padding:5px 10px">Text</a>
         ${c?`<button type="button" class="small" data-cb-open="${esc(e.clientId)}">Card</button>`:""}<button type="button" class="small" data-cb-done="${esc(ph)}">Done</button></div>`; }).join("") || `<div class="meta">Nobody is waiting on a call back.</div>`) +
     `<div class="actions"><button type="button" class="primary" id="cbClose">Close</button></div>`;
