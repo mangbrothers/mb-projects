@@ -1034,6 +1034,7 @@ function leadNext(c){
   if(ssaSigned(c)||lsaSigned(c)||ldaSignedAll(c).length) return ["good", payOnFileOk(c) ? "Signed" : "Signed \u00B7 needs a card", payOnFileOk(c) ? "signed" : "card"];
   const r=anyReq(c);
   if(r && r.status==="signed") return ["good","Signed \u00B7 waiting for the card","card"];
+  if(r && r.status==="sent" && r.bounced && !r.openedAt) return ["bad","Email bounced \u00B7 check address","fix"];
   if(r && r.status==="sent") return r.openedAt ? ["hot",`Agreement opened ${ago(r.openedAt)} \u00B7 not signed`,"opened"] : ["warm",`Agreement sent ${ago(r.sentAt||r.createdAt)} \u00B7 not opened`,"sent"];
   if(r && r.status==="queued") return ["warm","Agreement sending","sent"];
   if(r && r.status==="error") return ["bad","Agreement email failed \u00B7 resend","fix"];
@@ -1073,8 +1074,10 @@ function fuKind(e){
 }
 // The next step for an open lead: { what, due (yyyy-mm-dd), over, today, label }. null when the rule does not apply.
 function fuStep(id, c){
-  if(!c || !LEAD_STAGES.includes(c.status)) return null;
-  const nk=leadNext(c)[2]; if(nk==="signed"||nk==="card") return null;
+  const isWon = !!c && c.status==="active", ask = isWon ? openAsk(c, id) : null;
+  if(!c || !(LEAD_STAGES.includes(c.status) || wonPending(c, id))) return null;
+  if(!isWon){ const nk=leadNext(c)[2]; if(nk==="signed"||nk==="card") return null; }
+  const askOnly = !!ask && !REQ_SLOTS.some(k=>c[k]&&OPEN_REQ.includes(c[k].status));
   const ev=Object.values(logs[id]||{}).map(e=>({ at:e.at, k:fuKind(e) })).filter(e=>e.k&&e.at).sort((a,b)=>a.at-b.at);
   let anchor=null, out=null, missed=null, fail=null;
   for(const e of ev){
@@ -1088,6 +1091,7 @@ function fuStep(id, c){
   if(missed && (!out || missed.at>out.at)){ what="Call back"; due=ymdOf(missed.at); }
   else if(fail && !out){ what = c.email ? "Follow-up email" : "Call"; due=ymdOf(fail.at); } // text not delivered: email the same day
   else if(out){ what="Call"; due=addDays(ymdOf(out.at), FU_CALL_DAYS); }
+  else if(askOnly){ what="Quote or reply"; due=addDays(ymdOf(Math.max(ask.at, anchor?anchor.at:0)), FU_MSG_DAYS); } // an ask is owed a quote or a reply in 3 days
   else if(anchor){ what = how==="call" ? "Call" : "Follow-up "+how; due=addDays(ymdOf(anchor.at), FU_MSG_DAYS); }
   else { what="First call"; due=ymdOf(c.createdAt||Date.now()); }
   if(c.holdUntil){ // on hold: nothing is asked for until the date; the call comes due the day after
@@ -1152,11 +1156,33 @@ function leadDrop(id, col){
   if(c.status==="lost" && LEAD_STAGES.includes(col)) return reviveLead(id, col);
   return setStatus(id, col);
 }
+// Open ask (Nov 14, 2026): an active client ticked as interested in a service with nothing behind it: no service on
+// file, no signed agreement covering it, no agreement out for it. Returns { types, at } or null. "at" is when the
+// tick was made (interestAt), or for older ticks the last time the customer got in touch.
+function openAsk(c, id){
+  if(!c || c.status!=="active" || !c.interestIn) return null;
+  const L=svcList(c), sg=ssaSigned(c), cov=(sg&&sg[1].covers)||{}, open=REQ_SLOTS.map(k=>c[k]).filter(r=>r&&OPEN_REQ.includes(r.status));
+  const seasOut=open.some(r=>r.kind!=="landscaping"&&r.kind!=="lawn"), landOut=open.some(r=>r.kind==="landscaping"||(r.covers&&r.covers.landscaping)), lawnOut=open.some(r=>r.kind==="lawn");
+  const types=Object.keys(c.interestIn).filter(t=>c.interestIn[t] && SERVICE_TYPES[t] && !L.some(x=>x.type===t) && !cov[t]
+    && !(t==="landscaping" ? landOut : t==="lawn" ? (lawnOut||seasOut) : seasOut));
+  if(!types.length) return null;
+  const st=types.map(t=>(c.interestAt||{})[t]).filter(Boolean);
+  let at = st.length ? Math.min(...st) : 0;
+  if(!at){ const ins=Object.values(logs[id]||{}).filter(e=>["in","missed"].includes(fuKind(e))).map(e=>e.at); at = ins.length ? Math.max(...ins) : (lastContact(c)||Date.now()); }
+  return { types, at, label:`Open ask, no quote: ${types.map(t=>SERVICE_TYPES[t].label).join(", ")}`, days:Math.max(0,Math.round((Date.parse(today())-Date.parse(ymdOf(at)))/864e5)) };
+}
+// A Won client that still has an agreement out or an open ask is followed like a lead.
+const wonPending = (c, id) => !!c && c.status==="active" && (REQ_SLOTS.some(k=>c[k]&&OPEN_REQ.includes(c[k].status)) || !!openAsk(c, id));
 // Where a client stands, for the strip on Won cards and the Clients table.
 function clientNext(c, id){
   if(lastDeclined(id)) return ["bad","Charge declined"];
   const signedAny = !!(ssaSigned(c)||lsaSigned(c)||ldaSignedAll(c).length);
   if(signedAny && !payOnFileOk(c)) return ["hot","Signed \u00B7 needs a card"];
+  { const r=anyReq(c); // an agreement out for signature shows its link state, the same words as on a lead
+    if(r && r.status==="sent" && r.bounced && !r.openedAt) return ["bad","Email bounced \u00B7 check address","fix"];
+    if(r && r.status==="sent") return r.openedAt ? ["hot",`Agreement opened ${ago(r.openedAt)} \u00B7 not signed`,"opened"] : ["warm",`Agreement sent ${ago(r.sentAt||r.createdAt)} \u00B7 not opened`,"sent"];
+    if(r && r.status==="queued") return ["warm","Agreement sending","sent"];
+    if(r && r.status==="error") return ["bad","Agreement email failed \u00B7 resend","fix"]; }
   if(unsignedFor(c)) return ["warm","Agreement not signed"];
   if(c.payStatus==="pastdue") return ["bad","Past due in QuickBooks"];
   if(signedAny) return ["good","Signed \u00B7 card on file"];
@@ -1184,37 +1210,43 @@ function renderCallbacks(){
   box.querySelectorAll("[data-cb-open]").forEach(b=>b.onclick=()=>{ $("#cbDlg").close(); openClient(b.dataset.cbOpen); });
   $("#cbClose").onclick=()=>$("#cbDlg").close();
 }
-const LEAD_CHIPS = [["call","Needs a first call"],["quote","Needs a quote"],["sent","Sent, not opened"],["opened","Opened, not signed"],["follow","Follow up"],["fix","Link problem"],["card","Signed, needs a card"]];
+const LEAD_CHIPS = [["call","Needs a first call"],["quote","Needs a quote"],["sent","Sent, not opened"],["opened","Opened, not signed"],["follow","Follow up"],["fix","Link problem"],["card","Signed, needs a card"],["ask","Open ask, no quote"]];
 function renderLeads(m){
   const lfFocus = !!(document.activeElement && document.activeElement.id==="lfq");
   const allLeads = live().filter(([,c])=>LEAD_STAGES.includes(c.status));
   const lq = leadFilter.q.trim().toLowerCase();
   const hit = ([,c]) => (!lq || [c.name,c.phone,c.address,c.email,c.interest].join(" ").toLowerCase().includes(lq)) && (!leadFilter.src || (c.source||"Other")===leadFilter.src);
   const kOf = c => leadNext(c)[2];
+  const pend = live().filter(([id,c])=>wonPending(c, id)); // Won clients with an agreement out or an open ask
+  const wonK = ([id,c]) => clientNext(c,id)[2]||"";
+  const wonHit = x => (!leadFilter.k || (leadFilter.k==="ask" ? !!openAsk(x[1],x[0]) : wonK(x)===leadFilter.k)) && (!leadFilter.due || fuDueNow(x[0], x[1]));
   const leads = allLeads.filter(x=>hit(x) && (!leadFilter.k || kOf(x[1])===leadFilter.k) && (!leadFilter.due || fuDueNow(x[0], x[1])));
-  const dueCount = allLeads.filter(hit).filter(x=>fuDueNow(x[0], x[1])).length;
+  const dueCount = [...allLeads, ...pend].filter(hit).filter(x=>fuDueNow(x[0], x[1])).length;
   const kCount = {}; allLeads.filter(hit).forEach(([,c])=>{ const k=kOf(c); kCount[k]=(kCount[k]||0)+1; });
+  pend.filter(hit).forEach(x=>{ const k=wonK(x); if(["sent","opened","fix"].includes(k)) kCount[k]=(kCount[k]||0)+1; if(openAsk(x[1],x[0])) kCount.ask=(kCount.ask||0)+1; });
 
-  const won = live().filter(([,c])=>c.status==="active" && c.wonAt && Date.now()-c.wonAt < 30*864e5).filter(hit);
+  const won = live().filter(([id,c])=>c.status==="active" && ((c.wonAt && Date.now()-c.wonAt < 30*864e5) || wonPending(c, id))).filter(hit).filter(wonHit);
   const lost = live().filter(([,c])=>c.status==="lost").filter(hit);
   const src = groupBy(allLeads, ([,c])=>c.source||"Other");
   const cols = [
     ...LEAD_STAGES.map(s=>({key:s,label:STATUSES[s],items:leads.filter(([,c])=>c.status===s)})),
-    {key:"active",label:"Won (last 30 days)",items:won,cls:"won"},
+    {key:"active",label:"Won (last 30 days, or still open)",items:won,cls:"won"},
     {key:"lost",label:"Lost",items:lost,cls:"lost"} ];
   const card = ([id,c]) => {
     const lc = lastContact(c); const stale = LEAD_STAGES.includes(c.status) && Date.now()-lc > 5*864e5;
     const isLead = LEAD_STAGES.includes(c.status), gv = c.status==="lost" && lostKind(c)==="quiet", nx = isLead ? leadNext(c) : c.status==="active" ? clientNext(c,id) : c.status==="lost" ? lostStrip(c) : null;
-    const sg = ssaSigned(c), r = anyReq(c), openReq = isLead && !!(r && OPEN_REQ.includes(r.status));
-    const fu = isLead ? fuStep(id, c) : null;
+    const isWon = c.status==="active";
+    const sg = ssaSigned(c), r = anyReq(c), openReq = (isLead||isWon) && !!(r && OPEN_REQ.includes(r.status));
+    const fu = (isLead||isWon) ? fuStep(id, c) : null, ask = isWon ? openAsk(c, id) : null;
     const srcTxt = isLead && (!c.source||c.source==="Other") ? `<b class="stale" title="No lead source recorded. Ask how they heard about us.">Source?</b>` : esc(c.source||"");
     const act = gv ? `<button type="button" class="small primary" data-revive="${id}">Pick back up</button>`
-      : !isLead ? ""
+      : !isLead && !(isWon && openReq) ? ""
       : openReq ? `<button type="button" class="small" data-lead-status="${id}">Link: copy or resend</button>`
       : `<button type="button" class="small primary" data-lead-send="${id}">${c.ssaDraft?"Finish the quote":"Quote"}</button>`;
     return `<div class="lead" data-card="${id}" data-id="${id}">
       <div class="name"><span>${esc(c.name)}</span>${isLead?ageBadge(c):`<span class="meta" style="margin-left:auto;font-weight:400">${ago(lc)}</span>`}</div>
       ${nx?`<div class="lstat ${nx[0]}"${openReq?` data-lead-status="${id}" title="Open the link status"`:c.status==="lost"?` data-lost-flip="${id}" title="Tap to switch: They said no, We said no, Not followed up" style="cursor:pointer"`:""}>${esc(nx[1])}</div>`:""}
+      ${ask?`<div class="lstat todo" title="Ticked as interested, with no quote, agreement or service on file">${esc(ask.label)} \u00B7 ${ask.days<=0?"today":ask.days+"d"}</div>`:""}
       ${fu?`<div class="fu${fu.over?" over":fu.today?" now":""}" title="Follow-up rule: a text or email 3 days after a call, then a call 2 days later">${esc(fu.label)}</div>`:""}
       <div class="l2">${[tel(c.phone), esc(c.region||""), srcTxt, c.landline?"Landline":""].filter(Boolean).join(" \u00B7 ")}</div>
       ${tags(c)?`<div class="ltags">${tags(c)}</div>`:""}
@@ -1571,6 +1603,9 @@ $("#clientSave").onclick = async () => {
   const svcTouched = removedServices.size>0 || JSON.stringify(draftServices)!==svcBase;
   const services = {}; for(const [sid,s] of Object.entries(draftServices)) services[sid]=s;
   const data = { name:f.name.value.trim(), phone:f.phone.value.trim(), landline:f.landline.checked||null, holdUntil:f.holdUntil.value||null, email:f.email.value.trim(), email2:f.email2.value.trim(), address:f.address.value.trim(), region:f.region.value, status:f.status.value, source:f.source.value, interest:f.interest.value.trim(), interestIn: Object.keys(draftInt).length ? { ...draftInt } : null };
+  { const p0=openId?clients[openId]:null, was=(p0&&p0.interestIn)||{}, wasAt=(p0&&p0.interestAt)||{}, at={}; // when each interest was ticked, for the age of an open ask
+    Object.keys(draftInt).forEach(k=>{ if(wasAt[k]) at[k]=wasAt[k]; else if(!was[k]) at[k]=Date.now(); });
+    data.interestAt = Object.keys(at).length ? at : null; }
   if(!data.name){ $("#foldContact").open=true; toast("Name is required"); f.name.focus(); return; }
   if(!data.source){ $("#foldContact").open=true; toast("Pick a lead source"); f.source.focus(); return; }
   const prev = openId ? clients[openId] : null;
