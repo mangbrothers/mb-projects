@@ -102,6 +102,11 @@
   .intchips{display:flex;gap:6px;flex-wrap:wrap}
   .intchips button{border:1px solid var(--line);background:var(--card);border-radius:999px;padding:5px 12px;font-size:13px;color:var(--muted)}
   .intchips button.on{background:var(--ink);color:var(--card);border-color:var(--ink);font-weight:600}
+  .intchips button[data-int=lawn]{border-color:var(--s-lawn);color:var(--s-lawn)} .intchips button[data-int=lawn].on{background:var(--s-lawn);border-color:var(--s-lawn);color:#fff}
+  .intchips button[data-int=fall]{border-color:var(--s-fall);color:var(--s-fall)} .intchips button[data-int=fall].on{background:var(--s-fall);border-color:var(--s-fall);color:#fff}
+  .intchips button[data-int=lights]{border-color:var(--s-lights);color:var(--s-lights)} .intchips button[data-int=lights].on{background:var(--s-lights);border-color:var(--s-lights);color:#fff}
+  .intchips button[data-int=snow]{border-color:var(--s-snow);color:var(--s-snow)} .intchips button[data-int=snow].on{background:var(--s-snow);border-color:var(--s-snow);color:#fff}
+  .intchips button[data-int=landscaping]{border-color:var(--s-landscaping);color:var(--s-landscaping)} .intchips button[data-int=landscaping].on{background:var(--s-landscaping);border-color:var(--s-landscaping);color:#fff}
   details.fold{border-top:1px solid var(--line);margin-top:14px;padding-top:2px}
   #foldContact{border-top:0;margin-top:4px} #contactLine{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
   #cardState .lstat{font-size:14px;padding:7px 10px;margin:8px 0 2px}
@@ -428,7 +433,8 @@ details.ssamore summary{cursor:pointer;font-weight:600}
     <div class="grid2">
       <div><label>Name</label><input name="name"></div>
       <div><label>Phone</label><input name="phone" type="tel" id="dlgPhone">
-        <label class="row" style="margin-top:6px;gap:8px;flex-wrap:nowrap;font-weight:400"><input type="checkbox" name="landline" style="width:20px;height:20px;flex:none"> <span>Landline: no texts</span></label></div>
+        <label class="row" style="margin-top:6px;gap:8px;flex-wrap:nowrap;font-weight:400"><input type="checkbox" name="landline" style="width:20px;height:20px;flex:none"> <span>Landline: no texts</span></label>
+        <label style="margin-top:8px">Hold until (waiting on the customer)</label><input type="date" name="holdUntil" style="max-width:200px"></div>
       <div style="grid-column:1/-1" id="dlgDup"></div>
       <div><label>Email</label><input name="email" type="email"></div>
       <div><label>Second email (optional)</label><input name="email2" type="email"></div>
@@ -1023,7 +1029,7 @@ function toggleCol(k){ collapsedCols.has(k) ? collapsedCols.delete(k) : collapse
 // (lostFrom), the reason (lostReason "quiet"), the date (lostAt) and a log line. Any new contact after that (a note,
 // a call or text the Quo sync logs) puts it back in the stage it came from.
 const GRAVE_DAYS = 7;
-const isGrave = c => LEAD_STAGES.includes(c.status) && Date.now()-lastContact(c) > GRAVE_DAYS*864e5;
+const isGrave = c => LEAD_STAGES.includes(c.status) && Date.now()-Math.max(lastContact(c)||0, c.holdUntil ? Date.parse(c.holdUntil+"T23:59:00") : 0) > GRAVE_DAYS*864e5;
 function leadNext(c){
   if(ssaSigned(c)||lsaSigned(c)||ldaSignedAll(c).length) return ["good", payOnFileOk(c) ? "Signed" : "Signed \u00B7 needs a card", payOnFileOk(c) ? "signed" : "card"];
   const r=anyReq(c);
@@ -1058,6 +1064,7 @@ function fuKind(e){
     return null;
   }
   if(src==="contract") return /^Emailed /i.test(t) ? "talk" : /^Signed /i.test(t) ? "in" : null;
+  if(src==="gmail") return /^Email out:/i.test(t) ? "out" : /^Email in:/i.test(t) ? "in" : null;
   if(src) return null;
   if(/^(Moved to Lost|Picked back up|Landline)/i.test(t)) return null;
   if(/\b(replied|texted back|called back|emailed back|wrote back|responded|got back to)\b/i.test(t)) return "in";
@@ -1083,6 +1090,9 @@ function fuStep(id, c){
   else if(out){ what="Call"; due=addDays(ymdOf(out.at), FU_CALL_DAYS); }
   else if(anchor){ what = how==="call" ? "Call" : "Follow-up "+how; due=addDays(ymdOf(anchor.at), FU_MSG_DAYS); }
   else { what="First call"; due=ymdOf(c.createdAt||Date.now()); }
+  if(c.holdUntil){ // on hold: nothing is asked for until the date; the call comes due the day after
+    if(c.holdUntil>=today()) return { what:"On hold", due:c.holdUntil, over:false, today:false, hold:true, label:`On hold until ${fuDay(c.holdUntil)}` };
+    if(!ev.length || ymdOf(ev[ev.length-1].at)<=c.holdUntil){ what="Call"; due=addDays(c.holdUntil,1); } }
   const td=today(), over=due<td, isToday=due===td;
   return { what, due, over, today:isToday, label: over ? `Overdue: ${what.toLowerCase()} was due ${fuDay(due)}` : `${what} due ${isToday?"today":fuDay(due)}` };
 }
@@ -1116,7 +1126,7 @@ function hangerTable(){
     HANGER_DROPS.map(dr=>`<tr><td colspan="7" style="padding-top:8px"><b>Pass ${dr.n}: ${dr.name}</b> <span class="meta">${dr.date>td?"planned for":"on doors"} ${fuDay(dr.date)}</span></td></tr>`+R.filter(r=>r.pass===dr.n).map(line).join("")).join("")
   }</tbody></table><p class="meta" style="margin-top:6px">Door hanger leads only, placed by first contact date and area. A lead that calls after a later drop counts for that pass, so pass 2 and 3 include late callers from the pass before. Drop dates are the planned ones.${other?` ${other} door hanger lead${other===1?"":"s"} not shown: first contact before November 11 or an area outside the routes.`:""}</p>`;
 }
-function ageBadge(c){ const d=Math.floor((Date.now()-lastContact(c))/864e5); return `<span class="age ${d<=2?"a0":d<GRAVE_DAYS?"a1":"a2"}" title="Days since the last contact">${d<=0?"today":d+"d"}</span>`; }
+function ageBadge(c){ const d=Math.round((Date.parse(today())-Date.parse(ymdOf(lastContact(c))))/864e5); return `<span class="age ${d<=2?"a0":d<GRAVE_DAYS?"a1":"a2"}" title="Days since the last contact">${d<=0?"today":d+"d"}</span>`; }
 const backStage = c => LEAD_STAGES.includes(c.lostFrom) ? c.lostFrom : "contacted";
 // Two kinds of Lost (Nov 11, 2026). "quiet": nobody followed up for GRAVE_DAYS (set by the page, or by hand).
 // "no": the customer said no. A record lost before this was tracked is read from its dates: lost more than
@@ -1428,7 +1438,7 @@ let sameCard;
 function openClient(id, defaultStatus){
   openId = id; const c = id ? clients[id] : { status: defaultStatus||"new" };
   const f=$("#clientForm");
-  f.name.value=c.name||""; f.phone.value=c.phone||""; f.email.value=c.email||""; f.landline.checked=!!c.landline; f.email2.value=c.email2||""; f.address.value=c.address||""; f.region.value=c.region||""; f.status.value=c.status||"new"; f.source.value=c.source||""; f.interest.value=c.interest||"";
+  f.name.value=c.name||""; f.phone.value=c.phone||""; f.email.value=c.email||""; f.landline.checked=!!c.landline; f.holdUntil.value=c.holdUntil||""; f.email2.value=c.email2||""; f.address.value=c.address||""; f.region.value=c.region||""; f.status.value=c.status||"new"; f.source.value=c.source||""; f.interest.value=c.interest||"";
   $("#clientTitle").textContent = id ? c.name : "New client";
   draftServices = JSON.parse(JSON.stringify(c.services||{})); removedServices = new Set();
   draftInt = { ...((c.interestIn && Object.keys(c.interestIn).length) ? c.interestIn : (id && LEAD_STAGES.includes(c.status) ? intFromText(c.interest) : {})) }; renderInt();
@@ -1560,7 +1570,7 @@ $("#clientSave").onclick = async () => {
   const f=$("#clientForm"); readSvcForm();
   const svcTouched = removedServices.size>0 || JSON.stringify(draftServices)!==svcBase;
   const services = {}; for(const [sid,s] of Object.entries(draftServices)) services[sid]=s;
-  const data = { name:f.name.value.trim(), phone:f.phone.value.trim(), landline:f.landline.checked||null, email:f.email.value.trim(), email2:f.email2.value.trim(), address:f.address.value.trim(), region:f.region.value, status:f.status.value, source:f.source.value, interest:f.interest.value.trim(), interestIn: Object.keys(draftInt).length ? { ...draftInt } : null };
+  const data = { name:f.name.value.trim(), phone:f.phone.value.trim(), landline:f.landline.checked||null, holdUntil:f.holdUntil.value||null, email:f.email.value.trim(), email2:f.email2.value.trim(), address:f.address.value.trim(), region:f.region.value, status:f.status.value, source:f.source.value, interest:f.interest.value.trim(), interestIn: Object.keys(draftInt).length ? { ...draftInt } : null };
   if(!data.name){ $("#foldContact").open=true; toast("Name is required"); f.name.focus(); return; }
   if(!data.source){ $("#foldContact").open=true; toast("Pick a lead source"); f.source.focus(); return; }
   const prev = openId ? clients[openId] : null;
@@ -2257,7 +2267,8 @@ const ssaBlank = c => ssaFromProp(c, ({
   extras:[],
   fall:{ on:hasSvc(c,"fall")||(LEAD_STAGES.includes(c.status)&&!!intOf(c).fall), two:false, corner:false, oak:false, gutters:false, big:false, bigPrice:"", nb:false, cp:false, cpPrice:"", cpWhy:"", cpOther:"", wlDisp:"haul", wlGut:false, note:"", mode:"", modeWhy:"" },
   lights:{ on:hasSvc(c,"lights")||(LEAD_STAGES.includes(c.status)&&!!intOf(c).lights), pkg:"", color:"", shrub:0, medTree:0, lgTree:0, wreath:0, two:false, twoShow:false, steep:false, ft:0, nb:false, cp:false, cpPrice:"", cpWhy:"", cpOther:"" },
-  snow:{ on:hasSvc(c,"snow")||(LEAD_STAGES.includes(c.status)&&!!intOf(c).snow), lot:"", nb:false, cp:false, cpPrice:"", cpWhy:"", cpOther:"", cpPP:"" } }));
+  snow:{ on:hasSvc(c,"snow")||(LEAD_STAGES.includes(c.status)&&!!intOf(c).snow), lot:"", nb:false, cp:false, cpPrice:"", cpWhy:"", cpOther:"", cpPP:"" },
+  lawn:{ on: LEAD_STAGES.includes(c.status) && !!intOf(c).lawn, freq:(lsaService(c)||{}).freq==="Biweekly"?"Biweekly":"Weekly", price:(lsaService(c)||{}).price ?? "" } }));
 // A new agreement starts from the property check, when there is one. Nothing is locked; every box can be changed.
 function ssaFromProp(c, S){ const P=propOf(c);
   if(P.corner===true){ S.fall.corner=true; S.snow.lot="corner"; } else if(P.corner===false) S.snow.lot="standard";
@@ -2311,7 +2322,8 @@ function ssaCalc(S){
   // Lights: half of the price before the credit at signing; the credit comes off the install-day balance.
   const lightsHalf = r2(lightsGross/2);
   const dueNow = r2(fall + snow + lightsHalf), dueInstall = r2(lights - lightsHalf);
-  return { fall, lights, snow, total:r2(fall+lights+snow), fl, ll, sl, lightsGross, dueNow, dueInstall, std };
+  const lawn = S.lawn && S.lawn.on ? { price:r2(+S.lawn.price||0), freq:S.lawn.freq==="Biweekly"?"Bi-weekly":"Weekly" } : null;
+  return { fall, lights, snow, total:r2(fall+lights+snow), fl, ll, sl, lightsGross, dueNow, dueInstall, std, lawn };
 }
 // Newest signed, not voided agreement on a client, and whether a seasonal service is still not covered by one.
 function ssaSigned(c){ return Object.entries(c.contracts||{}).filter(([,m])=>m.tpl==="seasonal"&&m.name!==LSA_NAME&&m.name!==LDA_NAME&&m.status==="signed"&&!m.voided).sort((a,b)=>b[1].signedAt-a[1].signedAt)[0]||null; }
@@ -2333,7 +2345,7 @@ function ctrPickHtml(c, dirty){
 // What else rides with the seasonal agreement, chosen on the setup page. Not saved in the draft or the agreement.
 const ldaOpenJobs = c => ldaJobs(c).filter(x=>x.jobStatus!=="Done" && !ldaSignedFor(c,x));
 function ssaMoreBlank(c, pick){ const jobs=ldaOpenJobs(c);
-  return { land:{ on: pick ? !!pick.landscaping : jobs.length>0, sid: jobs.length ? jobs[0].sid : "new", desc:"", date:"", price:"" }, lawn:{ on: pick ? !!pick.lawn : false } }; }
+  return { land:{ on: pick ? !!pick.landscaping : jobs.length>0, sid: jobs.length ? jobs[0].sid : "new", desc:"", date:"", price:"" } }; }
 let ctrLawnNext=null, ctrLandNext=null;
 // After an agreement is sent: the next one the setup page asked for.
 function ctrNext(id){
@@ -2342,10 +2354,9 @@ function ctrNext(id){
 }
 async function ssaContinue(){
   const X=signCtx, S=X.S, M=X.more, id=X.clientId, c=clients[id]; if(X.busy) return;
-  const seas=S.fall.on||S.lights.on||S.snow.on, e=[];
+  const seas=S.fall.on||S.lights.on||S.snow.on||S.lawn.on, e=[];
   if(!S.test){
     if(M.land.on && M.land.sid==="new"){ if(!M.land.desc) e.push("the landscaping job"); if(!(+M.land.price>0)) e.push("the landscaping price"); }
-    if(M.lawn.on && !lsaService(c)) e.push("the Lawn service and its price per cut on the client");
   }
   ssaErrors().forEach(x=>e.push(x));
   if(!S.email) e.unshift("the customer's email");
@@ -2358,13 +2369,12 @@ async function ssaContinue(){
       try{ await db.ref("clients/"+id+"/services/"+sid).set(job); M.land.sid=sid;
         if(openId===id && $("#clientDlg").open){ draftServices[sid]={ ...job }; renderSvcs(); renderContracts(); } } // keep the open card in step, so it does not read as unsaved
       catch(err){ return toast("Job not saved: "+(err.code||err.message)); } } }
-  ctrLawnNext = M.lawn.on ? id : null; ctrLandNext=null;
+  ctrLawnNext=null; ctrLandNext=null;
   if(seas){
     if(sid){ if(bundleOn()) bundleCtx={ clientId:id, queue:[sid], held:null }; else ctrLandNext={ id, sid }; }
     return ssaSend();
   }
   if(sid) return openLandscaping(id, sid);
-  ctrLawnNext=null; return openLawn(id);
 }
 function ctrAddSvc(type, msg){
   const sel=$("#addSvcSel"); sel.value=type; sel.dispatchEvent(new Event("change",{bubbles:true}));
@@ -2414,16 +2424,32 @@ function ssaTable(lines, inline){
 }
 // The agreement as text, holding only what applies to the services chosen. Article numbers are kept as in
 // the full agreement so the cross references inside the clauses (Section 1.3, 6.1, 7.5) stay true.
+// Lawn inside the Seasonal Services Agreement (Nov 14, 2026). The terms are the Lawn Service Agreement's, renumbered.
+const SSA_LAWN_ART = 11;
+function ssaLawnArt(L){ const p=money(L.price), n=SSA_LAWN_ART; return [
+  `## Article ${n}: Lawn Service Terms`,
+  `**${n}.1 Season.** Lawn service covers the ${LSA_SEASON} lawn season. Service begins about ${LSA_START} and runs through the end of the growing season, as weather allows. The Company sets the service day and the first and last cut dates and tells the Customer when they are scheduled. The Customer's spot on the route is reserved once this Agreement is signed and a payment method is on file.`,
+  `**${n}.2 Each Visit.** Each visit includes mowing, string trimming, edging along hard surfaces, and blowing clippings off the driveway, walks, and porch.`,
+  `**${n}.3 Price.** The price per cut in Section 2.5 (${p}) holds for the entire ${LSA_SEASON} season.`,
+  `**${n}.4 Added Work.** Mulch, landscaping, cleanups, and any other added work are quoted separately, billed when the work is done, and never added to the monthly lawn charge.`,
+  `**${n}.5 First-Cut Cleanup.** If the lawn needs extra work before the first cut of the season, such as overgrowth, leaves, sticks, or debris left from winter, the Company may charge a one-time cleanup fee with the first cut, at its discretion, of no more than $${LSA_CLEANUP_MAX}. The Company sends photos of the condition with the receipt for that charge. This fee does not apply to a Customer who had lawn service with the Company in the previous season.`,
+  `**${n}.6 Every Week.** Every scheduled week gets a visit, and every visit is billed. A visit missed because of rain is made up by the end of that weekend and is billed as normal.`,
+  `**${n}.7 Dry Weather.** Service continues during dry weather. The Company mows at a higher setting, trims, edges, and blows, and the visit is billed as normal. The Company does not pause or adjust service for individual watering, shade, or growth conditions.`,
+  `**${n}.8 Lawn Charges.** Nothing is charged for lawn service at signing. The first cut is charged after it is completed, together with any cleanup fee under Section ${n}.5. On that same day, the Company charges for the remaining scheduled cuts in that month. On the 1st of each month after that, the Company charges the price per cut times the number of scheduled service days in that month. Some months have five service weeks, so some monthly charges are higher than others.`,
+  `**${n}.9 Authorization.** The Customer's authorization to charge the payment method on file under Article 6 covers each lawn charge under Section ${n}.8 when it comes due and any first-cut cleanup fee under Section ${n}.5. The Company emails a receipt for every charge and does not send notice before a charge.`,
+  `**${n}.10 Credits.** Lawn credits are issued in only two cases, and each is applied to the next month's charge: (a) the Company misses the scheduled week and cannot make it up by Sunday of that week; or (b) the Customer asks to skip a visit, for any reason, at least 48 hours before the scheduled service day. A skip requested with less notice is not credited.`,
+  `**${n}.11 Bi-weekly Service.** A Customer who skips two visits in the same calendar month is moved to bi-weekly service at the Company's bi-weekly price per cut for the Property. The Company confirms that price in writing before the change.`,
+  `**${n}.12 Cancelling Lawn Service.** The Customer may cancel lawn service at any time, for any reason, by text, email, or phone call to the Company, with no cancellation fee. Cuts that were paid for but not performed are refunded to the original payment method within 10 business days. Cancelling lawn service does not change the other services in this Agreement.` ]; }
 function ssaText(c, S, k, agNo){
   const t = v => String(v||"").replace(/[|\r\n]+/g," ").trim();
   const sm = v => v<0 ? "−"+(money(-v)||"$0") : (money(v)||"$0");
-  const on = { fall:S.fall.on, lights:S.lights.on, snow:S.snow.on }, termFall = on.fall || ssaShowcaseFall(S);
+  const on = { fall:S.fall.on, lights:S.lights.on, snow:S.snow.on, lawn:!!k.lawn }, termFall = on.fall || ssaShowcaseFall(S);
   const pp = ssaPerPush(S), nbAny = (on.fall&&S.fall.nb)||(on.lights&&S.lights.nb)||(on.snow&&S.snow.nb);
   const md = today().slice(5), bundle = on.lights && termFall && md<="10-15" && !ssaOneVisit(S);
   const o=[]; const P = (...x) => o.push(x.join("\n"));
   const lineTable = (rows, label, total) => ["|= Item | Price", ...rows.map(r=>`| ${r[0]} | ${r[1]==null?"Included":sm(r[1])}`), `|+ ${label} | ${sm(total)}`].join("\n");
   P("# SEASONAL SERVICES AGREEMENT");
-  P([termFall&&"Fall Cleanup", on.lights&&"Holiday Lighting", on.snow&&"Snow & Ice Removal"].filter(Boolean).join(" • "));
+  P([termFall&&"Fall Cleanup", on.lights&&"Holiday Lighting", on.snow&&"Snow & Ice Removal", on.lawn&&"Lawn Service"].filter(Boolean).join(" • "));
   P(`**Agreement No.:** ${agNo}`, `**Effective Date:** ${fmtLong(today())}`);
   P("This Seasonal Services Agreement is entered into by and between **Mangiapane Brothers LLC** (the “Company”) and the customer identified below (the “Customer”). The Company and the Customer are each a “Party” and together the “Parties.” The Parties agree as follows:");
   P("## Article 1: Parties, Property and Term");
@@ -2432,7 +2458,7 @@ function ssaText(c, S, k, agNo){
   P(`**1.2 Property Type.** ${t(S.ptype)}`);
   P(`**1.3 Service Areas.** ${t(S.areas) || (on.snow ? "Driveway, apron, front walk to the door, porch steps, and the public sidewalk across the front of the lot." : "As walked with the Customer at signing.")}`);
   P("**1.4 Term.** This Agreement begins on the Effective Date and covers the season(s) below. It ends when the last selected season ends unless renewed in writing.");
-  P("|= Service | Timeframe", ...[termFall&&"fall", on.lights&&"lights", on.snow&&"snow"].filter(Boolean).map(x=>`| ${ssaTerm(S,x)[0]} | ${ssaTerm(S,x)[1]}`));
+  P("|= Service | Timeframe", ...[termFall&&"fall", on.lights&&"lights", on.snow&&"snow"].filter(Boolean).map(x=>`| ${ssaTerm(S,x)[0]} | ${ssaTerm(S,x)[1]}`), ...(on.lawn?[`| Lawn Service | ${LSA_SEASON} lawn season, beginning about ${LSA_START}`]:[]));
   P("## Article 2: Services and Pricing");
   P("The Customer purchases only the services listed below at the prices stated. All prices include card processing; there is no separate card fee.");
   if(on.fall){ P("### 2.1 Fall Cleanup"); P(ssaOneVisit(S) ? `**${ssaFallName(S)}.** ${ssaWlDesc(S.fall)}` : `**Full Fall Cleanup.** ${SSA_FALL_DESC}`); if(t(S.fall.note)) P(`**Agreed Scope.** ${t(S.fall.note)}`); P(lineTable(k.fl,"Fall Cleanup Total",k.fall)); }
@@ -2440,6 +2466,7 @@ function ssaText(c, S, k, agNo){
     P("### 2.2 Holiday Lighting"); P(`**${pk.n}.** ${pk.d}`); P(SSA_LIGHTS_NOTE); P(`**Light Color:** ${t(S.lights.color)}`); P(lineTable(k.ll,"Holiday Lighting Total",k.lights)); }
   if(on.snow){ P("### 2.3 Snow Removal"); P([...lineTable(k.sl,"Snow Removal Season Total",k.snow).split("\n"), `| Each visit after the sixteenth (Section 4.8) | ${money(pp)}`].join("\n")); }
   if(bundle){ P("### 2.4 Priority Scheduling"); P("Because Fall Cleanup and Holiday Lighting were both signed by October 15, the Customer receives a locked installation week and first place on the route for both leaf visits. No price reduction applies."); }
+  if(on.lawn){ P("### 2.5 Lawn Service"); P("|= Service | Detail", "| Service | Lawn mowing", `| Frequency | ${k.lawn.freq}`, `| Price per cut | ${money(k.lawn.price)}`, "| Charged at signing | $0", `| Terms and charges | Article ${SSA_LAWN_ART}`); }
   for(const A of SSA_ART){
     if(A.svc && !(A.svc==="fall" ? termFall : on[A.svc])) continue;
     P(`## Article ${A.n}: ${A.title}`);
@@ -2455,10 +2482,12 @@ function ssaText(c, S, k, agNo){
         `|+ Charged at signing (Section 6.1) | ${sm(k.dueNow)}`,
         ...(on.lights?[`|+ Charged when lighting installation is complete | ${sm(k.dueInstall)}`]:[]),
         ...(on.snow?[`| Each snow visit after the sixteenth, charged after the visit | ${money(pp)}`]:[]),
+        ...(on.lawn?[`| 2.5 Lawn Service, each cut, charged by the month (Article ${SSA_LAWN_ART}) | ${money(k.lawn.price)}`]:[]),
         ...(on.lights?[`| Each lighting service call after the first | No ladder $${SSA_CALL.plain} / ladder $${SSA_CALL.ladder}`]:[]));
     }
     if(A.n===7) P(`**Pre-existing conditions noted at signing:** ${t(S.pre)||"None noted"}`);
   }
+  if(on.lawn) ssaLawnArt(k.lawn).forEach(x=>P(x));
   P("## Signatures");
   P("IN WITNESS WHEREOF, the Parties have executed this Agreement as of the dates below.");
   P(`**${SSA_CANCEL_STATEMENT}**`);
@@ -2508,9 +2537,10 @@ function openSeasonal(clientId, pick){
   const c=clients[clientId]; if(!c) return toast("Save the client first.");
   if($("#clientDlg").open && openId===clientId && dialogDirty()) return toast("Save the client first, then open the agreement.");
   const base=ssaBlank(c), d=c.ssaDraft||{};
-  const S={ ...base, ...d, fall:{...base.fall,...(d.fall||{})}, lights:{...base.lights,...(d.lights||{})}, snow:{...base.snow,...(d.snow||{})} };
+  const S={ ...base, ...d, fall:{...base.fall,...(d.fall||{})}, lights:{...base.lights,...(d.lights||{})}, snow:{...base.snow,...(d.snow||{})}, lawn:{...base.lawn,...(d.lawn||{})} };
   S.test=false; // a test agreement is chosen fresh each time, never carried in a saved draft
   if(pick) SSA_TYPES.forEach(t=>{ S[t].on=!!pick[t]; });
+  if(pick && "lawn" in pick) S.lawn.on=!!pick.lawn;
   S.extras = Object.values(S.extras||{}).filter(Boolean).map(x=>({ svc:x.svc||"fall", desc:x.desc||"", price:x.price??"" }));
   if(!S.prop) S.prop=c.address||""; if(!S.email) S.email=c.email||"";
   signCtx={ mode:"ssa-setup", clientId, S, more: ssaMoreBlank(c, pick) };
@@ -2578,8 +2608,10 @@ function ssaSetup(){
         <div id="ss-land-new" class="grid2" style="margin-top:6px"><div style="grid-column:1/-1"><label>Job, as the customer will read it</label><input id="ss-land-desc" value="${esc(X.more.land.desc)}" autocomplete="off" placeholder="Mulch the front beds, trim the hedges"></div>
           <div><label>Date (optional)</label><input id="ss-land-date" type="date" value="${esc(X.more.land.date)}"></div><div><label>Price, $</label><input id="ss-land-price" type="number" inputmode="decimal" min="0" step="0.01" value="${esc(X.more.land.price)}"></div></div>
         <p class="meta" style="margin:6px 0 0">The landscaping terms, deposit and warranty are set on the next screen.</p></div></div>
-    <div class="svc svcbar lawn">${ck("ss-lawn",`<b>Lawn</b> <span class="meta">its own agreement, set up right after this one</span>`,X.more.lawn.on)}
-      <div id="ss-lawn-box" class="ssabox"><p class="meta" style="margin:0">${lsaService(c)?esc("Uses the Lawn service on the client: "+SERVICE_TYPES.lawn.summary(lsaService(c))):"There is no Lawn service on this client yet. Add it on the client with the price per cut, then come back."}</p></div></div>
+    <div class="svc svcbar lawn">${ck("ss-lawn",`<b>Lawn</b> <span class="meta" id="ss-lawn-p"></span>`,S.lawn.on)}
+      <div id="ss-lawn-box" class="ssabox"><div class="grid2"><div><label>Frequency</label><select id="ss-lawn-freq"><option value="Weekly"${S.lawn.freq!=="Biweekly"?" selected":""}>Weekly</option><option value="Biweekly"${S.lawn.freq==="Biweekly"?" selected":""}>Bi-weekly</option></select></div>
+        <div><label>Price per cut, $</label><input id="ss-lawn-price" type="number" inputmode="decimal" min="0" step="0.01" value="${esc(S.lawn.price??"")}"></div></div>
+        <p class="meta" style="margin:6px 0 0">${LSA_SEASON} lawn season. Nothing is charged at signing; cuts are charged by the month once the season starts. Part of this agreement (Section 2.5 and Article ${SSA_LAWN_ART}).</p></div></div>
     <div class="svc svcbar"><b>Special items</b> <span class="meta">Anything outside the standard options: a description and a price, added to one of the services ticked above. It prints in that service's price table and follows its payment schedule.</span>
       <div id="ss-extras"></div>
       <button type="button" class="small" id="ss-ex-add" style="margin-top:8px">+ Add a special item</button></div>
@@ -2603,17 +2635,17 @@ function ssaSetup(){
   const CPK={f:"fall",l:"lights",s:"snow"};
   form.querySelectorAll("[data-cp]").forEach(b=>b.onclick=()=>{ ssaSync(); const p=b.dataset.cp, x=S[CPK[p]]; x.cp=!x.cp; ssaSync(); if(x.cp){ const el=document.getElementById(`ss-${p}-cpp`); if(el) el.focus(); } });
   $("#ss-later").onclick = async () => { ssaSync(); try{ await ssaSaveDraft(); toast("Setup saved on the client."); $("#signDlg").close(); }catch(e){ toast("Not saved: "+(e.code||e.message)); } };
-  $("#ss-go").onclick = () => { ssaSync(); const e=ssaErrors(); if(!S.test && !S.fall.on && !S.lights.on && !S.snow.on) e.unshift("a seasonal service to sign here (Landscaping and Lawn are signed from their own agreement)"); $("#ss-err").textContent = e.length ? "Still needed: "+e.join(", ")+"." : ""; if(!e.length) ssaShow(); };
+  $("#ss-go").onclick = () => { ssaSync(); const e=ssaErrors(); if(!S.test && !S.fall.on && !S.lights.on && !S.snow.on && !S.lawn.on) e.unshift("a seasonal service to sign here (Landscaping is signed from its own agreement)"); $("#ss-err").textContent = e.length ? "Still needed: "+e.join(", ")+"." : ""; if(!e.length) ssaShow(); };
   $("#ss-send").onclick = () => { ssaSync(); ssaContinue(); };
   if(!S.email) setTimeout(()=>{ const el=$("#ss-email"); if(el && signCtx===X) el.focus({preventScroll:true}); }, 50);
 }
 function ssaSync(){
   const X=signCtx; if(!X || X.mode!=="ssa-setup") return; const S=X.S, g=id=>document.getElementById(id), n=id=>Math.max(0,parseInt(g(id).value)||0);
   S.email=g("ss-email").value.trim(); S.email2=g("ss-email2").value.trim(); S.zone=g("ss-zone").value; S.prop=g("ss-prop").value.trim(); S.ptype=g("ss-ptype").value; S.areas=g("ss-areas").value.trim(); S.pre=g("ss-pre").value.trim();
-  const M=X.more; if(M && g("ss-land")){ M.land.on=g("ss-land").checked; M.land.sid=g("ss-land-sid").value; M.land.desc=g("ss-land-desc").value.trim(); M.land.date=g("ss-land-date").value; M.land.price=g("ss-land-price").value; M.lawn.on=g("ss-lawn").checked;
-    g("ss-land-box").hidden=!M.land.on; g("ss-land-new").hidden=M.land.sid!=="new"; g("ss-lawn-box").hidden=!M.lawn.on;
-    const seasOn=g("ss-fall").checked||g("ss-lights").checked||g("ss-snow").checked, sb=g("ss-send");
-    if(sb && !X.busy) sb.textContent = S.test ? "Email contract to sign" : M.land.on ? "Next: the landscaping agreement" : (!seasOn && M.lawn.on) ? "Next: the lawn agreement" : "Email contract to sign"; }
+  const M=X.more; if(M && g("ss-land")){ M.land.on=g("ss-land").checked; M.land.sid=g("ss-land-sid").value; M.land.desc=g("ss-land-desc").value.trim(); M.land.date=g("ss-land-date").value; M.land.price=g("ss-land-price").value;
+    g("ss-land-box").hidden=!M.land.on; g("ss-land-new").hidden=M.land.sid!=="new"; const sb=g("ss-send");
+    if(sb && !X.busy) sb.textContent = !S.test && M.land.on ? "Next: the landscaping agreement" : "Email contract to sign"; }
+  if(g("ss-lawn")){ S.lawn.on=g("ss-lawn").checked; S.lawn.freq=g("ss-lawn-freq").value; S.lawn.price=g("ss-lawn-price").value; g("ss-lawn-box").hidden=!S.lawn.on; g("ss-lawn-p").textContent = S.lawn.on && +S.lawn.price>0 ? money(+S.lawn.price)+" per cut" : ""; }
   S.fall.on=g("ss-fall").checked; SSA_FALL_ADJ.forEach(([k])=>S.fall[k]=g("ss-f-"+k).checked); S.fall.bigPrice=g("ss-f-bigp").value; S.fall.big=g("ss-f-big").checked; S.fall.nb=g("ss-f-nb").checked; S.fall.wlDisp=g("ss-f-wldisp").value; S.fall.wlGut=g("ss-f-wlgut").checked; S.fall.note=g("ss-f-note").value.trim(); S.fall.mode=g("ss-f-mode").value; S.fall.modeWhy=g("ss-f-modewhy").value.trim();
   S.extras=[...document.querySelectorAll("#ss-extras .exrow")].map(r=>({ svc:r.querySelector(".exs").value, desc:r.querySelector(".exd").value, price:r.querySelector(".exp").value }));
   S.lights.on=g("ss-lights").checked; S.lights.pkg=g("ss-l-pkg").value; S.lights.color=g("ss-l-color").value; S.lights.nb=g("ss-l-nb").checked;
@@ -2646,8 +2678,9 @@ function ssaErrors(){
   const S=signCtx.S, e=[];
   if(S.test){ if(S.email && !/^\S+@\S+\.\S+$/.test(S.email)) e.push("a valid email"); return e; }
   if(!S.prop) e.push("service property");
-  const more=signCtx.more||{land:{},lawn:{}};
-  if(!S.fall.on && !S.lights.on && !S.snow.on && !more.land.on && !more.lawn.on) e.push("at least one service");
+  const more=signCtx.more||{land:{}}, lawnOn=!!(S.lawn&&S.lawn.on);
+  if(!S.fall.on && !S.lights.on && !S.snow.on && !lawnOn && !more.land.on) e.push("at least one service");
+  if(lawnOn && !(+S.lawn.price>0)) e.push("the lawn price per cut");
   if(S.fall.on && ssaFallOver(S) && !S.fall.modeWhy) e.push("a reason for changing the Fall Cleanup type");
   (S.extras||[]).forEach(x=>{ if(!ssaClean(x.desc) || x.price==="" || !isFinite(+x.price)) e.push("a description and a price on every special item (or remove it)"); else if(!S[x.svc] || !S[x.svc].on) e.push(`the service ticked for the special item "${ssaClean(x.desc)}"`); });
   if(S.fall.on && S.fall.big && !(+S.fall.bigPrice>0)) e.push("the walked price for the large lawn");
@@ -2713,10 +2746,11 @@ function ssaDetails(S, k, agNo){
     addons:Object.fromEntries(SSA_ADDONS.map(([a])=>[a,S.lights[a]||0]).filter(x=>x[1]>0)), options:{ two:S.lights.pkg!=="showcase"&&S.lights.two, twoShow:S.lights.pkg==="showcase"&&S.lights.twoShow, steep:S.lights.steep }, extraFeet:S.lights.ft||0,
     serviceCall:{ included:1, noLadder:SSA_CALL.plain, ladder:SSA_CALL.ladder }, customPrice:ssaCpDetail(S.lights,k.std.lights) };
   if(S.snow.on) details.snow = { lines:k.sl, total:k.snow, lot:S.snow.lot, includedPushes:SSA_PUSHES, perPushAfter:ssaPerPush(S), customPrice:ssaCpDetail(S.snow,k.std.snow) };
+  if(k.lawn) details.lawn = { pricePerCut:k.lawn.price, frequency:k.lawn.freq, season:LSA_SEASON, start:LSA_START, cleanupMax:LSA_CLEANUP_MAX };
   return details;
 }
-const ssaSummary = (S,k) => { const fallOn=S.fall.on; return [fallOn&&"Fall Cleanup "+money(k.fall), S.lights.on&&"Christmas Lights "+money(k.lights), S.snow.on&&"Snow Removal "+money(k.snow)].filter(Boolean).join(" · "); };
-const ssaCovers = S => { const fallOn=S.fall.on, c={}; if(fallOn||ssaShowcaseFall(S)) c.fall=true; if(S.lights.on) c.lights=true; if(S.snow.on) c.snow=true; return c; };
+const ssaSummary = (S,k) => { const fallOn=S.fall.on; return [fallOn&&"Fall Cleanup "+money(k.fall), S.lights.on&&"Christmas Lights "+money(k.lights), S.snow.on&&"Snow Removal "+money(k.snow), k.lawn&&`Lawn ${money(k.lawn.price)} per cut (${k.lawn.freq.toLowerCase()})`].filter(Boolean).join(" · "); };
+const ssaCovers = S => { const fallOn=S.fall.on, c={}; if(fallOn||ssaShowcaseFall(S)) c.fall=true; if(S.lights.on) c.lights=true; if(S.snow.on) c.snow=true; if(S.lawn&&S.lawn.on) c.lawn=true; return c; };
 // The client changes a signed agreement makes: services at the agreement price, Active status, emails, payment
 // method missing until recorded, and the charges on the payment schedule. cid is "{{CID}}" for an emailed link
 // (the signing service fills in the contract id when the customer signs).
@@ -2737,6 +2771,7 @@ function ssaApply(c, id, S, k, agNo, now, cid){
   else if(incFall) put("fall", { package:ssaOneVisit(S)?"One visit":"Two passes" }, { route:"Route 1", price:0, pass1:false, pass2:false }, `Included in the Showcase lights package (${agNo})`);
   if(S.lights.on) put("lights", { price:k.lights }, { install:"", installed:false, takedown:"", gutters:false }, S.lights.color+": "+noteOf(k.ll));
   if(S.snow.on) put("snow", { price:k.snow }, { crew:"", start:"2026-11-01", end:"2027-03-15" }, noteOf(k.sl));
+  if(k.lawn) put("lawn", { freq:k.lawn.freq==="Bi-weekly"?"Biweekly":"Weekly", price:k.lawn.price, season:"On" }, { day:"" }, `${LSA_SEASON} lawn season, ${money(k.lawn.price)} per cut (${agNo})`);
   if(LEAD_STAGES.includes(c.status)){ upd["clients/"+id+"/status"]="active"; if(!c.wonAt) upd["clients/"+id+"/wonAt"]=now; }
   Object.assign(upd, qbCustomerRow(id));
   return upd;
@@ -2787,7 +2822,7 @@ const LSA_VERSION = 4;
 const LSA_CLEANUP_MAX = 200; // first-cut cleanup cap; internal rate $50 an hour ($25 labor, $25 everything else), never printed
 const LSA_SEASON = "2027";
 const LSA_START = "April 14, 2027";
-function lsaSigned(c){ return Object.entries(c.contracts||{}).filter(([,m])=>m.name===LSA_NAME&&m.status==="signed"&&!m.voided).sort((a,b)=>b[1].signedAt-a[1].signedAt)[0]||null; }
+function lsaSigned(c){ return Object.entries(c.contracts||{}).filter(([,m])=>(m.name===LSA_NAME||(m.tpl==="seasonal"&&(m.covers||{}).lawn))&&m.status==="signed"&&!m.voided).sort((a,b)=>b[1].signedAt-a[1].signedAt)[0]||null; }
 const lsaCount = () => live().reduce((n,[,c])=>n+Object.values(c.contracts||{}).filter(x=>x.name===LSA_NAME&&x.status==="signed"&&!x.voided&&!x.test).length,0);
 // Nov 10, 2026: each agreement keeps its link status in its own slot, so a Landscaping link no longer wipes a Lawn
 // link's status (and the other way round). The new slots need the Nov 10 signing service; until the ping says it is
