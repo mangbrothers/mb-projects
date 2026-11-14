@@ -1087,6 +1087,35 @@ function fuStep(id, c){
   return { what, due, over, today:isToday, label: over ? `Overdue: ${what.toLowerCase()} was due ${fuDay(due)}` : `${what} due ${isToday?"today":fuDay(due)}` };
 }
 const fuDueNow = (id, c) => { const st=fuStep(id,c); return !!st && (st.over || st.today); };
+// ---------- Door hanger passes, fall 2026 (Russel, Nov 14, 2026) ----------
+// Planned drop dates from the Direct to Door Campaigns project. Change a date here when the agency photos show the
+// real one: it moves the line between passes. Areas: South Livonia = sections 34 and 35, North Livonia = sections
+// 5 to 8, Westland = the Westland pocket. Cost is the agency invoice ($11,750 for 31,504 hangers) per hanger.
+const HANGER_COST_EACH = 11750/31504;
+const HANGER_SECTIONS = { "South Livonia":"34, 35", "North Livonia":"5, 6, 7, 8", "Westland":"Westland pocket" };
+const HANGER_DROPS = [
+  { n:1, date:"2026-11-11", name:"Fall Cleanup and Lights 1", doors:{ "South Livonia":3974, "North Livonia":1885, "Westland":692 }, hangers:{ "South Livonia":7948, "North Livonia":3211, "Westland":692 } },
+  { n:2, date:"2026-11-18", name:"Lights 2 and Snow 1",       doors:{ "South Livonia":3974, "North Livonia":1885, "Westland":692 }, hangers:{ "South Livonia":7948, "North Livonia":3770, "Westland":1384 } },
+  { n:3, date:"2026-11-25", name:"Snow 2",                    doors:{ "South Livonia":3974, "North Livonia":1885, "Westland":692 }, hangers:{ "South Livonia":3974, "North Livonia":1885, "Westland":692 } } ];
+const firstYmd = c => { const t=c && (c.firstContactAt||c.createdAt); return t ? new Intl.DateTimeFormat("en-CA",{timeZone:TZ,year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date(t)) : ""; };
+// The pass on doors when a door hanger lead first made contact: 1, 2 or 3. 0 = before the first drop. null = not a door hanger lead.
+function hangerPass(c){ if(!c || c.source!=="Door hanger") return null; const d=firstYmd(c); if(!d) return null; return HANGER_DROPS.filter(x=>x.date<=d).length; }
+const hangerSigned = c => Object.values(c.contracts||{}).some(x=>x && x.status==="signed" && !x.voided && !x.test && !x.sample);
+function hangerStats(){
+  const rows=[];
+  HANGER_DROPS.forEach(dr=>Object.keys(HANGER_SECTIONS).forEach(rg=>{
+    const L=live().filter(([,c])=>hangerPass(c)===dr.n && c.region===rg), signed=L.filter(([,c])=>hangerSigned(c)).length, cost=dr.hangers[rg]*HANGER_COST_EACH;
+    rows.push({ pass:dr.n, name:dr.name, date:dr.date, region:rg, doors:dr.doors[rg], hangers:dr.hangers[rg], leads:L.length, signed, per1000: dr.doors[rg] ? L.length/dr.doors[rg]*1000 : 0, cost, cac: signed ? cost/signed : null });
+  }));
+  return rows;
+}
+function hangerTable(){
+  const R=hangerStats(), td=today(), other=live().filter(([,c])=>hangerPass(c)!==null && (hangerPass(c)===0 || !HANGER_SECTIONS[c.region])).length;
+  const line=r=>`<tr><td>${r.region}</td><td>${r.doors.toLocaleString("en-US")}</td><td>${r.leads}</td><td>${r.per1000.toFixed(1)}</td><td>${r.signed}</td><td>${money(Math.round(r.cost))}</td><td>${r.cac==null?"none signed":money(Math.round(r.cac))}</td></tr>`;
+  return `<table class="hgt" style="width:100%;border-collapse:collapse;font-size:14px"><thead><tr style="text-align:left"><th>Area</th><th>Doors</th><th>Leads</th><th>Per 1,000 doors</th><th>Signed</th><th>Cost</th><th>Cost per signed</th></tr></thead><tbody>${
+    HANGER_DROPS.map(dr=>`<tr><td colspan="7" style="padding-top:8px"><b>Pass ${dr.n}: ${dr.name}</b> <span class="meta">${dr.date>td?"planned for":"on doors"} ${fuDay(dr.date)}</span></td></tr>`+R.filter(r=>r.pass===dr.n).map(line).join("")).join("")
+  }</tbody></table><p class="meta" style="margin-top:6px">Door hanger leads only, placed by first contact date and area. A lead that calls after a later drop counts for that pass, so pass 2 and 3 include late callers from the pass before. Drop dates are the planned ones.${other?` ${other} door hanger lead${other===1?"":"s"} not shown: first contact before November 11 or an area outside the routes.`:""}</p>`;
+}
 function ageBadge(c){ const d=Math.floor((Date.now()-lastContact(c))/864e5); return `<span class="age ${d<=2?"a0":d<GRAVE_DAYS?"a1":"a2"}" title="Days since the last contact">${d<=0?"today":d+"d"}</span>`; }
 const backStage = c => LEAD_STAGES.includes(c.lostFrom) ? c.lostFrom : "contacted";
 // Two kinds of Lost (Nov 11, 2026). "quiet": nobody followed up for GRAVE_DAYS (set by the page, or by hand).
@@ -3882,6 +3911,7 @@ function renderTools(m){
   <div class="card">
     <div class="tool"><div><h3>Export for Claude (.json)</h3><p>Every client and lead with services, contracts, billing status, notes, and the QuickBooks queue. ${n} records, ${active} active. Card and bank numbers are never in this file because they are never in this tool.</p></div>
       <div class="row"><button id="expCopy">Copy</button><button class="primary" id="expDl">Download</button></div></div>
+    <div class="tool" id="hangerTool" style="display:block"><h3>Door hanger passes</h3>${hangerTable()}</div>
     <div class="tool"><div><h3>Clients as CSV</h3><p>Name, phone, address, region, status, services, billing. Opens in Excel or Sheets.</p></div><div class="row"><button id="csvDl">Download</button></div></div>
     <div class="tool"><div><h3>Backup (.json)</h3><p>Raw database copy of clients, notes, templates, and the queue. Signed contracts are backed up separately by Claude. Keep one somewhere safe now and then.</p></div><div class="row"><button id="bakDl">Download</button></div></div>
   </div>`;
@@ -3892,8 +3922,8 @@ function renderTools(m){
   $("#expCopy").onclick = () => navigator.clipboard.writeText(JSON.stringify(snapshot(),null,2)).then(()=>toast("Copied. Paste it into Claude."));
   $("#expDl").onclick = () => download(`mb-crm-${today()}.json`, JSON.stringify(snapshot(),null,2), "application/json");
   $("#bakDl").onclick = () => download(`mb-crm-backup-${today()}.json`, JSON.stringify({clients,clientLog:logs,contractTemplates:templates,syncQb:qbRows},null,2), "application/json");
-  $("#csvDl").onclick = () => { const q=v=>`"${String(v??"").replace(/"/g,'""')}"`; const rows=[["Name","Phone","Email","Address","Region","Status","Source","Services","Contracts signed","Payment method","Payment status","QuickBooks ID","First contact","Last contact"]];
-    live().sort(byName).forEach(([,c])=>rows.push([c.name,c.phone,c.email,c.address,c.region,STATUSES[c.status],c.source,svcList(c).map(s=>SERVICE_TYPES[s.type]?.label+(s.price?" "+money(s.price):"")).join("; "),Object.values(c.contracts||{}).filter(x=>x.status==="signed"&&!x.voided).map(x=>x.name).join("; "),c.payMethod,PAY_STATUSES[c.payStatus],c.qbId,fmtStamp(c.firstContactAt),fmtStamp(lastContact(c))]));
+  $("#csvDl").onclick = () => { const q=v=>`"${String(v??"").replace(/"/g,'""')}"`; const rows=[["Name","Phone","Email","Address","Region","Status","Source","Services","Contracts signed","Payment method","Payment status","QuickBooks ID","First contact","Last contact","Hanger pass","Sections"]];
+    live().sort(byName).forEach(([,c])=>rows.push([c.name,c.phone,c.email,c.address,c.region,STATUSES[c.status],c.source,svcList(c).map(s=>SERVICE_TYPES[s.type]?.label+(s.price?" "+money(s.price):"")).join("; "),Object.values(c.contracts||{}).filter(x=>x.status==="signed"&&!x.voided).map(x=>x.name).join("; "),c.payMethod,PAY_STATUSES[c.payStatus],c.qbId,fmtStamp(c.firstContactAt||c.createdAt),fmtStamp(lastContact(c)),hangerPass(c)??"",HANGER_SECTIONS[c.region]||""]));
     download(`mb-clients-${today()}.csv`, rows.map(r=>r.map(q).join(",")).join("\n"), "text/csv"); };
 }
 

@@ -1143,10 +1143,14 @@ function backupJson(){ return JSON.stringify({ exportedAt:new Date().toISOString
 // growing waits (1, 5, 15, then 60 minutes), kept per person at logins/_lock and in this browser. The tab locks again
 // after 5 minutes without use (switching browser tabs does not lock it; closing or reloading the page does). Lose the code and the list is gone:
 // delete logins/_vault in the Firebase console to clear the tab and set a new code.
-let logins = {}, loginEdit = null, loginAdding = false, loginQ = "", loginShown = new Set(), loginKind = "";
+let logins = {}, loginEdit = null, loginAdding = false, loginQ = "", loginShown = new Set(), loginKind = "", loginTab = "pass";
 // Entry types on the locked tab. [label, plural for the filter, first field label, secret field label, name placeholder]
 const LG_KINDS = { pass:["Password","Passwords","Username or email","Password","QuickBooks"], api:["API key","API keys","Key name or account","API key","Quo API"],
-  bank:["Bank info","Bank info","Routing number","Account number","Business checking"], tax:["Tax ID","Tax ID","Legal name on file","Tax ID number","Federal EIN"] };
+  bank:["Bank account","Bank accounts","Routing number","Account number","Business checking"], tax:["Tax ID","Tax IDs","Legal name on file","Tax ID number","Federal EIN"],
+  lic:["License or policy","Licenses and insurance","Issued by","License or policy number","General liability policy"], other:["Other","Other","Label","Value","Shop door code"] };
+const LG_LAST4 = { bank:1, tax:1, lic:1 }; // long numbers: show the last 4 while hidden, so the right one can be picked without opening it
+const lgIsCred = l => lgKind(l) !== "pass";
+const lgExpDays = l => l && l.exp ? Math.round((new Date(l.exp+"T12:00:00") - new Date(new Date().toDateString()+" 12:00:00"))/864e5) : null;
 const lgKind = l => LG_KINDS[l && l.kind] ? l.kind : "pass";
 const LG = { key: null, items: {}, salt: null, iter: 600000, openedVer: null, idle: null, entry: "", busy: false, setup: null, msg: "" };
 const LG_WAITS = [60e3, 5*60e3, 15*60e3, 60*60e3], LG_IDLE = 5*60e3;
@@ -1256,41 +1260,50 @@ function renderLogins(m){
   }
   const items = LG.items;
   const q=loginQ.toLowerCase(), all=Object.entries(items).filter(([,l])=>l).sort((a,b)=>(Object.keys(LG_KINDS).indexOf(lgKind(a[1]))-Object.keys(LG_KINDS).indexOf(lgKind(b[1]))) || (a[1].site||"").localeCompare(b[1].site||""));
-  const list=all.filter(([,l])=>!loginKind || lgKind(l)===loginKind).filter(([,l])=>!q || [l.site,l.url,l.user,l.note].join(" ").toLowerCase().includes(q));
+  const inTab=all.filter(([,l])=>loginTab==="cred" ? lgIsCred(l) : !lgIsCred(l));
+  const list=inTab.filter(([,l])=>loginTab!=="cred" || !loginKind || lgKind(l)===loginKind).filter(([,l])=>!q || [l.site,l.url,l.user,l.note].join(" ").toLowerCase().includes(q));
   const e=loginEdit ? (items[loginEdit]||{}) : {};
   const href=u=>!u?"":/^https?:\/\//i.test(u)?u:"https://"+u;
   const host=u=>{ try{ return new URL(href(u)).hostname.replace(/^www\./,""); }catch(x){ return ""; } };
   const icon=u=>host(u)?`<img class="lgfav" src="https://www.google.com/s2/favicons?domain=${encodeURIComponent(host(u))}&sz=64" alt="" loading="lazy" onerror="this.style.visibility='hidden'">`:`<span class="lgfav lgnone">${esc((u||"?").slice(0,1))}</span>`;
   const formOpen = loginEdit || loginAdding;
-  const ek = loginEdit ? lgKind(e) : (loginKind || "pass"), EK = LG_KINDS[ek];
+  const ek = loginEdit ? lgKind(e) : loginTab==="cred" ? (loginKind || "api") : "pass", EK = LG_KINDS[ek], credForm = ek!=="pass";
+  const nPass=all.filter(([,l])=>!lgIsCred(l)).length, nCred=all.length-nPass, soon=all.filter(([,l])=>{ const d=lgExpDays(l); return d!==null && d<=30; }).length;
+  const mask=l=>LG_LAST4[lgKind(l)] && String(l.pass).length>4 ? "&bull;&bull;&bull;&bull; "+esc(String(l.pass).slice(-4)) : "&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;";
+  const expTag=l=>{ const d=lgExpDays(l); if(d===null) return ""; const on=new Date(l.exp+"T12:00:00").toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"});
+    return `<div class="lgrow"><span class="meta">Expires</span><code${d<=30?' style="color:#a63b3b;font-weight:700"':""}>${d<0?"Expired "+on:d===0?"Today":on+(d<=30?" ("+d+" day"+(d===1?"":"s")+")":"")}</code></div>`; };
   m.innerHTML=`<div class="lg">
-    <div class="card"><div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><h2 style="margin:0">Quick links</h2><span class="meta" style="margin-left:0">${all.length} saved &middot; admins only &middot; encrypted</span>
+    <div class="card"><div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><h2 style="margin:0">${loginTab==="cred"?"Credentials":"Quick links"}</h2><span class="meta" style="margin-left:0">${inTab.length} saved &middot; admins only &middot; encrypted</span>
       <span style="margin-left:auto;display:flex;gap:8px;flex-wrap:wrap"><input id="lgQ" value="${esc(loginQ)}" placeholder="Search" autocomplete="off" style="width:160px">${formOpen?"":`<button class="primary" id="lgNew">+ Add</button>`}<button id="lgLockNow">Lock</button><button id="lgChange">Change code</button></span></div>
-      <div class="lglinks">${all.filter(([,l])=>l.url).map(([id,l])=>`<a class="lglink" href="${esc(href(l.url))}" target="_blank" rel="noopener">${icon(l.url)}<span>${esc(l.site||host(l.url))}</span></a>`).join("")||'<p class="meta">Add a site with its web address and it shows here as one tap.</p>'}</div></div>
-    <div class="lgkinds" style="display:flex;gap:6px;flex-wrap:wrap;margin:0 0 12px">${[["","All"]].concat(Object.entries(LG_KINDS).map(([k,v])=>[k,v[1]])).map(([k,lab])=>`<button class="small${loginKind===k?" primary":""}" data-lgkind="${k}">${lab} <span style="opacity:.7">${k?all.filter(([,l])=>lgKind(l)===k).length:all.length}</span></button>`).join("")}</div>
-    ${formOpen?`<div class="card" id="lgForm"><h2>${loginEdit?"Change "+esc(e.site||"entry"):"Add an entry"}</h2>
-      <div class="grid2"><div><label for="lgType">Type</label><select id="lgType">${Object.entries(LG_KINDS).map(([k,v])=>`<option value="${k}"${k===ek?" selected":""}>${v[0]}</option>`).join("")}</select></div>
+      ${loginTab==="cred"?'<p class="meta" style="margin:8px 0 0">Numbers and keys that are not a sign-in: API keys, bank accounts, tax IDs, licenses and insurance. Add the expiry or renewal date and it turns red 30 days out.</p>':""}
+      <div class="lglinks"${loginTab==="cred"?' style="display:none"':""}>${inTab.filter(([,l])=>l.url).map(([id,l])=>`<a class="lglink" href="${esc(href(l.url))}" target="_blank" rel="noopener">${icon(l.url)}<span>${esc(l.site||host(l.url))}</span></a>`).join("")||'<p class="meta">Add a site with its web address and it shows here as one tap.</p>'}</div></div>
+    <div class="lgtabs" style="display:flex;gap:8px;margin:0 0 10px"><button data-lgtab="pass" class="${loginTab==="pass"?"primary":""}" style="flex:1">Passwords <span style="opacity:.7">${nPass}</span></button><button data-lgtab="cred" class="${loginTab==="cred"?"primary":""}" style="flex:1">Credentials <span style="opacity:.7">${nCred}</span>${soon?` <span title="Expiring within 30 days or expired" style="color:${loginTab==="cred"?"#fff":"#a63b3b"};font-weight:700">&middot; ${soon} expiring</span>`:""}</button></div>
+    ${loginTab==="cred"?`<div class="lgkinds" style="display:flex;gap:6px;flex-wrap:wrap;margin:0 0 12px">${[["","All"]].concat(Object.entries(LG_KINDS).filter(([k])=>k!=="pass").map(([k,v])=>[k,v[1]])).map(([k,lab])=>`<button class="small${loginKind===k?" primary":""}" data-lgkind="${k}">${lab} <span style="opacity:.7">${k?inTab.filter(([,l])=>lgKind(l)===k).length:inTab.length}</span></button>`).join("")}</div>`:""}
+    ${formOpen?`<div class="card" id="lgForm"><h2>${loginEdit?"Change "+esc(e.site||"entry"):credForm?"Add a credential":"Add a password"}</h2>
+      <div class="grid2"><div${credForm?"":' style="display:none"'}><label for="lgType">Type</label><select id="lgType">${Object.entries(LG_KINDS).filter(([k])=>credForm ? k!=="pass" : k==="pass").map(([k,v])=>`<option value="${k}"${k===ek?" selected":""}>${v[0]}</option>`).join("")}</select></div>
         <div><label for="lgSite">Name</label><input id="lgSite" value="${esc(e.site||"")}" placeholder="${EK[4]}" autocomplete="off"></div>
-        <div><label for="lgUrl">Sign-in link</label><input id="lgUrl" value="${esc(e.url||"")}" placeholder="https://quickbooks.intuit.com" autocomplete="off" autocapitalize="off" inputmode="url"></div>
+        <div><label for="lgUrl">${credForm?"Web link (optional)":"Sign-in link"}</label><input id="lgUrl" value="${esc(e.url||"")}" placeholder="https://quickbooks.intuit.com" autocomplete="off" autocapitalize="off" inputmode="url"></div>
         <div><label for="lgUser" id="lgUserL">${EK[2]}</label><input id="lgUser" value="${esc(e.user||"")}" autocomplete="off" autocapitalize="off" spellcheck="false"></div>
         <div><label for="lgPass" id="lgPassL">${EK[3]}</label><input id="lgPass" value="${esc(e.pass||"")}" autocomplete="new-password" autocapitalize="off" spellcheck="false"></div></div>
-      <label for="lgNote">Sign-in notes (where the 2-step code goes, PIN, security answers, who set it up)</label><input id="lgNote" value="${esc(e.note||"")}" autocomplete="off">
+      ${credForm?`<label for="lgExp">Expires or renews on (optional)</label><input id="lgExp" type="date" value="${esc(e.exp||"")}" style="max-width:220px">`:""}
+      <label for="lgNote">${credForm?"Notes (what it is used for, who holds the original, who to call)":"Sign-in notes (where the 2-step code goes, PIN, security answers, who set it up)"}</label><input id="lgNote" value="${esc(e.note||"")}" autocomplete="off">
       <div class="actions" style="display:flex;gap:8px;justify-content:flex-end;margin-top:10px"><button id="lgCancel">Cancel</button><button class="primary" id="lgSave">${loginEdit?"Save":"Add"}</button></div></div>`:""}
     <div class="lggrid">${list.map(([id,l])=>`<div class="card lgcard">
-      <div class="lghead">${icon(l.url)}<div style="min-width:0;flex:1"><b class="lgsite">${esc(l.site||"")}</b> <span class="meta lgtype">${LG_KINDS[lgKind(l)][0]}</span>${l.url?`<div class="meta lghost">${esc(host(l.url))}</div>`:""}</div>${l.url?`<a class="primary lgopen" href="${esc(href(l.url))}" target="_blank" rel="noopener">Open</a>`:""}</div>
+      <div class="lghead">${icon(l.url)}<div style="min-width:0;flex:1"><b class="lgsite">${esc(l.site||"")}</b> ${lgIsCred(l)?`<span class="meta lgtype">${LG_KINDS[lgKind(l)][0]}</span>`:""}${l.url?`<div class="meta lghost">${esc(host(l.url))}</div>`:""}</div>${l.url?`<a class="primary lgopen" href="${esc(href(l.url))}" target="_blank" rel="noopener">Open</a>`:""}</div>
       <div class="lgrow"><span class="meta">${LG_KINDS[lgKind(l)][2]}</span>${l.user?`<code>${esc(l.user)}</code>`:'<span class="lgempty">none saved</span>'}${l.user?`<button class="small" data-lgcopy="${id}|user">Copy</button>`:""}</div>
-      <div class="lgrow"><span class="meta">${LG_KINDS[lgKind(l)][3]}</span>${l.pass?`<code>${loginShown.has(id)?esc(l.pass):"&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;"}</code>`:'<span class="lgempty">none saved</span>'}${l.pass?`<button class="small" data-lgshow="${id}">${loginShown.has(id)?"Hide":"Show"}</button><button class="small" data-lgcopy="${id}|pass">Copy</button>`:""}</div>
-      ${l.note?`<div class="lgnote">${esc(l.note)}</div>`:""}
+      <div class="lgrow"><span class="meta">${LG_KINDS[lgKind(l)][3]}</span>${l.pass?`<code>${loginShown.has(id)?esc(l.pass):mask(l)}</code>`:'<span class="lgempty">none saved</span>'}${l.pass?`<button class="small" data-lgshow="${id}">${loginShown.has(id)?"Hide":"Show"}</button><button class="small" data-lgcopy="${id}|pass">Copy</button>`:""}</div>
+      ${expTag(l)}${l.note?`<div class="lgnote">${esc(l.note)}</div>`:""}
       <div class="lgfoot"><span class="meta">${l.updatedBy?"Changed by "+esc(l.updatedBy.split("@")[0])+", ":""}${l.updatedAt?new Date(l.updatedAt).toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"}):""}</span><span style="display:flex;gap:6px"><button class="small" data-lgedit="${id}">Edit</button><button class="small danger" data-lgdel="${id}">Delete</button></span></div></div>`).join("")||`<div class="card"><p class="meta">${q||loginKind?"Nothing matches.":"Nothing saved yet. Tap + Add."}</p></div>`}</div></div>`;
   const nb=$("#lgNew"); if(nb) nb.onclick=()=>{ loginAdding=true; render(); setTimeout(()=>{ const f=$("#lgSite"); f&&f.focus(); },0); };
   $("#lgLockNow").onclick=()=>lgLock("");
   $("#lgChange").onclick=()=>{ LG.setup={ step:1 }; LG.entry=""; LG.msg=""; render(); };
   const sv=$("#lgSave"); if(sv) sv.onclick=async()=>{ const site=$("#lgSite").value.trim(); if(!site) return toast("Give it a name");
     const id=loginEdit||db.ref("logins").push().key, old=LG.items[id]||{};
-    const v={ ...old, kind:$("#lgType").value==="pass"?null:$("#lgType").value, site, url:$("#lgUrl").value.trim()||null, user:$("#lgUser").value.trim()||null, pass:$("#lgPass").value||null, note:$("#lgNote").value.trim()||null, ...stamp() };
+    const v={ ...old, kind:$("#lgType").value==="pass"?null:$("#lgType").value, site, url:$("#lgUrl").value.trim()||null, user:$("#lgUser").value.trim()||null, pass:$("#lgPass").value||null, exp:($("#lgExp")&&$("#lgExp").value)||null, note:$("#lgNote").value.trim()||null, ...stamp() };
     if(!loginEdit){ v.createdAt=Date.now(); v.createdBy=me.email; }
     Object.keys(v).forEach(k=>v[k]==null&&delete v[k]);
     await lgSave({ ...LG.items, [id]: v }, (loginEdit?"Saved ":"Added ")+site); loginEdit=null; loginAdding=false; render(); };
+  m.querySelectorAll("[data-lgtab]").forEach(b=>b.onclick=()=>{ loginTab=b.dataset.lgtab; loginKind=""; loginEdit=null; loginAdding=false; render(); });
   m.querySelectorAll("[data-lgkind]").forEach(b=>b.onclick=()=>{ loginKind=b.dataset.lgkind; render(); });
   const ty=$("#lgType"); if(ty) ty.onchange=()=>{ const K=LG_KINDS[ty.value]; $("#lgUserL").textContent=K[2]; $("#lgPassL").textContent=K[3]; $("#lgSite").placeholder=K[4]; };
   const c=$("#lgCancel"); if(c) c.onclick=()=>{ loginEdit=null; loginAdding=false; render(); };
