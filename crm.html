@@ -1072,7 +1072,7 @@ function fuStep(id, c){
   for(const e of ev){
     if(e.k==="talk"||e.k==="in"){ anchor=e; out=null; missed=null; }
     else if(e.k==="missed") missed=e;
-    else if(e.k==="out" && !out && (!anchor || ymdOf(e.at)>ymdOf(anchor.at))) out=e; // a message the same day as the call is part of the call
+    else if(e.k==="out" && (!anchor || ymdOf(e.at)>ymdOf(anchor.at))) out=e; // a message the same day as the call is part of the call
   }
   const how = (c.landline || !c.phone) ? (c.email ? "email" : "call") : "text";
   let what, due;
