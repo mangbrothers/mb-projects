@@ -2243,6 +2243,13 @@ function ctrPickGo(){
     jobs.forEach(x=>steps.push({ label:LDA_NAME+": "+SERVICE_TYPES.landscaping.summary(x), attr:`data-lda="${x.sid}"`, run:()=>openLandscaping(openId,x.sid) }));
     if(!jobs.length) steps.push({ label:LDA_NAME+": add the job first", attr:'data-lda-new="1"', run:()=>ctrAddSvc("landscaping","Fill in the Job, Date and Price, tap Save, then Contracts again.") });
   }
+  // Seasonal plus a landscaping job that is ready: one email, one link, signed one after the other, card once.
+  const si=steps.findIndex(x=>x.attr==='data-ssa="1"'), li=steps.findIndex(x=>x.attr.indexOf('data-lda="')===0);
+  if(bundleOn() && si>=0 && li>=0){
+    const sid=/data-lda="([^"]+)"/.exec(steps[li].attr)[1], lbl=steps[si].label+" + "+steps[li].label;
+    const pair={ label:lbl+" (one email, signed one after the other, card once)", attr:'data-bundle="1"', run:()=>{ bundleCtx={ clientId:openId, queue:[sid], held:null }; openSeasonal(openId, Object.fromEntries(SSA_TYPES.map(t=>[t,seas.includes(t)]))); } };
+    steps.splice(Math.max(si,li),1); steps.splice(Math.min(si,li),1,pair);
+  }
   const box=$("#pkSteps");
   if(!steps.length){ box.innerHTML=`<div class="warnline">Tick at least one service.</div>`; return; }
   if(steps.length===1){ box.innerHTML=""; return steps[0].run(); }
@@ -2434,7 +2441,7 @@ function ssaSetup(){
     <div class="meta" id="ss-later-amt"></div>
     <div class="warnline" id="ss-warn" hidden></div>
     <div class="meta" id="ss-err" style="color:var(--red);font-weight:600;margin-top:8px"></div>
-    <div class="actions"><button type="button" class="left" id="ss-later">Save for later</button><button type="button" id="ss-go">Sign here on this device</button><button type="button" class="primary big" id="ss-send">Email contract to sign</button></div>
+    <div class="actions"><button type="button" class="left" id="ss-later">Save for later</button><button type="button" id="ss-go">Sign here on this device</button><button type="button" class="primary big" id="ss-send">${bundleCtx&&bundleCtx.clientId===X.clientId&&bundleCtx.queue.length?"Next: the landscaping agreement":"Email contract to sign"}</button></div>
     <p class="meta" style="margin:8px 0 0">${svcReady()?`<b>Email contract to sign</b> sends one link to ${esc([S.email,S.email2].filter(Boolean).join(" and ")||"the customer's email")}: the quote, the agreement, a typed-name signature, then their card on the next screen.`:`Emailing the contract needs the signing service: More, Contracts, Signing service.`} <b>Sign here</b> is for door to door and landscaping: the customer signs on this screen, then you take the card.</p>
   </div>`;
   const form=$("#ssaForm");
@@ -2631,6 +2638,11 @@ const lsaCount = () => live().reduce((n,[,c])=>n+Object.values(c.contracts||{}).
 // link's status (and the other way round). The new slots need the Nov 10 signing service; until the ping says it is
 // deployed (svcSlots), everything stays on the old single slot.
 let svcSlots = false;
+// Nov 13, 2026: one link for a Seasonal and a Landscaping agreement (needs the Nov 13 signing service).
+let svcBundle = false;
+// A bundle being set up: { clientId, queue:[landscaping sid], held:{ token, upd } }. Nothing is written until both are ready.
+let bundleCtx = null;
+const bundleOn = () => svcBundle && svcSlots;
 const REQ_SLOTS = ["signReq","signReqLawn","signReqLand"];
 const slotLawn = () => svcSlots ? "signReqLawn" : "signReq", slotLand = () => svcSlots ? "signReqLand" : "signReq";
 const reqSlot = (c, r) => (r && REQ_SLOTS.find(k=>c[k] && c[k].token===r.token)) || "signReq";
@@ -2955,7 +2967,7 @@ function ldaSetup(){
     <div class="pstotal"><span>Charged today</span><b>${money(half)||"$0"}</b></div>
     <div class="meta">${half>0?`50% when the card is saved at signing. The other ${money(r2(price-half))} is charged when the job is set to Done.`:`Under $${LDA_DEPOSIT_MIN}: the card goes on file at signing and the full ${money(price)} is charged when the job is set to Done.`}</div>
     <div class="meta" id="ld-err" style="color:var(--red);font-weight:600;margin-top:8px"></div>
-    <div class="actions"><button type="button" class="left" id="ld-later">Save for later</button><button type="button" class="primary big" id="ld-send">Email contract to sign</button></div>
+    <div class="actions"><button type="button" class="left" id="ld-later">Save for later</button><button type="button" class="primary big" id="ld-send">${bundleCtx&&bundleCtx.clientId===X.clientId&&bundleCtx.held?"Email both agreements to sign":"Email contract to sign"}</button></div>
   </div>`;
   const form=$("#ldaForm"); form.oninput=ldaSync; form.onchange=ldaSync;
   $("#ld-later").onclick = async () => { ldaSync(); try{ await ldaSaveDraft(); toast("Setup saved on the client."); $("#signDlg").close(); }catch(e){ toast("Not saved: "+(e.code||e.message)); } };
@@ -3007,6 +3019,8 @@ async function ldaSend(){
       details:{ kind:"landscaping", agreementNo:X.agNo, version:LDA_VERSION, sid:s.sid, job:s.desc||"", date:s.date||"", total:price, dueNow:half, dueAtCompletion:bal, serviceProperty:S.prop, propertyType:S.ptype, workAreas:S.areas, materials:S.materials, warranty:S.warranty, preExisting:S.pre, email:S.email, email2:S.email2||"" },
       covers:{ landscaping:true }, textT, noticeT, signerName:c.name, to, companySig:mySig.data, companySigner:mySig.name||me.displayName||me.email,
       createdAt:now, createdBy:me.email, expiresAt:now+7*864e5, link, apply:Object.entries(upd0), payUrl:"" };
+    const held = (bundleCtx && bundleCtx.clientId===id && bundleCtx.held) || null;
+    if(held){ const P=held.upd["sync/sign/"+held.token]; req.status="sent"; req.sentAt=now; req.bundleOf=held.token; req.expiresAt=P.expiresAt; req.link=P.link; }
     const upd = {
       ["sync/sign/"+token]: JSON.parse(JSON.stringify(req)),
       ["clients/"+id+"/"+slotLand()]: { token, kind:"landscaping", sid:s.sid, status:"queued", createdAt:now, createdBy:me.email, to, link, agreementNo:X.agNo, amount:price, dueNow:half },
@@ -3015,9 +3029,16 @@ async function ldaSend(){
     };
     const prev=ldaReq(c, s.sid); if(prev && OPEN_REQ.includes(prev.status) && prev.token!==token) upd["sync/sign/"+prev.token+"/status"]="cancelled";
     if(LEAD_STAGES.includes(c.status) && c.status!=="quoted") upd["clients/"+id+"/status"]="quoted";
+    if(held){
+      const slot="clients/"+id+"/"+slotLand();
+      Object.assign(upd[slot], { status:"sent", sentAt:now, bundleOf:held.token, link:req.link });
+      held.upd["sync/sign/"+held.token].bundle=[token]; held.upd["clients/"+id+"/signReq"].bundle=[token];
+      Object.keys(held.upd).forEach(k2=>{ if(!(k2 in upd)) upd[k2]=held.upd[k2]; });
+    }
     await db.ref().update(upd);
-    svcCall("send", { t:token });
-    X.sentToken=token; showSent();
+    svcCall("send", { t: held ? held.token : token });
+    if(held) bundleCtx=null;
+    X.sentToken = held ? held.token : token; showSent();
   }catch(e){ toast("Not sent: "+(e.code||e.message)); }
   finally{ X.busy=false; if(btn){ btn.disabled=false; btn.textContent="Email contract to sign"; } }
 }
@@ -3065,8 +3086,13 @@ async function ssaSend(){
       ["clients/"+id+"/lastContactAt"]: now,
       ["clientLog/"+id+"/"+db.ref("clientLog").push().key]: { text:`Emailed ${SSA_NAME} ${X.agNo} to ${to.join(" and ")}: ${ssaSummary(S,k)}. Total ${money(k.total)}; charged at signing ${money(k.dueNow)}.`, at:now, by:me.email, source:"contract" }
     };
-    if(c.signReq && !c.signReq.kind && OPEN_REQ.includes(c.signReq.status) && c.signReq.token!==token) upd["sync/sign/"+c.signReq.token+"/status"]="cancelled";
+    if(c.signReq && !c.signReq.kind && OPEN_REQ.includes(c.signReq.status) && c.signReq.token!==token){ upd["sync/sign/"+c.signReq.token+"/status"]="cancelled"; bundleCancel(c, c.signReq, upd, id); }
     if(LEAD_STAGES.includes(c.status) && c.status!=="quoted") upd["clients/"+id+"/status"]="quoted";
+    if(bundleCtx && bundleCtx.clientId===id && bundleCtx.queue.length){
+      bundleCtx.held={ token, upd }; const sid=bundleCtx.queue.shift(); X.busy=false;
+      toast("Seasonal agreement is ready. Now the landscaping agreement. Nothing is sent until both are ready.");
+      openLandscaping(id, sid); return;
+    }
     await db.ref().update(upd);
     svcCall("send", { t:token });
     X.sentToken=token; showSent();
@@ -3125,6 +3151,12 @@ function reqStatusText(r, c){
   return { queued:"Sending…", sent: r.openedAt ? `Opened ${ago(r.openedAt)}. Waiting for the signature.` : `Sent ${r.sentAt?ago(r.sentAt):""}. Not opened yet.`, error:`Email failed: ${r.error||""}`, expired:"Link expired.", cancelled:"Link cancelled." }[r.status] || r.status;
 }
 let sentTimer=null;
+// Withdrawing a bundle's first agreement withdraws the ones that ride on it.
+function bundleCancel(c, r, upd, id){
+  (Array.isArray(r&&r.bundle)?r.bundle:Object.values((r&&r.bundle)||{})).forEach(bt=>{ upd["sync/sign/"+bt+"/status"]="cancelled";
+    REQ_SLOTS.forEach(k=>{ if(c[k] && c[k].token===bt && OPEN_REQ.includes(c[k].status)) upd["clients/"+id+"/"+k+"/status"]="cancelled"; }); });
+}
+$("#signDlg").addEventListener("close", ()=>{ if(!bundleCtx) return; if(bundleCtx.held) toast("Nothing was sent. The two agreements go out together: open Contracts and start again."); bundleCtx=null; });
 function showSent(){
   const X=signCtx, id=X.clientId; ssaBarOff(); X.mode="sent";
   const slot = X.sentToken ? reqSlot(clients[id]||{}, { token:X.sentToken }) : (X.slot||"signReq");
@@ -3156,7 +3188,7 @@ const CARD_AUTH_NAME = "Card on File Authorization";
 const CARD_LINK_DAYS = 7;
 let svcCard = null; // null: not asked yet; false: asking, or the deployed service has no card links yet; true: ready
 function svcCardReady(){
-  if(svcCard===null && svcReady()){ svcCard=false; svcCall("ping").then(p=>{ if(!p) svcCard=null; else { svcCard=!!p.cardLink; svcSlots=!!p.slots; } if(openId) renderCardLink(); }); }
+  if(svcCard===null && svcReady()){ svcCard=false; svcCall("ping").then(p=>{ if(!p) svcCard=null; else { svcCard=!!p.cardLink; svcSlots=!!p.slots; svcBundle=!!p.bundle; } if(openId) renderCardLink(); }); }
   return svcCard===true;
 }
 function lastDeclined(id){

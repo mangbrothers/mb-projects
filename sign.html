@@ -115,7 +115,8 @@
 "use strict";
 const PHONE = "734-450-2400", EMAIL = "admin@mangbrothers.com";
 const q = new URLSearchParams(location.search);
-const TOKEN = (q.get("t")||"").replace(/[^\w-]/g,""), DEPLOY = (q.get("s")||"").replace(/[^\w-]/g,"");
+let TOKEN = (q.get("t")||"").replace(/[^\w-]/g,""); // the link's own agreement; in a bundle, the one that carries the card step
+const DEPLOY = (q.get("s")||"").replace(/[^\w-]/g,"");
 const SVC = DEPLOY ? `https://script.google.com/macros/s/${DEPLOY}/exec` : "";
 const $ = s => document.querySelector(s);
 const esc = s => String(s==null?"":s).replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -157,15 +158,17 @@ function quoteRows(A, withLines){
     <div class="totals${lines.length?"":" solo"}">${lines.length?t("Total",esc(money(A.total)),"tot"):""}
     ${t("Charged today",esc(money(A.dueNow)||"$0"),"today")}
     ${A.dueInstall>0?t("Charged when your lights are installed",esc(money(A.dueInstall)),"later"):""}
-    ${A.tplName==="Landscaping Services Agreement"&&A.total>A.dueNow?t("Charged when the job is done",esc(money(A.total-A.dueNow)),"later"):""}</div>
+    ${A.tplName==="Landscaping Services Agreement"&&A.total>A.dueNow?t("Charged when the job is done",esc(money(A.total-A.dueNow)),"later"):""}
+    ${A.bundleAll&&A.bundleLater>0?t("Charged when the landscaping job is done",esc(money(A.bundleLater)),"later"):""}</div>
     ${snowNote(A, starred)}`;
 }
 
-async function call(action, body){
+async function call(action, body, tok){
   if(!SVC || !TOKEN) throw new Error("This link is incomplete.");
+  const T = tok || TOKEN;
   const r = body
-    ? await fetch(SVC, { method:"POST", redirect:"follow", headers:{ "Content-Type":"text/plain;charset=utf-8" }, body:JSON.stringify({ action, t:TOKEN, ...body }) })
-    : await fetch(`${SVC}?action=${action}&t=${encodeURIComponent(TOKEN)}`, { redirect:"follow" });
+    ? await fetch(SVC, { method:"POST", redirect:"follow", headers:{ "Content-Type":"text/plain;charset=utf-8" }, body:JSON.stringify({ action, t:T, ...body }) })
+    : await fetch(`${SVC}?action=${action}&t=${encodeURIComponent(T)}`, { redirect:"follow" });
   if(!r.ok) throw new Error("Our system did not answer ("+r.status+").");
   return r.json();
 }
@@ -176,11 +179,16 @@ function message(title, text){
 function dropBar(){ const b=$("#bar"); if(b) b.remove(); document.body.style.paddingBottom="0"; }
 
 // ---------- step 1: read and sign ----------
-function showSign(A){
+// part: { n, of, tok } when the link carries more than one agreement. tok is set for every agreement after the first.
+function showSign(A, part){
+  part = part || ((A.bundle||[]).length ? { n:1, of:1+A.bundle.length } : null);
+  const more = !!part && part.n < part.of;
+  const goText = more ? "Sign and continue to the next agreement" : "Sign and continue to payment";
   const head = `<div class="ssahead"><img src="mb-logo.png" alt="Mangiapane Brothers"><span>${esc(A.tplName||"Seasonal Services Agreement")}</span></div>`;
   $("#main").innerHTML = `${steps(0)}
     <div class="card"><h1>Hello ${esc(first(A))},</h1>
-      <p style="margin:0 0 6px">Here is your official quote and agreement with Mangiapane Brothers, as we discussed. There are two steps: sign the agreement, then add your card. It takes about five minutes.</p>
+      ${part?`<p class="meta" style="margin:0 0 6px"><b>Agreement ${part.n} of ${part.of}</b></p>`:""}
+      <p style="margin:0 0 6px">${part ? (part.n===1 ? `Here are your official quotes and agreements with Mangiapane Brothers, as we discussed. You have ${part.of} agreements to sign, one after the other, then you add your card once at the end. It takes about ten minutes.` : `This is agreement ${part.n} of ${part.of}. Read it and sign it the same way.${more?"":" Your card comes next, once, for everything."}`) : "Here is your official quote and agreement with Mangiapane Brothers, as we discussed. There are two steps: sign the agreement, then add your card. It takes about five minutes."}</p>
       ${quoteRows(A, true)}
       <p class="meta" style="margin:10px 0 0">Agreement ${esc(A.agreementNo)}. This link works until ${esc(fmtStamp(A.expiresAt))}.</p></div>
     <div class="doc">${head}${renderDoc(A.text)}</div>
@@ -188,7 +196,7 @@ function showSign(A){
       <label class="ck"><input type="checkbox" id="consent"><span>I have read this agreement. I agree to sign it electronically, that my typed name is my signature and is as binding as one on paper, and to receive my copy, receipts, and notices by email at ${esc((A.to||[]).join(" and "))}.</span></label>
       <div class="field"><label for="typed">Type your full name to sign</label><input id="typed" autocomplete="name" autocapitalize="words" spellcheck="false" placeholder="${esc(A.signerName||"Your full name")}"></div>
       <p class="meta" style="margin:8px 0 4px">Date: <b>${esc(A.todayLong)}</b>. Countersigned for Mangiapane Brothers LLC by ${esc(A.companySigner||"the Company")}.</p>
-      <button type="button" class="primary wide" id="go" style="margin-top:10px">Sign and continue to payment</button>
+      <button type="button" class="primary wide" id="go" style="margin-top:10px">${goText}</button>
       <div class="err" id="err" hidden></div></div>
     <div class="doc notice">${renderDoc(A.notice)}</div>
     <p class="meta">${contact}</p>`;
@@ -203,10 +211,16 @@ function showSign(A){
     if(typed.length<3 || !/[A-Za-z]/.test(typed)){ err("Type your full name to sign."); $("#typed").focus(); return; }
     err(""); const b=$("#go"); b.disabled=true; b.textContent="Signing…";
     try{
-      const R = await call("sign", { typedName:typed, consent:true, ua:navigator.userAgent.slice(0,300), screen:`${screen.width}x${screen.height}` });
+      const R = await call("sign", { typedName:typed, consent:true, ua:navigator.userAgent.slice(0,300), screen:`${screen.width}x${screen.height}` }, part && part.tok);
       if(!R.ok) throw new Error(R.error||"Not signed.");
-      dropBar(); route({ ...A, ...R });
-    }catch(e){ b.disabled=false; b.textContent="Sign and continue to payment"; err(e.message+" Nothing was signed. Try again, or call "+PHONE+"."); }
+      dropBar();
+      if(part && part.tok){ // a later agreement in the bundle: go back to the first, which knows what is left and holds the card step
+        let P; try{ P = await call("get"); }catch(e2){ P = null; }
+        if(!P || !P.ok) return message("Signed. One more step", "Your agreement is signed. Reload this page to continue to your card, or call "+esc(PHONE)+".");
+        return route(P);
+      }
+      route({ ...A, ...R });
+    }catch(e){ b.disabled=false; b.textContent=goText; err(e.message+" Nothing was signed. Try again, or call "+PHONE+"."); }
   };
 }
 
@@ -251,7 +265,7 @@ function showPay(A){
   const token = true;
   $("#main").innerHTML = `${steps(1)}
     <div class="card done"><h2 style="margin:0"><span class="tick">✓</span>Signed. Thank you, ${esc(first(A))}.</h2>
-      <p class="meta" style="margin:8px 0 0">Agreement ${esc(A.agreementNo)}. Your signed copy is on its way to ${esc((A.to||[]).join(" and "))}.</p></div>
+      <p class="meta" style="margin:8px 0 0">${A.bundleAll?`Agreements ${esc([A.agreementNo].concat(A.bundle.map(x=>x.agreementNo)).join(" and "))}. Your signed copies are`:`Agreement ${esc(A.agreementNo)}. Your signed copy is`} on its way to ${esc((A.to||[]).join(" and "))}.</p></div>
     <div class="card"><h2>Last step: your card on file</h2>
       ${quoteRows(A, false)}
       <form class="opt main" id="cardForm" autocomplete="on" onsubmit="return false">
@@ -351,7 +365,7 @@ function showPay(A){
 function showPayLink(A){
   $("#main").innerHTML = `${steps(1)}
     <div class="card done"><h2 style="margin:0"><span class="tick">✓</span>Signed. Thank you, ${esc(first(A))}.</h2>
-      <p class="meta" style="margin:8px 0 0">Agreement ${esc(A.agreementNo)}. Your signed copy is on its way to ${esc((A.to||[]).join(" and "))}.</p></div>
+      <p class="meta" style="margin:8px 0 0">${A.bundleAll?`Agreements ${esc([A.agreementNo].concat(A.bundle.map(x=>x.agreementNo)).join(" and "))}. Your signed copies are`:`Agreement ${esc(A.agreementNo)}. Your signed copy is`} on its way to ${esc((A.to||[]).join(" and "))}.</p></div>
     <div class="card"><h2>Last step: your card on file</h2>
       ${quoteRows(A, false)}
       <div class="opt main"><h3>Card on file</h3>
@@ -492,12 +506,13 @@ function showDone(A){
     ${check?`<div class="card"><h2>Mail your check</h2><table class="quote">
       ${r("Amount","<b>"+esc(money(C.amount))+"</b>")}${r("Payable to",esc(C.payable||"Mangiapane Brothers LLC"))}${r("Mail to",esc(C.mailTo||""))}${r("Memo line",esc(C.memo||A.agreementNo))}</table></div>`:""}
     <div class="card"><h2>Summary</h2><table class="quote">
-      ${r("Agreement",esc(A.agreementNo))}
+      ${A.bundleAll?r("Agreements",esc([A.agreementNo].concat(A.bundle.map(x=>x.agreementNo)).join(" and "))):r("Agreement",esc(A.agreementNo))}
       ${A.signedAt?r("Signed",esc(fmtStamp(A.signedAt))):""}
       ${r("Signed copy sent to",esc((A.to||[]).join(" and ")))}
       ${r("Payment method",esc(methodLine))}
       ${check?"":r("Charged today",esc(linkMode ? (money(A.dueNow)||"$0") : todayCell))}
-      ${A.dueInstall>0&&!check?r("Charged when your lights are installed",esc(money(A.dueInstall))):""}</table>
+      ${A.dueInstall>0&&!check?r("Charged when your lights are installed",esc(money(A.dueInstall))):""}
+      ${A.bundleAll&&A.bundleLater>0&&!check?r("Charged when the landscaping job is done",esc(money(A.bundleLater))):""}</table>
       ${check?"":snowNote(A, false)}
       ${check?"":`<p class="meta" style="margin:10px 0 0">A receipt is emailed for every charge.</p>`}
       ${A.cancelByLong?`<p class="meta" style="margin:8px 0 0">You may cancel without penalty until midnight of ${esc(A.cancelByLong)}. The Notice of Cancellation is at the end of your signed copy.</p>`:""}</div>
@@ -505,9 +520,25 @@ function showDone(A){
   window.scrollTo(0,0);
 }
 
+async function nextInBundle(A, x){
+  const idx = A.bundle.indexOf(x) + 2, of = A.bundle.length + 1;
+  let B;
+  try{ B = await call("get", null, x.t); }catch(e){ return message("We could not load your next agreement", esc(e.message)+" Check your connection and reload this page."); }
+  if(B && B.ok && B.status==="ready") return showSign(B, { n:idx, of, tok:x.t });
+  if(B && B.ok && B.status==="signed"){ let P; try{ P = await call("get"); }catch(e){ P=null; } if(P && P.ok) return route(P); }
+  // The second agreement was withdrawn or ran out. The first is signed, so the card step still goes ahead for it.
+  return route({ ...A, bundle: A.bundle.filter(y=>y!==x) });
+}
 function route(A){
   if(A.test) IS_TEST = true;
   if(A.status!=="signed") return showSign(A);
+  // More than one agreement on this link: sign each, then one card step with the combined figures.
+  if((A.bundle||[]).length){
+    const nx = A.bundle.find(x=>x.status==="ready");
+    if(nx && !A.pay){ dropBar(); $("#main").innerHTML = `<div class="card"><p>Loading your next agreement…</p></div>`; return nextInBundle(A, nx); }
+    const signed = A.bundle.filter(x=>x.status==="signed");
+    if(signed.length && A.bundleDueNow!=null) A = { ...A, bundle:signed, bundleAll:true, dueNow:A.bundleDueNow, total:A.bundleTotal, lines:A.bundleLines||A.lines };
+  }
   // A card is being saved and charged right now (another tab, or a reload mid-charge): wait for the result, never show "all set" early.
   if(A.payBusy && A.payBusy.at && Date.now() - A.payBusy.at < 120000){ dropBar(); return message("We are confirming your payment", "Please do not enter your card again. Reload this page in a minute to see the result, or call "+esc(PHONE)+"."); }
   if(!A.pay) return showPay(A);
@@ -521,6 +552,11 @@ function route(A){
   try{ A = await call("get"); }
   catch(e){ return message("We could not load your agreement", esc(e.message)+" Check your connection and reload this page."); }
   if(!A.ok) return message("We could not load your agreement", esc(A.error||""));
+  if(A.bundleOf){ // a later agreement in a bundle was opened directly: start from the first
+    TOKEN = String(A.bundleOf).replace(/[^\w-]/g,"");
+    try{ A = await call("get"); }catch(e){ return message("We could not load your agreement", esc(e.message)+" Check your connection and reload this page."); }
+    if(!A.ok) return message("We could not load your agreement", esc(A.error||""));
+  }
   if(A.kind==="card") return routeCard(A);
   if(A.status==="cancelled") return message("This link is no longer active", "This agreement link was withdrawn, usually because a corrected one was sent. Check your email for a newer link.");
   if(A.status==="expired") return message("This link has expired", "Agreement links work for 7 days. Call us and we will send a new one.");
