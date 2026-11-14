@@ -1052,6 +1052,7 @@ function fuKind(e){
   if(src==="quo"){
     if(/^Text out:/i.test(t)) return /^Text out:\s*This is Mangiapane Brothers/i.test(t) ? null : "out"; // the automatic missed-call text is not a follow-up
     if(/^Text in:/i.test(t)) return "in";
+    if(/^Text not delivered/i.test(t)) return "fail"; // Quo could not deliver our text
     if(/^(Missed call|Voicemail)/i.test(t)) return "missed";
     if(/^Call (outbound|inbound)/i.test(t)) return "talk";
     return null;
@@ -1068,15 +1069,17 @@ function fuStep(id, c){
   if(!c || !LEAD_STAGES.includes(c.status)) return null;
   const nk=leadNext(c)[2]; if(nk==="signed"||nk==="card") return null;
   const ev=Object.values(logs[id]||{}).map(e=>({ at:e.at, k:fuKind(e) })).filter(e=>e.k&&e.at).sort((a,b)=>a.at-b.at);
-  let anchor=null, out=null, missed=null;
+  let anchor=null, out=null, missed=null, fail=null;
   for(const e of ev){
-    if(e.k==="talk"||e.k==="in"){ anchor=e; out=null; missed=null; }
+    if(e.k==="talk"||e.k==="in"){ anchor=e; out=null; missed=null; fail=null; }
+    else if(e.k==="fail"){ fail=e; if(out && out.at<=e.at) out=null; } // the text that failed was not a follow-up
     else if(e.k==="missed") missed=e;
     else if(e.k==="out" && (!anchor || ymdOf(e.at)>ymdOf(anchor.at))) out=e; // a message the same day as the call is part of the call
   }
   const how = (c.landline || !c.phone) ? (c.email ? "email" : "call") : "text";
   let what, due;
   if(missed && (!out || missed.at>out.at)){ what="Call back"; due=ymdOf(missed.at); }
+  else if(fail && !out){ what = c.email ? "Follow-up email" : "Call"; due=ymdOf(fail.at); } // text not delivered: email the same day
   else if(out){ what="Call"; due=addDays(ymdOf(out.at), FU_CALL_DAYS); }
   else if(anchor){ what = how==="call" ? "Call" : "Follow-up "+how; due=addDays(ymdOf(anchor.at), FU_MSG_DAYS); }
   else { what="First call"; due=ymdOf(c.createdAt||Date.now()); }
