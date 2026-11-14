@@ -2271,11 +2271,14 @@ function propLine(c){ const P=propOf(c); if(!P.at) return "";
   if(P.corner===true) bits.push(`<b>Corner lot</b> (snow ${money(SSA_SNOW[1][col])} not ${money(SSA_SNOW[0][col])}; fall +${money(SSA_FALL_ADJ[1][2])})`); else if(P.corner===false) bits.push("Not a corner");
   if(P.storeys===2) bits.push(`<b>Two-storey</b> (fall +${money(SSA_FALL_ADJ[0][2])}; lights +${money(SSA_L_ADJ[0][2])})`); else if(P.storeys===1) bits.push("One storey");
   if(P.steep===true) bits.push(`<b>Steep roof</b> (lights +${money(SSA_L_ADJ[2][2])})`);
-  if(P.footprint) bits.push("house about "+Number(P.footprint).toLocaleString("en-US")+" sq ft on the ground");
+  const n0=v=>Number(v).toLocaleString("en-US");
+  if(P.lotSqFt) bits.push(`<b>Lot ${n0(P.lotSqFt)} sq ft</b> (${(P.lotSqFt/43560).toFixed(2)} acre)`);
+  if(P.livingSqFt) bits.push("house "+n0(P.livingSqFt)+" sq ft"+(P.yearBuilt?", built "+esc(P.yearBuilt):""));
+  if(P.footprint && !P.livingSqFt) bits.push("house about "+Number(P.footprint).toLocaleString("en-US")+" sq ft on the ground");
   if(P.drive) bits.push("driveway: "+esc(P.drive));
   if(P.trees) bits.push("trees: "+esc(P.trees));
   if(P.note) bits.push(esc(P.note));
-  return `<b>Property</b><span>${bits.join(" \u00B7 ")} <i class="meta">(checked on Google Maps ${fmtStamp(P.at)}${P.map?`, <a href="${esc(P.map)}" target="_blank" rel="noopener">map</a>`:""}; confirm on site)</i></span>`; }
+  return `<b>Property</b><span>${bits.join(" \u00B7 ")} <i class="meta">(checked on Google Maps${P.lotSqFt||P.livingSqFt?" and the public record":""} ${fmtStamp(P.at)}${P.map?`, <a href="${esc(P.map)}" target="_blank" rel="noopener">map</a>`:""}; confirm on site)</i></span>`; }
 // Showcase carries a full season Fall Cleanup inside its price. It is sold only in Livonia (South or North).
 const ssaShowcaseFall = S => S.lights.on && S.lights.pkg==="showcase";
 const r2 = n => Math.round(n*100)/100;
@@ -2324,13 +2327,44 @@ function leadCtrHtml(id, c){
 function showSentFor(clientId, slot){ signCtx={ mode:"sent", clientId, slot:slot||"signReq", S:signCtx?.S }; showSent(); if(!$("#signDlg").open) $("#signDlg").showModal(); }
 const PK_TYPES = ["lawn","fall","lights","snow","landscaping"];
 function ctrPickHtml(c, dirty){
-  const sg=ssaSigned(c), cov=(sg&&sg[1].covers)||{}, b=ssaBlank(c);
-  const pre={ lawn:hasSvc(c,"lawn")&&!lsaSigned(c), fall:b.fall.on&&!cov.fall, lights:b.lights.on&&!cov.lights, snow:b.snow.on&&!cov.snow, landscaping:ldaJobs(c).some(x=>x.jobStatus!=="Done"&&!ldaSignedFor(c,x)) };
-  return `<div class="ctr"><div class="t"><b>Contracts</b><div class="meta">Pick the services, then set up, email or sign. Agreements already sent or signed are listed below.</div></div>
-    <button type="button" class="small primary" data-setup="1" ${dirty?"disabled":""}>Contracts</button></div>
-    <div class="setupMenu" id="setupMenu" hidden><span class="meta">Which services is this for?</span>
-      ${PK_TYPES.map(t=>`<label class="row pk"><input type="checkbox" data-pk="${t}" ${pre[t]?"checked":""}> <span>${esc(SERVICE_TYPES[t].label)}</span></label>`).join("")}
-      <button type="button" class="small primary" data-pk-go="1">Continue</button><div id="pkSteps"></div></div>`;
+  return `<div class="ctr"><div class="t"><b>Contracts</b><div class="meta">Opens the agreement setup: tick the services there, then email or sign. Agreements already sent or signed are listed below.</div></div>
+    <button type="button" class="small primary" data-ssa="1" ${dirty?"disabled":""}>Contracts</button></div>`;
+}
+// What else rides with the seasonal agreement, chosen on the setup page. Not saved in the draft or the agreement.
+const ldaOpenJobs = c => ldaJobs(c).filter(x=>x.jobStatus!=="Done" && !ldaSignedFor(c,x));
+function ssaMoreBlank(c, pick){ const jobs=ldaOpenJobs(c);
+  return { land:{ on: pick ? !!pick.landscaping : jobs.length>0, sid: jobs.length ? jobs[0].sid : "new", desc:"", date:"", price:"" }, lawn:{ on: pick ? !!pick.lawn : false } }; }
+let ctrLawnNext=null, ctrLandNext=null;
+// After an agreement is sent: the next one the setup page asked for.
+function ctrNext(id){
+  if(ctrLandNext && ctrLandNext.id===id){ const sid=ctrLandNext.sid; ctrLandNext=null; toast("Sent. Now the landscaping agreement."); return openLandscaping(id, sid); }
+  if(ctrLawnNext===id){ ctrLawnNext=null; toast("Sent. Now the lawn agreement."); return openLawn(id); }
+}
+async function ssaContinue(){
+  const X=signCtx, S=X.S, M=X.more, id=X.clientId, c=clients[id]; if(X.busy) return;
+  const seas=S.fall.on||S.lights.on||S.snow.on, e=[];
+  if(!S.test){
+    if(M.land.on && M.land.sid==="new"){ if(!M.land.desc) e.push("the landscaping job"); if(!(+M.land.price>0)) e.push("the landscaping price"); }
+    if(M.lawn.on && !lsaService(c)) e.push("the Lawn service and its price per cut on the client");
+  }
+  ssaErrors().forEach(x=>e.push(x));
+  if(!S.email) e.unshift("the customer's email");
+  $("#ss-err").textContent = e.length ? "Still needed: "+e.join(", ")+"." : ""; if(e.length) return;
+  if(S.test) return ssaSend();
+  let sid=null;
+  if(M.land.on){ sid=M.land.sid;
+    if(sid==="new"){ sid="s"+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+      const job={ type:"landscaping", desc:M.land.desc, jobStatus:"Quoted", date:M.land.date||"", price:+M.land.price, createdAt:Date.now() };
+      try{ await db.ref("clients/"+id+"/services/"+sid).set(job); M.land.sid=sid;
+        if(openId===id && $("#clientDlg").open){ draftServices[sid]={ ...job }; renderSvcs(); renderContracts(); } } // keep the open card in step, so it does not read as unsaved
+      catch(err){ return toast("Job not saved: "+(err.code||err.message)); } } }
+  ctrLawnNext = M.lawn.on ? id : null; ctrLandNext=null;
+  if(seas){
+    if(sid){ if(bundleOn()) bundleCtx={ clientId:id, queue:[sid], held:null }; else ctrLandNext={ id, sid }; }
+    return ssaSend();
+  }
+  if(sid) return openLandscaping(id, sid);
+  ctrLawnNext=null; return openLawn(id);
 }
 function ctrAddSvc(type, msg){
   const sel=$("#addSvcSel"); sel.value=type; sel.dispatchEvent(new Event("change",{bubbles:true}));
@@ -2479,13 +2513,14 @@ function openSeasonal(clientId, pick){
   if(pick) SSA_TYPES.forEach(t=>{ S[t].on=!!pick[t]; });
   S.extras = Object.values(S.extras||{}).filter(Boolean).map(x=>({ svc:x.svc||"fall", desc:x.desc||"", price:x.price??"" }));
   if(!S.prop) S.prop=c.address||""; if(!S.email) S.email=c.email||"";
-  signCtx={ mode:"ssa-setup", clientId, S };
+  signCtx={ mode:"ssa-setup", clientId, S, more: ssaMoreBlank(c, pick) };
   ssaSetup();
   if(!$("#signDlg").open) $("#signDlg").showModal();
   $("#signBody").scrollTop=0;
 }
 function ssaBarOff(){ const b=document.getElementById("ssaBar"); if(b) b.remove(); }
 $("#signDlg").addEventListener("close", ssaBarOff);
+$("#signDlg").addEventListener("close", ()=>{ ctrLawnNext=null; ctrLandNext=null; });
 function ssaSetup(){
   const X=signCtx, S=X.S, c=clients[X.clientId]; X.mode="ssa-setup"; X.pad=null; ssaBarOff();
   const ck=(id,label,on)=>`<label class="row ssack"><input type="checkbox" id="${id}" ${on?"checked":""}> <span>${label}</span></label>`;
@@ -2538,6 +2573,13 @@ function ssaSetup(){
       <div id="ss-snow-box" class="ssabox"><label>Lot</label><select id="ss-s-lot"><option value="">Choose</option>${SSA_SNOW.map(P=>`<option value="${P.k}"${S.snow.lot===P.k?" selected":""}>${P.n} ($${P.sw} South and Westland, $${P.n2} North)</option>`).join("")}</select>
         ${nb("ss-s-nb",S.snow.nb)}${cp("s",S.snow,"Snow Removal")}
         <div id="ss-s-pprow" ${S.snow.cp?"":"hidden"} style="margin-top:6px"><label>Per visit after the sixteenth, $ (leave empty for the lot's standard rate)</label><input id="ss-s-pp" type="number" inputmode="decimal" min="0" step="1" style="width:140px" value="${esc(S.snow.cpPP||"")}"></div></div></div>
+    <div class="svc svcbar landscaping">${ck("ss-land",`<b>Landscaping</b> <span class="meta">its own agreement, same email and link, signed second, card once</span>`,X.more.land.on)}
+      <div id="ss-land-box" class="ssabox"><label>Job</label><select id="ss-land-sid">${ldaOpenJobs(c).map(x=>`<option value="${esc(x.sid)}"${X.more.land.sid===x.sid?" selected":""}>${esc(SERVICE_TYPES.landscaping.summary(x))}</option>`).join("")}<option value="new"${X.more.land.sid==="new"?" selected":""}>New job</option></select>
+        <div id="ss-land-new" class="grid2" style="margin-top:6px"><div style="grid-column:1/-1"><label>Job, as the customer will read it</label><input id="ss-land-desc" value="${esc(X.more.land.desc)}" autocomplete="off" placeholder="Mulch the front beds, trim the hedges"></div>
+          <div><label>Date (optional)</label><input id="ss-land-date" type="date" value="${esc(X.more.land.date)}"></div><div><label>Price, $</label><input id="ss-land-price" type="number" inputmode="decimal" min="0" step="0.01" value="${esc(X.more.land.price)}"></div></div>
+        <p class="meta" style="margin:6px 0 0">The landscaping terms, deposit and warranty are set on the next screen.</p></div></div>
+    <div class="svc svcbar lawn">${ck("ss-lawn",`<b>Lawn</b> <span class="meta">its own agreement, set up right after this one</span>`,X.more.lawn.on)}
+      <div id="ss-lawn-box" class="ssabox"><p class="meta" style="margin:0">${lsaService(c)?esc("Uses the Lawn service on the client: "+SERVICE_TYPES.lawn.summary(lsaService(c))):"There is no Lawn service on this client yet. Add it on the client with the price per cut, then come back."}</p></div></div>
     <div class="svc svcbar"><b>Special items</b> <span class="meta">Anything outside the standard options: a description and a price, added to one of the services ticked above. It prints in that service's price table and follows its payment schedule.</span>
       <div id="ss-extras"></div>
       <button type="button" class="small" id="ss-ex-add" style="margin-top:8px">+ Add a special item</button></div>
@@ -2561,13 +2603,17 @@ function ssaSetup(){
   const CPK={f:"fall",l:"lights",s:"snow"};
   form.querySelectorAll("[data-cp]").forEach(b=>b.onclick=()=>{ ssaSync(); const p=b.dataset.cp, x=S[CPK[p]]; x.cp=!x.cp; ssaSync(); if(x.cp){ const el=document.getElementById(`ss-${p}-cpp`); if(el) el.focus(); } });
   $("#ss-later").onclick = async () => { ssaSync(); try{ await ssaSaveDraft(); toast("Setup saved on the client."); $("#signDlg").close(); }catch(e){ toast("Not saved: "+(e.code||e.message)); } };
-  $("#ss-go").onclick = () => { ssaSync(); const e=ssaErrors(); $("#ss-err").textContent = e.length ? "Still needed: "+e.join(", ")+"." : ""; if(!e.length) ssaShow(); };
-  $("#ss-send").onclick = () => { ssaSync(); const e=ssaErrors(); if(!S.email) e.unshift("the customer's email"); $("#ss-err").textContent = e.length ? "Still needed: "+e.join(", ")+"." : ""; if(!e.length) ssaSend(); };
+  $("#ss-go").onclick = () => { ssaSync(); const e=ssaErrors(); if(!S.test && !S.fall.on && !S.lights.on && !S.snow.on) e.unshift("a seasonal service to sign here (Landscaping and Lawn are signed from their own agreement)"); $("#ss-err").textContent = e.length ? "Still needed: "+e.join(", ")+"." : ""; if(!e.length) ssaShow(); };
+  $("#ss-send").onclick = () => { ssaSync(); ssaContinue(); };
   if(!S.email) setTimeout(()=>{ const el=$("#ss-email"); if(el && signCtx===X) el.focus({preventScroll:true}); }, 50);
 }
 function ssaSync(){
   const X=signCtx; if(!X || X.mode!=="ssa-setup") return; const S=X.S, g=id=>document.getElementById(id), n=id=>Math.max(0,parseInt(g(id).value)||0);
   S.email=g("ss-email").value.trim(); S.email2=g("ss-email2").value.trim(); S.zone=g("ss-zone").value; S.prop=g("ss-prop").value.trim(); S.ptype=g("ss-ptype").value; S.areas=g("ss-areas").value.trim(); S.pre=g("ss-pre").value.trim();
+  const M=X.more; if(M && g("ss-land")){ M.land.on=g("ss-land").checked; M.land.sid=g("ss-land-sid").value; M.land.desc=g("ss-land-desc").value.trim(); M.land.date=g("ss-land-date").value; M.land.price=g("ss-land-price").value; M.lawn.on=g("ss-lawn").checked;
+    g("ss-land-box").hidden=!M.land.on; g("ss-land-new").hidden=M.land.sid!=="new"; g("ss-lawn-box").hidden=!M.lawn.on;
+    const seasOn=g("ss-fall").checked||g("ss-lights").checked||g("ss-snow").checked, sb=g("ss-send");
+    if(sb && !X.busy) sb.textContent = S.test ? "Email contract to sign" : M.land.on ? "Next: the landscaping agreement" : (!seasOn && M.lawn.on) ? "Next: the lawn agreement" : "Email contract to sign"; }
   S.fall.on=g("ss-fall").checked; SSA_FALL_ADJ.forEach(([k])=>S.fall[k]=g("ss-f-"+k).checked); S.fall.bigPrice=g("ss-f-bigp").value; S.fall.big=g("ss-f-big").checked; S.fall.nb=g("ss-f-nb").checked; S.fall.wlDisp=g("ss-f-wldisp").value; S.fall.wlGut=g("ss-f-wlgut").checked; S.fall.note=g("ss-f-note").value.trim(); S.fall.mode=g("ss-f-mode").value; S.fall.modeWhy=g("ss-f-modewhy").value.trim();
   S.extras=[...document.querySelectorAll("#ss-extras .exrow")].map(r=>({ svc:r.querySelector(".exs").value, desc:r.querySelector(".exd").value, price:r.querySelector(".exp").value }));
   S.lights.on=g("ss-lights").checked; S.lights.pkg=g("ss-l-pkg").value; S.lights.color=g("ss-l-color").value; S.lights.nb=g("ss-l-nb").checked;
@@ -2600,7 +2646,8 @@ function ssaErrors(){
   const S=signCtx.S, e=[];
   if(S.test){ if(S.email && !/^\S+@\S+\.\S+$/.test(S.email)) e.push("a valid email"); return e; }
   if(!S.prop) e.push("service property");
-  if(!S.fall.on && !S.lights.on && !S.snow.on) e.push("at least one service");
+  const more=signCtx.more||{land:{},lawn:{}};
+  if(!S.fall.on && !S.lights.on && !S.snow.on && !more.land.on && !more.lawn.on) e.push("at least one service");
   if(S.fall.on && ssaFallOver(S) && !S.fall.modeWhy) e.push("a reason for changing the Fall Cleanup type");
   (S.extras||[]).forEach(x=>{ if(!ssaClean(x.desc) || x.price==="" || !isFinite(+x.price)) e.push("a description and a price on every special item (or remove it)"); else if(!S[x.svc] || !S[x.svc].on) e.push(`the service ticked for the special item "${ssaClean(x.desc)}"`); });
   if(S.fall.on && S.fall.big && !(+S.fall.bigPrice>0)) e.push("the walked price for the large lawn");
@@ -3146,7 +3193,7 @@ async function ldaSend(){
     await db.ref().update(upd);
     svcCall("send", { t: held ? held.token : token });
     if(held) bundleCtx=null;
-    X.sentToken = held ? held.token : token; showSent();
+    X.sentToken = held ? held.token : token; showSent(); ctrNext(id);
   }catch(e){ toast("Not sent: "+(e.code||e.message)); }
   finally{ X.busy=false; if(btn){ btn.disabled=false; btn.textContent="Email contract to sign"; } }
 }
@@ -3203,7 +3250,7 @@ async function ssaSend(){
     }
     await db.ref().update(upd);
     svcCall("send", { t:token });
-    X.sentToken=token; showSent();
+    X.sentToken=token; showSent(); ctrNext(id);
   }catch(e){ toast("Not sent: "+(e.code||e.message)); }
   finally{ X.busy=false; if(btn){ btn.disabled=false; btn.textContent="Email contract to sign"; } }
 }
