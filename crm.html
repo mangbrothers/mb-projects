@@ -2346,7 +2346,24 @@ function ctrPickHtml(c, dirty){
 const ldaOpenJobs = c => ldaJobs(c).filter(x=>x.jobStatus!=="Done" && !ldaSignedFor(c,x));
 function ssaMoreBlank(c, pick){ const jobs=ldaOpenJobs(c);
   return { land:{ on: pick ? !!pick.landscaping : jobs.length>0, sid: jobs.length ? jobs[0].sid : "new", desc:"", date:"", price:"" } }; }
-let ctrLawnNext=null, ctrLandNext=null;
+let ctrLawnNext=null, ctrLandNext=null, ctrLandSign=null;
+// Sign here: the seasonal agreement is signed on the device first, then the landscaping agreement.
+async function ssaGoHere(){
+  const X=signCtx, S=X.S, M=X.more, id=X.clientId; if(X.busy) return;
+  const seas=S.fall.on||S.lights.on||S.snow.on||S.lawn.on, e=ssaErrors();
+  if(!S.test && M.land.on && M.land.sid==="new"){ if(!M.land.desc) e.push("the landscaping job"); if(!(+M.land.price>0)) e.push("the landscaping price"); }
+  $("#ss-err").textContent = e.length ? "Still needed: "+e.join(", ")+"." : ""; if(e.length) return;
+  let sid=null;
+  if(!S.test && M.land.on){ sid=M.land.sid;
+    if(sid==="new"){ sid="s"+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+      const job={ type:"landscaping", desc:M.land.desc, jobStatus:"Quoted", date:M.land.date||"", price:+M.land.price, createdAt:Date.now() };
+      try{ await db.ref("clients/"+id+"/services/"+sid).set(job); M.land.sid=sid;
+        if(openId===id && $("#clientDlg").open){ draftServices[sid]={ ...job }; renderSvcs(); renderContracts(); } }
+      catch(err){ return toast("Job not saved: "+(err.code||err.message)); } } }
+  ctrLandSign = sid && seas ? { id, sid } : null;
+  if(seas || S.test) return ssaShow();
+  openLandscaping(id, sid, true);
+}
 // After an agreement is sent: the next one the setup page asked for.
 function ctrNext(id){
   if(ctrLandNext && ctrLandNext.id===id){ const sid=ctrLandNext.sid; ctrLandNext=null; toast("Sent. Now the landscaping agreement."); return openLandscaping(id, sid); }
@@ -2550,7 +2567,7 @@ function openSeasonal(clientId, pick){
 }
 function ssaBarOff(){ const b=document.getElementById("ssaBar"); if(b) b.remove(); }
 $("#signDlg").addEventListener("close", ssaBarOff);
-$("#signDlg").addEventListener("close", ()=>{ ctrLawnNext=null; ctrLandNext=null; });
+$("#signDlg").addEventListener("close", ()=>{ ctrLawnNext=null; ctrLandNext=null; ctrLandSign=null; });
 function ssaSetup(){
   const X=signCtx, S=X.S, c=clients[X.clientId]; X.mode="ssa-setup"; X.pad=null; ssaBarOff();
   const ck=(id,label,on)=>`<label class="row ssack"><input type="checkbox" id="${id}" ${on?"checked":""}> <span>${label}</span></label>`;
@@ -2624,7 +2641,7 @@ function ssaSetup(){
     <div class="warnline" id="ss-warn" hidden></div>
     <div class="meta" id="ss-err" style="color:var(--red);font-weight:600;margin-top:8px"></div>
     <div class="actions"><button type="button" class="left" id="ss-later">Save for later</button><button type="button" id="ss-go">Sign here on this device</button><button type="button" class="primary big" id="ss-send">${bundleCtx&&bundleCtx.clientId===X.clientId&&bundleCtx.queue.length?"Next: the landscaping agreement":"Email contract to sign"}</button></div>
-    <p class="meta" style="margin:8px 0 0">${svcReady()?`<b>Email contract to sign</b> sends one link to ${esc([S.email,S.email2].filter(Boolean).join(" and ")||"the customer's email")}: the quote, the agreement, a typed-name signature, then their card on the next screen.`:`Emailing the contract needs the signing service: More, Contracts, Signing service.`} <b>Sign here</b> is for door to door and landscaping: the customer signs on this screen, then you take the card.</p>
+    <p class="meta" style="margin:8px 0 0">${svcReady()?`<b>Email contract to sign</b> sends one link to ${esc([S.email,S.email2].filter(Boolean).join(" and ")||"the customer's email")}: the quote, the agreement, a typed-name signature, then their card on the next screen.`:`Emailing the contract needs the signing service: More, Contracts, Signing service.`} <b>Sign here</b> is for door to door: the customer signs on this screen, then you take the card. With Landscaping ticked, its agreement is signed right after.</p>
   </div>`;
   const form=$("#ssaForm");
   const exDraw = () => { $("#ss-extras").innerHTML = (S.extras||[]).map((x,i)=>`<div class="exrow" data-ex="${i}"><select class="exs">${opts(SSA_TYPES, x.svc, {fall:"Fall Cleanup",lights:"Christmas Lights",snow:"Snow Removal"})}</select><input class="exd" value="${esc(x.desc)}" placeholder="What it is, as the customer will read it" autocomplete="off"><input class="exp" type="number" inputmode="decimal" step="0.01" value="${esc(x.price)}" placeholder="$"><button type="button" class="small danger" data-ex-rm="${i}">Remove</button></div>`).join("");
@@ -2635,7 +2652,7 @@ function ssaSetup(){
   const CPK={f:"fall",l:"lights",s:"snow"};
   form.querySelectorAll("[data-cp]").forEach(b=>b.onclick=()=>{ ssaSync(); const p=b.dataset.cp, x=S[CPK[p]]; x.cp=!x.cp; ssaSync(); if(x.cp){ const el=document.getElementById(`ss-${p}-cpp`); if(el) el.focus(); } });
   $("#ss-later").onclick = async () => { ssaSync(); try{ await ssaSaveDraft(); toast("Setup saved on the client."); $("#signDlg").close(); }catch(e){ toast("Not saved: "+(e.code||e.message)); } };
-  $("#ss-go").onclick = () => { ssaSync(); const e=ssaErrors(); if(!S.test && !S.fall.on && !S.lights.on && !S.snow.on && !S.lawn.on) e.unshift("a seasonal service to sign here (Landscaping is signed from its own agreement)"); $("#ss-err").textContent = e.length ? "Still needed: "+e.join(", ")+"." : ""; if(!e.length) ssaShow(); };
+  $("#ss-go").onclick = () => { ssaSync(); ssaGoHere(); };
   $("#ss-send").onclick = () => { ssaSync(); ssaContinue(); };
   if(!S.email) setTimeout(()=>{ const el=$("#ss-email"); if(el && signCtx===X) el.focus({preventScroll:true}); }, 50);
 }
@@ -2811,6 +2828,7 @@ async function lockSeasonal(){
   await viewContract(id, cid, rec);
   if(svcReady()) svcCall("mail", { k:cid }); else driveStatus(id, cid, rec, true);
   openPaySheet(id, cid, rec);
+  if(ctrLandSign && ctrLandSign.id===id){ const sid2=ctrLandSign.sid; ctrLandSign=null; openLandscaping(id, sid2, true); toast("Seasonal agreement signed. Take the card, then the landscaping agreement is next on this screen."); }
 }
 
 // ---------- Lawn Service Agreement: the lawn contract, emailed on the same signing system ----------
@@ -3124,9 +3142,9 @@ function ldaText(c, S, s, agNo){
   P("**If you cancel within that period, all payments you have made will be refunded in full within 10 business days after the Company receives your cancellation notice.**");
   return o.join("\n\n");
 }
-function openLandscaping(clientId, sid){
+function openLandscaping(clientId, sid, force){
   const c=clients[clientId]; if(!c) return toast("Save the client first.");
-  if($("#clientDlg").open && openId===clientId && dialogDirty()) return toast("Save the client first, then open the agreement.");
+  if(!force && $("#clientDlg").open && openId===clientId && dialogDirty()) return toast("Save the client first, then open the agreement.");
   const s=ldaJobs(c).find(x=>x.sid===sid) || ldaJobs(c)[0]; if(!s) return toast("Add a Landscaping job with its price first.");
   const d=(c.ldaDraft||{})[s.sid]||{};
   const S={ sid:s.sid, email:c.email||"", email2:c.email2||"", prop:c.address||"", ptype:"Residential", areas:"", materials:"", warranty:"None", done:"", pre:"", ...d };
@@ -3157,11 +3175,86 @@ function ldaSetup(){
     <div class="pstotal"><span>Charged today</span><b>${money(half)||"$0"}</b></div>
     <div class="meta">${half>0?`50% when the card is saved at signing. The other ${money(r2(price-half))} is charged when the job is set to Done.`:`Under $${LDA_DEPOSIT_MIN}: the card goes on file at signing and the full ${money(price)} is charged when the job is set to Done.`}</div>
     <div class="meta" id="ld-err" style="color:var(--red);font-weight:600;margin-top:8px"></div>
-    <div class="actions"><button type="button" class="left" id="ld-later">Save for later</button><button type="button" class="primary big" id="ld-send">${bundleCtx&&bundleCtx.clientId===X.clientId&&bundleCtx.held?"Email both agreements to sign":"Email contract to sign"}</button></div>
+    <div class="actions"><button type="button" class="left" id="ld-later">Save for later</button>${bundleCtx&&bundleCtx.clientId===X.clientId&&bundleCtx.held?"":`<button type="button" id="ld-go">Sign here on this device</button>`}<button type="button" class="primary big" id="ld-send">${bundleCtx&&bundleCtx.clientId===X.clientId&&bundleCtx.held?"Email both agreements to sign":"Email contract to sign"}</button></div>
   </div>`;
   const form=$("#ldaForm"); form.oninput=ldaSync; form.onchange=ldaSync;
   $("#ld-later").onclick = async () => { ldaSync(); try{ await ldaSaveDraft(); toast("Setup saved on the client."); $("#signDlg").close(); }catch(e){ toast("Not saved: "+(e.code||e.message)); } };
+  { const gb=$("#ld-go"); if(gb) gb.onclick = () => { ldaSync(); const e=ldaErrors().filter(x=>x!=="the customer's email"); $("#ld-err").textContent = e.length ? "Still needed: "+e.join(", ")+"." : ""; if(!e.length) ldaShow(); }; }
   $("#ld-send").onclick = () => { ldaSync(); const e=ldaErrors(); $("#ld-err").textContent = e.length ? "Still needed: "+e.join(", ")+"." : ""; if(!e.length) ldaSend(); };
+}
+async function ldaShow(){
+  const X=signCtx, S=X.S, c=clients[X.clientId], s={ sid:S.sid, ...(c.services||{})[S.sid] };
+  ldaSaveDraft().catch(()=>{});
+  X.agNo = X.agNo || `MB-${today().replace(/-/g,"")}-${Math.random().toString(36).slice(2,6).toUpperCase().padEnd(4,"X")}`;
+  X.text=ldaText(c,S,s,X.agNo); X.notice=ssaNotice(X.agNo); X.mySig = X.mySig!==undefined ? X.mySig : await loadMySig();
+  if(signCtx!==X) return;
+  const half=ldaDeposit(+s.price);
+  X.mode="sign"; X.kind="landscaping";
+  $("#signTitle").textContent = LDA_NAME;
+  $("#signBody").innerHTML = `
+    <div class="doc" id="docLive">${docHead(LDA_NAME)}${renderDocHtml(X.text,"view")}</div>
+    <div class="signpanel" id="ssaSignHere">
+      <h4>Customer signature</h4>
+      <p class="meta" style="margin:0 0 8px">Sign with a finger or Apple Pencil inside the box.</p>
+      <canvas class="pad" id="padClient"></canvas>
+      <div class="row" style="margin-top:8px"><button type="button" class="small" id="padClientClear">Clear signature</button><span class="meta" style="margin-left:auto">Date: <b>${esc(fmtLong(today()))}</b></span></div>
+      <div class="ssaname">Printed name: <b>${esc(c.name||"")}</b></div>
+    </div>
+    <div class="signpanel"><h4>Signed for Mangiapane Brothers LLC</h4><div id="sgCompany"></div></div>
+    <div class="signpanel">
+      <div class="row"><button type="button" class="primary big" id="sgLock">Sign and lock</button><span class="meta" id="sgStatus"></span><button type="button" class="small" id="ssaBack" style="margin-left:auto">Back to setup</button></div>
+      <p class="meta" style="margin:8px 0 0">After locking, the agreement cannot be edited. A mistake is fixed by voiding it and signing again.</p>
+    </div>
+    <div class="doc ssanotice" id="docNotice">${renderDocHtml(X.notice,"view")}</div>
+    `;
+  ssaBarOff(); const bar=document.createElement("div"); bar.className="ssabar"; bar.id="ssaBar";
+  bar.innerHTML=`<span>Charged today <b>${money(half)||"$0"}</b></span><button type="button" id="ssaToSign">Go to signature</button>`; $("#signDlg").appendChild(bar);
+  $("#signBody").scrollTop=0;
+  X.pad = makePad($("#padClient"));
+  $("#padClientClear").onclick = () => X.pad.clear();
+  $("#ssaToSign").onclick = () => $("#ssaSignHere").scrollIntoView({behavior:"smooth",block:"end"});
+  $("#ssaBack").onclick = () => ldaSetup();
+  renderCompanySig();
+  $("#sgLock").onclick = lockLandscaping;
+}
+async function lockLandscaping(){
+  const X=signCtx; if(!X || X.busy || X.kind!=="landscaping") return;
+  const c=clients[X.clientId], S=X.S, id=X.clientId, s={ sid:S.sid, ...(c.services||{})[S.sid] };
+  if(X.pad.isEmpty()){ $("#padClient").scrollIntoView({block:"center"}); return toast("The customer has not signed."); }
+  const signerName=String(c.name||"").trim(); if(!signerName) return toast("The client record has no name. Close this, add the name, and open the agreement again.");
+  let companySig = X.mySig?.data || null, saveSig=false;
+  if(!companySig){ if(!X.cpad || X.cpad.isEmpty()){ $("#padCompany").scrollIntoView({block:"center"}); return toast("Draw your company signature once."); } companySig=X.cpad.data(); saveSig=true; }
+  const now=Date.now(), price=+s.price, half=ldaDeposit(price), bal=r2(price-half), job=`Landscaping${s.desc?": "+s.desc:""}`;
+  const summary = `${job}, ${money(price)}: ${half>0?"50% at signing, balance when done":"billed in full when done"}`;
+  let applyT; try{ applyT=ldaApply(c, id, S, s, X.agNo, now); }catch(e){ return toast(e.message); }
+  X.busy=true; $("#sgLock").disabled=true; $("#sgStatus").textContent="Saving…";
+  const payload = JSON.parse(JSON.stringify({ v:1, kind:"landscaping", clientId:id, tpl:"seasonal", tplName:LDA_NAME, tplVersion:LDA_VERSION, sample:false, sid:s.sid, serviceType:"landscaping",
+    serviceSummary:summary, amount:price, agreementNo:X.agNo,
+    details:{ kind:"landscaping", agreementNo:X.agNo, version:LDA_VERSION, sid:s.sid, job:s.desc||"", date:s.date||"", total:price, dueNow:half, dueAtCompletion:bal, serviceProperty:S.prop, propertyType:S.ptype, workAreas:S.areas, materials:S.materials, warranty:S.warranty, preExisting:S.pre, email:S.email, email2:S.email2||"" },
+    text:X.text, notice:X.notice, cancelBy:ssaCancelBy(today()), choices:{}, initials:{}, signerName, signedDate:today(), signedAt:now, signature:X.pad.data(),
+    companySig, companySigner: X.mySig?.name || me.displayName || me.email, witness:me.email, device:navigator.userAgent.slice(0,300) }));
+  const hash = await sha256(canon(payload));
+  const cid = db.ref("contracts/"+id).push().key;
+  const upd = {
+    ["contracts/"+id+"/"+cid]: { ...payload, status:"signed", hash },
+    ["clients/"+id+"/contracts/"+cid]: { tpl:"seasonal", sid:s.sid, name:LDA_NAME, sample:false, status:"signed", signedAt:now, covers:{ landscaping:true }, agreementNo:X.agNo, amount:price, dueNow:half, dueInstall:0 },
+    ["clients/"+id+"/ldaDraft/"+s.sid]: null,
+    ["clients/"+id+"/lastContactAt"]: now, ["clients/"+id+"/updatedAt"]: now, ["clients/"+id+"/updatedBy"]: me.email,
+    ["clientLog/"+id+"/"+db.ref("clientLog").push().key]: { text:`Signed ${LDA_NAME} ${X.agNo} (version ${LDA_VERSION}) on this device: ${summary}. Total ${money(price)}; charged at signing ${money(half)||"$0"}.`, at:now, by:me.email, source:"contract" },
+    ...JSON.parse(JSON.stringify(applyT).split("{{CID}}").join(cid))
+  };
+  // An open emailed link for this job is replaced by this signing.
+  { const r=ldaReq(c, s.sid); if(r && ["queued","sent","error"].includes(r.status)){ upd["sync/sign/"+r.token+"/status"]="cancelled"; upd["clients/"+id+"/"+reqSlot(c,r)+"/status"]="cancelled"; } }
+  const to=[S.email, S.email2].filter(Boolean);
+  if(svcReady() && to.length) upd["sync/mail/"+cid] = { kind:"contract", clientId:id, contractId:cid, to, status:"queued", createdAt:now, createdBy:me.email };
+  if(saveSig) upd["adminSigs/"+mySigKey()] = { data:companySig, name:me.displayName||me.email, savedAt:now };
+  try { await db.ref().update(upd); }
+  catch(e){ X.busy=false; $("#sgLock").disabled=false; $("#sgStatus").textContent=""; return toast("Not saved. Check the connection and press Sign and lock again. ("+(e.code||e.message)+")"); }
+  toast("Signed and locked."); ssaBarOff();
+  const rec={ ...payload, status:"signed", hash };
+  await viewContract(id, cid, rec);
+  if(svcReady() && to.length) svcCall("mail", { k:cid }); else driveStatus(id, cid, rec, true);
+  openPaySheet(id, cid, rec);
 }
 function ldaSync(){
   const X=signCtx; if(!X || X.mode!=="lda-setup") return; const S=X.S, g=id=>document.getElementById(id);
@@ -3176,6 +3269,23 @@ function ldaErrors(){
   if(!S.prop) e.push("service property");
   if(!s) e.push("the Landscaping job"); else { if(!s.desc) e.push("the job description"); if(!(+s.price>0)) e.push("the job price"); }
   return e;
+}
+// What signing a landscaping agreement writes: charges, job status, contact details. "{{CID}}" stands for the
+// contract id; the signing service fills it for an emailed link, lockLandscaping fills it on the device.
+function ldaApply(c, id, S, s, agNo, now){
+  const price=+s.price, half=ldaDeposit(price), bal=r2(price-half), job=`Landscaping${s.desc?": "+s.desc:""}`;
+  const upd0 = {};
+  if(S.email && S.email!==(c.email||"")) upd0["clients/"+id+"/email"]=S.email;
+  if((S.email2||"")!==(c.email2||"")) upd0["clients/"+id+"/email2"]=S.email2||null;
+  if(!payOnFileOk(c)) upd0["clients/"+id+"/payOnFile"] = { status:"missing", since:now };
+  upd0[`clients/${id}/services/${s.sid}/agreementNo`] = agNo;
+  if(s.jobStatus!=="Done") upd0[`clients/${id}/services/${s.sid}/jobStatus`] = "Scheduled";
+  if(Object.values(qbRows).some(r=>r.type==="charge" && r.sid===s.sid && ["deposit","completion"].includes(r.trigger))) throw new Error("This job already has charges from Bill 50/50. Remove them in Charges first, or bill it without an agreement.");
+  if(half>0) upd0["sync/qb/"+db.ref("sync/qb").push().key] = { type:"charge", trigger:"signing", status:"pending", clientId:id, contractId:"{{CID}}", sid:s.sid, amount:half, date:today(), description:`${LDA_NAME} ${agNo}: 50% deposit, ${job}`, createdAt:now, createdBy:me.email };
+  upd0["sync/qb/"+db.ref("sync/qb").push().key] = { type:"charge", trigger:"completion", status:"scheduled", clientId:id, contractId:"{{CID}}", sid:s.sid, amount:bal, description:`${job}: ${half>0?"balance":"full amount"}, job complete (${agNo})`, createdAt:now, createdBy:me.email };
+  if(LEAD_STAGES.includes(c.status)){ upd0["clients/"+id+"/status"]="active"; if(!c.wonAt) upd0["clients/"+id+"/wonAt"]=now; }
+  Object.assign(upd0, qbCustomerRow(id));
+  return upd0;
 }
 async function ldaSend(){
   const X=signCtx; if(!X || X.busy) return;
@@ -3193,17 +3303,7 @@ async function ldaSend(){
     const noticeT = ssaNotice(X.agNo).split(CB).join("{{CANCEL_BY_LONG}}").split(L).join("{{SIGNED_LONG}}");
     const token = randToken(), svc=svcInfo(), link = `${SIGN_PAGE}?t=${token}&s=${svcDeploy(svc.url)}`;
     const job = `Landscaping${s.desc?": "+s.desc:""}`, summary = `${job}, ${money(price)}: ${half>0?"50% at signing, balance when done":"billed in full when done"}`;
-    const upd0 = {};
-    if(S.email && S.email!==(c.email||"")) upd0["clients/"+id+"/email"]=S.email;
-    if((S.email2||"")!==(c.email2||"")) upd0["clients/"+id+"/email2"]=S.email2||null;
-    if(!payOnFileOk(c)) upd0["clients/"+id+"/payOnFile"] = { status:"missing", since:now };
-    upd0[`clients/${id}/services/${s.sid}/agreementNo`] = X.agNo;
-    if(s.jobStatus!=="Done") upd0[`clients/${id}/services/${s.sid}/jobStatus`] = "Scheduled";
-    if(Object.values(qbRows).some(r=>r.type==="charge" && r.sid===s.sid && ["deposit","completion"].includes(r.trigger))) throw new Error("This job already has charges from Bill 50/50. Remove them in Charges first, or bill it without an agreement.");
-    if(half>0) upd0["sync/qb/"+db.ref("sync/qb").push().key] = { type:"charge", trigger:"signing", status:"pending", clientId:id, contractId:"{{CID}}", sid:s.sid, amount:half, date:today(), description:`${LDA_NAME} ${X.agNo}: 50% deposit, ${job}`, createdAt:now, createdBy:me.email };
-    upd0["sync/qb/"+db.ref("sync/qb").push().key] = { type:"charge", trigger:"completion", status:"scheduled", clientId:id, contractId:"{{CID}}", sid:s.sid, amount:bal, description:`${job}: ${half>0?"balance":"full amount"}, job complete (${X.agNo})`, createdAt:now, createdBy:me.email };
-    if(LEAD_STAGES.includes(c.status)){ upd0["clients/"+id+"/status"]="active"; if(!c.wonAt) upd0["clients/"+id+"/wonAt"]=now; }
-    Object.assign(upd0, qbCustomerRow(id));
+    const upd0 = ldaApply(c, id, S, s, X.agNo, now);
     const req = { status:"queued", kind:"landscaping", clientId:id, tplName:LDA_NAME, tplVersion:LDA_VERSION, agreementNo:X.agNo, amount:price, dueNow:half, dueInstall:0, perVisit:null,
       lines:[[job, price]], serviceSummary:summary,
       details:{ kind:"landscaping", agreementNo:X.agNo, version:LDA_VERSION, sid:s.sid, job:s.desc||"", date:s.date||"", total:price, dueNow:half, dueAtCompletion:bal, serviceProperty:S.prop, propertyType:S.ptype, workAreas:S.areas, materials:S.materials, warranty:S.warranty, preExisting:S.pre, email:S.email, email2:S.email2||"" },
