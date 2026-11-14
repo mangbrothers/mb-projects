@@ -192,6 +192,8 @@
   .lead .stale{color:var(--red);font-weight:600}
   .lead .name{display:flex;align-items:center;gap:6px} .lead .name .age{margin-left:auto;font-size:11px;font-weight:700;border-radius:999px;padding:1px 8px;white-space:nowrap}
   .age.a0{background:var(--green-soft);color:var(--green)} .age.a1{background:var(--amber-soft);color:var(--amber)} .age.a2{background:var(--red-soft);color:var(--red)}
+  .fu{font-size:12px;font-weight:600;color:var(--ink2);margin:2px 0 3px} .fu.now{color:var(--amber)} .fu.over{color:var(--red)}
+  .fchip.due.on{border-color:var(--red)}
   .lstat{font-size:12px;font-weight:700;border-radius:5px;padding:3px 8px;margin:5px 0 3px;border-left:4px solid currentColor}
   .lstat.todo{background:var(--accent-soft);color:var(--accent)} .lstat.warm{background:var(--amber-soft);color:var(--amber)} .lstat.hot,.lstat.bad{background:var(--red-soft);color:var(--red)} .lstat.good{background:var(--green-soft);color:var(--green)} .lstat.cold{background:var(--surface2);color:var(--ink2)}
   @media(max-width:700px){ main .card{overflow-x:auto;-webkit-overflow-scrolling:touch} body{overflow-x:clip} }
@@ -425,7 +427,8 @@ details.ssamore summary{cursor:pointer;font-weight:600}
     <details class="fold" id="foldContact"><summary><span>Contact details</span><span class="n" id="contactLine"></span></summary>
     <div class="grid2">
       <div><label>Name</label><input name="name"></div>
-      <div><label>Phone</label><input name="phone" type="tel" id="dlgPhone"></div>
+      <div><label>Phone</label><input name="phone" type="tel" id="dlgPhone">
+        <label class="row" style="margin-top:6px;gap:8px;flex-wrap:nowrap;font-weight:400"><input type="checkbox" name="landline" style="width:20px;height:20px;flex:none"> <span>Landline: no texts</span></label></div>
       <div style="grid-column:1/-1" id="dlgDup"></div>
       <div><label>Email</label><input name="email" type="email"></div>
       <div><label>Second email (optional)</label><input name="email2" type="email"></div>
@@ -865,7 +868,8 @@ function renderCardState(){
   const nx = LEAD_STAGES.includes(c.status) ? leadNext(c) : c.status==="active" ? clientNext(c, openId) : c.status==="lost" ? [lostStrip(c)[0], "Lost: "+lostStrip(c)[1]] : ["cold", STATUSES[c.status]||c.status];
   const d=String(c.phone||"").replace(/\D/g,""), k=phoneKey(c.phone);
   box.innerHTML = `<div class="lstat ${nx[0]}">${nx[1].startsWith(c.status==="quoted"?"Quoted":"\u0000") ? "" : esc(STATUSES[c.status]||"")}${LEAD_STAGES.includes(c.status)||c.status==="active"?(nx[1].startsWith(c.status==="quoted"?"Quoted":"\u0000")?"":" \u00B7 ")+esc(nx[1]):c.status==="lost"?" \u00B7 "+esc(nx[1].replace(/^Lost: /,"")):""}</div>
-    <div class="quickrow">${k?`<a href="tel:${k}">Call ${esc(c.phone)}</a><a href="sms:${k}">Text</a>`:""}${c.email?`<a href="mailto:${esc(c.email)}">Email</a>`:""}${c.address?`<a href="https://maps.apple.com/?q=${encodeURIComponent(c.address)}" target="_blank" rel="noopener">Map</a>`:""}</div>
+    ${(()=>{ const st=openId?fuStep(openId,c):null; return st?`<div class="fu${st.over?" over":st.today?" now":""}" style="font-size:13px">${esc(st.label)}</div>`:""; })()}
+    <div class="quickrow">${k?`<a href="tel:${k}">Call ${esc(c.phone)}</a>${c.landline?`<span class="meta" title="This number is a landline. Use email.">Landline: no texts</span>`:`<a href="sms:${k}">Text</a>`}`:""}${c.email?`<a href="mailto:${esc(c.email)}">Email</a>`:""}${c.address?`<a href="https://maps.apple.com/?q=${encodeURIComponent(c.address)}" target="_blank" rel="noopener">Map</a>`:""}</div>
     ${c.status==="lost"?`<div class="row" style="margin-top:8px;gap:8px;flex-wrap:nowrap"><label style="margin:0;white-space:nowrap">Why it was lost</label><select id="lostWhy" style="max-width:240px">${opts(Object.keys(LOST_WHY), lostKind(c), LOST_WHY)}</select></div>`:""}`;
   { const lw=$("#lostWhy"); if(lw) lw.onchange=()=>setLostWhy(openId, lw.value); }
   $("#contactLine").textContent = [c.address, c.region, c.source].filter(Boolean).join(" \u00B7 ");
@@ -1033,6 +1037,53 @@ function leadNext(c){
   if(c.status==="contacted") return ["todo","Talked \u00B7 needs a quote","quote"];
   return ["warm","Quoted \u00B7 follow up","follow"];
 }
+// ---------- Lead follow-up rule (Russel, Nov 13, 2026) ----------
+// 1. After a call with a lead, a follow-up text or email is due 3 days later. 2. With no reply, a call is due 2 days
+// after the follow-up. 3. A landline cannot get texts, so its follow-up is an email. Any inbound text, call or email
+// restarts the rule. Everything is read from the contact log: Quo calls and texts, agreement emails, typed notes.
+const FU_MSG_DAYS = 3, FU_CALL_DAYS = 2;
+const ymdOf = ms => new Intl.DateTimeFormat("en-CA",{timeZone:TZ,year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date(ms));
+const addDays = (ymd, n) => { const d=new Date(ymd+"T12:00:00Z"); d.setUTCDate(d.getUTCDate()+n); return d.toISOString().slice(0,10); };
+const fuDay = ymd => new Date(ymd+"T12:00:00Z").toLocaleDateString("en-US",{timeZone:"UTC",month:"short",day:"numeric"});
+// What a log line means for the rule: "talk" (a call, or the quote going out), "out" (a message we sent),
+// "in" (the customer got back to us), "missed" (they called and nobody answered), or null (does not count).
+function fuKind(e){
+  const t=String(e.text||""), src=e.source||"";
+  if(src==="quo"){
+    if(/^Text out:/i.test(t)) return /^Text out:\s*This is Mangiapane Brothers/i.test(t) ? null : "out"; // the automatic missed-call text is not a follow-up
+    if(/^Text in:/i.test(t)) return "in";
+    if(/^(Missed call|Voicemail)/i.test(t)) return "missed";
+    if(/^Call (outbound|inbound)/i.test(t)) return "talk";
+    return null;
+  }
+  if(src==="contract") return /^Emailed /i.test(t) ? "talk" : /^Signed /i.test(t) ? "in" : null;
+  if(src) return null;
+  if(/^(Moved to Lost|Picked back up|Landline)/i.test(t)) return null;
+  if(/\b(replied|texted back|called back|emailed back|wrote back|responded|got back to)\b/i.test(t)) return "in";
+  if(/\b(follow(ed)?[- ]?up|texted|emailed|sent (a |an |the )?(text|email|message)|left (a |an )?(voicemail|voice mail|message))\b/i.test(t)) return "out";
+  return "talk";
+}
+// The next step for an open lead: { what, due (yyyy-mm-dd), over, today, label }. null when the rule does not apply.
+function fuStep(id, c){
+  if(!c || !LEAD_STAGES.includes(c.status)) return null;
+  const nk=leadNext(c)[2]; if(nk==="signed"||nk==="card") return null;
+  const ev=Object.values(logs[id]||{}).map(e=>({ at:e.at, k:fuKind(e) })).filter(e=>e.k&&e.at).sort((a,b)=>a.at-b.at);
+  let anchor=null, out=null, missed=null;
+  for(const e of ev){
+    if(e.k==="talk"||e.k==="in"){ anchor=e; out=null; missed=null; }
+    else if(e.k==="missed") missed=e;
+    else if(e.k==="out" && !out && (!anchor || ymdOf(e.at)>ymdOf(anchor.at))) out=e; // a message the same day as the call is part of the call
+  }
+  const how = (c.landline || !c.phone) ? (c.email ? "email" : "call") : "text";
+  let what, due;
+  if(missed && (!out || missed.at>out.at)){ what="Call back"; due=ymdOf(missed.at); }
+  else if(out){ what="Call"; due=addDays(ymdOf(out.at), FU_CALL_DAYS); }
+  else if(anchor){ what = how==="call" ? "Call" : "Follow-up "+how; due=addDays(ymdOf(anchor.at), FU_MSG_DAYS); }
+  else { what="First call"; due=ymdOf(c.createdAt||Date.now()); }
+  const td=today(), over=due<td, isToday=due===td;
+  return { what, due, over, today:isToday, label: over ? `Overdue: ${what.toLowerCase()} was due ${fuDay(due)}` : `${what} due ${isToday?"today":fuDay(due)}` };
+}
+const fuDueNow = (id, c) => { const st=fuStep(id,c); return !!st && (st.over || st.today); };
 function ageBadge(c){ const d=Math.floor((Date.now()-lastContact(c))/864e5); return `<span class="age ${d<=2?"a0":d<GRAVE_DAYS?"a1":"a2"}" title="Days since the last contact">${d<=0?"today":d+"d"}</span>`; }
 const backStage = c => LEAD_STAGES.includes(c.lostFrom) ? c.lostFrom : "contacted";
 // Two kinds of Lost (Nov 11, 2026). "quiet": nobody followed up for GRAVE_DAYS (set by the page, or by hand).
@@ -1070,7 +1121,7 @@ function clientNext(c, id){
   return ["cold","No agreement yet"];
 }
 // What the board is narrowed to: typed search, one "needs" chip, one source. Kept while the page is open.
-let leadFilter = { q:"", k:"", src:"" };
+let leadFilter = { q:"", k:"", src:"", due:false };
 // Call back list (Nov 11, 2026). One entry per number: { name, clientId, first, at (latest missed call), count }.
 // The Quo sync adds a number on a missed call with no voicemail and takes it off once the call is returned, the
 // caller texts or leaves a voicemail, or two days pass. Done here takes it off by hand. Nothing here is a lead.
@@ -1097,7 +1148,8 @@ function renderLeads(m){
   const lq = leadFilter.q.trim().toLowerCase();
   const hit = ([,c]) => (!lq || [c.name,c.phone,c.address,c.email,c.interest].join(" ").toLowerCase().includes(lq)) && (!leadFilter.src || (c.source||"Other")===leadFilter.src);
   const kOf = c => leadNext(c)[2];
-  const leads = allLeads.filter(x=>hit(x) && (!leadFilter.k || kOf(x[1])===leadFilter.k));
+  const leads = allLeads.filter(x=>hit(x) && (!leadFilter.k || kOf(x[1])===leadFilter.k) && (!leadFilter.due || fuDueNow(x[0], x[1])));
+  const dueCount = allLeads.filter(hit).filter(x=>fuDueNow(x[0], x[1])).length;
   const kCount = {}; allLeads.filter(hit).forEach(([,c])=>{ const k=kOf(c); kCount[k]=(kCount[k]||0)+1; });
 
   const won = live().filter(([,c])=>c.status==="active" && c.wonAt && Date.now()-c.wonAt < 30*864e5).filter(hit);
@@ -1111,6 +1163,7 @@ function renderLeads(m){
     const lc = lastContact(c); const stale = LEAD_STAGES.includes(c.status) && Date.now()-lc > 5*864e5;
     const isLead = LEAD_STAGES.includes(c.status), gv = c.status==="lost" && lostKind(c)==="quiet", nx = isLead ? leadNext(c) : c.status==="active" ? clientNext(c,id) : c.status==="lost" ? lostStrip(c) : null;
     const sg = ssaSigned(c), r = anyReq(c), openReq = isLead && !!(r && OPEN_REQ.includes(r.status));
+    const fu = isLead ? fuStep(id, c) : null;
     const srcTxt = isLead && (!c.source||c.source==="Other") ? `<b class="stale" title="No lead source recorded. Ask how they heard about us.">Source?</b>` : esc(c.source||"");
     const act = gv ? `<button type="button" class="small primary" data-revive="${id}">Pick back up</button>`
       : !isLead ? ""
@@ -1119,7 +1172,8 @@ function renderLeads(m){
     return `<div class="lead" data-card="${id}" data-id="${id}">
       <div class="name"><span>${esc(c.name)}</span>${isLead?ageBadge(c):`<span class="meta" style="margin-left:auto;font-weight:400">${ago(lc)}</span>`}</div>
       ${nx?`<div class="lstat ${nx[0]}"${openReq?` data-lead-status="${id}" title="Open the link status"`:c.status==="lost"?` data-lost-flip="${id}" title="Tap to switch: They said no, We said no, Not followed up" style="cursor:pointer"`:""}>${esc(nx[1])}</div>`:""}
-      <div class="l2">${[tel(c.phone), esc(c.region||""), srcTxt].filter(Boolean).join(" \u00B7 ")}</div>
+      ${fu?`<div class="fu${fu.over?" over":fu.today?" now":""}" title="Follow-up rule: a text or email 3 days after a call, then a call 2 days later">${esc(fu.label)}</div>`:""}
+      <div class="l2">${[tel(c.phone), esc(c.region||""), srcTxt, c.landline?"Landline":""].filter(Boolean).join(" \u00B7 ")}</div>
       ${tags(c)?`<div class="ltags">${tags(c)}</div>`:""}
       ${c.interest?`<div class="l3" title="${esc(c.interest)}">${esc(c.interest)}</div>`:""}
       ${act?`<div class="leadctr">${act}</div>`:""}
@@ -1146,7 +1200,8 @@ function renderLeads(m){
       ${cbList().length?`<button type="button" class="fchip cbchip" id="cbOpen" title="Missed calls with no voicemail, not returned yet">\u260E Call back<b>${cbList().length}</b></button>`:""}
       <input type="search" id="lfq" placeholder="Search leads: name, phone, address" value="${esc(leadFilter.q)}">
       ${LEAD_CHIPS.map(([k,l])=>`<button type="button" class="fchip${leadFilter.k===k?" on":""}${kCount[k]?"":" zero"}" data-lk="${k}">${l}<b>${kCount[k]||0}</b></button>`).join("")}
-      ${leadFilter.q||leadFilter.k||leadFilter.src?`<button type="button" class="small" id="lfClear">Show all</button>`:""}
+      <button type="button" class="fchip due${leadFilter.due?" on":""}${dueCount?"":" zero"}" data-ldue="1" title="Follow-ups and calls due today or overdue">Due today<b>${dueCount}</b></button>
+      ${leadFilter.q||leadFilter.k||leadFilter.src||leadFilter.due?`<button type="button" class="small" id="lfClear">Show all</button>`:""}
     </div>
     <div class="srcstrip">${SOURCES.map(s=>`<button type="button" class="pill${leadFilter.src===s?" on":""}" data-lsrc="${esc(s)}">${esc(s)} <b>${(src[s]||[]).length}</b></button>`).join("")}</div>
     <div class="board" style="grid-template-columns:${cols.map(col=>collapsedCols.has(col.key)?"52px":"minmax(230px,1fr)").join(" ")}">${cols.map(col=>{ const shut=collapsedCols.has(col.key); return `
@@ -1158,8 +1213,9 @@ function renderLeads(m){
   { const q=$("#lfq"); q.oninput = e => { leadFilter.q=e.target.value; renderLeads(m); };
     if(lfFocus){ q.focus(); try{ q.setSelectionRange(q.value.length,q.value.length); }catch(e){} } }
   m.querySelectorAll("[data-lk]").forEach(b=>b.onclick=()=>{ leadFilter.k = leadFilter.k===b.dataset.lk ? "" : b.dataset.lk; renderLeads(m); });
+  m.querySelectorAll("[data-ldue]").forEach(b=>b.onclick=()=>{ leadFilter.due=!leadFilter.due; renderLeads(m); });
   m.querySelectorAll("[data-lsrc]").forEach(b=>b.onclick=()=>{ leadFilter.src = leadFilter.src===b.dataset.lsrc ? "" : b.dataset.lsrc; renderLeads(m); });
-  { const c=$("#lfClear"); if(c) c.onclick=()=>{ leadFilter={ q:"", k:"", src:"" }; renderLeads(m); }; }
+  { const c=$("#lfClear"); if(c) c.onclick=()=>{ leadFilter={ q:"", k:"", src:"", due:false }; renderLeads(m); }; }
   { const c=$("#cbOpen"); if(c) c.onclick=()=>{ renderCallbacks(); if(!$("#cbDlg").open) $("#cbDlg").showModal(); }; }
   const form=$("#quickAdd");
   if(prev){ for(const [k,v] of Object.entries(prev)) if(form.elements[k]) form.elements[k].value=v; if(focusName && form.elements[focusName]){ const el=form.elements[focusName]; el.focus(); try{ el.setSelectionRange(el.value.length,el.value.length); }catch(e){} } }
@@ -1339,7 +1395,7 @@ let sameCard;
 function openClient(id, defaultStatus){
   openId = id; const c = id ? clients[id] : { status: defaultStatus||"new" };
   const f=$("#clientForm");
-  f.name.value=c.name||""; f.phone.value=c.phone||""; f.email.value=c.email||""; f.email2.value=c.email2||""; f.address.value=c.address||""; f.region.value=c.region||""; f.status.value=c.status||"new"; f.source.value=c.source||""; f.interest.value=c.interest||"";
+  f.name.value=c.name||""; f.phone.value=c.phone||""; f.email.value=c.email||""; f.landline.checked=!!c.landline; f.email2.value=c.email2||""; f.address.value=c.address||""; f.region.value=c.region||""; f.status.value=c.status||"new"; f.source.value=c.source||""; f.interest.value=c.interest||"";
   $("#clientTitle").textContent = id ? c.name : "New client";
   draftServices = JSON.parse(JSON.stringify(c.services||{})); removedServices = new Set();
   draftInt = { ...((c.interestIn && Object.keys(c.interestIn).length) ? c.interestIn : (id && LEAD_STAGES.includes(c.status) ? intFromText(c.interest) : {})) }; renderInt();
@@ -1471,7 +1527,7 @@ $("#clientSave").onclick = async () => {
   const f=$("#clientForm"); readSvcForm();
   const svcTouched = removedServices.size>0 || JSON.stringify(draftServices)!==svcBase;
   const services = {}; for(const [sid,s] of Object.entries(draftServices)) services[sid]=s;
-  const data = { name:f.name.value.trim(), phone:f.phone.value.trim(), email:f.email.value.trim(), email2:f.email2.value.trim(), address:f.address.value.trim(), region:f.region.value, status:f.status.value, source:f.source.value, interest:f.interest.value.trim(), interestIn: Object.keys(draftInt).length ? { ...draftInt } : null };
+  const data = { name:f.name.value.trim(), phone:f.phone.value.trim(), landline:f.landline.checked||null, email:f.email.value.trim(), email2:f.email2.value.trim(), address:f.address.value.trim(), region:f.region.value, status:f.status.value, source:f.source.value, interest:f.interest.value.trim(), interestIn: Object.keys(draftInt).length ? { ...draftInt } : null };
   if(!data.name){ $("#foldContact").open=true; toast("Name is required"); f.name.focus(); return; }
   if(!data.source){ $("#foldContact").open=true; toast("Pick a lead source"); f.source.focus(); return; }
   const prev = openId ? clients[openId] : null;
