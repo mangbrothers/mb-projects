@@ -434,7 +434,9 @@ details.ssamore summary{cursor:pointer;font-weight:600}
       <div><label>Name</label><input name="name"></div>
       <div><label>Phone</label><input name="phone" type="tel" id="dlgPhone">
         <label class="row" style="margin-top:6px;gap:8px;flex-wrap:nowrap;font-weight:400"><input type="checkbox" name="landline" style="width:20px;height:20px;flex:none"> <span>Landline: no texts</span></label>
-        <label style="margin-top:8px">Hold until (waiting on the customer)</label><input type="date" name="holdUntil" style="max-width:200px"></div>
+        <label style="margin-top:8px">Hold until (waiting on the customer)</label><input type="date" name="holdUntil" style="max-width:200px">
+        <label style="margin-top:8px">Second number (optional)</label><input name="phone2" type="tel" placeholder="Spouse, family">
+        <label style="margin-top:6px">Whose number is it?</label><input name="phone2Label" placeholder="Wife, Husband, Daughter, Son" maxlength="30" autocomplete="off"></div>
       <div style="grid-column:1/-1" id="dlgDup"></div>
       <div><label>Email</label><input name="email" type="email"></div>
       <div><label>Second email (optional)</label><input name="email2" type="email"></div>
@@ -728,6 +730,7 @@ function attach(){
   refs.l.on("value", s => { logs = s.val()||{}; render(); if(openId) renderLog(); clearTimeout(autoStage.t); autoStage.t=setTimeout(autoStage, 1500); });
   refs.t.on("value", s => { templates = s.val()||{}; render(); if(openId) renderContracts(); });
   refs.q.on("value", s => { qbRows = s.val()||{}; if(view==="tools"||view==="servicelog"||view==="charges") render(); if(openId) { renderSvcBills(); renderStamps(); renderRecord(); } });
+  refs.qe = db.ref("sync/quoContactErr"); refs.qe.on("value", s => { quoErrs = s.val()||{}; if(view==="leads") render(); }, ()=>{});
   refs.cb = db.ref("sync/quo/callbacks"); refs.cb.on("value", s => { callbacks = s.val()||{}; if(view==="leads") render(); if($("#cbDlg").open) renderCallbacks(); }, ()=>{});
   refs.sl = db.ref("serviceLog"); refs.dl = db.ref("dayLogs");
   refs.sl.on("value", s => { svcLog = s.val()||{}; if(view==="servicelog" || view==="clients") render(); if(openId) renderRecord(); });
@@ -799,7 +802,7 @@ function phoneUpdates(id, phone){
 }
 function findByPhone(phone, exceptId){
   const k=phoneKey(phone); if(!k) return null;
-  const hit = live().find(([id,c])=>id!==exceptId && (c.phoneKey||phoneKey(c.phone))===k);
+  const hit = live().find(([id,c])=>id!==exceptId && ((c.phoneKey||phoneKey(c.phone))===k || phoneKey(c.phone2)===k));
   return hit ? {id:hit[0], c:hit[1]} : null;
 }
 function dupHtml(hit){ return `<div class="warnline">Already in the CRM: <b>${esc(hit.c.name)}</b>, ${esc(STATUSES[hit.c.status]||hit.c.status)}${tags(hit.c)?", ":""}${tags(hit.c)} <button type="button" class="small" data-open-dup="${hit.id}">Open record</button></div>`; }
@@ -1074,9 +1077,30 @@ function fuKind(e){
   if(/\b(follow(ed)?[- ]?up|texted|emailed|sent (a |an |the )?(text|email|message)|left (a |an )?(voicemail|voice mail|message))\b/i.test(t)) return "out";
   return "talk";
 }
+// Texts that did not reach the phone and have not been made up for: the count of failed texts since the last time
+// we got through (a later text, call or email) or the customer got back to us. { n, at } or null.
+function textFails(id){
+  const ev=Object.values(logs[id]||{}).map(e=>({ at:e.at, k:fuKind(e), src:e.source })).filter(e=>e.k&&e.at).sort((a,b)=>a.at-b.at);
+  let n=0, at=0, pend=null; // pend: a text sent after a failure; it counts as delivered unless its own failure follows
+  for(const e of ev){
+    if(pend){ if(!(e.k==="fail" && e.at-pend.at < 60000)){ n=0; at=0; } pend=null; }
+    if(e.k==="fail"){ n++; at=e.at; }
+    else if(e.k==="in" || e.k==="talk"){ n=0; at=0; }
+    else if(e.k==="out" && n){ if(e.src==="quo") pend=e; else { n=0; at=0; } } // an email made up for it
+  }
+  if(pend && Date.now()-pend.at > 20*60000){ n=0; at=0; } // the delivery check has had time to report it
+  return n ? { n, at } : null;
+}
 // The next step for an open lead: { what, due (yyyy-mm-dd), over, today, label }. null when the rule does not apply.
 function fuStep(id, c){
   const isWon = !!c && c.status==="active", ask = isWon ? openAsk(c, id) : null;
+  const tf = c ? textFails(id) : null;
+  if(c && isWon && !wonPending(c, id)){ // an active client with nothing being sold: only an undelivered text asks for anything
+    if(!tf) return null;
+    const what0 = tf.n>=2 ? (c.email ? "Email (two texts not delivered, stop texting)" : "Call (two texts not delivered, stop texting)") : (c.email ? "Email (text not delivered)" : "Call (text not delivered)");
+    const due0=ymdOf(tf.at), td0=today(), over0=due0<td0;
+    return { what:what0, due:due0, over:over0, today:due0===td0, fail:true, label: over0 ? `Overdue: ${what0.charAt(0).toLowerCase()+what0.slice(1)}, was due ${fuDay(due0)}` : `${what0} due today` };
+  }
   if(!c || !(LEAD_STAGES.includes(c.status) || wonPending(c, id))) return null;
   if(!isWon){ const nk=leadNext(c)[2]; if(nk==="signed"||nk==="card") return null; }
   const askOnly = !!ask && !REQ_SLOTS.some(k=>c[k]&&OPEN_REQ.includes(c[k].status));
@@ -1091,7 +1115,7 @@ function fuStep(id, c){
   const how = (c.landline || !c.phone) ? (c.email ? "email" : "call") : "text";
   let what, due;
   if(missed && (!out || missed.at>out.at)){ what="Call back"; due=ymdOf(missed.at); }
-  else if(fail && !out){ what = c.email ? "Follow-up email" : "Call"; due=ymdOf(fail.at); } // text not delivered: email the same day
+  else if(fail && !out){ what = (c.email ? "Follow-up email" : "Call") + (tf && tf.n>=2 ? " (two texts not delivered, stop texting)" : ""); due=ymdOf(fail.at); } // text not delivered: email the same day
   else if(out){ what="Call"; due=addDays(ymdOf(out.at), FU_CALL_DAYS); }
   else if(askOnly){ what="Quote or reply"; due=addDays(ymdOf(Math.max(ask.at, anchor?anchor.at:0)), FU_MSG_DAYS); } // an ask is owed a quote or a reply in 3 days
   else if(anchor){ what = how==="call" ? "Call" : "Follow-up "+how; due=addDays(ymdOf(anchor.at), FU_MSG_DAYS); }
@@ -1209,6 +1233,28 @@ function clientNext(c, id){
 }
 // What the board is narrowed to: typed search, one "needs" chip, one source. Kept while the page is open.
 let leadFilter = { q:"", k:"", src:"", due:false };
+// Needs a fix (Nov 14, 2026): two cards sharing a phone or an email, a second number with nobody named on it, and
+// contacts the Quo sync could not push. Trashed cards are not counted.
+let quoErrs = {};
+function fixList(){
+  const out=[], byP={}, byE={};
+  live().forEach(([id,c])=>{ [phoneKey(c.phone), phoneKey(c.phone2)].filter(Boolean).forEach(k=>(byP[k]=byP[k]||new Set()).add(id)); const e=String(c.email||"").trim().toLowerCase(); if(e) (byE[e]=byE[e]||new Set()).add(id); });
+  const seen=new Set();
+  [[byP,"the same phone number"],[byE,"the same email"]].forEach(([m,why])=>Object.values(m).forEach(set=>{ if(set.size<2) return; const ids=[...set].sort(), key=ids.join("|"); if(seen.has(key)) return; seen.add(key);
+    out.push({ kind:"dup", ids, text:`${ids.map(i=>clients[i].name||"No name").join(" and ")} share ${why}. Open both and merge them.` }); }));
+  live().forEach(([id,c])=>{ if(c.phone2 && !c.phone2Label) out.push({ kind:"label", ids:[id], text:`${c.name}: the second number has no name on it. Say whose it is (Wife, Daughter).` }); });
+  Object.entries(quoErrs||{}).forEach(([id,e])=>{ if(e && clients[id] && !clients[id].deletedAt) out.push({ kind:"quo", ids:[id], text:`${clients[id].name}: not pushed to Quo. ${String(e.error||"").slice(0,90)}` }); });
+  return out;
+}
+function renderFixes(){
+  const L=fixList(), box=$("#cbBody");
+  box.innerHTML = `<h3 style="margin:0 0 4px">Needs a fix <span class="meta" style="font-weight:400">${L.length}</span></h3>
+    <p class="meta" style="margin:0 0 10px">Records that will cause trouble if left: duplicates split notes and follow-ups, and an unnamed second number cannot be saved as a contact in Quo.</p>` +
+    (L.map(x=>`<div class="ctr"><div class="t">${esc(x.text)}</div>${x.ids.map(i=>`<button type="button" class="small" data-cb-open="${esc(i)}">${x.ids.length>1?esc((clients[i].name||"Card").split(" ")[0])+" ("+esc(STATUSES[clients[i].status]||"")+")":"Open"}</button>`).join("")}</div>`).join("") || `<div class="meta">Nothing needs a fix.</div>`) +
+    `<div class="actions"><button type="button" class="primary" id="cbClose">Close</button></div>`;
+  box.querySelectorAll("[data-cb-open]").forEach(b=>b.onclick=()=>{ $("#cbDlg").close(); openClient(b.dataset.cbOpen); });
+  $("#cbClose").onclick=()=>$("#cbDlg").close();
+}
 // Call back list (Nov 11, 2026). One entry per number: { name, clientId, first, at (latest missed call), count }.
 // The Quo sync adds a number on a missed call with no voicemail and takes it off once the call is returned, the
 // caller texts or leaves a voicemail. Age does not take a number off (Nov 14, 2026): the default is call back as soon
@@ -1236,11 +1282,12 @@ function renderLeads(m){
   const lq = leadFilter.q.trim().toLowerCase();
   const hit = ([,c]) => (!lq || [c.name,c.phone,c.address,c.email,c.interest].join(" ").toLowerCase().includes(lq)) && (!leadFilter.src || (c.source||"Other")===leadFilter.src);
   const kOf = c => leadNext(c)[2];
+  const failed = live().filter(([id,c])=>c.status==="active" && !wonPending(c, id) && textFails(id)); // active clients whose text did not arrive
   const pend = live().filter(([id,c])=>wonPending(c, id)); // Won clients with an agreement out or an open ask
   const wonK = ([id,c]) => clientNext(c,id)[2]||"";
   const wonHit = x => (!leadFilter.k || (leadFilter.k==="ask" ? !!openAsk(x[1],x[0]) : wonK(x)===leadFilter.k)) && (!leadFilter.due || fuDueNow(x[0], x[1]));
   const leads = allLeads.filter(x=>hit(x) && (!leadFilter.k || kOf(x[1])===leadFilter.k) && (!leadFilter.due || fuDueNow(x[0], x[1])));
-  const dueCount = [...allLeads, ...pend].filter(hit).filter(x=>fuDueNow(x[0], x[1])).length;
+  const dueCount = [...allLeads, ...pend, ...failed].filter(hit).filter(x=>fuDueNow(x[0], x[1])).length;
   const kCount = {}; allLeads.filter(hit).forEach(([,c])=>{ const k=kOf(c); kCount[k]=(kCount[k]||0)+1; });
   pend.filter(hit).forEach(x=>{ const k=wonK(x); if(["sent","opened","fix"].includes(k)) kCount[k]=(kCount[k]||0)+1; if(openAsk(x[1],x[0])) kCount.ask=(kCount.ask||0)+1; });
 
@@ -1249,7 +1296,7 @@ function renderLeads(m){
   const src = groupBy(allLeads, ([,c])=>c.source||"Other");
   const cols = [
     ...LEAD_STAGES.map(s=>({key:s,label:STATUSES[s],items:[...leads.filter(([,c])=>c.status===s), ...pend.filter(hit).filter(wonHit).filter(([id,c])=>saleStage(c,id)===s)]})),
-    {key:"active",label:"Won (last 30 days)",items:[...won.filter(([id,c])=>!saleStage(c,id)), ...pend.filter(hit).filter(wonHit).filter(([id,c])=>saleStage(c,id)==="closed")],cls:"won"},
+    {key:"active",label:"Won (last 30 days)",items:[...won.filter(([id,c])=>!saleStage(c,id)), ...pend.filter(hit).filter(wonHit).filter(([id,c])=>saleStage(c,id)==="closed"), ...failed.filter(hit).filter(wonHit).filter(x=>!won.some(w=>w[0]===x[0]))],cls:"won"},
     {key:"lost",label:"Lost",items:lost,cls:"lost"} ];
   const card = ([id,c]) => {
     const lc = lastContact(c); const stale = LEAD_STAGES.includes(c.status) && Date.now()-lc > 5*864e5;
@@ -1293,6 +1340,7 @@ function renderLeads(m){
     </div>
     <div class="leadbar">
       ${cbList().length?`<button type="button" class="fchip cbchip" id="cbOpen" title="Missed calls with no voicemail, not returned yet">\u260E Call back<b>${cbList().length}</b></button>`:""}
+      ${fixList().length?`<button type="button" class="fchip cbchip" id="fixOpen" title="Duplicate cards, unnamed second numbers, contacts not pushed to Quo">Needs a fix<b>${fixList().length}</b></button>`:""}
       <input type="search" id="lfq" placeholder="Search leads: name, phone, address" value="${esc(leadFilter.q)}">
       ${LEAD_CHIPS.map(([k,l])=>`<button type="button" class="fchip${leadFilter.k===k?" on":""}${kCount[k]?"":" zero"}" data-lk="${k}">${l}<b>${kCount[k]||0}</b></button>`).join("")}
       <button type="button" class="fchip due${leadFilter.due?" on":""}${dueCount?"":" zero"}" data-ldue="1" title="Follow-ups and calls due today or overdue">Due today<b>${dueCount}</b></button>
@@ -1312,6 +1360,7 @@ function renderLeads(m){
   m.querySelectorAll("[data-lsrc]").forEach(b=>b.onclick=()=>{ leadFilter.src = leadFilter.src===b.dataset.lsrc ? "" : b.dataset.lsrc; renderLeads(m); });
   { const c=$("#lfClear"); if(c) c.onclick=()=>{ leadFilter={ q:"", k:"", src:"", due:false }; renderLeads(m); }; }
   { const c=$("#cbOpen"); if(c) c.onclick=()=>{ renderCallbacks(); if(!$("#cbDlg").open) $("#cbDlg").showModal(); }; }
+  { const c=$("#fixOpen"); if(c) c.onclick=()=>{ renderFixes(); if(!$("#cbDlg").open) $("#cbDlg").showModal(); }; }
   const form=$("#quickAdd");
   if(prev){ for(const [k,v] of Object.entries(prev)) if(form.elements[k]) form.elements[k].value=v; if(focusName && form.elements[focusName]){ const el=form.elements[focusName]; el.focus(); try{ el.setSelectionRange(el.value.length,el.value.length); }catch(e){} } }
   const showDup = () => { const hit=findByPhone(form.phone.value); $("#quickDup").innerHTML = hit ? dupHtml(hit) : ""; wireDup($("#quickDup")); if(!hit) quickDupAck=null; return hit; };
@@ -1490,7 +1539,7 @@ let sameCard;
 function openClient(id, defaultStatus){
   openId = id; const c = id ? clients[id] : { status: defaultStatus||"new" };
   const f=$("#clientForm");
-  f.name.value=c.name||""; f.phone.value=c.phone||""; f.email.value=c.email||""; f.landline.checked=!!c.landline; f.holdUntil.value=c.holdUntil||""; f.email2.value=c.email2||""; f.address.value=c.address||""; f.region.value=c.region||""; f.status.value=c.status||"new"; f.source.value=c.source||""; f.interest.value=c.interest||"";
+  f.name.value=c.name||""; f.phone.value=c.phone||""; f.email.value=c.email||""; f.landline.checked=!!c.landline; f.holdUntil.value=c.holdUntil||""; f.phone2.value=c.phone2||""; f.phone2Label.value=c.phone2Label||""; f.email2.value=c.email2||""; f.address.value=c.address||""; f.region.value=c.region||""; f.status.value=c.status||"new"; f.source.value=c.source||""; f.interest.value=c.interest||"";
   $("#clientTitle").textContent = id ? c.name : "New client";
   draftServices = JSON.parse(JSON.stringify(c.services||{})); removedServices = new Set();
   draftInt = { ...((c.interestIn && Object.keys(c.interestIn).length) ? c.interestIn : (id && LEAD_STAGES.includes(c.status) ? intFromText(c.interest) : {})) }; renderInt();
@@ -1622,7 +1671,7 @@ $("#clientSave").onclick = async () => {
   const f=$("#clientForm"); readSvcForm();
   const svcTouched = removedServices.size>0 || JSON.stringify(draftServices)!==svcBase;
   const services = {}; for(const [sid,s] of Object.entries(draftServices)) services[sid]=s;
-  const data = { name:f.name.value.trim(), phone:f.phone.value.trim(), landline:f.landline.checked||null, holdUntil:f.holdUntil.value||null, email:f.email.value.trim(), email2:f.email2.value.trim(), address:f.address.value.trim(), region:f.region.value, status:f.status.value, source:f.source.value, interest:f.interest.value.trim(), interestIn: Object.keys(draftInt).length ? { ...draftInt } : null };
+  const data = { name:f.name.value.trim(), phone:f.phone.value.trim(), landline:f.landline.checked||null, holdUntil:f.holdUntil.value||null, phone2:f.phone2.value.trim()||null, phone2Label:(f.phone2.value.trim() && f.phone2Label.value.replace(/\s+/g," ").trim())||null, email:f.email.value.trim(), email2:f.email2.value.trim(), address:f.address.value.trim(), region:f.region.value, status:f.status.value, source:f.source.value, interest:f.interest.value.trim(), interestIn: Object.keys(draftInt).length ? { ...draftInt } : null };
   { const p0=openId?clients[openId]:null, was=(p0&&p0.interestIn)||{}, wasAt=(p0&&p0.interestAt)||{}, at={}; // when each interest was ticked, for the age of an open ask
     Object.keys(draftInt).forEach(k=>{ if(wasAt[k]) at[k]=wasAt[k]; else if(!was[k]) at[k]=Date.now(); });
     data.interestAt = Object.keys(at).length ? at : null; }
@@ -1631,6 +1680,7 @@ $("#clientSave").onclick = async () => {
   const prev = openId ? clients[openId] : null;
   // A new record needs a phone; an existing record that already has one cannot have it cleared.
   // Older imported records with no phone can still be edited.
+  if(data.phone2){ const pm2=phoneProblem(data.phone2, false) || (phoneKey(data.phone2)===phoneKey(data.phone) ? "The second number is the same as the first." : ""); if(pm2){ $("#foldContact").open=true; toast(pm2==="That phone number needs 10 digits."?"The second number needs 10 digits.":pm2); f.phone2.focus(); return; } }
   { const pm=phoneProblem(data.phone, !prev || !!(prev.phone||"").trim()); if(pm){ $("#foldContact").open=true; toast(pm); f.phone.focus(); return; } }
   const upd = {};
   if(prev && data.status==="active" && prev.status!=="active" && !prev.wonAt) data.wonAt=Date.now();
