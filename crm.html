@@ -584,8 +584,10 @@ const TIER_HOME = { admin:"projects.html", crew:"crews.html", walker:"routes.htm
 // Nov 10, 2026: regions are the pricing areas. Old names on a record still price correctly (ssaZoneOf).
 const REGIONS = ["South Livonia","North Livonia","Westland","Other Livonia","Other"];
 const SOURCES = ["Angi","Door hanger","Referral","Website","Google","Yard sign","Legacy","Other"];
-const STATUSES = { new:"New lead", contacted:"Contacted", quoted:"Quoted", closed:"Closed, not signed", active:"Active client", paused:"Paused", former:"Former client", lost:"Lost" };
-const LEAD_STAGES = ["new","contacted","quoted","closed"];
+const STATUSES = { new:"New lead", contacted:"Contacted", quoted:"Quoted", active:"Active client", paused:"Paused", former:"Former client", lost:"Lost" };
+const LEAD_STAGES = ["new","contacted","quoted"];
+const SALE_STAGES = [...LEAD_STAGES, "closed"]; // stage of an open sale to an active client; "closed" = said yes, not signed
+const CLOSED_TAG = "Closed, not signed";
 const GOPAY = "Card (QuickBooks GoPayment)";
 const PAY_METHODS = ["","Zelle","Check","Cash","Venmo","PayPal",GOPAY,"Other"];
 const PAY_STATUSES = { "":"", paid:"Paid", open:"Open", pastdue:"Past due" };
@@ -667,7 +669,7 @@ let sort = { key:"name", dir:1 };
 try{ const sv=JSON.parse(localStorage.getItem("crmSort")||"null"); if(sv&&sv.key) sort=sv; }catch(e){}
 const SORTS = { name:"Name", address:"Address", region:"Region", services:"Services", status:"Status", pay:"Billing", first:"First contact", last:"Last contact" };
 const PAY_ORDER = { pastdue:0, open:1, paid:2, "":3 };
-const STATUS_ORDER = { active:0, paused:1, former:2, new:3, contacted:4, quoted:5, closed:5.5, lost:6 };
+const STATUS_ORDER = { active:0, paused:1, former:2, new:3, contacted:4, quoted:5, lost:6 };
 function sortRows(rows){
   const k=sort.key, d=sort.dir;
   const val = c => k==="name" ? (c.name||"").toLowerCase() : k==="address" ? (c.address||"").toLowerCase() : k==="region" ? (c.region||"zz") : k==="services" ? -svcList(c).length : k==="status" ? (STATUS_ORDER[c.status]??9) : k==="pay" ? (PAY_ORDER[c.payStatus||""]??9) : k==="first" ? -(c.firstContactAt||c.createdAt||0) : -(lastContact(c)||0);
@@ -911,7 +913,7 @@ function contractNeeds(c){
   }
   return out;
 }
-const unsignedFor = (c, sid) => (c.status==="active"||c.status==="quoted"||c.status==="closed") && (contractNeeds(c).some(x=>!x.signed && (!sid || x.sid===sid)) || ssaOpen(c, sid));
+const unsignedFor = (c, sid) => (c.status==="active"||c.status==="quoted") && (contractNeeds(c).some(x=>!x.signed && (!sid || x.sid===sid)) || ssaOpen(c, sid));
 const unsignedPill = (c, sid) => unsignedFor(c, sid) ? ` <span class="pill unsigned" title="A required contract is not signed">unsigned</span>` : "";
 
 // ---------- service notes: what the crew sees ----------
@@ -1042,7 +1044,6 @@ function leadNext(c){
   if(c.ssaDraft) return ["warm","Quote saved \u00B7 not sent","quote"];
   if(c.status==="new") return ["todo","Needs a first call","call"];
   if(c.status==="contacted") return ["todo","Talked \u00B7 needs a quote","quote"];
-  if(c.status==="closed") return ["hot","Said yes \u00B7 send the agreement","quote"];
   return ["warm","Quoted \u00B7 follow up","follow"];
 }
 // ---------- Lead follow-up rule (Russel, Nov 13, 2026) ----------
@@ -1155,8 +1156,9 @@ function reviveLead(id, status){
 function leadDrop(id, col){
   const c=clients[id]; if(!c) return;
   if(saleStage(c, id)){ // an active client being sold another service: the card moves, the client stays Active
-    if(!LEAD_STAGES.includes(col)) return toast(col==="active" ? "This client is already active. The card leaves the board when the new agreement is signed." : "This is an active client. To drop the sale, cancel the link or untick the interest on the card.");
-    return commit(`${c.name}: sale moved to ${STATUSES[col]}`, { ["clients/"+id+"/saleStage"]: col, ...Object.fromEntries(Object.entries(stamp()).map(([k,v])=>["clients/"+id+"/"+k, v])) });
+    if(col!=="active" && !LEAD_STAGES.includes(col)) return toast("This is an active client. To drop the sale, cancel the link or untick the interest on the card.");
+    const to = col==="active" ? "closed" : col; // the Won column: said yes, not signed yet
+    return commit(`${c.name}: sale ${to==="closed"?"closed, not signed":"moved to "+STATUSES[col]}`, { ["clients/"+id+"/saleStage"]: to, ...Object.fromEntries(Object.entries(stamp()).map(([k,v])=>["clients/"+id+"/"+k, v])) });
   }
   if(c.status==="lost" && LEAD_STAGES.includes(col)) return reviveLead(id, col);
   return setStatus(id, col);
@@ -1185,8 +1187,8 @@ function saleStage(c, id){
   const priced = REQ_SLOTS.some(k=>c[k]&&OPEN_REQ.includes(c[k].status)) || ssaOpen(c) || svcList(c).some(x=>x.type==="landscaping" && x.jobStatus==="Quoted" && !ldaSignedFor(c, x));
   const base = priced ? "quoted" : openAsk(c, id) ? "contacted" : null;
   if(!base) return null;
-  const set = LEAD_STAGES.includes(c.saleStage) ? c.saleStage : base;
-  return LEAD_STAGES.indexOf(set) >= LEAD_STAGES.indexOf(base) ? set : base;
+  const set = SALE_STAGES.includes(c.saleStage) ? c.saleStage : base;
+  return SALE_STAGES.indexOf(set) >= SALE_STAGES.indexOf(base) ? set : base;
 }
 const wonPending = (c, id) => !!saleStage(c, id);
 // Where a client stands, for the strip on Won cards and the Clients table.
@@ -1202,6 +1204,7 @@ function clientNext(c, id){
   if(unsignedFor(c)) return ["warm","Agreement not signed"];
   if(c.payStatus==="pastdue") return ["bad",`Past due in QuickBooks${+c.qbBalance>0?": "+money(c.qbBalance):""}`];
   if(signedAny) return ["good","Signed \u00B7 card on file"];
+  if(c.wonAt && Date.now()-c.wonAt < 30*864e5) return ["hot",CLOSED_TAG];
   return ["cold","No agreement yet"];
 }
 // What the board is narrowed to: typed search, one "needs" chip, one source. Kept while the page is open.
@@ -1246,7 +1249,7 @@ function renderLeads(m){
   const src = groupBy(allLeads, ([,c])=>c.source||"Other");
   const cols = [
     ...LEAD_STAGES.map(s=>({key:s,label:STATUSES[s],items:[...leads.filter(([,c])=>c.status===s), ...pend.filter(hit).filter(wonHit).filter(([id,c])=>saleStage(c,id)===s)]})),
-    {key:"active",label:"Won (last 30 days)",items:won.filter(([id,c])=>!saleStage(c,id)),cls:"won"},
+    {key:"active",label:"Won (last 30 days)",items:[...won.filter(([id,c])=>!saleStage(c,id)), ...pend.filter(hit).filter(wonHit).filter(([id,c])=>saleStage(c,id)==="closed")],cls:"won"},
     {key:"lost",label:"Lost",items:lost,cls:"lost"} ];
   const card = ([id,c]) => {
     const lc = lastContact(c); const stale = LEAD_STAGES.includes(c.status) && Date.now()-lc > 5*864e5;
@@ -1262,13 +1265,14 @@ function renderLeads(m){
     return `<div class="lead" data-card="${id}" data-id="${id}">
       <div class="name"><span>${esc(c.name)}</span>${isLead?ageBadge(c):`<span class="meta" style="margin-left:auto;font-weight:400">${ago(lc)}</span>`}</div>
       ${nx?`<div class="lstat ${nx[0]}"${openReq?` data-lead-status="${id}" title="Open the link status"`:c.status==="lost"?` data-lost-flip="${id}" title="Tap to switch: They said no, We said no, Not followed up" style="cursor:pointer"`:""}>${esc(nx[1])}</div>`:""}
+      ${sale==="closed"?`<div class="lstat hot" title="Said yes. Nothing is signed yet.">${CLOSED_TAG}</div>`:""}
       ${ask?`<div class="lstat todo" title="Ticked as interested, with no quote, agreement or service on file">${esc(ask.label)} \u00B7 ${ask.days<=0?"today":ask.days+"d"}</div>`:""}
       ${fu?`<div class="fu${fu.over?" over":fu.today?" now":""}" title="Follow-up rule: a text or email 3 days after a call, then a call 2 days later">${esc(fu.label)}</div>`:""}
       <div class="l2">${[sale?"<b>Active client</b>":"", tel(c.phone), esc(c.region||""), srcTxt, c.landline?"Landline":""].filter(Boolean).join(" \u00B7 ")}</div>
       ${tags(c)?`<div class="ltags">${tags(c)}</div>`:""}
       ${c.interest?`<div class="l3" title="${esc(c.interest)}">${esc(c.interest)}</div>`:""}
       ${act?`<div class="leadctr">${act}</div>`:""}
-      ${sale ? `<select data-stage="${id}" title="Stage of this sale. The client stays Active.">${opts(LEAD_STAGES, sale, STATUSES)}</select>` : `<select data-stage="${id}">${opts([...LEAD_STAGES,"active","lost"], c.status, {...STATUSES, active:"Won \u2192 Active client"})}</select>`}
+      ${sale ? `<select data-stage="${id}" title="Stage of this sale. The client stays Active.">${opts([...LEAD_STAGES,"active"], sale==="closed"?"active":sale, {...STATUSES, active:CLOSED_TAG})}</select>` : `<select data-stage="${id}">${opts([...LEAD_STAGES,"active","lost"], c.status, {...STATUSES, active:"Won \u2192 Active client"})}</select>`}
     </div>`; };
   // Keep what was typed in the quick-add form across live re-renders.
   const prev = $("#quickAdd") ? Object.fromEntries(new FormData($("#quickAdd")).entries()) : null;
@@ -3077,7 +3081,7 @@ async function lsaSend(){
       ["clientLog/"+id+"/"+db.ref("clientLog").push().key]: { text:`Emailed ${LSA_NAME} ${X.agNo} to ${to.join(" and ")}: ${summary}. Nothing charged at signing.`, at:now, by:me.email, source:"contract" }
     };
     const prev=lsaReq(c); if(prev && OPEN_REQ.includes(prev.status) && prev.token!==token) upd["sync/sign/"+prev.token+"/status"]="cancelled";
-    if(LEAD_STAGES.includes(c.status) && c.status!=="quoted" && c.status!=="closed") upd["clients/"+id+"/status"]="quoted";
+    if(LEAD_STAGES.includes(c.status) && c.status!=="quoted") upd["clients/"+id+"/status"]="quoted";
     await db.ref().update(upd);
     svcCall("send", { t:token });
     X.sentToken=token; showSent();
@@ -3369,7 +3373,7 @@ async function ldaSend(){
       ["clientLog/"+id+"/"+db.ref("clientLog").push().key]: { text:`Emailed ${LDA_NAME} ${X.agNo} to ${to.join(" and ")}: ${summary}.`, at:now, by:me.email, source:"contract" }
     };
     const prev=ldaReq(c, s.sid); if(prev && OPEN_REQ.includes(prev.status) && prev.token!==token) upd["sync/sign/"+prev.token+"/status"]="cancelled";
-    if(LEAD_STAGES.includes(c.status) && c.status!=="quoted" && c.status!=="closed") upd["clients/"+id+"/status"]="quoted";
+    if(LEAD_STAGES.includes(c.status) && c.status!=="quoted") upd["clients/"+id+"/status"]="quoted";
     if(held){
       const slot="clients/"+id+"/"+slotLand();
       Object.assign(upd[slot], { status:"sent", sentAt:now, bundleOf:held.token, link:req.link });
@@ -3428,7 +3432,7 @@ async function ssaSend(){
       ["clientLog/"+id+"/"+db.ref("clientLog").push().key]: { text:`Emailed ${SSA_NAME} ${X.agNo} to ${to.join(" and ")}: ${ssaSummary(S,k)}. Total ${money(k.total)}; charged at signing ${money(k.dueNow)}.`, at:now, by:me.email, source:"contract" }
     };
     if(c.signReq && !c.signReq.kind && OPEN_REQ.includes(c.signReq.status) && c.signReq.token!==token){ upd["sync/sign/"+c.signReq.token+"/status"]="cancelled"; bundleCancel(c, c.signReq, upd, id); }
-    if(LEAD_STAGES.includes(c.status) && c.status!=="quoted" && c.status!=="closed") upd["clients/"+id+"/status"]="quoted";
+    if(LEAD_STAGES.includes(c.status) && c.status!=="quoted") upd["clients/"+id+"/status"]="quoted";
     if(bundleCtx && bundleCtx.clientId===id && bundleCtx.queue.length){
       bundleCtx.held={ token, upd }; const sid=bundleCtx.queue.shift(); X.busy=false;
       toast("Seasonal agreement is ready. Now the landscaping agreement. Nothing is sent until both are ready.");
