@@ -1153,9 +1153,11 @@ function backupJson(){ return JSON.stringify({ exportedAt:new Date().toISOString
 let logins = {}, loginEdit = null, loginAdding = false, loginQ = "", loginShown = new Set(), loginKind = "", loginTab = "pass";
 // Entry types on the locked tab. [label, plural for the filter, first field label, secret field label, name placeholder]
 const LG_KINDS = { pass:["Password","Passwords","Username or email","Password","QuickBooks"], api:["API key","API keys","Key name or account","API key","Quo API"],
-  bank:["Bank account","Bank accounts","Routing number","Account number","Business checking"], tax:["Tax ID","Tax IDs","Legal name on file","Tax ID number","Federal EIN"],
+  bank:["Bank account","Bank accounts","Routing number","Account number","Business checking"], card:["Card","Cards","Name on card","Card number","Business Visa"], tax:["Tax ID","Tax IDs","Legal name on file","Tax ID number","Federal EIN"],
   lic:["License or policy","Licenses and insurance","Issued by","License or policy number","General liability policy"], other:["Other","Other","Label","Value","Shop door code"] };
-const LG_LAST4 = { bank:1, tax:1, lic:1 }; // long numbers: show the last 4 while hidden, so the right one can be picked without opening it
+const LG_LAST4 = { bank:1, card:1, tax:1, lic:1 };
+const lgNoteLabel = k => k==="pass" ? "Sign-in notes (where the 2-step code goes, PIN, security answers, who set it up)" : k==="card" ? "Notes (security code, billing ZIP, who carries the card)" : "Notes (what it is used for, who holds the original, who to call)";
+const lgExpLabel = k => k==="card" ? "Card expires on (last day of the month)" : "Expires or renews on (optional)"; // long numbers: show the last 4 while hidden, so the right one can be picked without opening it
 const lgIsCred = l => lgKind(l) !== "pass";
 const lgExpDays = l => l && l.exp ? Math.round((new Date(l.exp+"T12:00:00") - new Date(new Date().toDateString()+" 12:00:00"))/864e5) : null;
 const lgKind = l => LG_KINDS[l && l.kind] ? l.kind : "pass";
@@ -1309,7 +1311,7 @@ function renderLogins(m){
   m.innerHTML=`<div class="lg">
     <div class="card"><div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><h2 style="margin:0">${loginTab==="cred"?"Credentials":"Quick links"}</h2><span class="meta" style="margin-left:0">${inTab.length} saved &middot; admins only &middot; encrypted</span>
       <span style="margin-left:auto;display:flex;gap:8px;flex-wrap:wrap"><input id="lgQ" value="${esc(loginQ)}" placeholder="Search" autocomplete="off" style="width:160px">${formOpen?"":`<button class="primary" id="lgNew">+ Add</button>`}${loginTab==="pass"&&!formOpen&&!lgImport?`<button id="lgImp" title="Bring in a password export from Apple Passwords or Chrome">Import</button><input type="file" id="lgImpFile" accept=".csv,text/csv" style="display:none">`:""}<button id="lgLockNow">Lock</button><button id="lgChange">Change code</button></span></div>
-      ${loginTab==="cred"?'<p class="meta" style="margin:8px 0 0">Numbers and keys that are not a sign-in: API keys, bank accounts, tax IDs, licenses and insurance. Add the expiry or renewal date and it turns red 30 days out.</p>':""}
+      ${loginTab==="cred"?'<p class="meta" style="margin:8px 0 0">Numbers and keys that are not a sign-in: API keys, bank accounts, cards, tax IDs, licenses and insurance. Add the expiry or renewal date and it turns red 30 days out.</p>':""}
       <div class="lglinks"${loginTab==="cred"?' style="display:none"':""}>${inTab.filter(([,l])=>l.url).map(([id,l])=>`<a class="lglink" href="${esc(href(l.url))}" target="_blank" rel="noopener">${icon(l.url)}<span>${esc(l.site||host(l.url))}</span></a>`).join("")||'<p class="meta">Add a site with its web address and it shows here as one tap.</p>'}</div></div>
     <div class="lgtabs" style="display:flex;gap:8px;margin:0 0 10px"><button data-lgtab="pass" class="${loginTab==="pass"?"primary":""}" style="flex:1">Passwords <span style="opacity:.7">${nPass}</span></button><button data-lgtab="cred" class="${loginTab==="cred"?"primary":""}" style="flex:1">Credentials <span style="opacity:.7">${nCred}</span>${soon?` <span title="Expiring within 30 days or expired" style="color:${loginTab==="cred"?"#fff":"#a63b3b"};font-weight:700">&middot; ${soon} expiring</span>`:""}</button></div>
     ${loginTab==="cred"?`<div class="lgkinds" style="display:flex;gap:6px;flex-wrap:wrap;margin:0 0 12px">${[["","All"]].concat(Object.entries(LG_KINDS).filter(([k])=>k!=="pass").map(([k,v])=>[k,v[1]])).map(([k,lab])=>`<button class="small${loginKind===k?" primary":""}" data-lgkind="${k}">${lab} <span style="opacity:.7">${k?inTab.filter(([,l])=>lgKind(l)===k).length:inTab.length}</span></button>`).join("")}</div>`:""}
@@ -1319,8 +1321,8 @@ function renderLogins(m){
         <div><label for="lgUrl" id="lgUrlL">${credForm?"Web link (optional)":"Sign-in link"}</label><input id="lgUrl" value="${esc(e.url||"")}" placeholder="https://quickbooks.intuit.com" autocomplete="off" autocapitalize="off" inputmode="url"></div>
         <div><label for="lgUser" id="lgUserL">${EK[2]}</label><input id="lgUser" value="${esc(e.user||"")}" autocomplete="off" autocapitalize="off" spellcheck="false"></div>
         <div><label for="lgPass" id="lgPassL">${EK[3]}</label><input id="lgPass" value="${esc(e.pass||"")}" autocomplete="new-password" autocapitalize="off" spellcheck="false"></div></div>
-      <div id="lgExpBox"${credForm?"":' style="display:none"'}><label for="lgExp">Expires or renews on (optional)</label><input id="lgExp" type="date" value="${esc(e.exp||"")}" style="max-width:220px"></div>
-      <label for="lgNote" id="lgNoteL">${credForm?"Notes (what it is used for, who holds the original, who to call)":"Sign-in notes (where the 2-step code goes, PIN, security answers, who set it up)"}</label><input id="lgNote" value="${esc(e.note||"")}" autocomplete="off">
+      <div id="lgExpBox"${credForm?"":' style="display:none"'}><label for="lgExp" id="lgExpL">${lgExpLabel(ek)}</label><input id="lgExp" type="date" value="${esc(e.exp||"")}" style="max-width:220px"></div>
+      <label for="lgNote" id="lgNoteL">${lgNoteLabel(ek)}</label><input id="lgNote" value="${esc(e.note||"")}" autocomplete="off">
       <div class="actions" style="display:flex;gap:8px;justify-content:flex-end;margin-top:10px"><button id="lgCancel">Cancel</button><button class="primary" id="lgSave">${loginEdit?"Save":"Add"}</button></div></div>`:""}
     ${lgImport?`<div class="card" id="lgImpCard"><h2>Import passwords</h2>
       <p class="meta" style="margin:0 0 8px">${lgImport.length} found in the file. Untick anything you do not want. Entries you already have are unticked. Nothing is saved until you press Import.</p>
@@ -1362,7 +1364,7 @@ function renderLogins(m){
   const ty=$("#lgType"); if(ty) ty.onchange=()=>{ const K=LG_KINDS[ty.value]; $("#lgUserL").textContent=K[2]; $("#lgPassL").textContent=K[3]; $("#lgSite").placeholder=K[4];
     if(!loginEdit) $("#lgFormH").textContent = ty.value!=="pass" ? "Add a credential" : "Add a password";
     const cred=ty.value!=="pass"; $("#lgExpBox").style.display=cred?"":"none"; $("#lgUrlL").textContent=cred?"Web link (optional)":"Sign-in link";
-    $("#lgNoteL").textContent=cred?"Notes (what it is used for, who holds the original, who to call)":"Sign-in notes (where the 2-step code goes, PIN, security answers, who set it up)"; };
+    $("#lgNoteL").textContent=lgNoteLabel(ty.value); $("#lgExpL").textContent=lgExpLabel(ty.value); };
   const c=$("#lgCancel"); if(c) c.onclick=()=>{ loginEdit=null; loginAdding=false; render(); };
   const qb=$("#lgQ"); qb.oninput=()=>{ loginQ=qb.value; const pos=qb.selectionStart; render(); const n=$("#lgQ"); n.focus(); try{ n.setSelectionRange(pos,pos); }catch(x){} };
   m.querySelectorAll("[data-lgmove]").forEach(sel=>sel.onchange=async()=>{ const id=sel.dataset.lgmove, to=sel.value, l=LG.items[id]; if(!to || !l || !LG_KINDS[to]) return;
