@@ -1152,6 +1152,33 @@ const LG_LAST4 = { bank:1, tax:1, lic:1 }; // long numbers: show the last 4 whil
 const lgIsCred = l => lgKind(l) !== "pass";
 const lgExpDays = l => l && l.exp ? Math.round((new Date(l.exp+"T12:00:00") - new Date(new Date().toDateString()+" 12:00:00"))/864e5) : null;
 const lgKind = l => LG_KINDS[l && l.kind] ? l.kind : "pass";
+let lgImport = null; // rows read from a password export, waiting for the pick
+function lgCsv(text){ // CSV with quoted fields, commas and line breaks inside quotes
+  const rows=[]; let row=[], cur="", q=false; text=String(text||"").replace(/^\uFEFF/,"");
+  for(let i=0;i<text.length;i++){ const ch=text[i];
+    if(q){ if(ch==='"'){ if(text[i+1]==='"'){ cur+='"'; i++; } else q=false; } else cur+=ch; }
+    else if(ch==='"') q=true;
+    else if(ch===","){ row.push(cur); cur=""; }
+    else if(ch==="\n" || ch==="\r"){ if(ch==="\r" && text[i+1]==="\n") i++; row.push(cur); cur=""; if(row.some(x=>x!=="")) rows.push(row); row=[]; }
+    else cur+=ch; }
+  row.push(cur); if(row.some(x=>x!=="")) rows.push(row);
+  return rows;
+}
+const lgHost = u => { try{ return new URL(/^https?:/i.test(u)?u:"https://"+u).hostname.replace(/^www\./,""); }catch(x){ return ""; } };
+function lgImportRows(text){
+  const R=lgCsv(text); if(R.length<2) return [];
+  const H=R[0].map(h=>h.trim().toLowerCase().replace(/[^a-z]/g,"")), col=(...names)=>{ for(const n of names){ const i=H.indexOf(n); if(i>=0) return i; } return -1; };
+  const cT=col("title","name"), cU=col("url","website","loginuri","web"), cN=col("username","loginusername","user","email"), cP=col("password","loginpassword"), cO=col("notes","note","extra");
+  if(cP<0) return [];
+  const have=new Set(Object.values(LG.items||{}).filter(Boolean).map(l=>(lgHost(l.url||"")||String(l.site||"").toLowerCase())+"|"+String(l.user||"").toLowerCase()));
+  return R.slice(1).map(r=>{ const g=i=>i>=0 ? String(r[i]||"").trim() : "";
+    const url=g(cU), user=g(cN), pass=cP>=0 ? String(r[cP]||"") : "";
+    let site=g(cT).replace(/\s*\([^()]*\)\s*$/,"").trim() || lgHost(url) || user; // Apple titles read "site.com (username)"
+    site=site.replace(/^www\./i,"");
+    const dup=have.has((lgHost(url)||site.toLowerCase())+"|"+user.toLowerCase());
+    return { site, url, user, pass, note:g(cO), dup, on:!dup };
+  }).filter(x=>x.pass && x.site).slice(0,500);
+}
 const LG = { key: null, items: {}, salt: null, iter: 600000, openedVer: null, idle: null, entry: "", busy: false, setup: null, msg: "" };
 const LG_WAITS = [60e3, 5*60e3, 15*60e3, 60*60e3], LG_IDLE = 5*60e3;
 const lgB64 = b => btoa(String.fromCharCode(...new Uint8Array(b)));
@@ -1175,7 +1202,7 @@ async function lgSetLock(st){
   try { localStorage.setItem("mb-lg-lock", JSON.stringify(st)); } catch(e){}
   try { await db.ref("logins/_lock/" + lgMeKey()).set(st.fails || st.until ? { fails: st.fails, until: st.until, at: Date.now() } : null); } catch(e){}
 }
-function lgLock(why){ if(!LG.key) return; LG.key = null; LG.items = {}; LG.entry = ""; loginShown = new Set(); loginEdit = null; loginAdding = false; clearTimeout(LG.idle);
+function lgLock(why){ if(!LG.key) return; LG.key = null; LG.items = {}; LG.entry = ""; loginShown = new Set(); loginEdit = null; loginAdding = false; lgImport = null; clearTimeout(LG.idle);
   if(why) LG.msg = why; if(view === "logins") render(); }
 const LG_IDLE_MSG = "Locked after 5 minutes without use.";
 function lgTouch(){ clearTimeout(LG.idle); LG.last = Date.now(); if(LG.key) LG.idle = setTimeout(() => lgLock(LG_IDLE_MSG), LG_IDLE); }
@@ -1274,7 +1301,7 @@ function renderLogins(m){
     return `<div class="lgrow"><span class="meta">Expires</span><code${d<=30?' style="color:#a63b3b;font-weight:700"':""}>${d<0?"Expired "+on:d===0?"Today":on+(d<=30?" ("+d+" day"+(d===1?"":"s")+")":"")}</code></div>`; };
   m.innerHTML=`<div class="lg">
     <div class="card"><div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><h2 style="margin:0">${loginTab==="cred"?"Credentials":"Quick links"}</h2><span class="meta" style="margin-left:0">${inTab.length} saved &middot; admins only &middot; encrypted</span>
-      <span style="margin-left:auto;display:flex;gap:8px;flex-wrap:wrap"><input id="lgQ" value="${esc(loginQ)}" placeholder="Search" autocomplete="off" style="width:160px">${formOpen?"":`<button class="primary" id="lgNew">+ Add</button>`}<button id="lgLockNow">Lock</button><button id="lgChange">Change code</button></span></div>
+      <span style="margin-left:auto;display:flex;gap:8px;flex-wrap:wrap"><input id="lgQ" value="${esc(loginQ)}" placeholder="Search" autocomplete="off" style="width:160px">${formOpen?"":`<button class="primary" id="lgNew">+ Add</button>`}${loginTab==="pass"&&!formOpen&&!lgImport?`<button id="lgImp" title="Bring in a password export from Apple Passwords or Chrome">Import</button><input type="file" id="lgImpFile" accept=".csv,text/csv" style="display:none">`:""}<button id="lgLockNow">Lock</button><button id="lgChange">Change code</button></span></div>
       ${loginTab==="cred"?'<p class="meta" style="margin:8px 0 0">Numbers and keys that are not a sign-in: API keys, bank accounts, tax IDs, licenses and insurance. Add the expiry or renewal date and it turns red 30 days out.</p>':""}
       <div class="lglinks"${loginTab==="cred"?' style="display:none"':""}>${inTab.filter(([,l])=>l.url).map(([id,l])=>`<a class="lglink" href="${esc(href(l.url))}" target="_blank" rel="noopener">${icon(l.url)}<span>${esc(l.site||host(l.url))}</span></a>`).join("")||'<p class="meta">Add a site with its web address and it shows here as one tap.</p>'}</div></div>
     <div class="lgtabs" style="display:flex;gap:8px;margin:0 0 10px"><button data-lgtab="pass" class="${loginTab==="pass"?"primary":""}" style="flex:1">Passwords <span style="opacity:.7">${nPass}</span></button><button data-lgtab="cred" class="${loginTab==="cred"?"primary":""}" style="flex:1">Credentials <span style="opacity:.7">${nCred}</span>${soon?` <span title="Expiring within 30 days or expired" style="color:${loginTab==="cred"?"#fff":"#a63b3b"};font-weight:700">&middot; ${soon} expiring</span>`:""}</button></div>
@@ -1288,6 +1315,12 @@ function renderLogins(m){
       ${credForm?`<label for="lgExp">Expires or renews on (optional)</label><input id="lgExp" type="date" value="${esc(e.exp||"")}" style="max-width:220px">`:""}
       <label for="lgNote">${credForm?"Notes (what it is used for, who holds the original, who to call)":"Sign-in notes (where the 2-step code goes, PIN, security answers, who set it up)"}</label><input id="lgNote" value="${esc(e.note||"")}" autocomplete="off">
       <div class="actions" style="display:flex;gap:8px;justify-content:flex-end;margin-top:10px"><button id="lgCancel">Cancel</button><button class="primary" id="lgSave">${loginEdit?"Save":"Add"}</button></div></div>`:""}
+    ${lgImport?`<div class="card" id="lgImpCard"><h2>Import passwords</h2>
+      <p class="meta" style="margin:0 0 8px">${lgImport.length} found in the file. Untick anything you do not want. Entries you already have are unticked. Nothing is saved until you press Import.</p>
+      <div style="display:flex;gap:8px;margin:0 0 8px"><button class="small" id="lgImpAll">Tick all</button><button class="small" id="lgImpNone">Untick all</button></div>
+      <div style="max-height:340px;overflow:auto;border:1px solid var(--line,#ddd);border-radius:8px">${lgImport.map((r,i)=>`<label style="display:flex;gap:10px;align-items:center;padding:8px 10px;border-bottom:1px solid var(--line,#eee);font-weight:400;margin:0"><input type="checkbox" data-lgimp="${i}"${r.on?" checked":""} style="width:20px;height:20px;flex:none"><span style="min-width:0;flex:1"><b>${esc(r.site)}</b> <span class="meta">${esc(r.user||"no username")}${r.url?" &middot; "+esc(host(r.url)):""}${r.dup?" &middot; already saved":""}</span></span></label>`).join("")}</div>
+      <p class="meta" style="margin:8px 0 0">Delete the export file from your device when you are done. It holds every password in plain text.</p>
+      <div class="actions" style="display:flex;gap:8px;justify-content:flex-end;margin-top:10px"><button id="lgImpCancel">Cancel</button><button class="primary" id="lgImpGo">Import ${lgImport.filter(r=>r.on).length}</button></div></div>`:""}
     <div class="lggrid">${list.map(([id,l])=>`<div class="card lgcard">
       <div class="lghead">${icon(l.url)}<div style="min-width:0;flex:1"><b class="lgsite">${esc(l.site||"")}</b> ${lgIsCred(l)?`<span class="meta lgtype">${LG_KINDS[lgKind(l)][0]}</span>`:""}${l.url?`<div class="meta lghost">${esc(host(l.url))}</div>`:""}</div>${l.url?`<a class="primary lgopen" href="${esc(href(l.url))}" target="_blank" rel="noopener">Open</a>`:""}</div>
       <div class="lgrow"><span class="meta">${LG_KINDS[lgKind(l)][2]}</span>${l.user?`<code>${esc(l.user)}</code>`:'<span class="lgempty">none saved</span>'}${l.user?`<button class="small" data-lgcopy="${id}|user">Copy</button>`:""}</div>
@@ -1295,6 +1328,18 @@ function renderLogins(m){
       ${expTag(l)}${l.note?`<div class="lgnote">${esc(l.note)}</div>`:""}
       <div class="lgfoot"><span class="meta">${l.updatedBy?"Changed by "+esc(l.updatedBy.split("@")[0])+", ":""}${l.updatedAt?new Date(l.updatedAt).toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"}):""}</span><span style="display:flex;gap:6px;align-items:center"><select class="lgmove" data-lgmove="${id}" aria-label="Move to another list" title="Move to another list" style="width:auto;max-width:120px;padding:4px 6px;font-size:.85rem"><option value="">Move to</option>${Object.entries(LG_KINDS).filter(([k])=>k!==lgKind(l)).map(([k,v])=>`<option value="${k}">${k==="pass"?"Passwords":"Credentials: "+v[0]}</option>`).join("")}</select><button class="small" data-lgedit="${id}">Edit</button><button class="small danger" data-lgdel="${id}">Delete</button></span></div></div>`).join("")||`<div class="card"><p class="meta">${q||loginKind?"Nothing matches.":"Nothing saved yet. Tap + Add."}</p></div>`}</div></div>`;
   const nb=$("#lgNew"); if(nb) nb.onclick=()=>{ loginAdding=true; render(); setTimeout(()=>{ const f=$("#lgSite"); f&&f.focus(); },0); };
+  { const ib=$("#lgImp"), fi=$("#lgImpFile");
+    if(ib && fi){ ib.onclick=()=>fi.click(); fi.onchange=async()=>{ const file=fi.files[0]; if(!file) return; let rows=[]; try{ rows=lgImportRows(await file.text()); }catch(e){ rows=[]; }
+      if(!rows.length) return toast("No passwords found in that file. Export from Apple Passwords as CSV and try again."); lgImport=rows; render(); const c=$("#lgImpCard"); c&&c.scrollIntoView({block:"start"}); }; }
+    m.querySelectorAll("[data-lgimp]").forEach(cb=>cb.onchange=()=>{ lgImport[+cb.dataset.lgimp].on=cb.checked; $("#lgImpGo").textContent="Import "+lgImport.filter(r=>r.on).length; });
+    const all=$("#lgImpAll"), none=$("#lgImpNone"), go=$("#lgImpGo"), cx=$("#lgImpCancel");
+    if(all) all.onclick=()=>{ lgImport.forEach(r=>r.on=true); render(); };
+    if(none) none.onclick=()=>{ lgImport.forEach(r=>r.on=false); render(); };
+    if(cx) cx.onclick=()=>{ lgImport=null; render(); };
+    if(go) go.onclick=async()=>{ const pick=lgImport.filter(r=>r.on); if(!pick.length) return toast("Nothing is ticked."); go.disabled=true;
+      const items={ ...LG.items }, now=Date.now();
+      pick.forEach(r=>{ const v={ site:r.site, url:r.url||null, user:r.user||null, pass:r.pass, note:r.note||null, ...stamp(), createdAt:now, createdBy:me.email }; Object.keys(v).forEach(k=>v[k]==null&&delete v[k]); items[db.ref("logins").push().key]=v; });
+      await lgSave(items, `Imported ${pick.length} ${pick.length===1?"password":"passwords"}`); lgImport=null; render(); }; }
   $("#lgLockNow").onclick=()=>lgLock("");
   $("#lgChange").onclick=()=>{ LG.setup={ step:1 }; LG.entry=""; LG.msg=""; render(); };
   const sv=$("#lgSave"); if(sv) sv.onclick=async()=>{ const site=$("#lgSite").value.trim(); if(!site) return toast("Give it a name");
