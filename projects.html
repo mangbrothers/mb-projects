@@ -1313,14 +1313,14 @@ function renderLogins(m){
       <div class="lglinks"${loginTab==="cred"?' style="display:none"':""}>${inTab.filter(([,l])=>l.url).map(([id,l])=>`<a class="lglink" href="${esc(href(l.url))}" target="_blank" rel="noopener">${icon(l.url)}<span>${esc(l.site||host(l.url))}</span></a>`).join("")||'<p class="meta">Add a site with its web address and it shows here as one tap.</p>'}</div></div>
     <div class="lgtabs" style="display:flex;gap:8px;margin:0 0 10px"><button data-lgtab="pass" class="${loginTab==="pass"?"primary":""}" style="flex:1">Passwords <span style="opacity:.7">${nPass}</span></button><button data-lgtab="cred" class="${loginTab==="cred"?"primary":""}" style="flex:1">Credentials <span style="opacity:.7">${nCred}</span>${soon?` <span title="Expiring within 30 days or expired" style="color:${loginTab==="cred"?"#fff":"#a63b3b"};font-weight:700">&middot; ${soon} expiring</span>`:""}</button></div>
     ${loginTab==="cred"?`<div class="lgkinds" style="display:flex;gap:6px;flex-wrap:wrap;margin:0 0 12px">${[["","All"]].concat(Object.entries(LG_KINDS).filter(([k])=>k!=="pass").map(([k,v])=>[k,v[1]])).map(([k,lab])=>`<button class="small${loginKind===k?" primary":""}" data-lgkind="${k}">${lab} <span style="opacity:.7">${k?inTab.filter(([,l])=>lgKind(l)===k).length:inTab.length}</span></button>`).join("")}</div>`:""}
-    ${formOpen?`<div class="card" id="lgForm"><h2>${loginEdit?"Change "+esc(e.site||"entry"):credForm?"Add a credential":"Add a password"}</h2>
-      <div class="grid2"><div${credForm?"":' style="display:none"'}><label for="lgType">Type</label><select id="lgType">${Object.entries(LG_KINDS).filter(([k])=>credForm ? k!=="pass" : k==="pass").map(([k,v])=>`<option value="${k}"${k===ek?" selected":""}>${v[0]}</option>`).join("")}</select></div>
+    ${formOpen?`<div class="card" id="lgForm"><h2 id="lgFormH">${loginEdit?"Change "+esc(e.site||"entry"):credForm?"Add a credential":"Add a password"}</h2>
+      <div class="grid2"><div><label for="lgType">Type</label><select id="lgType">${Object.entries(LG_KINDS).map(([k,v])=>`<option value="${k}"${k===ek?" selected":""}>${v[0]}</option>`).join("")}</select></div>
         <div><label for="lgSite">Name</label><input id="lgSite" value="${esc(e.site||"")}" placeholder="${EK[4]}" autocomplete="off"></div>
-        <div><label for="lgUrl">${credForm?"Web link (optional)":"Sign-in link"}</label><input id="lgUrl" value="${esc(e.url||"")}" placeholder="https://quickbooks.intuit.com" autocomplete="off" autocapitalize="off" inputmode="url"></div>
+        <div><label for="lgUrl" id="lgUrlL">${credForm?"Web link (optional)":"Sign-in link"}</label><input id="lgUrl" value="${esc(e.url||"")}" placeholder="https://quickbooks.intuit.com" autocomplete="off" autocapitalize="off" inputmode="url"></div>
         <div><label for="lgUser" id="lgUserL">${EK[2]}</label><input id="lgUser" value="${esc(e.user||"")}" autocomplete="off" autocapitalize="off" spellcheck="false"></div>
         <div><label for="lgPass" id="lgPassL">${EK[3]}</label><input id="lgPass" value="${esc(e.pass||"")}" autocomplete="new-password" autocapitalize="off" spellcheck="false"></div></div>
-      ${credForm?`<label for="lgExp">Expires or renews on (optional)</label><input id="lgExp" type="date" value="${esc(e.exp||"")}" style="max-width:220px">`:""}
-      <label for="lgNote">${credForm?"Notes (what it is used for, who holds the original, who to call)":"Sign-in notes (where the 2-step code goes, PIN, security answers, who set it up)"}</label><input id="lgNote" value="${esc(e.note||"")}" autocomplete="off">
+      <div id="lgExpBox"${credForm?"":' style="display:none"'}><label for="lgExp">Expires or renews on (optional)</label><input id="lgExp" type="date" value="${esc(e.exp||"")}" style="max-width:220px"></div>
+      <label for="lgNote" id="lgNoteL">${credForm?"Notes (what it is used for, who holds the original, who to call)":"Sign-in notes (where the 2-step code goes, PIN, security answers, who set it up)"}</label><input id="lgNote" value="${esc(e.note||"")}" autocomplete="off">
       <div class="actions" style="display:flex;gap:8px;justify-content:flex-end;margin-top:10px"><button id="lgCancel">Cancel</button><button class="primary" id="lgSave">${loginEdit?"Save":"Add"}</button></div></div>`:""}
     ${lgImport?`<div class="card" id="lgImpCard"><h2>Import passwords</h2>
       <p class="meta" style="margin:0 0 8px">${lgImport.length} found in the file. Untick anything you do not want. Entries you already have are unticked. Nothing is saved until you press Import.</p>
@@ -1351,13 +1351,18 @@ function renderLogins(m){
   $("#lgChange").onclick=()=>{ LG.setup={ step:1 }; LG.entry=""; LG.msg=""; render(); };
   const sv=$("#lgSave"); if(sv) sv.onclick=async()=>{ const site=$("#lgSite").value.trim(); if(!site) return toast("Give it a name");
     const id=loginEdit||db.ref("logins").push().key, old=LG.items[id]||{};
-    const v={ ...old, kind:$("#lgType").value==="pass"?null:$("#lgType").value, site, url:$("#lgUrl").value.trim()||null, user:$("#lgUser").value.trim()||null, pass:$("#lgPass").value||null, exp:($("#lgExp")&&$("#lgExp").value)||null, note:$("#lgNote").value.trim()||null, ...stamp() };
+    const v={ ...old, kind:$("#lgType").value==="pass"?null:$("#lgType").value, site, url:$("#lgUrl").value.trim()||null, user:$("#lgUser").value.trim()||null, pass:$("#lgPass").value||null, exp:($("#lgType").value==="pass" ? old.exp : $("#lgExp").value)||null, note:$("#lgNote").value.trim()||null, ...stamp() };
     if(!loginEdit){ v.createdAt=Date.now(); v.createdBy=me.email; }
     Object.keys(v).forEach(k=>v[k]==null&&delete v[k]);
-    await lgSave({ ...LG.items, [id]: v }, (loginEdit?"Saved ":"Added ")+site); loginEdit=null; loginAdding=false; render(); };
+    await lgSave({ ...LG.items, [id]: v }, (loginEdit?"Saved ":"Added ")+site); loginEdit=null; loginAdding=false;
+    { const cred=lgIsCred(v); if(cred!==(loginTab==="cred")){ loginTab=cred?"cred":"pass"; loginKind=""; } else if(cred && loginKind && loginKind!==lgKind(v)) loginKind=""; } // show the list it went to
+    render(); };
   m.querySelectorAll("[data-lgtab]").forEach(b=>b.onclick=()=>{ loginTab=b.dataset.lgtab; loginKind=""; loginEdit=null; loginAdding=false; render(); });
   m.querySelectorAll("[data-lgkind]").forEach(b=>b.onclick=()=>{ loginKind=b.dataset.lgkind; render(); });
-  const ty=$("#lgType"); if(ty) ty.onchange=()=>{ const K=LG_KINDS[ty.value]; $("#lgUserL").textContent=K[2]; $("#lgPassL").textContent=K[3]; $("#lgSite").placeholder=K[4]; };
+  const ty=$("#lgType"); if(ty) ty.onchange=()=>{ const K=LG_KINDS[ty.value]; $("#lgUserL").textContent=K[2]; $("#lgPassL").textContent=K[3]; $("#lgSite").placeholder=K[4];
+    if(!loginEdit) $("#lgFormH").textContent = ty.value!=="pass" ? "Add a credential" : "Add a password";
+    const cred=ty.value!=="pass"; $("#lgExpBox").style.display=cred?"":"none"; $("#lgUrlL").textContent=cred?"Web link (optional)":"Sign-in link";
+    $("#lgNoteL").textContent=cred?"Notes (what it is used for, who holds the original, who to call)":"Sign-in notes (where the 2-step code goes, PIN, security answers, who set it up)"; };
   const c=$("#lgCancel"); if(c) c.onclick=()=>{ loginEdit=null; loginAdding=false; render(); };
   const qb=$("#lgQ"); qb.oninput=()=>{ loginQ=qb.value; const pos=qb.selectionStart; render(); const n=$("#lgQ"); n.focus(); try{ n.setSelectionRange(pos,pos); }catch(x){} };
   m.querySelectorAll("[data-lgmove]").forEach(sel=>sel.onchange=async()=>{ const id=sel.dataset.lgmove, to=sel.value, l=LG.items[id]; if(!to || !l || !LG_KINDS[to]) return;
