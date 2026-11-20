@@ -209,8 +209,9 @@
   .lgmsg{min-height:20px;color:var(--danger,#a63b3b);font-size:14px;margin:4px 0 10px}
   .lgpinin{position:absolute;opacity:0;width:1px;height:1px;font-size:16px;pointer-events:none}
   .lgpad{display:grid;grid-template-columns:repeat(3,72px);gap:12px;justify-content:center} .lgpad button{height:72px;border-radius:50%;font-size:26px;font-weight:500} .lgpad button:disabled{opacity:.4}
-  .lgrow{display:flex;gap:6px;align-items:center;margin-top:6px} .lgrow .meta{width:70px;flex:none;margin-left:0} .lgrow code{flex:1;min-width:0} .lgrow button{flex:none}
-  .lgempty{flex:1;color:var(--muted);font-size:14px;font-style:italic} #lgNew{white-space:nowrap;flex:none}
+  .lgrow{display:flex;flex-wrap:wrap;gap:4px 6px;align-items:center;margin-top:8px} .lgrow .meta{flex:1;min-width:0;margin-left:0} .lgrow button{flex:none}
+  .lgrow code{order:3;flex:0 0 100%;min-width:0;box-sizing:border-box;word-break:normal;overflow-wrap:anywhere;padding:4px 8px}
+  .lgempty{order:3;flex:0 0 100%;color:var(--muted);font-size:14px;font-style:italic} #lgNew{white-space:nowrap;flex:none}
   .lgnote{color:var(--ink2);font-size:14px;margin-top:8px;white-space:pre-wrap} .lgfoot{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:10px;flex-wrap:wrap}
   @media(max-width:600px){.lggrid{grid-template-columns:1fr} #lgQ{width:100%!important} .lglinks{grid-template-columns:1fr 1fr}}
   @media(max-width:600px){.grid2{grid-template-columns:1fr}}
