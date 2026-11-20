@@ -179,6 +179,9 @@
   .pill.idea{background:var(--surface2);color:var(--ink2)}.pill.planned{background:var(--accent-soft);color:var(--accent)}.pill.active{background:var(--amber-soft);color:var(--amber)}.pill.done{background:var(--green-soft);color:var(--green)}
   .pill.todo{background:var(--surface2);color:var(--ink2)}.pill.doing{background:var(--amber-soft);color:var(--amber)}
   .overdue{color:var(--red);font-weight:600}
+  .evpast{color:var(--muted)}
+  .chip.c-past{opacity:.62;background:transparent;border-style:dashed} .chip.c-past b,.chip.c-past span{color:var(--muted);font-weight:400}
+  .dl-wk.past{color:var(--muted)} .dl-row.past{opacity:.65}
   .soon{color:var(--amber);font-weight:600}
   table{width:100%;border-collapse:collapse;font-size:14px}
   th,td{text-align:left;padding:7px 6px;border-bottom:1px solid var(--line);vertical-align:top}
@@ -458,7 +461,9 @@ const TZ="America/Detroit";
 const today = () => new Intl.DateTimeFormat("en-CA",{timeZone:TZ,year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date());
 function toast(m){ const t=$("#toast"); t.textContent=m; t.style.pointerEvents="none"; t.classList.add("show"); setTimeout(()=>t.classList.remove("show"),2200); }
 function fmtDate(d){ if(!d) return ""; const [y,m,dd]=d.split("-"); return `${+m}/${+dd}/${y.slice(2)}`; }
-function dueClass(d, done){ if(!d||done) return ""; const diff=(new Date(d)-new Date(today()))/864e5; if(diff<0) return "overdue"; if(diff<=3) return "soon"; return ""; }
+const EVENT_KEEP_DAYS = 14; // how long a passed event stays on the timeline and the Deadlines list
+function dueClass(d, done, ev){ if(!d||done) return ""; const diff=(new Date(d)-new Date(today()))/864e5; if(diff<0) return ev ? "evpast" : "overdue"; if(diff<=3) return "soon"; return ""; }
+const evGone = d => !!d && (new Date(today())-new Date(d))/864e5 > EVENT_KEEP_DAYS; // a passed event old enough to drop off
 function calLink(title, date, details){
   if(!date) return "";
   const s=date.replace(/-/g,""); const n=new Date(date); n.setDate(n.getDate()+1); const e=n.toISOString().slice(0,10).replace(/-/g,"");
@@ -798,7 +803,7 @@ const essentialProjects = () => openProjects().map(([id,p])=>({id,...p})).filter
 function timelineItems(){
   const items=essentialProjects().map(p=>({key:"p:"+p.id, kind:"project", name:p.name, date:p.deadline||"", event:!!p.event, cat:p.category||""}));
   openTasks().forEach(([id,t])=>{ if((t.essential||t.event) && t.status!=="done") items.push({key:"t:"+id, kind:"task", name:t.title, date:t.due||"", event:!!t.event, sub:projects[t.projectId]?.name||"", cat:t.category||projects[t.projectId]?.category||""}); });
-  return items.sort((a,b)=>(a.date||"9").localeCompare(b.date||"9") || a.name.localeCompare(b.name));
+  return items.filter(it=>!(it.event && evGone(it.date))).sort((a,b)=>(a.date||"9").localeCompare(b.date||"9") || a.name.localeCompare(b.name));
 }
 let tlScroll=null; // where the person left the strip; kept across re-renders in this tab
 function tlJumpToday(){
@@ -815,7 +820,7 @@ function renderEssential(){
   const marker=()=>{ parts.push('<span class="today" id="tlNow"><span>today</span></span>'); placed=true; };
   list.forEach(it=>{
     if(!placed && (!it.date || it.date>=td)) marker();
-    const dc=dueClass(it.date,false); const cls=(dc==="overdue"?"c-over":dc==="soon"?"c-soon":"")+(it.event?" ev":"")+(it.kind==="task"?" tk":"")+catCls(it.cat);
+    const dc=dueClass(it.date,false,it.event); const cls=(dc==="overdue"?"c-over":dc==="evpast"?"c-past":dc==="soon"?"c-soon":"")+(it.event?" ev":"")+(it.kind==="task"?" tk":"")+catCls(it.cat);
     const kind=it.event?"event":it.kind==="task"?"task due":"deadline";
     parts.push(`<button class="chip ${cls}" data-tl="${it.key}" title="${esc(it.name)}${it.sub?" ("+esc(it.sub)+")":""}${it.date?" \u00b7 "+kind+" "+fmtDate(it.date):" \u00b7 no date set"}"><b>${esc(abbr(it.name))}</b><span>${it.date?fmtDate(it.date):"no date"}${it.sub?` <em>\u00b7 ${esc(abbr(it.sub,18))}</em>`:""}</span></button>`);
   });
@@ -839,7 +844,7 @@ function taskRow(t, showProject, hideAssignee){
   return `<div class="task ${t.status==="done"?"done":""}" data-task="${t.id}">
     <input type="checkbox" ${t.status==="done"?"checked":""} data-toggle="${t.id}">
     <div class="t"><div class="title">${esc(t.title)}${t.essential?' <span class="pill essential" title="Essential: on the timeline">essential</span>':""}${t.event?' <span class="pill event" title="Event or launch: on the timeline">\u25C6 event</span>':""}</div>
-      <div class="meta">${[showProject&&p?`<b>${esc(p.name)}</b>`:"", hideAssignee?"":(t.assignee?esc(t.assignee):"<i>Unassigned</i>"), t.due?`<span class="${dueClass(t.due,t.status==="done")}">due ${fmtDate(t.due)}</span>`:"", t.status==="doing"?'<span class="pill doing">Doing</span>':""].filter(Boolean).join(" · ")}${t.notes?`<div>${esc(t.notes)}</div>`:""}</div></div>
+      <div class="meta">${[showProject&&p?`<b>${esc(p.name)}</b>`:"", hideAssignee?"":(t.assignee?esc(t.assignee):"<i>Unassigned</i>"), t.due?`<span class="${dueClass(t.due,t.status==="done",t.event)}">${t.event?"on":"due"} ${fmtDate(t.due)}</span>`:"", t.status==="doing"?'<span class="pill doing">Doing</span>':""].filter(Boolean).join(" · ")}${t.notes?`<div>${esc(t.notes)}</div>`:""}</div></div>
   </div>`;
 }
 
@@ -860,7 +865,7 @@ function renderBoard(m){
       const ts=tasksFor(p.id); const done=ts.filter(t=>t.status==="done").length; const isF=folded.has(p.id);
       const others=new Set(ts.map(t=>t.assignee||p.owner||"").filter(n=>n && n!==(p.owner||""))); // people other than the owner working on it
       return `<div class="card ${p.pinned?"pinned":""} ${isF?"folded":""}${catCls(p.category)}" data-proj="${p.id}"><div class="row head"><button class="fold" data-fold="${p.id}" title="${isF?"Show tasks":"Hide tasks"}" aria-expanded="${!isF}">${isF?"\u25B8":"\u25BE"}</button><h2 style="flex:1">${esc(p.name)}</h2>${catPill(p.category)}${p.essential?`<span class="pill essential" title="Essential to the yearly goal">essential</span>`:""}${p.event?`<span class="pill event" title="Event or launch">\u25C6 event</span>`:""}<span class="pill ${p.status}">${p.status}</span><button class="small pin ${p.pinned?"on":""}" data-pin="${p.id}" title="${p.pinned?"Unpin: let it sort normally":"Pin to the top of the board"}">${p.pinned?"Pinned":"Pin"}</button>${p.status==="done"?`<button class="small" data-archive-proj="${p.id}">Archive</button>`:""}</div>
-        <div class="meta">${p.owner?`Owner: ${esc(p.owner)}`:"No owner"}${p.deadline?` · <span class="${dueClass(p.deadline,p.status==="done")}">${p.event?"on":"deadline"} ${fmtDate(p.deadline)}</span> ${calLink("MB: "+p.name,p.deadline,p.description)}`:""}${(n=>n&&(!p.deadline||n<p.deadline)?` · <span class="${dueClass(n,false)}">next task due ${fmtDate(n)}</span>`:"")(nextTaskDue(p.id))} · ${done}/${ts.length} tasks done${isF&&ts.length-done?` · <span class="meta">${ts.length-done} open, hidden</span>`:""}</div>
+        <div class="meta">${p.owner?`Owner: ${esc(p.owner)}`:"No owner"}${p.deadline?` · <span class="${dueClass(p.deadline,p.status==="done",p.event)}">${p.event?"on":"deadline"} ${fmtDate(p.deadline)}</span> ${calLink("MB: "+p.name,p.deadline,p.description)}`:""}${(n=>n&&(!p.deadline||n<p.deadline)?` · <span class="${dueClass(n,false)}">next task due ${fmtDate(n)}</span>`:"")(nextTaskDue(p.id))} · ${done}/${ts.length} tasks done${isF&&ts.length-done?` · <span class="meta">${ts.length-done} open, hidden</span>`:""}</div>
         <div class="foldable">${p.description?`<p style="margin:8px 0">${esc(p.description)}</p>`:""}
         ${ts.map(t=>taskRow(t,false,!others.size)).join("")}
         <div class="row" style="margin-top:8px"><button class="small" data-new-task="${p.id}">+ Task</button><button class="small" data-files="${p.id}">Files${filesFor(p.id).length?` (${filesFor(p.id).length})`:""}</button></div></div></div>`;
@@ -927,7 +932,7 @@ function openPerson(name){
   const d=$("#personDlg"), k=teamKeyOf(name), t=k?team[k]:null;
   const ps=openProjects().filter(([,p])=>p.status!=="done" && !p.event && (p.owner||UNASSIGNED)===name);
   const ts=openTasks().filter(([,x])=>x.status!=="done" && ((x.assignee||projects[x.projectId]?.owner||UNASSIGNED)===name));
-  const late=ts.filter(([,x])=>x.due && x.due<today()).length;
+  const late=ts.filter(([,x])=>x.due && x.due<today() && !x.event).length;
   const pr=k?prioOf(k).map(id=>projects[id].name):[];
   d.querySelector(".body").innerHTML = `<h3 style="margin:0">${esc(name)}</h3>
     <div class="kv">${t?`<b>Email</b><span>${t.email?`<a href="mailto:${esc(t.email)}">${esc(t.email)}</a>`:"none"}</span><b>Access</b><span>${esc(t.tier||"admin")}</span>`:`<b>About</b><span>Work that nobody owns yet.</span>`}
@@ -960,7 +965,7 @@ function renderPerson(m){
     return {n, ps, ts, open: ps.reduce((s,x)=>s+x.mine.length,0)+ts.length};
   });
   const block=x=>`<div class="pblock" data-pblock="${x.p.id}" draggable="true" title="Drag onto a person to change the owner"><div class="row" style="flex-wrap:nowrap"><span class="grip" title="Drag to reassign">&#8942;&#8942;</span><b style="flex:1">${esc(x.p.name)}</b></div>
-      <div class="meta">${[x.p.deadline?`<span class="${dueClass(x.p.deadline,false)}">deadline ${fmtDate(x.p.deadline)}</span>`:"", (n=>n&&(!x.p.deadline||n<x.p.deadline)?`<span class="${dueClass(n,false)}">next task due ${fmtDate(n)}</span>`:"")(nextTaskDue(x.p.id)), x.mine.length?`${x.mine.length} open task${x.mine.length===1?"":"s"}`:"no open tasks", Object.keys(x.helpers).length?`with ${Object.entries(x.helpers).map(([h,c])=>`${esc(h||UNASSIGNED)} (${c})`).join(", ")}`:""].filter(Boolean).join(" \u00b7 ")}</div>
+      <div class="meta">${[x.p.deadline?`<span class="${dueClass(x.p.deadline,false,x.p.event)}">${x.p.event?"on":"deadline"} ${fmtDate(x.p.deadline)}</span>`:"", (n=>n&&(!x.p.deadline||n<x.p.deadline)?`<span class="${dueClass(n,false)}">next task due ${fmtDate(n)}</span>`:"")(nextTaskDue(x.p.id)), x.mine.length?`${x.mine.length} open task${x.mine.length===1?"":"s"}`:"no open tasks", Object.keys(x.helpers).length?`with ${Object.entries(x.helpers).map(([h,c])=>`${esc(h||UNASSIGNED)} (${c})`).join(", ")}`:""].filter(Boolean).join(" \u00b7 ")}</div>
       ${x.mine.length?`<details open><summary class="meta">Tasks</summary>${x.mine.map(t=>taskRow(t,false,true)).join("")}<button class="small" data-new-task="${x.p.id}" style="margin-top:6px">+ Task</button></details>`:`<button class="small" data-new-task="${x.p.id}" style="margin-top:6px">+ Task</button>`}</div>`;
   // One list per column, projects and loose tasks together, by date (project deadline or task due), undated last.
   const columnItems=g=>[...g.ps.map(x=>({d:effDate(x.p), n:x.p.name, html:block(x)})), ...g.ts.map(t=>({d:t.due||"", n:t.title, html:taskRow(t,true,true)}))]
@@ -1011,20 +1016,22 @@ function renderDeadlines(m){
   const items=[];
   openProjects().forEach(([id,p])=>{ if(p.deadline&&p.status!=="done") items.push({cat:p.category||"",kind:p.event?"Event":"Project",date:p.deadline,title:p.name,who:p.owner||"",sub:p.event?"":"Project deadline",cal:calLink("MB: "+p.name,p.deadline,p.description),edit:`data-edit-proj="${id}"`}); });
   openTasks().forEach(([id,t])=>{ const p=projects[t.projectId]; if(t.due&&t.status!=="done") items.push({cat:t.category||p?.category||"",kind:t.event?"Event":"Task",date:t.due,title:t.title,who:t.assignee||p?.owner||"",sub:p?.name||"",cal:calLink("MB: "+t.title,t.due,p?.name),edit:`data-edit-task="${id}"`}); });
-  const list=items.filter(i=>!catFilter||i.cat===catFilter).sort((a,b)=>a.date.localeCompare(b.date)||a.title.localeCompare(b.title));
   const td=today(), thisWk=weekStart(td).getTime();
+  const pastEv = i => i.kind==="Event" && i.date<td;
+  const list=items.filter(i=>!catFilter||i.cat===catFilter).filter(i=>!(pastEv(i) && evGone(i.date)))
+    .sort((a,b)=>(pastEv(a)-pastEv(b)) || (pastEv(a) ? b.date.localeCompare(a.date) : a.date.localeCompare(b.date)) || a.title.localeCompare(b.title)); // passed events go last, newest first
   const groups=[]; let cur=null;
   list.forEach(i=>{
-    const ws=weekStart(i.date); const key=i.date<td?"over":String(ws.getTime());
-    const label=key==="over"?"Overdue":ws.getTime()===thisWk?"This week":`Week of ${MON[ws.getMonth()]} ${ws.getDate()}`;
+    const ws=weekStart(i.date); const key=pastEv(i)?"past":i.date<td?"over":String(ws.getTime());
+    const label=key==="past"?`Past events (last ${EVENT_KEEP_DAYS} days)`:key==="over"?"Overdue":ws.getTime()===thisWk?"This week":`Week of ${MON[ws.getMonth()]} ${ws.getDate()}`;
     if(!cur||cur.key!==key){ cur={key,label,rows:[]}; groups.push(cur); }
     cur.rows.push(i);
   });
   const day = d => { const [y,mo,dd]=d.split("-").map(Number); const dt=new Date(y,mo-1,dd); return d<td ? fmtDate(d) : `${DOW[dt.getDay()]} ${dd}`; };
   const tag = c => `<span class="dl-tag${catName(c)?" cat-"+c:""}">${catName(c)||"Other"}</span>`;
-  const row = i => `<div class="dl-row tap" ${i.edit}><span class="dl-date ${dueClass(i.date)}">${day(i.date)}</span>${tag(i.cat)}<div class="dl-what">${i.kind==="Event"?'<span class="dl-ev" title="Event or launch">◆</span> ':""}${esc(i.title)}${i.sub?`<div class="meta">${esc(i.sub)}</div>`:""}</div><span class="dl-who" title="Responsible">${i.who?esc(i.who):"Unassigned"}</span><span class="dl-act">${i.cal}</span></div>`;
+  const row = i => `<div class="dl-row tap${pastEv(i)?" past":""}" ${i.edit}><span class="dl-date ${dueClass(i.date,false,i.kind==="Event")}">${day(i.date)}</span>${tag(i.cat)}<div class="dl-what">${i.kind==="Event"?'<span class="dl-ev" title="Event or launch">◆</span> ':""}${esc(i.title)}${i.sub?`<div class="meta">${esc(i.sub)}</div>`:""}</div><span class="dl-who" title="Responsible">${i.who?esc(i.who):"Unassigned"}</span><span class="dl-act">${i.cal}</span></div>`;
   m.innerHTML = `<div class="filters">${catBar()}</div>` +
-    `<div class="card">${groups.length ? groups.map(g=>`<div class="dl-wk${g.key==="over"?" overdue":""}">${g.label}</div>${g.rows.map(row).join("")}`).join("") : `<div class="meta">No open deadlines${catFilter?" in this category":""}.</div>`}</div>`;
+    `<div class="card">${groups.length ? groups.map(g=>`<div class="dl-wk${g.key==="over"?" overdue":g.key==="past"?" past":""}">${g.label}</div>${g.rows.map(row).join("")}`).join("") : `<div class="meta">No open deadlines${catFilter?" in this category":""}.</div>`}</div>`;
   wireCatBar();
   wire(m);
 }
